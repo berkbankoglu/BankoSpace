@@ -3,6 +3,7 @@ import './App.css';
 import CategoryColumn from './components/CategoryColumn';
 import ReferencePanel from './components/ReferencePanel';
 import Timer from './components/Timer';
+import FlashCards from './components/FlashCards';
 
 function App() {
   const [todos, setTodos] = useState(() => {
@@ -10,11 +11,25 @@ function App() {
     return saved ? JSON.parse(saved) : [];
   });
   const [currentFilter, setCurrentFilter] = useState('active');
+  const [theme, setTheme] = useState(() => {
+    const saved = localStorage.getItem('theme');
+    return saved || 'dark';
+  });
 
   // Todo'lar değiştiğinde localStorage'a kaydet
   useEffect(() => {
     localStorage.setItem('todos', JSON.stringify(todos));
   }, [todos]);
+
+  // Theme değiştiğinde localStorage'a kaydet ve body'ye class ekle
+  useEffect(() => {
+    localStorage.setItem('theme', theme);
+    document.body.className = theme;
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  };
 
   const addTodo = (category, text) => {
     const newTodo = {
@@ -45,6 +60,7 @@ function App() {
         todos: todos,
         refImages: localStorage.getItem('refImages') || '[]',
         refTexts: localStorage.getItem('refTexts') || '[]',
+        flashCards: localStorage.getItem('flashCards') || '[]',
         exportDate: new Date().toISOString(),
         version: '1.0'
       };
@@ -66,11 +82,11 @@ function App() {
 
       if (filePath) {
         await writeTextFile(filePath, dataStr);
-        alert('Veriler başarıyla dışa aktarıldı!');
+        alert('Data successfully exported!');
       }
     } catch (error) {
       console.error('Export error:', error);
-      alert('Dışa aktarma sırasında bir hata oluştu.');
+      alert('An error occurred during export.');
     }
   };
 
@@ -109,11 +125,16 @@ function App() {
         localStorage.setItem('refTexts', data.refTexts);
       }
 
-      alert('Veriler başarıyla içe aktarıldı! Sayfa yenilenecek.');
+      // FlashCards'ları yükle
+      if (data.flashCards) {
+        localStorage.setItem('flashCards', data.flashCards);
+      }
+
+      alert('Data successfully imported! Page will reload.');
       window.location.reload();
     } catch (error) {
       console.error('Import error:', error);
-      alert('Dosya okunamadı. Lütfen geçerli bir yedek dosyası seçin.');
+      alert('File could not be read. Please select a valid backup file.');
     }
   };
 
@@ -139,48 +160,51 @@ function App() {
   return (
     <div className="container">
       <div className="header-row">
-        <h1>To-Do</h1>
+        <h1>BankoSpace</h1>
         <div className="export-import-buttons">
-          <button onClick={exportData} className="export-btn" title="Verileri dışa aktar">
-            📥 Dışa Aktar
+          <button onClick={toggleTheme} className="theme-toggle-btn" title="Toggle theme">
+            {theme === 'dark' ? '☀️' : '🌙'}
           </button>
-          <button onClick={importData} className="import-btn" title="Verileri içe aktar">
-            📤 İçe Aktar
+          <button onClick={exportData} className="export-btn" title="Export data">
+            📥 Export
+          </button>
+          <button onClick={importData} className="import-btn" title="Import data">
+            📤 Import
           </button>
         </div>
       </div>
 
       <div className="stats">
-        <div className="stat-item">Toplam: <span>{stats.total}</span></div>
-        <div className="stat-item">Aktif: <span>{stats.active}</span></div>
-        <div className="stat-item">Bitti: <span>{stats.completed}</span></div>
+        <div className="stat-item">Total: <span>{stats.total}</span></div>
+        <div className="stat-item">Active: <span>{stats.active}</span></div>
+        <div className="stat-item">Done: <span>{stats.completed}</span></div>
         <Timer />
       </div>
 
       <div className="filters">
-        <button 
+        <button
           className={`filter-btn ${currentFilter === 'all' ? 'active' : ''}`}
           onClick={() => setCurrentFilter('all')}
         >
-          Tümü
+          All
         </button>
-        <button 
+        <button
           className={`filter-btn ${currentFilter === 'active' ? 'active' : ''}`}
           onClick={() => setCurrentFilter('active')}
         >
-          Aktif
+          Active
         </button>
-        <button 
+        <button
           className={`filter-btn ${currentFilter === 'completed' ? 'active' : ''}`}
           onClick={() => setCurrentFilter('completed')}
         >
-          Tamamlanan
+          Completed
         </button>
       </div>
 
       <div className="main-layout">
         <CategoryColumn
-          title="Günlük"
+          title="Daily"
           category="daily"
           todos={todosByCategory.daily}
           onAddTodo={addTodo}
@@ -189,7 +213,7 @@ function App() {
           currentFilter={currentFilter}
         />
         <CategoryColumn
-          title="Haftalık"
+          title="Weekly"
           category="weekly"
           todos={todosByCategory.weekly}
           onAddTodo={addTodo}
@@ -198,7 +222,7 @@ function App() {
           currentFilter={currentFilter}
         />
         <CategoryColumn
-          title="Aylık"
+          title="Monthly"
           category="monthly"
           todos={todosByCategory.monthly}
           onAddTodo={addTodo}
@@ -207,7 +231,7 @@ function App() {
           currentFilter={currentFilter}
         />
         <CategoryColumn
-          title="Geniş Zaman"
+          title="Long Term"
           category="longterm"
           todos={todosByCategory.longterm}
           onAddTodo={addTodo}
@@ -218,6 +242,7 @@ function App() {
       </div>
 
       <ReferencePanel />
+      <FlashCards />
     </div>
   );
 }

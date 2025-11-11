@@ -1,7 +1,7 @@
 {
-  "productName": "Todo App",
+  "productName": "BankoSpace",
   "version": "1.0.0",
-  "identifier": "com.berkbankoglu.todoapp",
+  "identifier": "com.berkbankoglu.bankospace",
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
@@ -14,7 +14,7 @@
   "app": {
     "windows": [
       {
-        "title": "Todo App",
+        "title": "BankoSpace",
         "width": 1200,
         "height": 800,
         "resizable": true,

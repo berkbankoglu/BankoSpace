@@ -42,17 +42,17 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
-    
-    const dateStr = date.toLocaleDateString('tr-TR', { 
-      day: 'numeric', 
+
+    const dateStr = date.toLocaleDateString('en-US', {
+      day: 'numeric',
       month: 'long',
       year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined
     });
-    
+
     if (date.toDateString() === today.toDateString()) {
-      return `Bugün - ${dateStr}`;
+      return `Today - ${dateStr}`;
     } else if (date.toDateString() === yesterday.toDateString()) {
-      return `Dün - ${dateStr}`;
+      return `Yesterday - ${dateStr}`;
     } else {
       return dateStr;
     }
@@ -61,7 +61,7 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
   return (
     <div className="category-column">
       <button className="new-task-btn" onClick={() => setShowInput(true)}>
-        + Yeni Görev Oluştur
+        + Create New Task
       </button>
 
       {showInput && (
@@ -69,16 +69,16 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
           <input
             type="text"
             className="task-input"
-            placeholder="Görev yazın..."
+            placeholder="Write task..."
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyPress}
             autoFocus
           />
           <div className="input-actions">
-            <button className="save-btn" onClick={handleAdd}>Kaydet</button>
+            <button className="save-btn" onClick={handleAdd}>Save</button>
             <button className="cancel-btn" onClick={() => { setShowInput(false); setInputValue(''); }}>
-              İptal
+              Cancel
             </button>
           </div>
         </div>
@@ -92,7 +92,7 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
       {currentFilter === 'completed' ? (
         <div>
           {Object.keys(groupedByDate).length === 0 ? (
-            <div className="empty-state">Görev yok</div>
+            <div className="empty-state">No tasks</div>
           ) : (
             Object.keys(groupedByDate).sort().reverse().map(dateKey => (
               <DateGroup
@@ -107,7 +107,7 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
       ) : (
         <ul className="todo-list">
           {todos.length === 0 ? (
-            <div className="empty-state">Görev yok</div>
+            <div className="empty-state">No tasks</div>
           ) : (
             todos.map(todo => (
               <TodoItem

@@ -16,7 +16,14 @@ function ReferencePanel() {
   const [isDraggingSelection, setIsDraggingSelection] = useState(false);
   const [selectionDragStart, setSelectionDragStart] = useState({ x: 0, y: 0 });
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0, scrollTop: 0, scrollLeft: 0 });
+  const [transformOrigin, setTransformOrigin] = useState('0 0');
+  const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
+  const [isResizingCanvas, setIsResizingCanvas] = useState(false);
+  const [canvasResizeStart, setCanvasResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const contentRef = useRef(null);
+  const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -31,15 +38,29 @@ function ReferencePanel() {
   }, []);
 
   useEffect(() => {
-    const handleEscape = (e) => {
+    const handleKeyDown = (e) => {
       if (e.key === 'Escape' && isFullScreen) {
         setIsFullScreen(false);
       }
+
+      // Delete tuşu ile seçili öğeleri sil
+      if (e.key === 'Delete' && (selectedItems.images.length > 0 || selectedItems.texts.length > 0)) {
+        // Seçili görselleri sil
+        if (selectedItems.images.length > 0) {
+          setImages(prev => prev.filter(img => !selectedItems.images.includes(img.id)));
+        }
+        // Seçili metinleri sil
+        if (selectedItems.texts.length > 0) {
+          setTexts(prev => prev.filter(txt => !selectedItems.texts.includes(txt.id)));
+        }
+        // Seçimi temizle
+        setSelectedItems({ images: [], texts: [] });
+      }
     };
 
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
-  }, [isFullScreen]);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isFullScreen, selectedItems, images, texts]);
 
   const handleToggleFullScreen = () => {
     setIsFullScreen(!isFullScreen);
@@ -57,8 +78,35 @@ function ReferencePanel() {
     // Eğer Ctrl tuşuna basılıysa zoom yap
     if (e.ctrlKey) {
       e.preventDefault();
-      const delta = e.deltaY < 0 ? 0.05 : -0.05;
-      setZoomLevel(prev => Math.max(0.3, Math.min(3, prev + delta)));
+
+      if (contentRef.current) {
+        const rect = contentRef.current.getBoundingClientRect();
+
+        // Mouse pozisyonu (scroll dahil)
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        // Mevcut scroll pozisyonu
+        const scrollLeft = contentRef.current.scrollLeft;
+        const scrollTop = contentRef.current.scrollTop;
+
+        // Mouse'un scroll dahil gerçek pozisyonu
+        const pointX = mouseX / zoomLevel + scrollLeft;
+        const pointY = mouseY / zoomLevel + scrollTop;
+
+        const delta = e.deltaY < 0 ? 0.05 : -0.05;
+        const newZoom = Math.max(0.3, Math.min(3, zoomLevel + delta));
+
+        setZoomLevel(newZoom);
+
+        // Zoom sonrası mouse aynı noktada kalmalı
+        requestAnimationFrame(() => {
+          if (contentRef.current) {
+            contentRef.current.scrollLeft = pointX * newZoom - mouseX;
+            contentRef.current.scrollTop = pointY * newZoom - mouseY;
+          }
+        });
+      }
       return;
     }
 
@@ -149,6 +197,28 @@ function ReferencePanel() {
   };
 
   const handleMouseMove = (e) => {
+    // Canvas resize
+    if (isResizingCanvas) {
+      const deltaX = e.clientX - canvasResizeStart.x;
+      const deltaY = e.clientY - canvasResizeStart.y;
+
+      const newWidth = Math.max(400, canvasResizeStart.width + deltaX / zoomLevel);
+      const newHeight = Math.max(300, canvasResizeStart.height + deltaY / zoomLevel);
+
+      setCanvasSize({ width: newWidth, height: newHeight });
+      return;
+    }
+
+    // Sağ tıklama ile pan
+    if (isPanning && contentRef.current) {
+      const deltaX = e.clientX - panStart.x;
+      const deltaY = e.clientY - panStart.y;
+
+      contentRef.current.scrollLeft = panStart.scrollLeft - deltaX;
+      contentRef.current.scrollTop = panStart.scrollTop - deltaY;
+      return;
+    }
+
     // Dikdörtgen seçim alanını güncelle
     if (isSelecting && contentRef.current) {
       const rect = contentRef.current.getBoundingClientRect();
@@ -212,6 +282,8 @@ function ReferencePanel() {
   const handleMouseUp = () => {
     setDraggedImage(null);
     setResizingImage(null);
+    setIsPanning(false);
+    setIsResizingCanvas(false);
 
     // Seçim kutusu tamamlandıysa, içindeki öğeleri seç
     if (isSelecting && selectionBox) {
@@ -254,15 +326,28 @@ function ReferencePanel() {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [draggedImage, resizingImage, dragOffset, resizeStart, isSelecting, selectionBox, images, texts, isDraggingSelection, selectionDragStart, selectedItems]);
+  }, [draggedImage, resizingImage, dragOffset, resizeStart, isSelecting, selectionBox, images, texts, isDraggingSelection, selectionDragStart, selectedItems, isPanning, panStart, isResizingCanvas, canvasResizeStart, zoomLevel, canvasSize]);
 
   const deleteImage = (id) => {
     setImages(prev => prev.filter(img => img.id !== id));
   };
 
   const handlePanelMouseDown = (e) => {
-    // Ctrl+Alt ile dikdörtgen seçim başlat
-    if (e.ctrlKey && e.altKey && (e.target === contentRef.current || e.target.classList.contains('ref-panel-content'))) {
+    // Sağ tıklama ise pan başlat
+    if (e.button === 2) {
+      setIsPanning(true);
+      setPanStart({
+        x: e.clientX,
+        y: e.clientY,
+        scrollTop: contentRef.current.scrollTop,
+        scrollLeft: contentRef.current.scrollLeft
+      });
+      e.preventDefault();
+      return;
+    }
+
+    // Boş alana sol tıklanırsa selection box başlat
+    if (e.target === contentRef.current || e.target.classList.contains('ref-panel-content')) {
       const rect = contentRef.current.getBoundingClientRect();
       const startX = (e.clientX - rect.left) / zoomLevel;
       const startY = (e.clientY - rect.top + contentRef.current.scrollTop) / zoomLevel;
@@ -274,14 +359,16 @@ function ReferencePanel() {
         currentX: startX,
         currentY: startY
       });
-      e.preventDefault();
-    } else if (e.target === contentRef.current || e.target.classList.contains('ref-panel-content')) {
-      // Boş alana tıklanırsa seçimi kaldır
+
+      // Seçimi kaldır ve text editing'i kapat
       setSelectedItems({ images: [], texts: [] });
+      setEditingText(null);
+      e.preventDefault();
     }
   };
 
   const handleDoubleClick = (e) => {
+    // Çift tıkla text box oluştur
     if (e.target === contentRef.current || e.target.classList.contains('ref-panel-content')) {
       const rect = contentRef.current.getBoundingClientRect();
       const x = (e.clientX - rect.left) / zoomLevel;
@@ -360,10 +447,14 @@ function ReferencePanel() {
     ));
   };
 
+  const handleContextMenu = (e) => {
+    e.preventDefault();
+  };
+
   return (
     <div className={`ref-panel-box ${isFullScreen ? 'fullscreen' : ''}`}>
       <div className="ref-panel-header">
-        <h3>📎 Referanslar</h3>
+        <h3>📎 References</h3>
         <div className="ref-panel-actions">
           <button className="ref-btn" onClick={() => setZoomLevel(prev => Math.max(0.3, prev - 0.1))}>
             🔍−
@@ -374,7 +465,7 @@ function ReferencePanel() {
           </button>
           <button className="ref-btn" onClick={() => setZoomLevel(1)}>Reset</button>
           <button className="ref-btn" onClick={handleToggleFullScreen}>
-            {isFullScreen ? '🗗 Çıkış' : '🗖 Tam Ekran'}
+            {isFullScreen ? '🗗 Exit' : '🗖 Full Screen'}
           </button>
           <input
             ref={fileInputRef}
@@ -385,7 +476,7 @@ function ReferencePanel() {
             onChange={handleFileSelect}
           />
           <button className="ref-btn" onClick={() => fileInputRef.current.click()}>
-            + Görsel Ekle
+            + Add Image
           </button>
         </div>
       </div>
@@ -393,33 +484,48 @@ function ReferencePanel() {
         ref={contentRef}
         className="ref-panel-content"
         onWheel={handleWheel}
-        onDoubleClick={handleDoubleClick}
-        onMouseDown={handlePanelMouseDown}
-        style={{ transform: `scale(${zoomLevel})` }}
+        onContextMenu={handleContextMenu}
       >
-        {images.length === 0 && texts.length === 0 ? (
-          <div className="ref-empty-state">
-            <div style={{ fontSize: '48px', marginBottom: '10px' }}>🖼️</div>
-            <div>Referans görseli eklemek için "+ Görsel Ekle" butonuna tıklayın</div>
-            <div style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
-              Görselleri sürükleyip bırakabilir, boyutlandırabilirsiniz
+        <div
+          ref={canvasRef}
+          className="ref-canvas"
+          onDoubleClick={handleDoubleClick}
+          onMouseDown={handlePanelMouseDown}
+          style={{
+            width: `${canvasSize.width}px`,
+            height: `${canvasSize.height}px`
+          }}
+        >
+          <div className="ref-canvas-content" style={{
+            width: '100%',
+            height: '100%',
+            transform: `scale(${zoomLevel})`,
+            transformOrigin: '0 0',
+            position: 'relative'
+          }}>
+          {images.length === 0 && texts.length === 0 ? (
+            <div className="ref-empty-state">
+              <div style={{ fontSize: '48px', marginBottom: '10px' }}>🖼️</div>
+              <div>Click "+ Add Image" button to add reference images</div>
+              <div style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
+                You can drag and drop images, resize them
+              </div>
+              <div style={{ fontSize: '12px', color: '#888', marginTop: '10px' }}>
+                💡 Paste copied images with <strong>Ctrl+V</strong>
+              </div>
+              <div style={{ fontSize: '12px', color: '#888', marginTop: '5px' }}>
+                🖱️ Zoom with <strong>Ctrl+Mouse Wheel</strong>
+              </div>
+              <div style={{ fontSize: '12px', color: '#888', marginTop: '5px' }}>
+                ✍️ Add text with <strong>Double Click</strong>
+              </div>
+              <div style={{ fontSize: '12px', color: '#888', marginTop: '5px' }}>
+                🖱️ Rectangle selection with <strong>Ctrl+Alt+Drag</strong>
+              </div>
             </div>
-            <div style={{ fontSize: '12px', color: '#888', marginTop: '10px' }}>
-              💡 Kopyaladığınız görseli <strong>Ctrl+V</strong> ile yapıştırabilirsiniz
-            </div>
-            <div style={{ fontSize: '12px', color: '#888', marginTop: '5px' }}>
-              🖱️ <strong>Ctrl+Mouse Wheel</strong> ile zoom yapabilirsiniz
-            </div>
-            <div style={{ fontSize: '12px', color: '#888', marginTop: '5px' }}>
-              ✍️ <strong>Double Click</strong> ile metin ekleyebilirsiniz
-            </div>
-            <div style={{ fontSize: '12px', color: '#888', marginTop: '5px' }}>
-              🖱️ <strong>Ctrl+Alt+Sürükle</strong> ile dikdörtgen alan seçimi yapabilirsiniz
-            </div>
-          </div>
-        ) : (
-          <>
-            {images.map(image => (
+          ) : (
+            <>
+              {images.map(image => (
               <div
                 key={image.id}
                 className={`ref-image-container ${draggedImage?.id === image.id || selectedItems.images.includes(image.id) ? 'selected' : ''}`}
@@ -505,6 +611,21 @@ function ReferencePanel() {
             )}
           </>
         )}
+          <div
+            className="canvas-resize-handle"
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              setIsResizingCanvas(true);
+              setCanvasResizeStart({
+                x: e.clientX,
+                y: e.clientY,
+                width: canvasSize.width,
+                height: canvasSize.height
+              });
+            }}
+          />
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 {
-  "name": "todo-app",
+  "name": "bankospace",
   "version": "1.0.0",
-  "description": "Modern To-Do Application with Reference Panel",
+  "description": "BankoSpace - Modern productivity application with task management, references, and flashcards",
   "main": "index.js",
   "type": "module",
   "scripts": {
