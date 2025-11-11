@@ -24,7 +24,21 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "capabilities": [
+        {
+          "identifier": "main-capability",
+          "description": "Main app capabilities",
+          "windows": ["main"],
+          "permissions": [
+            "dialog:allow-save",
+            "dialog:allow-open",
+            "fs:allow-read-text-file",
+            "fs:allow-write-text-file",
+            "fs:default"
+          ]
+        }
+      ]
     }
   }
 }

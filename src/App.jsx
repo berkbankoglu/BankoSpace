@@ -2,29 +2,19 @@ import { useState, useEffect } from 'react';
 import './App.css';
 import CategoryColumn from './components/CategoryColumn';
 import ReferencePanel from './components/ReferencePanel';
+import Timer from './components/Timer';
 
 function App() {
-  const [todos, setTodos] = useState([]);
-  const [currentFilter, setCurrentFilter] = useState('active');
-  const [currentTime, setCurrentTime] = useState(new Date());
-
-  useEffect(() => {
+  const [todos, setTodos] = useState(() => {
     const saved = localStorage.getItem('todos');
-    if (saved) {
-      setTodos(JSON.parse(saved));
-    }
-  }, []);
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [currentFilter, setCurrentFilter] = useState('active');
 
+  // Todo'lar değiştiğinde localStorage'a kaydet
   useEffect(() => {
     localStorage.setItem('todos', JSON.stringify(todos));
   }, [todos]);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
 
   const addTodo = (category, text) => {
     const newTodo = {
@@ -47,6 +37,86 @@ function App() {
     setTodos(todos.filter(todo => todo.id !== id));
   };
 
+  // Export: Tüm verileri JSON dosyası olarak indir
+  const exportData = async () => {
+    try {
+      // localStorage'daki tüm verileri topla
+      const data = {
+        todos: todos,
+        refImages: localStorage.getItem('refImages') || '[]',
+        refTexts: localStorage.getItem('refTexts') || '[]',
+        exportDate: new Date().toISOString(),
+        version: '1.0'
+      };
+
+      const dataStr = JSON.stringify(data, null, 2);
+
+      // Tauri dialog API'sini kullan
+      const { save } = await import('@tauri-apps/plugin-dialog');
+      const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+
+      const date = new Date().toISOString().split('T')[0];
+      const filePath = await save({
+        defaultPath: `todo-yedek-${date}.json`,
+        filters: [{
+          name: 'JSON',
+          extensions: ['json']
+        }]
+      });
+
+      if (filePath) {
+        await writeTextFile(filePath, dataStr);
+        alert('Veriler başarıyla dışa aktarıldı!');
+      }
+    } catch (error) {
+      console.error('Export error:', error);
+      alert('Dışa aktarma sırasında bir hata oluştu.');
+    }
+  };
+
+  // Import: JSON dosyasından verileri yükle
+  const importData = async () => {
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog');
+      const { readTextFile } = await import('@tauri-apps/plugin-fs');
+
+      const filePath = await open({
+        multiple: false,
+        filters: [{
+          name: 'JSON',
+          extensions: ['json']
+        }]
+      });
+
+      if (!filePath) return;
+
+      const fileContent = await readTextFile(filePath);
+      const data = JSON.parse(fileContent);
+
+      // Todo'ları yükle
+      if (data.todos) {
+        setTodos(data.todos);
+        localStorage.setItem('todos', JSON.stringify(data.todos));
+      }
+
+      // Referans resimlerini yükle
+      if (data.refImages) {
+        localStorage.setItem('refImages', data.refImages);
+      }
+
+      // Referans metinlerini yükle
+      if (data.refTexts) {
+        localStorage.setItem('refTexts', data.refTexts);
+      }
+
+      alert('Veriler başarıyla içe aktarıldı! Sayfa yenilenecek.');
+      window.location.reload();
+    } catch (error) {
+      console.error('Import error:', error);
+      alert('Dosya okunamadı. Lütfen geçerli bir yedek dosyası seçin.');
+    }
+  };
+
   const filteredTodos = todos.filter(todo => {
     if (currentFilter === 'active') return !todo.completed;
     if (currentFilter === 'completed') return todo.completed;
@@ -66,33 +136,17 @@ function App() {
     completed: todos.filter(t => t.completed).length
   };
 
-  const formatDate = () => {
-    const days = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
-    const months = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
-
-    const day = days[currentTime.getDay()];
-    const date = currentTime.getDate();
-    const month = months[currentTime.getMonth()];
-    const year = currentTime.getFullYear();
-
-    return `${day}, ${date} ${month} ${year}`;
-  };
-
-  const formatTime = () => {
-    return currentTime.toLocaleTimeString('tr-TR', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
-  };
-
   return (
     <div className="container">
       <div className="header-row">
         <h1>To-Do</h1>
-        <div className="date-time">
-          <div className="date">{formatDate()}</div>
-          <div className="time">{formatTime()}</div>
+        <div className="export-import-buttons">
+          <button onClick={exportData} className="export-btn" title="Verileri dışa aktar">
+            📥 Dışa Aktar
+          </button>
+          <button onClick={importData} className="import-btn" title="Verileri içe aktar">
+            📤 İçe Aktar
+          </button>
         </div>
       </div>
 
@@ -100,6 +154,7 @@ function App() {
         <div className="stat-item">Toplam: <span>{stats.total}</span></div>
         <div className="stat-item">Aktif: <span>{stats.active}</span></div>
         <div className="stat-item">Bitti: <span>{stats.completed}</span></div>
+        <Timer />
       </div>
 
       <div className="filters">
