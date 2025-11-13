@@ -24,6 +24,8 @@ function ReferencePanel() {
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0, scrollTop: 0, scrollLeft: 0 });
   const [editingTabId, setEditingTabId] = useState(null);
+  const [moveModeActive, setMoveModeActive] = useState(false);
+  const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
   const contentRef = useRef(null);
   const leftPageRef = useRef(null);
   const rightPageRef = useRef(null);
@@ -76,10 +78,42 @@ function ReferencePanel() {
     }
   }, []);
 
+  // Track mouse position
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      const currentPageRef = activePage === 'left' ? leftPageRef : rightPageRef;
+      if (currentPageRef.current) {
+        const rect = currentPageRef.current.getBoundingClientRect();
+        const x = (e.clientX - rect.left) / zoomLevel;
+        const y = (e.clientY - rect.top) / zoomLevel;
+        setLastMousePos({ x, y });
+      }
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    return () => document.removeEventListener('mousemove', handleMouseMove);
+  }, [activePage, zoomLevel, leftPageRef, rightPageRef]);
+
   useEffect(() => {
     const handleKeyDown = (e) => {
+      // Ignore if typing in input
+      if (e.target.tagName === 'INPUT') return;
+
       if (e.key === 'Escape' && isFullScreen) {
         setIsFullScreen(false);
+      }
+
+
+      // T key to add text at mouse position
+      if (e.key === 't' || e.key === 'T') {
+        const newText = {
+          id: Date.now(),
+          content: '',
+          x: lastMousePos.x,
+          y: lastMousePos.y
+        };
+
+        setTexts(prev => [...prev, newText]);
       }
 
       // Delete key to remove selected items
@@ -96,7 +130,7 @@ function ReferencePanel() {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isFullScreen, selectedItems, images, texts]);
+  }, [isFullScreen, selectedItems, images, texts, activePage, zoomLevel, leftPageRef, rightPageRef, lastMousePos]);
 
   const handleToggleFullScreen = () => {
     setIsFullScreen(!isFullScreen);
@@ -152,35 +186,37 @@ function ReferencePanel() {
     e.target.value = '';
   };
 
-  const handlePaste = (e) => {
-    const items = e.clipboardData.items;
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].type.indexOf('image') !== -1) {
-        const blob = items[i].getAsFile();
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          setImages(prev => [...prev, {
-            id: Date.now(),
-            src: event.target.result,
-            x: 50,
-            y: 50,
-            width: 300,
-            height: 300
-          }]);
-        };
-        reader.readAsDataURL(blob);
-        e.preventDefault();
-        break;
-      }
-    }
-  };
-
   useEffect(() => {
+    const handlePaste = (e) => {
+      const items = e.clipboardData.items;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          const blob = items[i].getAsFile();
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            setImages(prev => [...prev, {
+              id: Date.now(),
+              src: event.target.result,
+              x: 50,
+              y: 50,
+              width: 300,
+              height: 300
+            }]);
+          };
+          reader.readAsDataURL(blob);
+          e.preventDefault();
+          break;
+        }
+      }
+    };
+
     document.addEventListener('paste', handlePaste);
     return () => document.removeEventListener('paste', handlePaste);
-  }, []);
+  }, [activePage, activeTabId]);
 
   const handleMouseDown = (e, image, isResize) => {
+    const currentPageRef = activePage === 'left' ? leftPageRef : rightPageRef;
+
     if (isResize) {
       setResizingImage(image);
       setResizeStart({
@@ -189,20 +225,26 @@ function ReferencePanel() {
         width: image.width,
         height: image.height
       });
+    } else if (e.ctrlKey || e.metaKey) {
+      // Ctrl+Click to toggle selection
+      setSelectedItems(prev => {
+        const isSelected = prev.images.includes(image.id);
+        return {
+          ...prev,
+          images: isSelected
+            ? prev.images.filter(id => id !== image.id)
+            : [...prev.images, image.id]
+        };
+      });
     } else {
-      if (selectedItems.images.includes(image.id)) {
-        setIsDraggingSelection(true);
-        setSelectionDragStart({
-          x: e.clientX,
-          y: e.clientY
-        });
-      } else {
-        const rect = e.currentTarget.getBoundingClientRect();
+      // Direct drag - calculate offset from image top-left
+      if (currentPageRef.current) {
+        const rect = currentPageRef.current.getBoundingClientRect();
+        const offsetX = (e.clientX - rect.left) / zoomLevel - image.x;
+        const offsetY = (e.clientY - rect.top) / zoomLevel - image.y;
+
         setDraggedImage(image);
-        setDragOffset({
-          x: e.clientX - rect.left,
-          y: e.clientY - rect.top
-        });
+        setDragOffset({ x: offsetX, y: offsetY });
       }
     }
     e.preventDefault();
@@ -295,23 +337,41 @@ function ReferencePanel() {
         bottom: Math.max(selectionBox.startY, selectionBox.currentY)
       };
 
-      const selectedImages = images.filter(img => {
+      const boxSelectedImages = images.filter(img => {
         const imgCenterX = img.x + img.width / 2;
         const imgCenterY = img.y + img.height / 2;
         return imgCenterX >= box.left && imgCenterX <= box.right &&
                imgCenterY >= box.top && imgCenterY <= box.bottom;
       });
 
-      const selectedTexts = texts.filter(txt => {
-        const txtCenterX = txt.x + txt.width / 2;
-        const txtCenterY = txt.y + 50;
+      const boxSelectedTexts = texts.filter(txt => {
+        const txtCenterX = txt.x + 50;
+        const txtCenterY = txt.y + 10;
         return txtCenterX >= box.left && txtCenterX <= box.right &&
                txtCenterY >= box.top && txtCenterY <= box.bottom;
       });
 
-      setSelectedItems({
-        images: selectedImages.map(img => img.id),
-        texts: selectedTexts.map(txt => txt.id)
+      // Add to existing selection (toggle: add if not selected, remove if already selected)
+      setSelectedItems(prev => {
+        const newImageIds = boxSelectedImages.map(img => img.id);
+        const newTextIds = boxSelectedTexts.map(txt => txt.id);
+
+        // Toggle images: add if not in prev, keep prev if not in box selection
+        const toggledImages = [
+          ...prev.images.filter(id => !newImageIds.includes(id)),
+          ...newImageIds.filter(id => !prev.images.includes(id))
+        ];
+
+        // Toggle texts
+        const toggledTexts = [
+          ...prev.texts.filter(id => !newTextIds.includes(id)),
+          ...newTextIds.filter(id => !prev.texts.includes(id))
+        ];
+
+        return {
+          images: toggledImages,
+          texts: toggledTexts
+        };
       });
     }
 
@@ -355,10 +415,11 @@ function ReferencePanel() {
       return;
     }
 
-    // Shift + left click for selection box
+    // Check if clicking on empty canvas area
     const isCanvasArea = e.target.classList.contains('ref-page') ||
                          e.target.classList.contains('ref-empty-state');
 
+    // Shift + left click for selection box
     if (e.shiftKey && isCanvasArea && e.button === 0 && currentPageRef.current) {
       const rect = currentPageRef.current.getBoundingClientRect();
       const startX = (e.clientX - rect.left) / zoomLevel;
@@ -372,8 +433,11 @@ function ReferencePanel() {
         currentY: startY
       });
 
-      setSelectedItems({ images: [], texts: [] });
+      // Don't clear selection - keep existing selection for multi-select
       e.preventDefault();
+    } else if (isCanvasArea && e.button === 0) {
+      // Click on empty area without Shift - deselect all
+      setSelectedItems({ images: [], texts: [] });
     }
   };
 
@@ -385,9 +449,10 @@ function ReferencePanel() {
       setActivePage(page);
     }
 
-    // Double click to create text box
+    // Double click to create text
     const isCanvasArea = e.target.classList.contains('ref-page') ||
-                         e.target.classList.contains('ref-empty-state');
+                         e.target.classList.contains('ref-empty-state') ||
+                         e.target.classList.contains('notebook-lines');
 
     if (isCanvasArea && currentPageRef.current) {
       const rect = currentPageRef.current.getBoundingClientRect();
@@ -398,9 +463,7 @@ function ReferencePanel() {
         id: Date.now(),
         content: '',
         x,
-        y,
-        width: 200,
-        height: 'auto'
+        y
       };
 
       setTexts(prev => [...prev, newText]);
@@ -408,21 +471,30 @@ function ReferencePanel() {
   };
 
   const handleTextMouseDown = (e, text) => {
-    if (selectedItems.texts.includes(text.id)) {
-      setIsDraggingSelection(true);
-      setSelectionDragStart({
-        x: e.clientX,
-        y: e.clientY
+    const currentPageRef = activePage === 'left' ? leftPageRef : rightPageRef;
+
+    if (e.ctrlKey || e.metaKey) {
+      // Ctrl+Click to toggle selection
+      setSelectedItems(prev => {
+        const isSelected = prev.texts.includes(text.id);
+        return {
+          ...prev,
+          texts: isSelected
+            ? prev.texts.filter(id => id !== text.id)
+            : [...prev.texts, text.id]
+        };
       });
-    } else {
-      const rect = e.currentTarget.getBoundingClientRect();
+    } else if (currentPageRef.current) {
+      const rect = currentPageRef.current.getBoundingClientRect();
+      const offsetX = (e.clientX - rect.left) / zoomLevel - text.x;
+      const offsetY = (e.clientY - rect.top) / zoomLevel - text.y;
+
       setDraggedText(text);
-      setDragOffset({
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top
-      });
+      setDragOffset({ x: offsetX, y: offsetY });
     }
+
     e.preventDefault();
+    e.stopPropagation();
   };
 
   const handleTextMouseMove = (e) => {
@@ -528,7 +600,8 @@ function ReferencePanel() {
               left: `${image.x}px`,
               top: `${image.y}px`,
               width: `${image.width}px`,
-              height: `${image.height}px`
+              height: `${image.height}px`,
+              cursor: 'pointer'
             }}
             onMouseDown={(e) => handleMouseDown(e, image, false)}
           >
@@ -552,49 +625,40 @@ function ReferencePanel() {
           </div>
         ))}
 
-        {/* Always show texts from this page */}
+        {/* Simple text elements */}
         {pageTexts.map(text => (
-          <div
+          <input
             key={text.id}
-            className={`ref-text-container ${draggedText?.id === text.id || selectedItems.texts.includes(text.id) ? 'selected' : ''}`}
+            type="text"
+            value={text.content}
             style={{
+              position: 'absolute',
               left: `${text.x}px`,
               top: `${text.y}px`,
-              width: 'auto',
-              minWidth: '50px'
+              color: '#ffffff',
+              fontSize: '16px',
+              minWidth: '100px',
+              padding: '2px 4px',
+              outline: 'none',
+              cursor: 'pointer',
+              border: selectedItems.texts.includes(text.id)
+                ? '2px solid #4A90E2'
+                : 'none',
+              background: selectedItems.texts.includes(text.id)
+                ? 'rgba(74, 144, 226, 0.2)'
+                : 'transparent',
+              direction: 'ltr',
+              textAlign: 'left',
+              pointerEvents: 'auto'
             }}
-            onMouseDown={(e) => handleTextMouseDown(e, text)}
-          >
-            <div
-              className="ref-text-display"
-              contentEditable={true}
-              suppressContentEditableWarning={true}
-              onDoubleClick={(e) => {
-                e.stopPropagation();
-              }}
-              onInput={(e) => {
-                handleTextEdit(text.id, e.currentTarget.textContent);
-              }}
-              onBlur={(e) => {
-                handleTextEdit(text.id, e.currentTarget.textContent);
-              }}
-              style={{
-                outline: 'none',
-                cursor: 'text'
-              }}
-            >
-              {text.content}
-            </div>
-            <button
-              className="ref-text-delete"
-              onClick={(e) => {
-                e.stopPropagation();
-                deleteText(text.id);
-              }}
-            >
-              ×
-            </button>
-          </div>
+            onChange={(e) => handleTextEdit(text.id, e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => {
+              handleTextMouseDown(e, text);
+            }}
+            onDoubleClick={(e) => e.stopPropagation()}
+            autoFocus={text.content === ''}
+          />
         ))}
 
         {activePage === page && selectionBox && (
@@ -616,6 +680,15 @@ function ReferencePanel() {
     <div className={`ref-panel-box ${isFullScreen ? 'fullscreen' : ''}`}>
       <div className="ref-panel-header">
         <h3>📎 References</h3>
+        <span style={{
+          position: 'absolute',
+          right: '10px',
+          top: '10px',
+          fontSize: '16px',
+          color: '#888',
+          fontFamily: 'monospace',
+          fontWeight: 'bold'
+        }}>v0.8</span>
         <div className="ref-panel-actions">
           {selectedCount > 0 && (
             <button

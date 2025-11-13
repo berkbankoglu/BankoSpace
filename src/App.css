@@ -985,7 +985,8 @@ body.light .reset-btn:hover {
     min-height: 500px;
     height: auto;
     padding: 20px;
-    overflow: auto;
+    overflow-y: auto;
+    overflow-x: hidden;
     position: relative;
     background: #1a1a1a;
     display: flex;
@@ -996,24 +997,34 @@ body.light .reset-btn:hover {
 .ref-notebook {
     display: flex;
     gap: 0;
-    min-width: fit-content;
+    width: 100%;
+    max-width: 1630px;
+    justify-content: space-between;
 }
 
 .notebook-divider {
-    width: 80px;
-    background: linear-gradient(to right, #333, #444, #333);
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+    width: 30px;
+    background: #1a1a1a;
+    box-shadow: none;
     min-height: 900px;
 }
 
 .ref-page {
-    width: 600px;
+    width: 800px;
     min-height: 900px;
     background: #242424;
     border: 1px solid #444;
     position: relative;
     cursor: crosshair;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.ref-page:first-child {
+    margin-right: auto;
+}
+
+.ref-page:last-child {
+    margin-left: auto;
 }
 
 .ref-page.active {
@@ -1117,7 +1128,8 @@ body.light .reset-btn:hover {
 }
 
 .ref-image-container.selected {
-    border-color: #667eea;
+    border-color: #4A90E2;
+    background: rgba(74, 144, 226, 0.15);
 }
 
 .ref-image-container img {
