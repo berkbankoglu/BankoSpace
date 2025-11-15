@@ -25,11 +25,11 @@
 
 Choose your preferred installer:
 
-- **[BankoSpace-Installer.exe](https://github.com/YOUR_USERNAME/bankospace/releases/download/v1.0.0/BankoSpace-Installer.exe)** (Recommended)
+- **[BankoSpace-Installer.exe](https://github.com/berkbankoglu/todo-app-react/releases/download/v1.0.0/BankoSpace-Installer.exe)** (Recommended)
   - NSIS installer with auto-update support
   - ~16 MB
 
-- **[BankoSpace-Setup.msi](https://github.com/YOUR_USERNAME/bankospace/releases/download/v1.0.0/BankoSpace-Setup.msi)**
+- **[BankoSpace-Setup.msi](https://github.com/berkbankoglu/todo-app-react/releases/download/v1.0.0/BankoSpace-Setup.msi)**
   - Windows Installer format
   - ~16 MB
 
