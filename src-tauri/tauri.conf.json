@@ -9,7 +9,18 @@
     "frontendDist": "../dist"
   },
   "bundle": {
-    "active": false
+    "active": true,
+    "targets": ["msi", "nsis"],
+    "publisher": "Berk Bankoglu",
+    "icon": [
+      "icons/icon.ico",
+      "icons/icon.png"
+    ],
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": ""
+    }
   },
   "app": {
     "windows": [
@@ -19,11 +30,13 @@
         "height": 800,
         "resizable": true,
         "fullscreen": false,
-        "decorations": true
+        "decorations": true,
+        "url": "index.html"
       }
     ],
+    "withGlobalTauri": true,
     "security": {
-      "csp": null,
+      "csp": "default-src 'self'; connect-src 'self' https://accounts.google.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com https://*.cloudfunctions.net; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; frame-src https://accounts.google.com https://*.firebaseapp.com",
       "capabilities": [
         {
           "identifier": "main-capability",
@@ -34,7 +47,8 @@
             "dialog:allow-open",
             "fs:allow-read-text-file",
             "fs:allow-write-text-file",
-            "fs:default"
+            "fs:default",
+            "notification:default"
           ]
         }
       ]

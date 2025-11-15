@@ -4,11 +4,14 @@ function ReferencePanel() {
   const [tabs, setTabs] = useState([{
     id: 1,
     name: 'Tab 1',
-    leftPage: { images: [], texts: [] },
-    rightPage: { images: [], texts: [] }
+    pages: [{
+      pageNumber: 1,
+      images: [],
+      texts: []
+    }],
+    currentPageIndex: 0
   }]);
   const [activeTabId, setActiveTabId] = useState(1);
-  const [activePage, setActivePage] = useState('left'); // 'left' or 'right'
   const [zoomLevel, setZoomLevel] = useState(1);
   const [draggedImage, setDraggedImage] = useState(null);
   const [draggedText, setDraggedText] = useState(null);
@@ -26,26 +29,34 @@ function ReferencePanel() {
   const [editingTabId, setEditingTabId] = useState(null);
   const [moveModeActive, setMoveModeActive] = useState(false);
   const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
+  const [editingTextId, setEditingTextId] = useState(null);
+  const [tKeyPressed, setTKeyPressed] = useState(false);
+  const [ctrlKeyPressed, setCtrlKeyPressed] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null);
   const contentRef = useRef(null);
-  const leftPageRef = useRef(null);
-  const rightPageRef = useRef(null);
+  const pageRef = useRef(null);
   const fileInputRef = useRef(null);
 
   const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0];
-  const images = activePage === 'left' ? activeTab.leftPage.images : activeTab.rightPage.images;
-  const texts = activePage === 'left' ? activeTab.leftPage.texts : activeTab.rightPage.texts;
+  const currentPage = activeTab.pages[activeTab.currentPageIndex];
+  const images = currentPage.images;
+  const texts = currentPage.texts;
 
   const setImages = (updateFn) => {
     setTabs(prev => prev.map(tab =>
       tab.id === activeTabId
         ? {
             ...tab,
-            [activePage === 'left' ? 'leftPage' : 'rightPage']: {
-              ...tab[activePage === 'left' ? 'leftPage' : 'rightPage'],
-              images: typeof updateFn === 'function'
-                ? updateFn(tab[activePage === 'left' ? 'leftPage' : 'rightPage'].images)
-                : updateFn
-            }
+            pages: tab.pages.map((page, idx) =>
+              idx === tab.currentPageIndex
+                ? {
+                    ...page,
+                    images: typeof updateFn === 'function'
+                      ? updateFn(page.images)
+                      : updateFn
+                  }
+                : page
+            )
           }
         : tab
     ));
@@ -56,12 +67,16 @@ function ReferencePanel() {
       tab.id === activeTabId
         ? {
             ...tab,
-            [activePage === 'left' ? 'leftPage' : 'rightPage']: {
-              ...tab[activePage === 'left' ? 'leftPage' : 'rightPage'],
-              texts: typeof updateFn === 'function'
-                ? updateFn(tab[activePage === 'left' ? 'leftPage' : 'rightPage'].texts)
-                : updateFn
-            }
+            pages: tab.pages.map((page, idx) =>
+              idx === tab.currentPageIndex
+                ? {
+                    ...page,
+                    texts: typeof updateFn === 'function'
+                      ? updateFn(page.texts)
+                      : updateFn
+                  }
+                : page
+            )
           }
         : tab
     ));
@@ -71,9 +86,50 @@ function ReferencePanel() {
     const saved = localStorage.getItem('refTabs');
     if (saved) {
       const loadedTabs = JSON.parse(saved);
-      setTabs(loadedTabs);
-      if (loadedTabs.length > 0) {
-        setActiveTabId(loadedTabs[0].id);
+      // Migrate old format to new format
+      const migratedTabs = loadedTabs.map(tab => {
+        if (!tab.pages) {
+          // Old format with leftPage/rightPage - merge into single page
+          const allImages = [
+            ...(tab.leftPage?.images || []),
+            ...(tab.rightPage?.images || [])
+          ];
+          const allTexts = [
+            ...(tab.leftPage?.texts || []),
+            ...(tab.rightPage?.texts || [])
+          ];
+          return {
+            ...tab,
+            pages: [{
+              pageNumber: 1,
+              images: allImages,
+              texts: allTexts
+            }],
+            currentPageIndex: 0
+          };
+        }
+        // Migrate pages with leftPage/rightPage to single page
+        if (tab.pages && tab.pages[0]?.leftPage) {
+          return {
+            ...tab,
+            pages: tab.pages.map(page => ({
+              pageNumber: page.pageNumber,
+              images: [
+                ...(page.leftPage?.images || []),
+                ...(page.rightPage?.images || [])
+              ],
+              texts: [
+                ...(page.leftPage?.texts || []),
+                ...(page.rightPage?.texts || [])
+              ]
+            }))
+          };
+        }
+        return tab;
+      });
+      setTabs(migratedTabs);
+      if (migratedTabs.length > 0) {
+        setActiveTabId(migratedTabs[0].id);
       }
     }
   }, []);
@@ -81,9 +137,8 @@ function ReferencePanel() {
   // Track mouse position
   useEffect(() => {
     const handleMouseMove = (e) => {
-      const currentPageRef = activePage === 'left' ? leftPageRef : rightPageRef;
-      if (currentPageRef.current) {
-        const rect = currentPageRef.current.getBoundingClientRect();
+      if (pageRef.current) {
+        const rect = pageRef.current.getBoundingClientRect();
         const x = (e.clientX - rect.left) / zoomLevel;
         const y = (e.clientY - rect.top) / zoomLevel;
         setLastMousePos({ x, y });
@@ -92,28 +147,25 @@ function ReferencePanel() {
 
     document.addEventListener('mousemove', handleMouseMove);
     return () => document.removeEventListener('mousemove', handleMouseMove);
-  }, [activePage, zoomLevel, leftPageRef, rightPageRef]);
+  }, [zoomLevel]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Ignore if typing in input
-      if (e.target.tagName === 'INPUT') return;
+      // Ignore if typing in input or textarea
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
       if (e.key === 'Escape' && isFullScreen) {
         setIsFullScreen(false);
       }
 
-
-      // T key to add text at mouse position
+      // T key - set state to true
       if (e.key === 't' || e.key === 'T') {
-        const newText = {
-          id: Date.now(),
-          content: '',
-          x: lastMousePos.x,
-          y: lastMousePos.y
-        };
+        setTKeyPressed(true);
+      }
 
-        setTexts(prev => [...prev, newText]);
+      // Ctrl key - enable pan mode
+      if (e.key === 'Control') {
+        setCtrlKeyPressed(true);
       }
 
       // Delete key to remove selected items
@@ -128,9 +180,26 @@ function ReferencePanel() {
       }
     };
 
+    const handleKeyUp = (e) => {
+      // T key released - set state to false
+      if (e.key === 't' || e.key === 'T') {
+        setTKeyPressed(false);
+      }
+
+      // Ctrl key released - disable pan mode
+      if (e.key === 'Control') {
+        setCtrlKeyPressed(false);
+        setIsPanning(false);
+      }
+    };
+
     document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isFullScreen, selectedItems, images, texts, activePage, zoomLevel, leftPageRef, rightPageRef, lastMousePos]);
+    document.addEventListener('keyup', handleKeyUp);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [isFullScreen, selectedItems, images, texts]);
 
   const handleToggleFullScreen = () => {
     setIsFullScreen(!isFullScreen);
@@ -140,13 +209,34 @@ function ReferencePanel() {
     localStorage.setItem('refTabs', JSON.stringify(tabs));
   }, [tabs]);
 
+  // Mouse wheel zoom
+  useEffect(() => {
+    const handleWheel = (e) => {
+      if (e.ctrlKey) {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -0.1 : 0.1;
+        setZoomLevel(prev => Math.max(0.5, Math.min(3, prev + delta)));
+      }
+    };
+
+    const contentElement = contentRef.current;
+    if (contentElement) {
+      contentElement.addEventListener('wheel', handleWheel, { passive: false });
+      return () => contentElement.removeEventListener('wheel', handleWheel);
+    }
+  }, []);
+
   const addNewTab = () => {
     const newId = Math.max(...tabs.map(t => t.id), 0) + 1;
     const newTab = {
       id: newId,
       name: `Tab ${newId}`,
-      leftPage: { images: [], texts: [] },
-      rightPage: { images: [], texts: [] }
+      pages: [{
+        pageNumber: 1,
+        images: [],
+        texts: []
+      }],
+      currentPageIndex: 0
     };
     setTabs(prev => [...prev, newTab]);
     setActiveTabId(newId);
@@ -165,6 +255,52 @@ function ReferencePanel() {
     setTabs(prev => prev.map(tab =>
       tab.id === tabId ? { ...tab, name: newName } : tab
     ));
+  };
+
+  const addNewPage = () => {
+    setTabs(prev => prev.map(tab =>
+      tab.id === activeTabId
+        ? {
+            ...tab,
+            pages: [...tab.pages, {
+              pageNumber: tab.pages.length + 1,
+              images: [],
+              texts: []
+            }]
+          }
+        : tab
+    ));
+  };
+
+  const goToNextPage = () => {
+    setTabs(prev => prev.map(tab =>
+      tab.id === activeTabId && tab.currentPageIndex < tab.pages.length - 1
+        ? { ...tab, currentPageIndex: tab.currentPageIndex + 1 }
+        : tab
+    ));
+  };
+
+  const goToPrevPage = () => {
+    setTabs(prev => prev.map(tab =>
+      tab.id === activeTabId && tab.currentPageIndex > 0
+        ? { ...tab, currentPageIndex: tab.currentPageIndex - 1 }
+        : tab
+    ));
+  };
+
+  const deletePage = () => {
+    if (activeTab.pages.length === 1) return; // Don't delete last page
+    if (window.confirm('Are you sure you want to delete this page?')) {
+      setTabs(prev => prev.map(tab =>
+        tab.id === activeTabId
+          ? {
+              ...tab,
+              pages: tab.pages.filter((_, idx) => idx !== tab.currentPageIndex),
+              currentPageIndex: Math.max(0, tab.currentPageIndex - 1)
+            }
+          : tab
+      ));
+    }
   };
 
   const handleFileSelect = (e) => {
@@ -212,10 +348,10 @@ function ReferencePanel() {
 
     document.addEventListener('paste', handlePaste);
     return () => document.removeEventListener('paste', handlePaste);
-  }, [activePage, activeTabId]);
+  }, [activeTabId]);
 
   const handleMouseDown = (e, image, isResize) => {
-    const currentPageRef = activePage === 'left' ? leftPageRef : rightPageRef;
+    const currentPageRef = pageRef;
 
     if (isResize) {
       setResizingImage(image);
@@ -251,7 +387,7 @@ function ReferencePanel() {
   };
 
   const handleMouseMove = (e) => {
-    const currentPageRef = activePage === 'left' ? leftPageRef : rightPageRef;
+    const currentPageRef = pageRef;
 
     // Right click pan
     if (isPanning && contentRef.current) {
@@ -393,17 +529,11 @@ function ReferencePanel() {
     setImages(prev => prev.filter(img => img.id !== id));
   };
 
-  const handlePanelMouseDown = (e, page) => {
-    const currentPageRef = page === 'left' ? leftPageRef : rightPageRef;
+  const handlePanelMouseDown = (e) => {
+    const currentPageRef = pageRef;
 
-    // Switch active page
-    if (activePage !== page) {
-      setActivePage(page);
-      setSelectedItems({ images: [], texts: [] });
-    }
-
-    // Right click for panning
-    if (e.button === 2) {
+    // Right click OR Ctrl + left click for panning
+    if (e.button === 2 || (ctrlKeyPressed && e.button === 0)) {
       setIsPanning(true);
       setPanStart({
         x: e.clientX,
@@ -417,7 +547,27 @@ function ReferencePanel() {
 
     // Check if clicking on empty canvas area
     const isCanvasArea = e.target.classList.contains('ref-page') ||
-                         e.target.classList.contains('ref-empty-state');
+                         e.target.classList.contains('ref-empty-state') ||
+                         e.target.classList.contains('notebook-lines');
+
+    // T key + left click to add text
+    if (tKeyPressed && isCanvasArea && e.button === 0 && currentPageRef.current) {
+      const rect = currentPageRef.current.getBoundingClientRect();
+      const x = (e.clientX - rect.left) / zoomLevel;
+      const y = (e.clientY - rect.top) / zoomLevel;
+
+      const newText = {
+        id: Date.now(),
+        content: '',
+        x,
+        y
+      };
+
+      setTexts(prev => [...prev, newText]);
+      setEditingTextId(newText.id);
+      e.preventDefault();
+      return;
+    }
 
     // Shift + left click for selection box
     if (e.shiftKey && isCanvasArea && e.button === 0 && currentPageRef.current) {
@@ -436,18 +586,13 @@ function ReferencePanel() {
       // Don't clear selection - keep existing selection for multi-select
       e.preventDefault();
     } else if (isCanvasArea && e.button === 0) {
-      // Click on empty area without Shift - deselect all
+      // Click on empty area without Shift or T - deselect all
       setSelectedItems({ images: [], texts: [] });
     }
   };
 
-  const handleDoubleClick = (e, page) => {
-    const currentPageRef = page === 'left' ? leftPageRef : rightPageRef;
-
-    // Switch active page
-    if (activePage !== page) {
-      setActivePage(page);
-    }
+  const handleDoubleClick = (e) => {
+    const currentPageRef = pageRef;
 
     // Double click to create text
     const isCanvasArea = e.target.classList.contains('ref-page') ||
@@ -467,11 +612,12 @@ function ReferencePanel() {
       };
 
       setTexts(prev => [...prev, newText]);
+      setEditingTextId(newText.id);
     }
   };
 
   const handleTextMouseDown = (e, text) => {
-    const currentPageRef = activePage === 'left' ? leftPageRef : rightPageRef;
+    const currentPageRef = pageRef;
 
     if (e.ctrlKey || e.metaKey) {
       // Ctrl+Click to toggle selection
@@ -498,7 +644,7 @@ function ReferencePanel() {
   };
 
   const handleTextMouseMove = (e) => {
-    const currentPageRef = activePage === 'left' ? leftPageRef : rightPageRef;
+    const currentPageRef = pageRef;
 
     if (draggedText && currentPageRef.current) {
       const rect = currentPageRef.current.getBoundingClientRect();
@@ -564,22 +710,26 @@ function ReferencePanel() {
     setZoomLevel(1);
   };
 
-  // Helper to render a page
-  const renderPage = (page, pageRef) => {
-    const pageImages = page === 'left' ? activeTab.leftPage.images : activeTab.rightPage.images;
-    const pageTexts = page === 'left' ? activeTab.leftPage.texts : activeTab.rightPage.texts;
+  // Helper to render the page
+  const renderPage = () => {
+    const pageImages = currentPage.images;
+    const pageTexts = currentPage.texts;
 
     return (
       <div
         ref={pageRef}
-        className={`ref-page ${activePage === page ? 'active' : ''}`}
+        className="ref-page ref-page-single"
         onContextMenu={handleContextMenu}
-        onMouseDown={(e) => handlePanelMouseDown(e, page)}
-        onDoubleClick={(e) => handleDoubleClick(e, page)}
-        style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top left' }}
+        onMouseDown={(e) => handlePanelMouseDown(e)}
+        onDoubleClick={(e) => handleDoubleClick(e)}
+        style={{
+          transform: `scale(${zoomLevel})`,
+          transformOrigin: 'top left',
+          cursor: ctrlKeyPressed ? 'grab' : isPanning ? 'grabbing' : 'default'
+        }}
       >
-        {/* Notebook lines */}
-        <div className="notebook-lines"></div>
+          {/* Notebook lines */}
+          <div className="notebook-lines"></div>
 
         {pageImages.length === 0 && pageTexts.length === 0 ? (
           <div className="ref-empty-state">
@@ -605,7 +755,16 @@ function ReferencePanel() {
             }}
             onMouseDown={(e) => handleMouseDown(e, image, false)}
           >
-            <img src={image.src} alt="Reference" />
+            <img
+              src={image.src}
+              alt="Reference"
+              onClick={(e) => {
+                if (!draggedImage && !resizingImage) {
+                  e.stopPropagation();
+                  setPreviewImage(image.src);
+                }
+              }}
+            />
             <button
               className="ref-image-delete"
               onClick={(e) => {
@@ -626,42 +785,84 @@ function ReferencePanel() {
         ))}
 
         {/* Simple text elements */}
-        {pageTexts.map(text => (
-          <input
-            key={text.id}
-            type="text"
-            value={text.content}
-            style={{
-              position: 'absolute',
-              left: `${text.x}px`,
-              top: `${text.y}px`,
-              color: '#ffffff',
-              fontSize: '16px',
-              minWidth: '100px',
-              padding: '2px 4px',
-              outline: 'none',
-              cursor: 'pointer',
-              border: selectedItems.texts.includes(text.id)
-                ? '2px solid #4A90E2'
-                : 'none',
-              background: selectedItems.texts.includes(text.id)
-                ? 'rgba(74, 144, 226, 0.2)'
-                : 'transparent',
-              direction: 'ltr',
-              textAlign: 'left',
-              pointerEvents: 'auto'
-            }}
-            onChange={(e) => handleTextEdit(text.id, e.target.value)}
-            onClick={(e) => e.stopPropagation()}
-            onMouseDown={(e) => {
-              handleTextMouseDown(e, text);
-            }}
-            onDoubleClick={(e) => e.stopPropagation()}
-            autoFocus={text.content === ''}
-          />
-        ))}
+        {pageTexts.map(text => {
+          const isEditing = editingTextId === text.id;
+          const lineCount = text.content.split('\n').length;
+          const maxLineLength = Math.max(...text.content.split('\n').map(line => line.length), 10);
 
-        {activePage === page && selectionBox && (
+          return (
+            <textarea
+              key={text.id}
+              value={text.content}
+              readOnly={!isEditing}
+              style={{
+                position: 'absolute',
+                left: `${text.x}px`,
+                top: `${text.y}px`,
+                color: '#ffffff',
+                fontSize: '16px',
+                width: `${Math.max(100, maxLineLength * 10 + 20)}px`,
+                height: `${Math.max(25, lineCount * 22)}px`,
+                padding: '2px 4px',
+                outline: 'none',
+                cursor: isEditing ? 'text' : 'pointer',
+                border: selectedItems.texts.includes(text.id)
+                  ? '2px solid #4A90E2'
+                  : (isEditing ? '2px solid #4A90E2' : 'none'),
+                background: selectedItems.texts.includes(text.id)
+                  ? 'rgba(74, 144, 226, 0.2)'
+                  : (isEditing ? 'rgba(74, 144, 226, 0.1)' : 'transparent'),
+                direction: 'ltr',
+                textAlign: 'left',
+                pointerEvents: 'auto',
+                resize: 'none',
+                overflow: 'hidden',
+                fontFamily: 'inherit',
+                lineHeight: '22px'
+              }}
+              onChange={(e) => handleTextEdit(text.id, e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => {
+                if (!isEditing) {
+                  handleTextMouseDown(e, text);
+                }
+              }}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                setEditingTextId(text.id);
+              }}
+              onKeyDown={(e) => {
+                // Right Shift + Enter için alt satıra geçiş
+                if (e.key === 'Enter' && e.shiftKey && e.location === 2) {
+                  // location === 2 means right shift
+                  e.preventDefault();
+                  const cursorPos = e.target.selectionStart;
+                  const newContent = text.content.slice(0, cursorPos) + '\n' + text.content.slice(cursorPos);
+                  handleTextEdit(text.id, newContent);
+                  // Cursor pozisyonunu yeni satırın başına taşı
+                  setTimeout(() => {
+                    e.target.selectionStart = e.target.selectionEnd = cursorPos + 1;
+                  }, 0);
+                } else if (e.key === 'Escape' && isEditing) {
+                  setEditingTextId(null);
+                }
+              }}
+              onBlur={(e) => {
+                if (isEditing) {
+                  setEditingTextId(null);
+                  // Boş yazıları sil
+                  if (text.content.trim() === '') {
+                    const pageToUpdate = page === 'left' ? 'left' : 'right';
+                    setTexts(prev => prev.filter(t => t.id !== text.id), pageToUpdate);
+                  }
+                }
+              }}
+              autoFocus={text.content === '' || isEditing}
+            />
+          );
+        })}
+
+        {selectionBox && (
           <div
             className="selection-box"
             style={{
@@ -679,16 +880,6 @@ function ReferencePanel() {
   return (
     <div className={`ref-panel-box ${isFullScreen ? 'fullscreen' : ''}`}>
       <div className="ref-panel-header">
-        <h3>📎 References</h3>
-        <span style={{
-          position: 'absolute',
-          right: '10px',
-          top: '10px',
-          fontSize: '16px',
-          color: '#888',
-          fontFamily: 'monospace',
-          fontWeight: 'bold'
-        }}>v0.8</span>
         <div className="ref-panel-actions">
           {selectedCount > 0 && (
             <button
@@ -699,10 +890,31 @@ function ReferencePanel() {
               🗑️ Delete ({selectedCount})
             </button>
           )}
+          <button className="ref-btn" onClick={goToPrevPage} disabled={activeTab.currentPageIndex === 0} title="Previous page">
+            ←
+          </button>
+          <span className="ref-btn" style={{ cursor: 'default', minWidth: '100px' }}>
+            Page {activeTab.currentPageIndex + 1} / {activeTab.pages.length}
+          </span>
+          <button className="ref-btn" onClick={goToNextPage} disabled={activeTab.currentPageIndex === activeTab.pages.length - 1} title="Next page">
+            →
+          </button>
+          <button className="ref-btn" onClick={addNewPage} style={{ background: '#5cb85c', color: '#fff' }} title="Add new page">
+            + Add Page
+          </button>
+          <button className="ref-btn" onClick={deletePage} disabled={activeTab.pages.length === 1} style={{ background: activeTab.pages.length === 1 ? '#3a3a3a' : '#dc3545', color: activeTab.pages.length === 1 ? '#666' : '#fff' }} title="Delete current page">
+            🗑️ Delete Page
+          </button>
           <div className="zoom-controls">
-            <button className="ref-btn" onClick={handleZoomOut} title="Zoom Out">−</button>
-            <button className="ref-btn" onClick={handleZoomReset} title="Reset Zoom">{Math.round(zoomLevel * 100)}%</button>
-            <button className="ref-btn" onClick={handleZoomIn} title="Zoom In">+</button>
+            <button className="ref-btn" onClick={handleZoomOut} title="Zoom Out">
+              −
+            </button>
+            <button className="ref-btn" onClick={handleZoomReset} title="Reset Zoom">
+              {Math.round(zoomLevel * 100)}%
+            </button>
+            <button className="ref-btn" onClick={handleZoomIn} title="Zoom In">
+              +
+            </button>
           </div>
           <button className="ref-btn" onClick={handleToggleFullScreen}>
             {isFullScreen ? '🗗 Exit' : '🗖 Full Screen'}
@@ -768,13 +980,58 @@ function ReferencePanel() {
           +
         </button>
       </div>
-      <div ref={contentRef} className="ref-panel-content">
-        <div className="ref-notebook">
-          {renderPage('left', leftPageRef)}
-          <div className="notebook-divider" />
-          {renderPage('right', rightPageRef)}
+
+      {/* Keyboard Shortcuts Hints */}
+      <div className="ref-hints">
+        <div className="ref-hint-item">
+          <span className="ref-hint-key">Double Click</span>
+          <span className="ref-hint-desc">Rename tab</span>
+        </div>
+        <div className="ref-hint-item">
+          <span className="ref-hint-key">T</span>
+          <span className="ref-hint-desc">Add text (click to place)</span>
+        </div>
+        <div className="ref-hint-item">
+          <span className="ref-hint-key">Ctrl + V</span>
+          <span className="ref-hint-desc">Paste image</span>
+        </div>
+        <div className="ref-hint-item">
+          <span className="ref-hint-key">Drag</span>
+          <span className="ref-hint-desc">Select multiple items</span>
+        </div>
+        <div className="ref-hint-item">
+          <span className="ref-hint-key">Ctrl + Wheel</span>
+          <span className="ref-hint-desc">Zoom in/out</span>
+        </div>
+        <div className="ref-hint-item">
+          <span className="ref-hint-key">Ctrl + Drag / Right Click</span>
+          <span className="ref-hint-desc">Pan view</span>
         </div>
       </div>
+
+      <div ref={contentRef} className="ref-panel-content">
+        <div className="ref-notebook-single">
+          {renderPage()}
+        </div>
+      </div>
+
+      {/* Image Preview Modal */}
+      {previewImage && (
+        <div
+          className="ref-image-preview-modal"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div className="ref-image-preview-content" onClick={(e) => e.stopPropagation()}>
+            <button
+              className="ref-image-preview-close"
+              onClick={() => setPreviewImage(null)}
+            >
+              ×
+            </button>
+            <img src={previewImage} alt="Preview" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

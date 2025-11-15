@@ -1,45 +1,41 @@
 # Firebase Kurulum Talimatları
 
-## Adım 1: Firebase Console'da Proje Oluştur
+BankoSpace uygulamanızı Firebase ile senkronize etmek için aşağıdaki adımları izleyin:
 
-1. [Firebase Console](https://console.firebase.google.com/) adresine gidin
-2. "Add project" veya "Proje ekle" butonuna tıklayın
-3. Proje adı girin (örn: "todo-app-react")
-4. Google Analytics'i istersen etkinleştir (isteğe bağlı)
-5. "Create project" / "Projeyi oluştur" tıklayın
+## 1. Firebase Projesi Oluşturma
 
-## Adım 2: Authentication'ı Etkinleştir
+1. **Firebase Console'a gidin**: https://console.firebase.google.com/
+2. **"Add project" (Proje Ekle)** butonuna tıklayın
+3. Proje adını girin (örn: "bankospace")
+4. Google Analytics'i istiyorsanız açın (opsiyonel)
+5. **"Create project"** butonuna tıklayın
 
-1. Sol menüden **Authentication** seçin
-2. "Get started" butonuna tıklayın
-3. "Sign-in method" sekmesine gidin
-4. "Email/Password" seçeneğini bulun ve etkinleştir
-5. "Save" / "Kaydet" tıklayın
+## 2. Web Uygulaması Ekleme
 
-## Adım 3: Firestore Database Oluştur
+1. Firebase projenizin ana sayfasında **"Web"** (</>) ikonuna tıklayın
+2. Uygulama takma adını girin (örn: "BankoSpace Web")
+3. **Firebase Hosting'i ayarlamak ister misiniz?** → Hayır (şimdilik)
+4. **"Register app"** butonuna tıklayın
 
-1. Sol menüden **Firestore Database** seçin
-2. "Create database" butonuna tıklayın
-3. "Start in test mode" seçin (şimdilik - sonra güvenlik kuralları ayarlayacağız)
-4. Location seç (Europe (eur3) önerilir)
-5. "Enable" / "Etkinleştir" tıklayın
+## 3. Firebase Configuration Bilgilerini Kopyalama
 
-## Adım 4: Web App Kaydet ve Config Al
+Console'da göreceğiniz kodu kopyalayın. Şuna benzer olacak:
 
-**NOT:** Storage kurulumuna gerek yok, referans resimleri localStorage'da saklanacak.
+```javascript
+const firebaseConfig = {
+  apiKey: "AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+  authDomain: "bankospace-xxxxx.firebaseapp.com",
+  projectId: "bankospace-xxxxx",
+  storageBucket: "bankospace-xxxxx.appspot.com",
+  messagingSenderId: "123456789012",
+  appId: "1:123456789012:web:xxxxxxxxxxxxxxxxxxxx"
+};
+```
 
-1. Proje ayarlarına git (sol üstteki dişli ikonu ⚙️)
-2. "Project settings" / "Proje ayarları" seçin
-3. Aşağı kaydır, "Your apps" / "Uygulamalarınız" bölümüne gel
-4. Web ikonu (<  />) tıkla
-5. App nickname gir (örn: "Todo App")
-6. "Register app" / "Uygulamayı kaydet" tıklayın
-7. Size gösterilen `firebaseConfig` objesini KOPYALA
+## 4. firebase.js Dosyasını Güncelleme
 
-## Adım 6: Config'i Projeye Ekle
-
-1. `src/firebase/config.js` dosyasını aç
-2. `firebaseConfig` objesindeki değerleri kopyaladığın değerlerle değiştir:
+1. `src/firebase.js` dosyasını açın
+2. `firebaseConfig` objesindeki `YOUR_API_KEY`, `YOUR_PROJECT_ID` gibi değerleri Firebase Console'dan kopyaladığınız değerlerle değiştirin:
 
 ```javascript
 const firebaseConfig = {
@@ -47,17 +43,37 @@ const firebaseConfig = {
   authDomain: "BURAYA_KENDI_AUTH_DOMAIN",
   projectId: "BURAYA_KENDI_PROJECT_ID",
   storageBucket: "BURAYA_KENDI_STORAGE_BUCKET",
-  messagingSenderId: "BURAYA_KENDI_SENDER_ID",
+  messagingSenderId: "BURAYA_KENDI_MESSAGING_SENDER_ID",
   appId: "BURAYA_KENDI_APP_ID"
 };
 ```
 
-## Adım 7: Firestore Güvenlik Kurallarını Ayarla (ÖNEMLİ!)
+## 5. Authentication'ı Aktif Etme
 
-1. Firebase Console'da **Firestore Database** > **Rules** sekmesine git
-2. Aşağıdaki kuralları yapıştır:
+1. Firebase Console'da sol menüden **"Authentication"** seçeneğine tıklayın
+2. **"Get started"** butonuna tıklayın
+3. **"Sign-in method"** sekmesine tıklayın
+4. **"Google"** seçeneğine tıklayın
+5. **Enable** toggle'ını açın
+6. Proje destek e-postası seçin (Google hesabınızın e-postası)
+7. **"Save"** butonuna tıklayın
 
-```
+## 6. Firestore Database Oluşturma
+
+1. Firebase Console'da sol menüden **"Firestore Database"** seçeneğine tıklayın
+2. **"Create database"** butonuna tıklayın
+3. **Production mode** veya **Test mode** seçin:
+   - **Test mode**: 30 gün boyunca herkes okuyup yazabilir (geliştirme için)
+   - **Production mode**: Güvenlik kuralları gerektirir
+4. Lokasyon seçin (örn: europe-west3 - Frankfurt)
+5. **"Enable"** butonuna tıklayın
+
+## 7. Firestore Güvenlik Kurallarını Ayarlama
+
+1. Firestore Database sayfasında **"Rules"** sekmesine tıklayın
+2. Aşağıdaki kuralları yapıştırın:
+
+```javascript
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -69,45 +85,54 @@ service cloud.firestore {
 }
 ```
 
-3. "Publish" / "Yayınla" tıklayın
+3. **"Publish"** butonuna tıklayın
 
-## Adım 8: Storage Güvenlik Kurallarını Ayarla (ÖNEMLİ!)
+## 8. Uygulamayı Test Etme
 
-1. Firebase Console'da **Storage** > **Rules** sekmesine git
-2. Aşağıdaki kuralları yapıştır:
+1. Uygulamayı build edin: `npm run tauri build`
+2. Uygulamayı çalıştırın
+3. **"Sign in with Google"** butonuna tıklayın
+4. Google hesabınızla giriş yapın
+5. Uygulamada bir todo ekleyin
+6. Firebase Console'da Firestore Database'e gidin
+7. `users` koleksiyonunda kullanıcı ID'nizle bir belge oluşturulduğunu göreceksiniz
 
-```
-rules_version = '2';
-service firebase.storage {
-  match /b/{bucket}/o {
-    // Kullanıcılar sadece kendi klasörlerindeki dosyaları okuyup yazabilir
-    match /users/{userId}/{allPaths=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
-  }
-}
-```
+## 9. Başka Bilgisayarda Kullanma
 
-3. "Publish" / "Yayınla" tıklayın
-
-## Test Et!
-
-1. Tauri uygulamasını başlat: `npm run tauri-dev`
-2. Email ve şifre ile kayıt ol
-3. Todo ekle, referans resmi yükle
-4. Çıkış yap ve tekrar giriş yap
-5. Verilerinin kayıtlı olduğunu gör! 🎉
-
-## Başka Birisiyle Paylaşmak İçin
-
-1. Uygulamayı build et: `npm run tauri-build`
-2. `src-tauri/target/release/` klasöründeki .exe dosyasını paylaş
-3. Kişi uygulamayı açtığında kendi email/şifre ile kayıt olacak
-4. Her kullanıcının verileri tamamen ayrı ve güvenli!
+1. Başka bir bilgisayarda uygulamayı açın
+2. Aynı Google hesabıyla giriş yapın
+3. Tüm verileriniz otomatik olarak senkronize olacak!
 
 ## Sorun Giderme
 
-- **"Firebase: Error (auth/invalid-api-key)"**: Config bilgilerini yanlış kopyaladın, tekrar kontrol et
-- **"Missing or insufficient permissions"**: Güvenlik kurallarını doğru ayarlamadın
-- **Resimler yüklenmiyor**: Storage kurallarını kontrol et
-- **Veriler kaybolmuyor**: Firestore kurallarını ve config'i kontrol et
+### "Firebase: Error (auth/unauthorized-domain)"
+- Firebase Console → Authentication → Settings → Authorized domains
+- `localhost` ve `tauri://localhost` domain'lerinin ekli olduğundan emin olun
+
+### Veriler senkronize olmuyor
+- Browser console'u açın (F12) ve hata mesajlarını kontrol edin
+- Firebase Console → Firestore Database → Rules → Kuralların doğru olduğundan emin olun
+- İnternet bağlantınızı kontrol edin
+
+### Google ile giriş yapamıyorum
+- Firebase Console → Authentication → Sign-in method → Google'ın enabled olduğundan emin olun
+- Proje destek e-postasının ayarlandığından emin olun
+
+## Güvenlik Notları
+
+⚠️ **ÖNEMLİ**:
+- `firebase.js` dosyanızı başkalarıyla paylaşmayın
+- GitHub'a yüklerken `.gitignore` dosyasına `src/firebase.js` ekleyin
+- Production kullanımında Firestore güvenlik kurallarını mutlaka ayarlayın
+
+## Ek Bilgiler
+
+- **Ücretsiz Plan Limitleri**:
+  - 50,000 okuma/gün
+  - 20,000 yazma/gün
+  - 1 GB depolama
+  - Bu limitler kişisel kullanım için fazlasıyla yeterlidir
+
+- **Real-time Sync**: Verileriniz gerçek zamanlı olarak senkronize olur. Bir cihazda yaptığınız değişiklik saniyeler içinde diğer cihazlarda görünür.
+
+- **Offline Support**: İnternet bağlantısı kesilse bile uygulama çalışmaya devam eder. Bağlantı yeniden kurulduğunda otomatik senkronizasyon başlar.

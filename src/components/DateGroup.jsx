@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 function DateGroup({ dateKey, todos, onToggleTodo }) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
 
   const formatDate = (timestamp) => {
     const date = new Date(timestamp);
