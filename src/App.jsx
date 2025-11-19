@@ -413,7 +413,7 @@ function App() {
         studyReminders: localStorage.getItem('studyReminders') || '[]',
         streakData: localStorage.getItem('streakData') || '{}',
         exportDate: new Date().toISOString(),
-        version: '4.1'
+        version: '4.2'
       };
 
       const dataStr = JSON.stringify(data, null, 2);
@@ -856,7 +856,7 @@ function App() {
         </div>
       </div>
 
-      <div className="version-badge">v4.1</div>
+      <div className="version-badge">v4.2</div>
     </div>
   );
 }

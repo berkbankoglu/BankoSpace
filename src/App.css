@@ -3057,17 +3057,7 @@ body.light .reset-btn:hover {
     z-index: 1000;
 }
 
-@media (max-width: 1400px) {
-    .main-layout {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-
-@media (max-width: 768px) {
-    .main-layout {
-        grid-template-columns: 1fr;
-    }
-}
+/* Removed responsive breakpoints - maintaining 3-column layout always */
 
 /* Auth Styles */
 .auth-container {
@@ -5373,17 +5363,19 @@ body.light .reset-btn:hover {
     display: flex;
     gap: 15px;
     align-items: flex-start;
-    justify-content: center;
+    justify-content: space-between;
     width: 100%;
     max-width: 100%;
+    min-width: 1160px;
     padding: 0 15px;
     box-sizing: border-box;
     position: relative;
 }
 
 .left-sidebar {
-    flex: 0 0 auto;
-    width: clamp(200px, 14%, 280px);
+    flex: 0 0 250px;
+    width: 250px;
+    min-width: 250px;
     align-self: flex-start;
     position: sticky;
     top: 20px;
@@ -5398,14 +5390,14 @@ body.light .reset-btn:hover {
 
 .main-content-area {
     flex: 1 1 auto;
-    min-width: 0;
-    max-width: 65%;
+    min-width: 600px;
     align-self: flex-start;
 }
 
 .right-sidebar {
-    flex: 0 0 auto;
-    width: clamp(200px, 16%, 320px);
+    flex: 0 0 280px;
+    width: 280px;
+    min-width: 280px;
     align-self: flex-start;
     position: sticky;
     top: 20px;
@@ -5418,17 +5410,7 @@ body.light .reset-btn:hover {
     display: none;
 }
 
-@media (max-width: 1400px) {
-    .content-wrapper {
-        flex-direction: column;
-        align-items: center;
-    }
-
-    .left-sidebar,
-    .right-sidebar {
-        width: 600px;
-    }
-}
+/* Removed responsive breakpoints - maintaining 3-column layout always */
 
 .sidebar-section {
     margin-bottom: 20px;
