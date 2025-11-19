@@ -5363,19 +5363,17 @@ body.light .reset-btn:hover {
     display: flex;
     gap: 15px;
     align-items: flex-start;
-    justify-content: space-between;
+    justify-content: center;
     width: 100%;
     max-width: 100%;
-    min-width: 1160px;
     padding: 0 15px;
     box-sizing: border-box;
     position: relative;
 }
 
 .left-sidebar {
-    flex: 0 0 250px;
-    width: 250px;
-    min-width: 250px;
+    flex: 0 0 auto;
+    width: clamp(220px, 18%, 280px);
     align-self: flex-start;
     position: sticky;
     top: 20px;
@@ -5390,14 +5388,14 @@ body.light .reset-btn:hover {
 
 .main-content-area {
     flex: 1 1 auto;
-    min-width: 600px;
+    min-width: 0;
+    max-width: 55%;
     align-self: flex-start;
 }
 
 .right-sidebar {
-    flex: 0 0 280px;
-    width: 280px;
-    min-width: 280px;
+    flex: 0 0 auto;
+    width: clamp(220px, 18%, 280px);
     align-self: flex-start;
     position: sticky;
     top: 20px;

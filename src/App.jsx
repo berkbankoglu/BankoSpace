@@ -856,7 +856,7 @@ function App() {
         </div>
       </div>
 
-      <div className="version-badge">v4.2</div>
+      <div className="version-badge">v4.3</div>
     </div>
   );
 }
