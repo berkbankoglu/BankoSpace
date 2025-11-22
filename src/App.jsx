@@ -731,7 +731,7 @@ function App() {
   return (
     <div className="container">
       <div className="header-row">
-        <h1>BankoSpace</h1>
+        <h1>BankoSpace <span className="version-badge">v6.6.0</span></h1>
         <div className="header-middle">
           {syncStatus === 'syncing' && <span className="sync-status">Syncing...</span>}
           {syncStatus === 'synced' && <span className="sync-status synced">Synced ✓</span>}
