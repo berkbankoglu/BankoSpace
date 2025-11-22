@@ -123,11 +123,25 @@ function Timer() {
     stopAlarm();
   };
 
-  const handleReset = () => {
+  const handleStop = () => {
     setIsRunning(false);
     setTimeLeft(0);
     setHasTimerRun(false);
     stopAlarm();
+  };
+
+  const handleRestart = () => {
+    stopAlarm();
+    setTimeLeft(initialTime);
+    setIsRunning(true);
+    setHasTimerRun(true);
+  };
+
+  const handleRepeat = () => {
+    stopAlarm();
+    setTimeLeft(initialTime);
+    setIsRunning(true);
+    setHasTimerRun(true);
   };
 
   const handleSetTime = () => {
@@ -229,18 +243,34 @@ function Timer() {
           </div>
 
           <div className="timer-controls-large">
-            {!isRunning ? (
-              <button className="timer-btn-large timer-btn-play" onClick={handleStart}>
-                ▶ Start
-              </button>
+            {timeLeft === 0 && hasTimerRun ? (
+              <>
+                <button className="timer-btn-large timer-btn-play" onClick={handleRepeat}>
+                  🔁 Repeat
+                </button>
+                <button className="timer-btn-large timer-btn-reset" onClick={handleStop}>
+                  ⏹ Stop
+                </button>
+              </>
             ) : (
-              <button className="timer-btn-large timer-btn-pause-large" onClick={handlePause}>
-                ⏸ Pause
-              </button>
+              <>
+                {!isRunning ? (
+                  <button className="timer-btn-large timer-btn-play" onClick={handleStart}>
+                    ▶ Start
+                  </button>
+                ) : (
+                  <button className="timer-btn-large timer-btn-pause-large" onClick={handlePause}>
+                    ⏸ Pause
+                  </button>
+                )}
+                <button className="timer-btn-large timer-btn-restart" onClick={handleRestart}>
+                  🔄 Restart
+                </button>
+                <button className="timer-btn-large timer-btn-reset" onClick={handleStop}>
+                  ⏹ Stop
+                </button>
+              </>
             )}
-            <button className="timer-btn-large timer-btn-reset" onClick={handleReset}>
-              ⏹ Reset
-            </button>
           </div>
 
           <div className="timer-presets">

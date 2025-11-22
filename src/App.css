@@ -1690,19 +1690,20 @@ body.light .reset-btn:hover {
 
 .timer-btn-large {
     flex: 1;
-    padding: 14px 20px;
+    padding: 10px 12px;
     background: #333;
     color: #e0e0e0;
     border: 2px solid #444;
     border-radius: 8px;
     cursor: pointer;
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 600;
     transition: all 0.2s;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    gap: 6px;
+    min-width: 0;
 }
 
 .timer-btn-large:hover {
@@ -1733,6 +1734,16 @@ body.light .reset-btn:hover {
 .timer-btn-pause-large:hover {
     background: #d97706;
     border-color: #d97706;
+}
+
+.timer-btn-restart {
+    background: #444;
+    border-color: #555;
+}
+
+.timer-btn-restart:hover {
+    background: #555;
+    border-color: #666;
 }
 
 .timer-btn-reset {
@@ -1940,10 +1951,10 @@ body.light .reset-btn:hover {
 
 .main-layout {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-template-columns: repeat(3, 1fr);
     gap: 15px;
     margin-bottom: 30px;
-    padding: 0;
+    padding: 0 15px;
     align-items: start;
     width: 100%;
     max-width: 100%;
@@ -2132,10 +2143,17 @@ body.light .reset-btn:hover {
     }
 }
 
-.todo-top {
+.todo-header {
     display: flex;
-    gap: 10px;
-    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+}
+
+.todo-header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     width: 100%;
 }
 
@@ -2150,7 +2168,6 @@ body.light .reset-btn:hover {
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-top: 2px;
 }
 
 .checkbox.checked {
@@ -2165,16 +2182,15 @@ body.light .reset-btn:hover {
 }
 
 .todo-content {
-    flex: 1;
-    min-width: 0;
+    width: 100%;
     display: flex;
     flex-direction: column;
 }
 
 .todo-text {
-    font-size: 16px;
+    font-size: 14px;
     color: #e0e0e0;
-    line-height: 1.5;
+    line-height: 1.4;
     word-wrap: break-word;
     word-break: break-word;
     overflow-wrap: break-word;
@@ -2680,9 +2696,10 @@ body.light .reset-btn:hover {
 }
 
 .ref-panel-content {
-    min-height: 500px;
-    height: auto;
-    padding: 20px 20px;
+    min-height: 30px;
+    max-height: 30px;
+    height: 30px;
+    padding: 5px 5px;
     overflow-y: auto;
     overflow-x: hidden;
     position: relative;
@@ -4785,9 +4802,21 @@ body.light .reset-btn:hover {
 /* ============= ACHIEVEMENTS COMPONENT ============= */
 
 .achievements-container {
-    background: #1a1a1a;
-    border-radius: 8px;
+    background: #2a2a2a;
+    border: 2px solid #444;
+    border-radius: 12px;
     padding: 0;
+    padding-bottom: 12px;
+    max-height: 600px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    scrollbar-width: none;
+}
+
+.achievements-container::-webkit-scrollbar {
+    display: none;
 }
 
 .achievements-header {
@@ -4841,7 +4870,7 @@ body.light .reset-btn:hover {
 
 .achievements-filters {
     display: flex;
-    gap: 10px;
+    gap: 16px;
 }
 
 .achievements-filter-select {
@@ -4860,10 +4889,10 @@ body.light .reset-btn:hover {
 }
 
 .achievements-grid {
-    padding: 20px;
+    padding: 16px 16px 0 16px;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 20px;
+    grid-template-columns: 1fr;
+    gap: 12px;
 }
 
 .achievements-empty {
@@ -4877,10 +4906,10 @@ body.light .reset-btn:hover {
 .achievement-card {
     background: #2a2a2a;
     border: 2px solid #444;
-    border-radius: 12px;
-    padding: 20px;
+    border-radius: 8px;
+    padding: 10px;
     display: flex;
-    gap: 16px;
+    gap: 8px;
     transition: all 0.3s;
     position: relative;
     overflow: hidden;
@@ -4919,18 +4948,18 @@ body.light .reset-btn:hover {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
 }
 
 .achievement-icon {
-    width: 64px;
-    height: 64px;
-    font-size: 36px;
+    width: 48px;
+    height: 48px;
+    font-size: 28px;
     display: flex;
     align-items: center;
     justify-content: center;
     background: #1a1a1a;
-    border-radius: 12px;
+    border-radius: 8px;
     border: 2px solid #444;
     transition: all 0.3s;
 }
@@ -4951,9 +4980,9 @@ body.light .reset-btn:hover {
 }
 
 .achievement-rarity {
-    padding: 3px 10px;
-    border-radius: 12px;
-    font-size: 9px;
+    padding: 2px 8px;
+    border-radius: 8px;
+    font-size: 8px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -4964,29 +4993,29 @@ body.light .reset-btn:hover {
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
 }
 
 .achievement-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    gap: 10px;
+    gap: 8px;
 }
 
 .achievement-title {
     margin: 0;
-    font-size: 17px;
+    font-size: 14px;
     font-weight: 700;
     color: #e0e0e0;
     line-height: 1.3;
 }
 
 .achievement-category {
-    padding: 3px 8px;
+    padding: 2px 6px;
     background: #444;
-    border-radius: 4px;
-    font-size: 10px;
+    border-radius: 3px;
+    font-size: 9px;
     font-weight: 600;
     color: #999;
     text-transform: uppercase;
@@ -4995,48 +5024,48 @@ body.light .reset-btn:hover {
 
 .achievement-description {
     margin: 0;
-    font-size: 13px;
+    font-size: 11px;
     color: #999;
-    line-height: 1.5;
+    line-height: 1.4;
 }
 
 .achievement-progress-section {
-    margin-top: 8px;
+    margin-top: 6px;
 }
 
 .achievement-progress-text {
-    font-size: 11px;
+    font-size: 10px;
     color: #999;
-    margin-bottom: 4px;
+    margin-bottom: 3px;
     text-align: right;
 }
 
 .achievement-progress-bar {
     width: 100%;
-    height: 6px;
+    height: 4px;
     background: #1a1a1a;
-    border-radius: 3px;
+    border-radius: 2px;
     overflow: hidden;
 }
 
 .achievement-progress-fill {
     height: 100%;
     transition: width 0.3s ease;
-    border-radius: 3px;
+    border-radius: 2px;
 }
 
 .achievement-unlocked-badge {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 6px 12px;
+    gap: 3px;
+    padding: 4px 8px;
     background: #48bb78;
     color: white;
-    border-radius: 6px;
-    font-size: 12px;
+    border-radius: 4px;
+    font-size: 10px;
     font-weight: 600;
     align-self: flex-start;
-    margin-top: 4px;
+    margin-top: 3px;
 }
 
 /* Version Badge */
@@ -5395,7 +5424,7 @@ body.light .reset-btn:hover {
 
 .right-sidebar {
     flex: 0 0 auto;
-    width: clamp(220px, 18%, 280px);
+    width: clamp(280px, 22%, 360px);
     align-self: flex-start;
     position: sticky;
     top: 20px;
@@ -5851,3 +5880,314 @@ body.light .sync-status.synced {
     color: #667eea;
 }
 
+
+/* =========================
+   Freeform Canvas Styles
+   ========================= */
+
+.freeform-container {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: #1a1a1a;
+    position: relative;
+    overflow: hidden;
+}
+
+.freeform-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 10px 15px;
+    background: #2a2a2a;
+    border-bottom: 1px solid #333;
+}
+
+.freeform-tools {
+    display: flex;
+    gap: 8px;
+}
+
+.freeform-tool-btn {
+    padding: 8px 12px;
+    background: #333;
+    color: #e0e0e0;
+    border: 2px solid #444;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+}
+
+.freeform-tool-btn:hover {
+    background: #444;
+    border-color: #555;
+}
+
+.freeform-tool-btn.active {
+    background: #667eea;
+    border-color: #667eea;
+    color: white;
+}
+
+.freeform-zoom {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.freeform-zoom button {
+    padding: 6px 12px;
+    background: #333;
+    color: #e0e0e0;
+    border: 1px solid #444;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.freeform-zoom span {
+    color: #999;
+    font-size: 13px;
+    min-width: 50px;
+    text-align: center;
+}
+
+.freeform-selection-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #999;
+    font-size: 13px;
+}
+
+.freeform-selection-info button {
+    padding: 4px 10px;
+    background: #ef4444;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.freeform-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 8px 15px;
+    background: #252525;
+    border-bottom: 1px solid #333;
+    overflow-x: auto;
+}
+
+.freeform-tab {
+    padding: 6px 12px;
+    background: #2a2a2a;
+    color: #999;
+    border-radius: 6px 6px 0 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+    transition: all 0.2s;
+}
+
+.freeform-tab:hover {
+    background: #333;
+    color: #e0e0e0;
+}
+
+.freeform-tab.active {
+    background: #1a1a1a;
+    color: #e0e0e0;
+    border-bottom: 2px solid #667eea;
+}
+
+.freeform-tab-input {
+    background: transparent;
+    border: none;
+    color: #e0e0e0;
+    font-size: 13px;
+    padding: 0;
+    outline: none;
+    min-width: 60px;
+}
+
+.freeform-tab-close {
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 0 4px;
+}
+
+.freeform-tab-close:hover {
+    color: #ef4444;
+}
+
+.freeform-tab-add {
+    padding: 6px 12px;
+    background: #333;
+    color: #999;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.freeform-tab-add:hover {
+    background: #444;
+    color: #e0e0e0;
+}
+
+.freeform-canvas {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: #1a1a1a;
+}
+
+.freeform-content {
+    position: relative;
+    width: 1000px;
+    height: 1000px;
+}
+
+.freeform-grid {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: 
+        linear-gradient(#222 1px, transparent 1px),
+        linear-gradient(90deg, #222 1px, transparent 1px);
+    background-size: 50px 50px;
+    pointer-events: none;
+}
+
+.freeform-item {
+    position: absolute;
+    cursor: move;
+    user-select: none;
+}
+
+.freeform-item.selected {
+    outline: 2px solid #667eea;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.2),
+                0 0 20px rgba(102, 126, 234, 0.4);
+}
+
+.freeform-image {
+    border-radius: 8px;
+    overflow: hidden;
+    background: #2a2a2a;
+}
+
+.freeform-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    pointer-events: none;
+}
+
+.freeform-text {
+    padding: 8px;
+    background: transparent;
+    min-width: 100px;
+    max-width: 400px;
+}
+
+.freeform-text-content {
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.freeform-text-input {
+    width: 100%;
+    min-width: 200px;
+    min-height: 30px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid #667eea;
+    border-radius: 4px;
+    color: #ffffff;
+    font-size: 16px;
+    padding: 8px;
+    resize: both;
+    font-family: inherit;
+}
+
+.freeform-sticky {
+    border-radius: 8px;
+    padding: 15px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.freeform-sticky-content {
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: #1a1a1a;
+    font-size: 14px;
+}
+
+.freeform-sticky-input {
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    border: none;
+    color: #1a1a1a;
+    font-size: 14px;
+    padding: 0;
+    resize: none;
+    font-family: inherit;
+    outline: none;
+}
+
+.freeform-resize-handle {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 12px;
+    height: 12px;
+    background: #667eea;
+    border-radius: 50%;
+    cursor: nwse-resize;
+}
+
+.freeform-selection-box {
+    position: absolute;
+    border: 2px solid #667eea;
+    background: rgba(102, 126, 234, 0.1);
+    pointer-events: none;
+}
+
+.freeform-hints {
+    position: absolute;
+    bottom: 15px;
+    right: 15px;
+    display: flex;
+    gap: 12px;
+    background: rgba(42, 42, 42, 0.95);
+    padding: 10px 15px;
+    border-radius: 8px;
+    font-size: 12px;
+    color: #999;
+    pointer-events: none;
+}
+
+.freeform-hints div {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.freeform-hints kbd {
+    background: #333;
+    padding: 2px 6px;
+    border-radius: 3px;
+    border: 1px solid #444;
+    font-size: 11px;
+    color: #e0e0e0;
+}

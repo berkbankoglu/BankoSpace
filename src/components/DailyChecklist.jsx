@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 
-function DailyChecklist() {
+function DailyChecklist({ storageKey = 'dailyChecklist' }) {
   const [items, setItems] = useState(() => {
-    const saved = localStorage.getItem('dailyChecklistItems');
+    const saved = localStorage.getItem(`${storageKey}Items`);
     return saved ? JSON.parse(saved) : [
       { id: 1, text: 'Morning Exercise', completed: false },
       { id: 2, text: 'Read 30 pages', completed: false },
@@ -13,7 +13,7 @@ function DailyChecklist() {
   });
 
   const [lastResetDate, setLastResetDate] = useState(() => {
-    const saved = localStorage.getItem('dailyChecklistLastReset');
+    const saved = localStorage.getItem(`${storageKey}LastReset`);
     return saved || new Date().toDateString();
   });
 
@@ -30,15 +30,15 @@ function DailyChecklist() {
       const resetItems = items.map(item => ({ ...item, completed: false }));
       setItems(resetItems);
       setLastResetDate(today);
-      localStorage.setItem('dailyChecklistLastReset', today);
-      localStorage.setItem('dailyChecklistItems', JSON.stringify(resetItems));
+      localStorage.setItem(`${storageKey}LastReset`, today);
+      localStorage.setItem(`${storageKey}Items`, JSON.stringify(resetItems));
     }
   }, []);
 
   // Save items to localStorage whenever they change
   useEffect(() => {
-    localStorage.setItem('dailyChecklistItems', JSON.stringify(items));
-  }, [items]);
+    localStorage.setItem(`${storageKey}Items`, JSON.stringify(items));
+  }, [items, storageKey]);
 
   const toggleItem = (id) => {
     setItems(items.map(item =>
