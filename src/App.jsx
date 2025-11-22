@@ -277,6 +277,29 @@ function App() {
     setTheme(prev => prev === 'dark' ? 'light' : 'dark');
   };
 
+  // Manual refresh function to sync data from Firebase
+  const refreshFromFirebase = async () => {
+    if (!firebaseSync || !user || user.uid === 'offline-user') {
+      console.log('Cannot refresh: No Firebase sync available');
+      return;
+    }
+
+    try {
+      setSyncStatus('syncing');
+      const firebaseData = await firebaseSync.loadData();
+
+      if (firebaseData) {
+        syncFirebaseToLocalStorage(firebaseData);
+        if (firebaseData.todos) setTodos(firebaseData.todos);
+        setSyncStatus('synced');
+        setTimeout(() => setSyncStatus('idle'), 2000);
+      }
+    } catch (error) {
+      console.error('Error refreshing from Firebase:', error);
+      setSyncStatus('offline');
+    }
+  };
+
   const addTodo = (category, text) => {
     const newTodo = {
       id: Date.now(),
@@ -710,9 +733,20 @@ function App() {
       <div className="header-row">
         <h1>BankoSpace</h1>
         <div className="header-middle">
-          {/* Sync happens automatically in background - no need to show status */}
+          {syncStatus === 'syncing' && <span className="sync-status">Syncing...</span>}
+          {syncStatus === 'synced' && <span className="sync-status synced">Synced ✓</span>}
         </div>
         <div className="header-right">
+          {user && user.uid !== 'offline-user' && (
+            <button
+              onClick={refreshFromFirebase}
+              className="refresh-btn"
+              title="Refresh from cloud"
+              disabled={syncStatus === 'syncing'}
+            >
+              🔄
+            </button>
+          )}
           <Auth user={user} onAuthChange={handleAuthChange} />
           <button
             onClick={() => setShowSettings(!showSettings)}
