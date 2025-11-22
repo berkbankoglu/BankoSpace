@@ -64,6 +64,10 @@ function App() {
     const saved = localStorage.getItem('dailyChecklistCollapsed');
     return saved === 'true';
   });
+  const [longtermChecklistCollapsed, setLongtermChecklistCollapsed] = useState(() => {
+    const saved = localStorage.getItem('longtermChecklistCollapsed');
+    return saved === 'true';
+  });
 
 
   // Custom category names
@@ -72,10 +76,20 @@ function App() {
     return saved ? JSON.parse(saved) : {
       daily: 'Daily',
       weekly: 'Weekly',
-      monthly: 'Monthly',
       longterm: 'Long Term'
     };
   });
+
+  // Checklist names
+  const [checklistNames, setChecklistNames] = useState(() => {
+    const saved = localStorage.getItem('checklistNames');
+    return saved ? JSON.parse(saved) : {
+      daily: 'Daily Check List',
+      longterm: 'Long-term Checklist'
+    };
+  });
+
+  const [editingChecklistId, setEditingChecklistId] = useState(null);
 
   // Streak Tracker State
   const [streakData, setStreakData] = useState(() => {
@@ -164,10 +178,19 @@ function App() {
     localStorage.setItem('dailyChecklistCollapsed', dailyChecklistCollapsed);
   }, [dailyChecklistCollapsed]);
 
+  useEffect(() => {
+    localStorage.setItem('longtermChecklistCollapsed', longtermChecklistCollapsed);
+  }, [longtermChecklistCollapsed]);
+
   // Save category names to localStorage
   useEffect(() => {
     localStorage.setItem('categoryNames', JSON.stringify(categoryNames));
   }, [categoryNames]);
+
+  // Save checklist names to localStorage
+  useEffect(() => {
+    localStorage.setItem('checklistNames', JSON.stringify(checklistNames));
+  }, [checklistNames]);
 
   // Save streak data to localStorage
   useEffect(() => {
@@ -623,20 +646,6 @@ function App() {
             onReorder={reorderTodos}
           />
           <CategoryColumn
-            title={categoryNames.monthly}
-            category="monthly"
-            todos={todosByCategory.monthly}
-            onAddTodo={addTodo}
-            onToggleTodo={toggleTodo}
-            onDeleteTodo={deleteTodo}
-            onRename={renameCategory}
-            currentFilter={currentFilter}
-            onAddSubtask={addSubtask}
-            onToggleSubtask={toggleSubtask}
-            onDeleteSubtask={deleteSubtask}
-            onReorder={reorderTodos}
-          />
-          <CategoryColumn
             title={categoryNames.longterm}
             category="longterm"
             todos={todosByCategory.longterm}
@@ -756,30 +765,15 @@ function App() {
           <div className="app-section sidebar-section">
             <div
               className="section-unified-header"
-              onClick={() => setRemindersCollapsed(!remindersCollapsed)}
+              onClick={() => setTimerCollapsed(!timerCollapsed)}
             >
               <div className="section-header-left">
-                <h2>Study Reminders</h2>
-                <span className="collapse-indicator">{remindersCollapsed ? '▼' : '▲'}</span>
+                <h2>Timer</h2>
+                <span className="collapse-indicator">{timerCollapsed ? '▼' : '▲'}</span>
               </div>
             </div>
-            <div className={`section-content ${remindersCollapsed ? 'collapsed' : ''}`}>
-              <StudyReminders />
-            </div>
-          </div>
-
-          <div className="app-section sidebar-section">
-            <div
-              className="section-unified-header"
-              onClick={() => setDailyChecklistCollapsed(!dailyChecklistCollapsed)}
-            >
-              <div className="section-header-left">
-                <h2>Daily Check List</h2>
-                <span className="collapse-indicator">{dailyChecklistCollapsed ? '▼' : '▲'}</span>
-              </div>
-            </div>
-            <div className={`section-content ${dailyChecklistCollapsed ? 'collapsed' : ''}`}>
-              <DailyChecklist />
+            <div className={`section-content ${timerCollapsed ? 'collapsed' : ''}`}>
+              <Timer />
             </div>
           </div>
 
@@ -827,15 +821,81 @@ function App() {
         <div className="app-section sidebar-section">
           <div
             className="section-unified-header"
-            onClick={() => setTimerCollapsed(!timerCollapsed)}
+            onClick={() => setRemindersCollapsed(!remindersCollapsed)}
           >
             <div className="section-header-left">
-              <h2>Timer</h2>
-              <span className="collapse-indicator">{timerCollapsed ? '▼' : '▲'}</span>
+              <h2>Study Reminders</h2>
+              <span className="collapse-indicator">{remindersCollapsed ? '▼' : '▲'}</span>
             </div>
           </div>
-          <div className={`section-content ${timerCollapsed ? 'collapsed' : ''}`}>
-            <Timer />
+          <div className={`section-content ${remindersCollapsed ? 'collapsed' : ''}`}>
+            <StudyReminders />
+          </div>
+        </div>
+
+        <div className="app-section sidebar-section">
+          <div
+            className="section-unified-header"
+            onClick={() => setDailyChecklistCollapsed(!dailyChecklistCollapsed)}
+          >
+            <div className="section-header-left">
+              {editingChecklistId === 'daily' ? (
+                <input
+                  className="category-name-input"
+                  value={checklistNames.daily}
+                  onChange={(e) => setChecklistNames({ ...checklistNames, daily: e.target.value })}
+                  onBlur={() => setEditingChecklistId(null)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') setEditingChecklistId(null);
+                    if (e.key === 'Escape') setEditingChecklistId(null);
+                  }}
+                  autoFocus
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <h2 onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  setEditingChecklistId('daily');
+                }}>{checklistNames.daily}</h2>
+              )}
+              <span className="collapse-indicator">{dailyChecklistCollapsed ? '▼' : '▲'}</span>
+            </div>
+          </div>
+          <div className={`section-content ${dailyChecklistCollapsed ? 'collapsed' : ''}`}>
+            <DailyChecklist />
+          </div>
+        </div>
+
+        <div className="app-section sidebar-section">
+          <div
+            className="section-unified-header"
+            onClick={() => setLongtermChecklistCollapsed(!longtermChecklistCollapsed)}
+          >
+            <div className="section-header-left">
+              {editingChecklistId === 'longterm' ? (
+                <input
+                  className="category-name-input"
+                  value={checklistNames.longterm}
+                  onChange={(e) => setChecklistNames({ ...checklistNames, longterm: e.target.value })}
+                  onBlur={() => setEditingChecklistId(null)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') setEditingChecklistId(null);
+                    if (e.key === 'Escape') setEditingChecklistId(null);
+                  }}
+                  autoFocus
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <h2 onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  setEditingChecklistId('longterm');
+                }}>{checklistNames.longterm}</h2>
+              )}
+              <span className="collapse-indicator">{longtermChecklistCollapsed ? '▼' : '▲'}</span>
+            </div>
+          </div>
+          <div className={`section-content ${longtermChecklistCollapsed ? 'collapsed' : ''}`}>
+            <DailyChecklist storageKey="longtermChecklist" />
           </div>
         </div>
 

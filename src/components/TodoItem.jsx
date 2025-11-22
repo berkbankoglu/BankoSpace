@@ -75,31 +75,33 @@ function TodoItem({ todo, index, onToggle, onDelete, onAddSubtask, onToggleSubta
       onDrop={onDrop}
       onDragEnd={onDragEnd}
     >
-      <div className="todo-top">
-        <div className="todo-reorder-buttons">
-          {!isFirst && (
-            <button
-              className="todo-move-btn todo-move-up"
-              onClick={() => onMoveUp(index)}
-              title="Move up"
-            >
-              ↑
-            </button>
-          )}
-          {!isLast && (
-            <button
-              className="todo-move-btn todo-move-down"
-              onClick={() => onMoveDown(index)}
-              title="Move down"
-            >
-              ↓
-            </button>
-          )}
+      <div className="todo-header">
+        <div className="todo-header-top">
+          <div
+            className={`checkbox ${todo.completed ? 'checked' : ''}`}
+            onClick={handleToggle}
+          />
+          <div className="todo-reorder-buttons">
+            {!isFirst && (
+              <button
+                className="todo-move-btn todo-move-up"
+                onClick={() => onMoveUp(index)}
+                title="Move up"
+              >
+                ↑
+              </button>
+            )}
+            {!isLast && (
+              <button
+                className="todo-move-btn todo-move-down"
+                onClick={() => onMoveDown(index)}
+                title="Move down"
+              >
+                ↓
+              </button>
+            )}
+          </div>
         </div>
-        <div
-          className={`checkbox ${todo.completed ? 'checked' : ''}`}
-          onClick={handleToggle}
-        />
         <div className="todo-content">
           <div className="todo-text-row">
             <div className="todo-text">{todo.text}</div>

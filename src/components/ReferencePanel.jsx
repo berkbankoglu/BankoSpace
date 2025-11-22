@@ -3,192 +3,128 @@ import { useState, useEffect, useRef } from 'react';
 function ReferencePanel() {
   const [tabs, setTabs] = useState([{
     id: 1,
-    name: 'Tab 1',
-    pages: [{
-      pageNumber: 1,
-      images: [],
-      texts: []
-    }],
-    currentPageIndex: 0
+    name: 'Board 1',
+    items: [] // images, texts, sticky notes
   }]);
   const [activeTabId, setActiveTabId] = useState(1);
   const [zoomLevel, setZoomLevel] = useState(1);
-  const [draggedImage, setDraggedImage] = useState(null);
-  const [draggedText, setDraggedText] = useState(null);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const [resizingImage, setResizingImage] = useState(null);
-  const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
-  const [selectionBox, setSelectionBox] = useState(null);
-  const [isSelecting, setIsSelecting] = useState(false);
-  const [selectedItems, setSelectedItems] = useState({ images: [], texts: [] });
-  const [isDraggingSelection, setIsDraggingSelection] = useState(false);
-  const [selectionDragStart, setSelectionDragStart] = useState({ x: 0, y: 0 });
-  const [isFullScreen, setIsFullScreen] = useState(false);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
-  const [panStart, setPanStart] = useState({ x: 0, y: 0, scrollTop: 0, scrollLeft: 0 });
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const [selectedItems, setSelectedItems] = useState([]);
+  const [draggedItem, setDraggedItem] = useState(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [resizingItem, setResizingItem] = useState(null);
+  const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const [editingTabId, setEditingTabId] = useState(null);
-  const [moveModeActive, setMoveModeActive] = useState(false);
-  const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
   const [editingTextId, setEditingTextId] = useState(null);
-  const [tKeyPressed, setTKeyPressed] = useState(false);
-  const [ctrlKeyPressed, setCtrlKeyPressed] = useState(false);
-  const [previewImage, setPreviewImage] = useState(null);
-  const contentRef = useRef(null);
-  const pageRef = useRef(null);
+  const [spaceKeyPressed, setSpaceKeyPressed] = useState(false);
+  const [selectionBox, setSelectionBox] = useState(null);
+  const [isDrawingSelection, setIsDrawingSelection] = useState(false);
+  const [hoveredItems, setHoveredItems] = useState([]);
+  const [tool, setTool] = useState('select'); // 'select', 'text', 'sticky'
+
+  const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
 
   const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0];
-  const currentPage = activeTab.pages[activeTab.currentPageIndex];
-  const images = currentPage.images;
-  const texts = currentPage.texts;
+  const items = activeTab.items;
 
-  const setImages = (updateFn) => {
+  const setItems = (updateFn) => {
     setTabs(prev => prev.map(tab =>
       tab.id === activeTabId
-        ? {
-            ...tab,
-            pages: tab.pages.map((page, idx) =>
-              idx === tab.currentPageIndex
-                ? {
-                    ...page,
-                    images: typeof updateFn === 'function'
-                      ? updateFn(page.images)
-                      : updateFn
-                  }
-                : page
-            )
-          }
+        ? { ...tab, items: typeof updateFn === 'function' ? updateFn(tab.items) : updateFn }
         : tab
     ));
   };
 
-  const setTexts = (updateFn) => {
-    setTabs(prev => prev.map(tab =>
-      tab.id === activeTabId
-        ? {
-            ...tab,
-            pages: tab.pages.map((page, idx) =>
-              idx === tab.currentPageIndex
-                ? {
-                    ...page,
-                    texts: typeof updateFn === 'function'
-                      ? updateFn(page.texts)
-                      : updateFn
-                  }
-                : page
-            )
-          }
-        : tab
-    ));
-  };
-
+  // Load from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem('refTabs');
+    const saved = localStorage.getItem('freeformTabs');
     if (saved) {
-      const loadedTabs = JSON.parse(saved);
-      // Migrate old format to new format
-      const migratedTabs = loadedTabs.map(tab => {
-        if (!tab.pages) {
-          // Old format with leftPage/rightPage - merge into single page
-          const allImages = [
-            ...(tab.leftPage?.images || []),
-            ...(tab.rightPage?.images || [])
-          ];
-          const allTexts = [
-            ...(tab.leftPage?.texts || []),
-            ...(tab.rightPage?.texts || [])
-          ];
-          return {
-            ...tab,
-            pages: [{
-              pageNumber: 1,
-              images: allImages,
-              texts: allTexts
-            }],
-            currentPageIndex: 0
-          };
+      try {
+        const loadedTabs = JSON.parse(saved);
+        setTabs(loadedTabs);
+        if (loadedTabs.length > 0) {
+          setActiveTabId(loadedTabs[0].id);
         }
-        // Migrate pages with leftPage/rightPage to single page
-        if (tab.pages && tab.pages[0]?.leftPage) {
-          return {
-            ...tab,
-            pages: tab.pages.map(page => ({
-              pageNumber: page.pageNumber,
-              images: [
-                ...(page.leftPage?.images || []),
-                ...(page.rightPage?.images || [])
-              ],
-              texts: [
-                ...(page.leftPage?.texts || []),
-                ...(page.rightPage?.texts || [])
-              ]
-            }))
-          };
-        }
-        return tab;
-      });
-      setTabs(migratedTabs);
-      if (migratedTabs.length > 0) {
-        setActiveTabId(migratedTabs[0].id);
+      } catch (e) {
+        console.error('Failed to load tabs:', e);
       }
     }
   }, []);
 
-  // Track mouse position
+  // Save to localStorage
   useEffect(() => {
-    const handleMouseMove = (e) => {
-      if (pageRef.current) {
-        const rect = pageRef.current.getBoundingClientRect();
-        const x = (e.clientX - rect.left) / zoomLevel;
-        const y = (e.clientY - rect.top) / zoomLevel;
-        setLastMousePos({ x, y });
-      }
-    };
+    localStorage.setItem('freeformTabs', JSON.stringify(tabs));
+  }, [tabs]);
 
-    document.addEventListener('mousemove', handleMouseMove);
-    return () => document.removeEventListener('mousemove', handleMouseMove);
-  }, [zoomLevel]);
-
+  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Ignore if typing in input or textarea
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
-      if (e.key === 'Escape' && isFullScreen) {
-        setIsFullScreen(false);
+      // Space for pan mode
+      if (e.code === 'Space') {
+        e.preventDefault();
+        setSpaceKeyPressed(true);
       }
 
-      // T key - set state to true
+      // V for select tool
+      if (e.key === 'v' || e.key === 'V') {
+        setTool('select');
+      }
+
+      // T for text tool
       if (e.key === 't' || e.key === 'T') {
-        setTKeyPressed(true);
+        setTool('text');
       }
 
-      // Ctrl key - enable pan mode
-      if (e.key === 'Control') {
-        setCtrlKeyPressed(true);
+      // N for sticky note
+      if (e.key === 'n' || e.key === 'N') {
+        setTool('sticky');
       }
 
-      // Delete key to remove selected items
-      if (e.key === 'Delete' && (selectedItems.images.length > 0 || selectedItems.texts.length > 0)) {
-        if (selectedItems.images.length > 0) {
-          setImages(prev => prev.filter(img => !selectedItems.images.includes(img.id)));
+      // Delete selected items
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedItems.length > 0) {
+          e.preventDefault();
+          setItems(prev => prev.filter(item => !selectedItems.includes(item.id)));
+          setSelectedItems([]);
         }
-        if (selectedItems.texts.length > 0) {
-          setTexts(prev => prev.filter(txt => !selectedItems.texts.includes(txt.id)));
-        }
-        setSelectedItems({ images: [], texts: [] });
+      }
+
+      // Cmd/Ctrl + A - Select all
+      if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
+        e.preventDefault();
+        setSelectedItems(items.map(item => item.id));
+      }
+
+      // Escape - Deselect all
+      if (e.key === 'Escape') {
+        setSelectedItems([]);
+        setTool('select');
+      }
+
+      // Zoom with Cmd/Ctrl + Plus/Minus
+      if ((e.metaKey || e.ctrlKey) && (e.key === '=' || e.key === '+')) {
+        e.preventDefault();
+        setZoomLevel(prev => Math.min(prev + 0.1, 3));
+      }
+      if ((e.metaKey || e.ctrlKey) && (e.key === '-' || e.key === '_')) {
+        e.preventDefault();
+        setZoomLevel(prev => Math.max(prev - 0.1, 0.25));
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === '0') {
+        e.preventDefault();
+        setZoomLevel(1);
+        setPanOffset({ x: 0, y: 0 });
       }
     };
 
     const handleKeyUp = (e) => {
-      // T key released - set state to false
-      if (e.key === 't' || e.key === 'T') {
-        setTKeyPressed(false);
-      }
-
-      // Ctrl key released - disable pan mode
-      if (e.key === 'Control') {
-        setCtrlKeyPressed(false);
+      if (e.code === 'Space') {
+        setSpaceKeyPressed(false);
         setIsPanning(false);
       }
     };
@@ -199,129 +135,26 @@ function ReferencePanel() {
       document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('keyup', handleKeyUp);
     };
-  }, [isFullScreen, selectedItems, images, texts]);
-
-  const handleToggleFullScreen = () => {
-    setIsFullScreen(!isFullScreen);
-  };
-
-  useEffect(() => {
-    localStorage.setItem('refTabs', JSON.stringify(tabs));
-  }, [tabs]);
+  }, [selectedItems, items]);
 
   // Mouse wheel zoom
   useEffect(() => {
     const handleWheel = (e) => {
-      if (e.ctrlKey) {
+      if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
         const delta = e.deltaY > 0 ? -0.1 : 0.1;
-        setZoomLevel(prev => Math.max(0.5, Math.min(3, prev + delta)));
+        setZoomLevel(prev => Math.max(0.25, Math.min(3, prev + delta)));
       }
     };
 
-    const contentElement = contentRef.current;
-    if (contentElement) {
-      contentElement.addEventListener('wheel', handleWheel, { passive: false });
-      return () => contentElement.removeEventListener('wheel', handleWheel);
+    const canvas = canvasRef.current;
+    if (canvas) {
+      canvas.addEventListener('wheel', handleWheel, { passive: false });
+      return () => canvas.removeEventListener('wheel', handleWheel);
     }
   }, []);
 
-  const addNewTab = () => {
-    const newId = Math.max(...tabs.map(t => t.id), 0) + 1;
-    const newTab = {
-      id: newId,
-      name: `Tab ${newId}`,
-      pages: [{
-        pageNumber: 1,
-        images: [],
-        texts: []
-      }],
-      currentPageIndex: 0
-    };
-    setTabs(prev => [...prev, newTab]);
-    setActiveTabId(newId);
-  };
-
-  const deleteTab = (tabId) => {
-    if (tabs.length === 1) return; // Don't delete last tab
-    const newTabs = tabs.filter(t => t.id !== tabId);
-    setTabs(newTabs);
-    if (activeTabId === tabId) {
-      setActiveTabId(newTabs[0].id);
-    }
-  };
-
-  const renameTab = (tabId, newName) => {
-    setTabs(prev => prev.map(tab =>
-      tab.id === tabId ? { ...tab, name: newName } : tab
-    ));
-  };
-
-  const addNewPage = () => {
-    setTabs(prev => prev.map(tab =>
-      tab.id === activeTabId
-        ? {
-            ...tab,
-            pages: [...tab.pages, {
-              pageNumber: tab.pages.length + 1,
-              images: [],
-              texts: []
-            }]
-          }
-        : tab
-    ));
-  };
-
-  const goToNextPage = () => {
-    setTabs(prev => prev.map(tab =>
-      tab.id === activeTabId && tab.currentPageIndex < tab.pages.length - 1
-        ? { ...tab, currentPageIndex: tab.currentPageIndex + 1 }
-        : tab
-    ));
-  };
-
-  const goToPrevPage = () => {
-    setTabs(prev => prev.map(tab =>
-      tab.id === activeTabId && tab.currentPageIndex > 0
-        ? { ...tab, currentPageIndex: tab.currentPageIndex - 1 }
-        : tab
-    ));
-  };
-
-  const deletePage = () => {
-    if (activeTab.pages.length === 1) return; // Don't delete last page
-    if (window.confirm('Are you sure you want to delete this page?')) {
-      setTabs(prev => prev.map(tab =>
-        tab.id === activeTabId
-          ? {
-              ...tab,
-              pages: tab.pages.filter((_, idx) => idx !== tab.currentPageIndex),
-              currentPageIndex: Math.max(0, tab.currentPageIndex - 1)
-            }
-          : tab
-      ));
-    }
-  };
-
-  const handleFileSelect = (e) => {
-    const files = Array.from(e.target.files);
-    files.forEach((file, index) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setImages(prev => [...prev, {
-          id: Date.now() + index,
-          src: event.target.result,
-          x: 50 + index * 20,
-          y: 50 + index * 20,
-          width: 300,
-          height: 300
-        }]);
-      };
-      reader.readAsDataURL(file);
-    });
-    e.target.value = '';
-  };
-
+  // Paste images
   useEffect(() => {
     const handlePaste = (e) => {
       const items = e.clipboardData.items;
@@ -330,14 +163,16 @@ function ReferencePanel() {
           const blob = items[i].getAsFile();
           const reader = new FileReader();
           reader.onload = (event) => {
-            setImages(prev => [...prev, {
+            const newItem = {
               id: Date.now(),
+              type: 'image',
               src: event.target.result,
-              x: 50,
-              y: 50,
+              x: -panOffset.x / zoomLevel + 100,
+              y: -panOffset.y / zoomLevel + 100,
               width: 300,
               height: 300
-            }]);
+            };
+            setItems(prev => [...prev, newItem]);
           };
           reader.readAsDataURL(blob);
           e.preventDefault();
@@ -348,576 +183,333 @@ function ReferencePanel() {
 
     document.addEventListener('paste', handlePaste);
     return () => document.removeEventListener('paste', handlePaste);
-  }, [activeTabId]);
+  }, [panOffset, zoomLevel]);
 
-  const handleMouseDown = (e, image, isResize) => {
-    const currentPageRef = pageRef;
-
-    if (isResize) {
-      setResizingImage(image);
-      setResizeStart({
-        x: e.clientX,
-        y: e.clientY,
-        width: image.width,
-        height: image.height
-      });
-    } else if (e.ctrlKey || e.metaKey) {
-      // Ctrl+Click to toggle selection
-      setSelectedItems(prev => {
-        const isSelected = prev.images.includes(image.id);
-        return {
-          ...prev,
-          images: isSelected
-            ? prev.images.filter(id => id !== image.id)
-            : [...prev.images, image.id]
+  const handleFileSelect = (e) => {
+    const files = Array.from(e.target.files);
+    files.forEach((file, index) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const newItem = {
+          id: Date.now() + index,
+          type: 'image',
+          src: event.target.result,
+          x: -panOffset.x / zoomLevel + 50 + index * 20,
+          y: -panOffset.y / zoomLevel + 50 + index * 20,
+          width: 300,
+          height: 300
         };
-      });
-    } else {
-      // Direct drag - calculate offset from image top-left
-      if (currentPageRef.current) {
-        const rect = currentPageRef.current.getBoundingClientRect();
-        const offsetX = (e.clientX - rect.left) / zoomLevel - image.x;
-        const offsetY = (e.clientY - rect.top) / zoomLevel - image.y;
-
-        setDraggedImage(image);
-        setDragOffset({ x: offsetX, y: offsetY });
-      }
-    }
-    e.preventDefault();
+        setItems(prev => [...prev, newItem]);
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = '';
   };
 
-  const handleMouseMove = (e) => {
-    const currentPageRef = pageRef;
+  const getCanvasCoords = (clientX, clientY) => {
+    if (!canvasRef.current) return { x: 0, y: 0 };
+    const rect = canvasRef.current.getBoundingClientRect();
+    return {
+      x: (clientX - rect.left - panOffset.x) / zoomLevel,
+      y: (clientY - rect.top - panOffset.y) / zoomLevel
+    };
+  };
 
-    // Right click pan
-    if (isPanning && contentRef.current) {
+  const getItemsInBox = (box) => {
+    return items.filter(item => {
+      // Get item dimensions with padding for easier selection
+      let itemWidth, itemHeight, itemX, itemY;
+      const padding = 20; // Extra padding for text items
+
+      if (item.type === 'image' || item.type === 'sticky') {
+        itemWidth = item.width || 100;
+        itemHeight = item.height || 100;
+        itemX = item.x;
+        itemY = item.y;
+      } else if (item.type === 'text') {
+        // Add padding around text for easier selection
+        itemWidth = Math.max(50, (item.content?.length || 5) * 8) + padding * 2;
+        itemHeight = 30 + padding * 2;
+        itemX = item.x - padding;
+        itemY = item.y - padding;
+      } else {
+        itemWidth = 100;
+        itemHeight = 30;
+        itemX = item.x;
+        itemY = item.y;
+      }
+
+      const itemRight = itemX + itemWidth;
+      const itemBottom = itemY + itemHeight;
+
+      // Check if there's any overlap (even 1px)
+      return !(itemRight <= box.left || itemX >= box.right ||
+               itemBottom <= box.top || itemY >= box.bottom);
+    }).map(item => item.id);
+  };
+
+  const handleCanvasMouseDown = (e) => {
+    if (e.button === 2) return; // Ignore right click
+
+    const coords = getCanvasCoords(e.clientX, e.clientY);
+
+    // Space + drag for panning
+    if (spaceKeyPressed || e.button === 1) {
+      setIsPanning(true);
+      setPanStart({ x: e.clientX, y: e.clientY });
+      e.preventDefault();
+      return;
+    }
+
+    // Text tool - create text
+    if (tool === 'text') {
+      const newItem = {
+        id: Date.now(),
+        type: 'text',
+        content: '',
+        x: coords.x,
+        y: coords.y,
+        fontSize: 16,
+        color: '#ffffff'
+      };
+      setItems(prev => [...prev, newItem]);
+      setEditingTextId(newItem.id);
+      setTool('select');
+      return;
+    }
+
+    // Sticky note tool
+    if (tool === 'sticky') {
+      const newItem = {
+        id: Date.now(),
+        type: 'sticky',
+        content: '',
+        x: coords.x,
+        y: coords.y,
+        width: 200,
+        height: 200,
+        color: '#fef08a' // yellow
+      };
+      setItems(prev => [...prev, newItem]);
+      setEditingTextId(newItem.id);
+      setTool('select');
+      return;
+    }
+
+    // Selection tool - start drawing selection box
+    if (tool === 'select') {
+      setIsDrawingSelection(true);
+      setSelectionBox({ startX: coords.x, startY: coords.y, currentX: coords.x, currentY: coords.y });
+      setSelectedItems([]); // Clear selection when starting new box
+      setHoveredItems([]); // Clear hovered items
+      return;
+    }
+  };
+
+  const handleCanvasMouseMove = (e) => {
+    if (isPanning) {
       const deltaX = e.clientX - panStart.x;
       const deltaY = e.clientY - panStart.y;
-
-      contentRef.current.scrollLeft = panStart.scrollLeft - deltaX;
-      contentRef.current.scrollTop = panStart.scrollTop - deltaY;
+      setPanOffset(prev => ({ x: prev.x + deltaX, y: prev.y + deltaY }));
+      setPanStart({ x: e.clientX, y: e.clientY });
       return;
     }
 
-    // Selection box update
-    if (isSelecting && currentPageRef.current) {
-      const rect = currentPageRef.current.getBoundingClientRect();
-      const currentX = (e.clientX - rect.left) / zoomLevel;
-      const currentY = (e.clientY - rect.top) / zoomLevel;
+    if (isDrawingSelection && selectionBox) {
+      const coords = getCanvasCoords(e.clientX, e.clientY);
+      setSelectionBox(prev => ({ ...prev, currentX: coords.x, currentY: coords.y }));
 
-      setSelectionBox(prev => ({
-        ...prev,
-        currentX,
-        currentY
-      }));
-      return;
-    }
-
-    // Drag multiple selected items
-    if (isDraggingSelection) {
-      const deltaX = (e.clientX - selectionDragStart.x) / zoomLevel;
-      const deltaY = (e.clientY - selectionDragStart.y) / zoomLevel;
-
-      setImages(prev => prev.map(img =>
-        selectedItems.images.includes(img.id)
-          ? { ...img, x: img.x + deltaX, y: img.y + deltaY }
-          : img
-      ));
-
-      setTexts(prev => prev.map(txt =>
-        selectedItems.texts.includes(txt.id)
-          ? { ...txt, x: txt.x + deltaX, y: txt.y + deltaY }
-          : txt
-      ));
-
-      setSelectionDragStart({
-        x: e.clientX,
-        y: e.clientY
-      });
-      return;
-    }
-
-    if (draggedImage && currentPageRef.current) {
-      const rect = currentPageRef.current.getBoundingClientRect();
-      const x = (e.clientX - rect.left - dragOffset.x * zoomLevel) / zoomLevel;
-      const y = (e.clientY - rect.top - dragOffset.y * zoomLevel) / zoomLevel;
-
-      setImages(prev => prev.map(img =>
-        img.id === draggedImage.id ? { ...img, x, y } : img
-      ));
-    }
-
-    if (resizingImage) {
-      const deltaX = (e.clientX - resizeStart.x) / zoomLevel;
-      const deltaY = (e.clientY - resizeStart.y) / zoomLevel;
-      const newWidth = Math.max(100, resizeStart.width + deltaX);
-      const newHeight = Math.max(100, resizeStart.height + deltaY);
-
-      setImages(prev => prev.map(img =>
-        img.id === resizingImage.id ? { ...img, width: newWidth, height: newHeight } : img
-      ));
+      // Update hovered items in real-time
+      const box = {
+        left: Math.min(selectionBox.startX, coords.x),
+        right: Math.max(selectionBox.startX, coords.x),
+        top: Math.min(selectionBox.startY, coords.y),
+        bottom: Math.max(selectionBox.startY, coords.y)
+      };
+      setHoveredItems(getItemsInBox(box));
     }
   };
 
-  const handleMouseUp = () => {
-    setDraggedImage(null);
-    setResizingImage(null);
+  const handleCanvasMouseUp = () => {
     setIsPanning(false);
 
-    // Selection box complete
-    if (isSelecting && selectionBox) {
+    if (isDrawingSelection && selectionBox) {
       const box = {
         left: Math.min(selectionBox.startX, selectionBox.currentX),
-        top: Math.min(selectionBox.startY, selectionBox.currentY),
         right: Math.max(selectionBox.startX, selectionBox.currentX),
+        top: Math.min(selectionBox.startY, selectionBox.currentY),
         bottom: Math.max(selectionBox.startY, selectionBox.currentY)
       };
 
-      const boxSelectedImages = images.filter(img => {
-        const imgCenterX = img.x + img.width / 2;
-        const imgCenterY = img.y + img.height / 2;
-        return imgCenterX >= box.left && imgCenterX <= box.right &&
-               imgCenterY >= box.top && imgCenterY <= box.bottom;
-      });
+      const selected = getItemsInBox(box);
 
-      const boxSelectedTexts = texts.filter(txt => {
-        const txtCenterX = txt.x + 50;
-        const txtCenterY = txt.y + 10;
-        return txtCenterX >= box.left && txtCenterX <= box.right &&
-               txtCenterY >= box.top && txtCenterY <= box.bottom;
-      });
-
-      // Add to existing selection (toggle: add if not selected, remove if already selected)
-      setSelectedItems(prev => {
-        const newImageIds = boxSelectedImages.map(img => img.id);
-        const newTextIds = boxSelectedTexts.map(txt => txt.id);
-
-        // Toggle images: add if not in prev, keep prev if not in box selection
-        const toggledImages = [
-          ...prev.images.filter(id => !newImageIds.includes(id)),
-          ...newImageIds.filter(id => !prev.images.includes(id))
-        ];
-
-        // Toggle texts
-        const toggledTexts = [
-          ...prev.texts.filter(id => !newTextIds.includes(id)),
-          ...newTextIds.filter(id => !prev.texts.includes(id))
-        ];
-
-        return {
-          images: toggledImages,
-          texts: toggledTexts
-        };
-      });
+      setSelectedItems(selected);
+      setSelectionBox(null);
+      setIsDrawingSelection(false);
+      setHoveredItems([]); // Clear hovered items
     }
-
-    setIsSelecting(false);
-    setSelectionBox(null);
-    setIsDraggingSelection(false);
   };
 
   useEffect(() => {
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('mousemove', handleCanvasMouseMove);
+    document.addEventListener('mouseup', handleCanvasMouseUp);
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('mousemove', handleCanvasMouseMove);
+      document.removeEventListener('mouseup', handleCanvasMouseUp);
     };
-  }, [draggedImage, resizingImage, dragOffset, resizeStart, isSelecting, selectionBox, images, texts, isDraggingSelection, selectionDragStart, selectedItems, isPanning, panStart]);
+  }, [isPanning, panStart, selectionBox, isDrawingSelection, items]);
 
-  const deleteImage = (id) => {
-    setImages(prev => prev.filter(img => img.id !== id));
-  };
-
-  const handlePanelMouseDown = (e) => {
-    const currentPageRef = pageRef;
-
-    // Right click OR Ctrl + left click for panning
-    if (e.button === 2 || (ctrlKeyPressed && e.button === 0)) {
-      setIsPanning(true);
-      setPanStart({
-        x: e.clientX,
-        y: e.clientY,
-        scrollTop: contentRef.current.scrollTop,
-        scrollLeft: contentRef.current.scrollLeft
-      });
-      e.preventDefault();
+  const handleItemMouseDown = (e, item) => {
+    // Don't interfere with other tools
+    if (tool !== 'select') {
+      e.stopPropagation();
       return;
     }
 
-    // Check if clicking on empty canvas area
-    const isCanvasArea = e.target.classList.contains('ref-page') ||
-                         e.target.classList.contains('ref-empty-state') ||
-                         e.target.classList.contains('notebook-lines');
-
-    // T key + left click to add text
-    if (tKeyPressed && isCanvasArea && e.button === 0 && currentPageRef.current) {
-      const rect = currentPageRef.current.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / zoomLevel;
-      const y = (e.clientY - rect.top) / zoomLevel;
-
-      const newText = {
-        id: Date.now(),
-        content: '',
-        x,
-        y
-      };
-
-      setTexts(prev => [...prev, newText]);
-      setEditingTextId(newText.id);
-      e.preventDefault();
-      return;
-    }
-
-    // Shift + left click for selection box
-    if (e.shiftKey && isCanvasArea && e.button === 0 && currentPageRef.current) {
-      const rect = currentPageRef.current.getBoundingClientRect();
-      const startX = (e.clientX - rect.left) / zoomLevel;
-      const startY = (e.clientY - rect.top) / zoomLevel;
-
-      setIsSelecting(true);
-      setSelectionBox({
-        startX,
-        startY,
-        currentX: startX,
-        currentY: startY
-      });
-
-      // Don't clear selection - keep existing selection for multi-select
-      e.preventDefault();
-    } else if (isCanvasArea && e.button === 0) {
-      // Click on empty area without Shift or T - deselect all
-      setSelectedItems({ images: [], texts: [] });
-    }
-  };
-
-  const handleDoubleClick = (e) => {
-    const currentPageRef = pageRef;
-
-    // Double click to create text
-    const isCanvasArea = e.target.classList.contains('ref-page') ||
-                         e.target.classList.contains('ref-empty-state') ||
-                         e.target.classList.contains('notebook-lines');
-
-    if (isCanvasArea && currentPageRef.current) {
-      const rect = currentPageRef.current.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / zoomLevel;
-      const y = (e.clientY - rect.top) / zoomLevel;
-
-      const newText = {
-        id: Date.now(),
-        content: '',
-        x,
-        y
-      };
-
-      setTexts(prev => [...prev, newText]);
-      setEditingTextId(newText.id);
-    }
-  };
-
-  const handleTextMouseDown = (e, text) => {
-    const currentPageRef = pageRef;
-
-    if (e.ctrlKey || e.metaKey) {
-      // Ctrl+Click to toggle selection
-      setSelectedItems(prev => {
-        const isSelected = prev.texts.includes(text.id);
-        return {
-          ...prev,
-          texts: isSelected
-            ? prev.texts.filter(id => id !== text.id)
-            : [...prev.texts, text.id]
-        };
-      });
-    } else if (currentPageRef.current) {
-      const rect = currentPageRef.current.getBoundingClientRect();
-      const offsetX = (e.clientX - rect.left) / zoomLevel - text.x;
-      const offsetY = (e.clientY - rect.top) / zoomLevel - text.y;
-
-      setDraggedText(text);
-      setDragOffset({ x: offsetX, y: offsetY });
-    }
-
-    e.preventDefault();
+    // Stop event propagation so canvas mousedown doesn't trigger
     e.stopPropagation();
+    e.preventDefault();
+
+    if (e.shiftKey || e.metaKey || e.ctrlKey) {
+      // Multi-select with modifier keys
+      if (selectedItems.includes(item.id)) {
+        setSelectedItems(prev => prev.filter(id => id !== item.id));
+      } else {
+        setSelectedItems(prev => [...prev, item.id]);
+      }
+      return;
+    }
+
+    // Single select - only select if not already selected
+    if (!selectedItems.includes(item.id)) {
+      setSelectedItems([item.id]);
+    }
+
+    // Start dragging
+    const coords = getCanvasCoords(e.clientX, e.clientY);
+    setDraggedItem(item);
+    setDragOffset({ x: coords.x - item.x, y: coords.y - item.y });
   };
 
-  const handleTextMouseMove = (e) => {
-    const currentPageRef = pageRef;
+  const handleItemMouseMove = (e) => {
+    if (draggedItem) {
+      const coords = getCanvasCoords(e.clientX, e.clientY);
+      const newX = coords.x - dragOffset.x;
+      const newY = coords.y - dragOffset.y;
 
-    if (draggedText && currentPageRef.current) {
-      const rect = currentPageRef.current.getBoundingClientRect();
-      const x = (e.clientX - rect.left - dragOffset.x * zoomLevel) / zoomLevel;
-      const y = (e.clientY - rect.top - dragOffset.y * zoomLevel) / zoomLevel;
+      setItems(prev => prev.map(item => {
+        if (item.id === draggedItem.id) {
+          return { ...item, x: newX, y: newY };
+        }
+        if (selectedItems.includes(item.id) && item.id !== draggedItem.id) {
+          const deltaX = newX - draggedItem.x;
+          const deltaY = newY - draggedItem.y;
+          return { ...item, x: item.x + deltaX, y: item.y + deltaY };
+        }
+        return item;
+      }));
 
-      setTexts(prev => prev.map(txt =>
-        txt.id === draggedText.id ? { ...txt, x, y } : txt
+      // Don't update draggedItem state, just track position internally
+      draggedItem.x = newX;
+      draggedItem.y = newY;
+    }
+
+    if (resizingItem) {
+      const coords = getCanvasCoords(e.clientX, e.clientY);
+      const deltaX = coords.x - resizeStart.x;
+      const deltaY = coords.y - resizeStart.y;
+      const newWidth = Math.max(50, resizeStart.width + deltaX);
+      const newHeight = Math.max(50, resizeStart.height + deltaY);
+
+      setItems(prev => prev.map(item =>
+        item.id === resizingItem.id ? { ...item, width: newWidth, height: newHeight } : item
       ));
     }
   };
 
-  const handleTextMouseUp = () => {
-    setDraggedText(null);
+  const handleItemMouseUp = () => {
+    setDraggedItem(null);
+    setResizingItem(null);
   };
 
   useEffect(() => {
-    if (draggedText) {
-      document.addEventListener('mousemove', handleTextMouseMove);
-      document.addEventListener('mouseup', handleTextMouseUp);
-      return () => {
-        document.removeEventListener('mousemove', handleTextMouseMove);
-        document.removeEventListener('mouseup', handleTextMouseUp);
-      };
+    const handleMove = (e) => {
+      if (!draggedItem && !resizingItem) return;
+      handleItemMouseMove(e);
+    };
+
+    const handleUp = () => {
+      if (!draggedItem && !resizingItem) return;
+      handleItemMouseUp();
+    };
+
+    document.addEventListener('mousemove', handleMove);
+    document.addEventListener('mouseup', handleUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMove);
+      document.removeEventListener('mouseup', handleUp);
+    };
+  }, [draggedItem, resizingItem, selectedItems, dragOffset, resizeStart]);
+
+  const handleResizeMouseDown = (e, item) => {
+    e.stopPropagation();
+    const coords = getCanvasCoords(e.clientX, e.clientY);
+    setResizingItem(item);
+    setResizeStart({ x: coords.x, y: coords.y, width: item.width, height: item.height });
+  };
+
+  const addNewTab = () => {
+    const newId = Math.max(...tabs.map(t => t.id), 0) + 1;
+    const newTab = { id: newId, name: `Board ${newId}`, items: [] };
+    setTabs(prev => [...prev, newTab]);
+    setActiveTabId(newId);
+  };
+
+  const deleteTab = (tabId) => {
+    if (tabs.length === 1) return;
+    const newTabs = tabs.filter(t => t.id !== tabId);
+    setTabs(newTabs);
+    if (activeTabId === tabId) {
+      setActiveTabId(newTabs[0].id);
     }
-  }, [draggedText, dragOffset]);
-
-  const deleteText = (id) => {
-    setTexts(prev => prev.filter(txt => txt.id !== id));
   };
 
-  const handleTextEdit = (id, newContent) => {
-    setTexts(prev => prev.map(txt =>
-      txt.id === id ? { ...txt, content: newContent } : txt
-    ));
-  };
-
-  const handleContextMenu = (e) => {
-    e.preventDefault();
-  };
-
-  const handleDeleteSelected = () => {
-    if (selectedItems.images.length > 0) {
-      setImages(prev => prev.filter(img => !selectedItems.images.includes(img.id)));
-    }
-    if (selectedItems.texts.length > 0) {
-      setTexts(prev => prev.filter(txt => !selectedItems.texts.includes(txt.id)));
-    }
-    setSelectedItems({ images: [], texts: [] });
-  };
-
-  const selectedCount = selectedItems.images.length + selectedItems.texts.length;
-
-  const handleZoomIn = () => {
-    setZoomLevel(prev => Math.min(prev + 0.1, 3));
-  };
-
-  const handleZoomOut = () => {
-    setZoomLevel(prev => Math.max(prev - 0.1, 0.5));
-  };
-
-  const handleZoomReset = () => {
-    setZoomLevel(1);
-  };
-
-  // Helper to render the page
-  const renderPage = () => {
-    const pageImages = currentPage.images;
-    const pageTexts = currentPage.texts;
-
-    return (
-      <div
-        ref={pageRef}
-        className="ref-page ref-page-single"
-        onContextMenu={handleContextMenu}
-        onMouseDown={(e) => handlePanelMouseDown(e)}
-        onDoubleClick={(e) => handleDoubleClick(e)}
-        style={{
-          transform: `scale(${zoomLevel})`,
-          transformOrigin: 'top left',
-          cursor: ctrlKeyPressed ? 'grab' : isPanning ? 'grabbing' : 'default'
-        }}
-      >
-          {/* Notebook lines */}
-          <div className="notebook-lines"></div>
-
-        {pageImages.length === 0 && pageTexts.length === 0 ? (
-          <div className="ref-empty-state">
-            <div style={{ fontSize: '48px', marginBottom: '10px' }}>🖼️</div>
-            <div>Double-click to add text</div>
-            <div style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
-              Or paste images with Ctrl+V
-            </div>
-          </div>
-        ) : null}
-
-        {/* Always show images from this page */}
-        {pageImages.map(image => (
-          <div
-            key={image.id}
-            className={`ref-image-container ${draggedImage?.id === image.id || selectedItems.images.includes(image.id) ? 'selected' : ''}`}
-            style={{
-              left: `${image.x}px`,
-              top: `${image.y}px`,
-              width: `${image.width}px`,
-              height: `${image.height}px`,
-              cursor: 'pointer'
-            }}
-            onMouseDown={(e) => handleMouseDown(e, image, false)}
-          >
-            <img
-              src={image.src}
-              alt="Reference"
-              onClick={(e) => {
-                if (!draggedImage && !resizingImage) {
-                  e.stopPropagation();
-                  setPreviewImage(image.src);
-                }
-              }}
-            />
-            <button
-              className="ref-image-delete"
-              onClick={(e) => {
-                e.stopPropagation();
-                deleteImage(image.id);
-              }}
-            >
-              ×
-            </button>
-            <div
-              className="ref-image-resize"
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                handleMouseDown(e, image, true);
-              }}
-            />
-          </div>
-        ))}
-
-        {/* Simple text elements */}
-        {pageTexts.map(text => {
-          const isEditing = editingTextId === text.id;
-          const lineCount = text.content.split('\n').length;
-          const maxLineLength = Math.max(...text.content.split('\n').map(line => line.length), 10);
-
-          return (
-            <textarea
-              key={text.id}
-              value={text.content}
-              readOnly={!isEditing}
-              style={{
-                position: 'absolute',
-                left: `${text.x}px`,
-                top: `${text.y}px`,
-                color: '#ffffff',
-                fontSize: '16px',
-                width: `${Math.max(100, maxLineLength * 10 + 20)}px`,
-                height: `${Math.max(25, lineCount * 22)}px`,
-                padding: '2px 4px',
-                outline: 'none',
-                cursor: isEditing ? 'text' : 'pointer',
-                border: selectedItems.texts.includes(text.id)
-                  ? '2px solid #4A90E2'
-                  : (isEditing ? '2px solid #4A90E2' : 'none'),
-                background: selectedItems.texts.includes(text.id)
-                  ? 'rgba(74, 144, 226, 0.2)'
-                  : (isEditing ? 'rgba(74, 144, 226, 0.1)' : 'transparent'),
-                direction: 'ltr',
-                textAlign: 'left',
-                pointerEvents: 'auto',
-                resize: 'none',
-                overflow: 'hidden',
-                fontFamily: 'inherit',
-                lineHeight: '22px'
-              }}
-              onChange={(e) => handleTextEdit(text.id, e.target.value)}
-              onClick={(e) => e.stopPropagation()}
-              onMouseDown={(e) => {
-                if (!isEditing) {
-                  handleTextMouseDown(e, text);
-                }
-              }}
-              onDoubleClick={(e) => {
-                e.stopPropagation();
-                setEditingTextId(text.id);
-              }}
-              onKeyDown={(e) => {
-                // Right Shift + Enter için alt satıra geçiş
-                if (e.key === 'Enter' && e.shiftKey && e.location === 2) {
-                  // location === 2 means right shift
-                  e.preventDefault();
-                  const cursorPos = e.target.selectionStart;
-                  const newContent = text.content.slice(0, cursorPos) + '\n' + text.content.slice(cursorPos);
-                  handleTextEdit(text.id, newContent);
-                  // Cursor pozisyonunu yeni satırın başına taşı
-                  setTimeout(() => {
-                    e.target.selectionStart = e.target.selectionEnd = cursorPos + 1;
-                  }, 0);
-                } else if (e.key === 'Escape' && isEditing) {
-                  setEditingTextId(null);
-                }
-              }}
-              onBlur={(e) => {
-                if (isEditing) {
-                  setEditingTextId(null);
-                  // Boş yazıları sil
-                  if (text.content.trim() === '') {
-                    const pageToUpdate = page === 'left' ? 'left' : 'right';
-                    setTexts(prev => prev.filter(t => t.id !== text.id), pageToUpdate);
-                  }
-                }
-              }}
-              autoFocus={text.content === '' || isEditing}
-            />
-          );
-        })}
-
-        {selectionBox && (
-          <div
-            className="selection-box"
-            style={{
-              left: `${Math.min(selectionBox.startX, selectionBox.currentX)}px`,
-              top: `${Math.min(selectionBox.startY, selectionBox.currentY)}px`,
-              width: `${Math.abs(selectionBox.currentX - selectionBox.startX)}px`,
-              height: `${Math.abs(selectionBox.currentY - selectionBox.startY)}px`
-            }}
-          />
-        )}
-      </div>
-    );
+  const renameTab = (tabId, newName) => {
+    setTabs(prev => prev.map(tab => tab.id === tabId ? { ...tab, name: newName } : tab));
   };
 
   return (
-    <div className={`ref-panel-box ${isFullScreen ? 'fullscreen' : ''}`}>
-      <div className="ref-panel-header">
-        <div className="ref-panel-actions">
-          {selectedCount > 0 && (
-            <button
-              className="ref-btn ref-btn-delete"
-              onClick={handleDeleteSelected}
-              title={`Delete ${selectedCount} selected item${selectedCount > 1 ? 's' : ''}`}
-            >
-              🗑️ Delete ({selectedCount})
-            </button>
-          )}
-          <button className="ref-btn" onClick={goToPrevPage} disabled={activeTab.currentPageIndex === 0} title="Previous page">
-            ←
+    <div className="freeform-container">
+      {/* Toolbar */}
+      <div className="freeform-toolbar">
+        <div className="freeform-tools">
+          <button
+            className={`freeform-tool-btn ${tool === 'select' ? 'active' : ''}`}
+            onClick={() => setTool('select')}
+            title="Select (V)"
+          >
+            ↖️
           </button>
-          <span className="ref-btn" style={{ cursor: 'default', minWidth: '100px' }}>
-            Page {activeTab.currentPageIndex + 1} / {activeTab.pages.length}
-          </span>
-          <button className="ref-btn" onClick={goToNextPage} disabled={activeTab.currentPageIndex === activeTab.pages.length - 1} title="Next page">
-            →
+          <button
+            className={`freeform-tool-btn ${tool === 'text' ? 'active' : ''}`}
+            onClick={() => setTool('text')}
+            title="Text (T)"
+          >
+            T
           </button>
-          <button className="ref-btn" onClick={addNewPage} style={{ background: '#5cb85c', color: '#fff' }} title="Add new page">
-            + Add Page
+          <button
+            className={`freeform-tool-btn ${tool === 'sticky' ? 'active' : ''}`}
+            onClick={() => setTool('sticky')}
+            title="Sticky Note (N)"
+          >
+            📝
           </button>
-          <button className="ref-btn" onClick={deletePage} disabled={activeTab.pages.length === 1} style={{ background: activeTab.pages.length === 1 ? '#3a3a3a' : '#dc3545', color: activeTab.pages.length === 1 ? '#666' : '#fff' }} title="Delete current page">
-            🗑️ Delete Page
-          </button>
-          <div className="zoom-controls">
-            <button className="ref-btn" onClick={handleZoomOut} title="Zoom Out">
-              −
-            </button>
-            <button className="ref-btn" onClick={handleZoomReset} title="Reset Zoom">
-              {Math.round(zoomLevel * 100)}%
-            </button>
-            <button className="ref-btn" onClick={handleZoomIn} title="Zoom In">
-              +
-            </button>
-          </div>
-          <button className="ref-btn" onClick={handleToggleFullScreen}>
-            {isFullScreen ? '🗗 Exit' : '🗖 Full Screen'}
+          <button
+            className="freeform-tool-btn"
+            onClick={() => fileInputRef.current?.click()}
+            title="Add Image"
+          >
+            🖼️
           </button>
           <input
             ref={fileInputRef}
@@ -927,111 +519,219 @@ function ReferencePanel() {
             style={{ display: 'none' }}
             onChange={handleFileSelect}
           />
-          <button className="ref-btn" onClick={() => fileInputRef.current.click()}>
-            + Add Image
-          </button>
         </div>
+
+        <div className="freeform-zoom">
+          <button onClick={() => setZoomLevel(prev => Math.max(prev - 0.1, 0.25))}>−</button>
+          <span>{Math.round(zoomLevel * 100)}%</span>
+          <button onClick={() => setZoomLevel(prev => Math.min(prev + 0.1, 3))}>+</button>
+          <button onClick={() => { setZoomLevel(1); setPanOffset({ x: 0, y: 0 }); }}>Reset</button>
+        </div>
+
+        {selectedItems.length > 0 && (
+          <div className="freeform-selection-info">
+            {selectedItems.length} selected
+            <button onClick={() => {
+              setItems(prev => prev.filter(item => !selectedItems.includes(item.id)));
+              setSelectedItems([]);
+            }}>Delete</button>
+          </div>
+        )}
       </div>
 
-      <div className="ref-tabs">
+      {/* Tabs */}
+      <div className="freeform-tabs">
         {tabs.map(tab => (
           <div
             key={tab.id}
-            className={`ref-tab ${tab.id === activeTabId ? 'active' : ''}`}
+            className={`freeform-tab ${tab.id === activeTabId ? 'active' : ''}`}
             onClick={() => setActiveTabId(tab.id)}
           >
             {editingTabId === tab.id ? (
               <input
-                className="ref-tab-input"
+                className="freeform-tab-input"
                 value={tab.name}
                 onChange={(e) => renameTab(tab.id, e.target.value)}
                 onBlur={() => setEditingTabId(null)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') setEditingTabId(null);
-                  if (e.key === 'Escape') setEditingTabId(null);
+                  if (e.key === 'Enter' || e.key === 'Escape') setEditingTabId(null);
                 }}
                 autoFocus
-                onFocus={(e) => e.target.select()}
                 onClick={(e) => e.stopPropagation()}
               />
             ) : (
-              <span onDoubleClick={(e) => {
-                e.stopPropagation();
-                setEditingTabId(tab.id);
-              }}>
+              <span onDoubleClick={(e) => { e.stopPropagation(); setEditingTabId(tab.id); }}>
                 {tab.name}
               </span>
             )}
             {tabs.length > 1 && (
               <button
-                className="ref-tab-close"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  deleteTab(tab.id);
-                }}
-                title="Close tab"
-              >
-                ×
-              </button>
+                className="freeform-tab-close"
+                onClick={(e) => { e.stopPropagation(); deleteTab(tab.id); }}
+              >×</button>
             )}
           </div>
         ))}
-        <button className="ref-tab-add" onClick={addNewTab} title="Add new tab">
-          +
-        </button>
+        <button className="freeform-tab-add" onClick={addNewTab}>+</button>
       </div>
 
-      {/* Keyboard Shortcuts Hints */}
-      <div className="ref-hints">
-        <div className="ref-hint-item">
-          <span className="ref-hint-key">Double Click</span>
-          <span className="ref-hint-desc">Rename tab</span>
-        </div>
-        <div className="ref-hint-item">
-          <span className="ref-hint-key">T</span>
-          <span className="ref-hint-desc">Add text (click to place)</span>
-        </div>
-        <div className="ref-hint-item">
-          <span className="ref-hint-key">Ctrl + V</span>
-          <span className="ref-hint-desc">Paste image</span>
-        </div>
-        <div className="ref-hint-item">
-          <span className="ref-hint-key">Drag</span>
-          <span className="ref-hint-desc">Select multiple items</span>
-        </div>
-        <div className="ref-hint-item">
-          <span className="ref-hint-key">Ctrl + Wheel</span>
-          <span className="ref-hint-desc">Zoom in/out</span>
-        </div>
-        <div className="ref-hint-item">
-          <span className="ref-hint-key">Ctrl + Drag / Right Click</span>
-          <span className="ref-hint-desc">Pan view</span>
-        </div>
-      </div>
-
-      <div ref={contentRef} className="ref-panel-content">
-        <div className="ref-notebook-single">
-          {renderPage()}
-        </div>
-      </div>
-
-      {/* Image Preview Modal */}
-      {previewImage && (
+      {/* Canvas */}
+      <div
+        ref={canvasRef}
+        className="freeform-canvas"
+        onMouseDown={handleCanvasMouseDown}
+        onContextMenu={(e) => e.preventDefault()}
+        style={{ cursor: spaceKeyPressed || isPanning ? 'grab' : tool === 'text' ? 'text' : 'default' }}
+      >
         <div
-          className="ref-image-preview-modal"
-          onClick={() => setPreviewImage(null)}
+          className="freeform-content"
+          style={{
+            transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomLevel})`,
+            transformOrigin: '0 0'
+          }}
         >
-          <div className="ref-image-preview-content" onClick={(e) => e.stopPropagation()}>
-            <button
-              className="ref-image-preview-close"
-              onClick={() => setPreviewImage(null)}
-            >
-              ×
-            </button>
-            <img src={previewImage} alt="Preview" />
-          </div>
+          {/* Grid background */}
+          <div className="freeform-grid"></div>
+
+          {/* Items */}
+          {items.map(item => {
+            const isSelected = selectedItems.includes(item.id);
+            const isHovered = hoveredItems.includes(item.id);
+
+            if (item.type === 'image') {
+              return (
+                <div
+                  key={item.id}
+                  className={`freeform-item freeform-image ${isSelected || isHovered ? 'selected' : ''}`}
+                  style={{
+                    left: `${item.x}px`,
+                    top: `${item.y}px`,
+                    width: `${item.width}px`,
+                    height: `${item.height}px`
+                  }}
+                  onMouseDown={(e) => handleItemMouseDown(e, item)}
+                >
+                  <img src={item.src} alt="" draggable={false} />
+                  {isSelected && (
+                    <div
+                      className="freeform-resize-handle"
+                      onMouseDown={(e) => handleResizeMouseDown(e, item)}
+                    />
+                  )}
+                </div>
+              );
+            }
+
+            if (item.type === 'text') {
+              const isEditing = editingTextId === item.id;
+              return (
+                <div
+                  key={item.id}
+                  className={`freeform-item freeform-text ${!isEditing && (isSelected || isHovered) ? 'selected' : ''}`}
+                  style={{
+                    left: `${item.x}px`,
+                    top: `${item.y}px`,
+                    fontSize: `${item.fontSize}px`,
+                    color: item.color
+                  }}
+                  onMouseDown={(e) => !isEditing && handleItemMouseDown(e, item)}
+                  onClick={(e) => {
+                    if (!isEditing) {
+                      e.stopPropagation();
+                      setEditingTextId(item.id);
+                    }
+                  }}
+                >
+                  {editingTextId === item.id ? (
+                    <textarea
+                      className="freeform-text-input"
+                      value={item.content}
+                      onChange={(e) => setItems(prev => prev.map(i =>
+                        i.id === item.id ? { ...i, content: e.target.value } : i
+                      ))}
+                      onBlur={() => setEditingTextId(null)}
+                      autoFocus
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  ) : (
+                    <div className="freeform-text-content">{item.content || 'Double-click to edit'}</div>
+                  )}
+                </div>
+              );
+            }
+
+            if (item.type === 'sticky') {
+              const isEditing = editingTextId === item.id;
+              return (
+                <div
+                  key={item.id}
+                  className={`freeform-item freeform-sticky ${!isEditing && (isSelected || isHovered) ? 'selected' : ''}`}
+                  style={{
+                    left: `${item.x}px`,
+                    top: `${item.y}px`,
+                    width: `${item.width}px`,
+                    height: `${item.height}px`,
+                    backgroundColor: item.color
+                  }}
+                  onMouseDown={(e) => !isEditing && handleItemMouseDown(e, item)}
+                  onClick={(e) => {
+                    if (!isEditing) {
+                      e.stopPropagation();
+                      setEditingTextId(item.id);
+                    }
+                  }}
+                >
+                  {editingTextId === item.id ? (
+                    <textarea
+                      className="freeform-sticky-input"
+                      value={item.content}
+                      onChange={(e) => setItems(prev => prev.map(i =>
+                        i.id === item.id ? { ...i, content: e.target.value } : i
+                      ))}
+                      onBlur={() => setEditingTextId(null)}
+                      autoFocus
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  ) : (
+                    <div className="freeform-sticky-content">{item.content || 'Double-click to edit'}</div>
+                  )}
+                  {isSelected && (
+                    <div
+                      className="freeform-resize-handle"
+                      onMouseDown={(e) => handleResizeMouseDown(e, item)}
+                    />
+                  )}
+                </div>
+              );
+            }
+
+            return null;
+          })}
+
+          {/* Selection box */}
+          {selectionBox && (
+            <div
+              className="freeform-selection-box"
+              style={{
+                left: `${Math.min(selectionBox.startX, selectionBox.currentX)}px`,
+                top: `${Math.min(selectionBox.startY, selectionBox.currentY)}px`,
+                width: `${Math.abs(selectionBox.currentX - selectionBox.startX)}px`,
+                height: `${Math.abs(selectionBox.currentY - selectionBox.startY)}px`
+              }}
+            />
+          )}
         </div>
-      )}
+      </div>
+
+      {/* Keyboard hints */}
+      <div className="freeform-hints">
+        <div><kbd>V</kbd> Select</div>
+        <div><kbd>T</kbd> Text</div>
+        <div><kbd>N</kbd> Note</div>
+        <div><kbd>Space</kbd> Pan</div>
+        <div><kbd>Shift</kbd> Multi-select</div>
+        <div><kbd>Cmd/Ctrl + Wheel</kbd> Zoom</div>
+      </div>
     </div>
   );
 }
