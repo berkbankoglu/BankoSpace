@@ -1420,7 +1420,7 @@ h1 {
     position: relative;
 }
 
-.settings-btn {
+.settings-btn, .refresh-btn {
     padding: 8px 16px;
     background: #2a2a2a;
     color: #e0e0e0;
@@ -1434,9 +1434,30 @@ h1 {
     gap: 6px;
 }
 
-.settings-btn:hover {
+.settings-btn:hover, .refresh-btn:hover:not(:disabled) {
     background: #3a3a3a;
     border-color: #555;
+}
+
+.refresh-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.sync-status {
+    font-size: 14px;
+    color: #999;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.sync-status.synced {
+    color: #4CAF50;
+    animation: none;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
 }
 
 .settings-dropdown {
