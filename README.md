@@ -2,17 +2,17 @@
 
 **Modern productivity app with task management, goals, flashcards, and more.**
 
-![Version](https://img.shields.io/badge/version-7.0.1-blue.svg)
-![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue.svg)
+![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS-blue.svg)
 
 ---
 
-## 📥 Download Latest Version (v7.0.1)
+## 📥 Download
 
 ### Windows
-**[⬇️ Download for Windows](https://github.com/berkbankoglu/BankoSpace/releases/latest/download/BankoSpace-Setup.exe)**
+**[⬇️ Download BankoSpace Installer (.exe)](https://github.com/berkbankoglu/BankoSpace/releases/download/v1.0.0/BankoSpace-Installer.exe)**
 
-Alternative: [Windows MSI Installer](https://github.com/berkbankoglu/BankoSpace/releases/latest/download/BankoSpace-Setup.msi)
+**[⬇️ Download BankoSpace Setup (.msi)](https://github.com/berkbankoglu/BankoSpace/releases/download/v1.0.0/BankoSpace-Setup.msi)**
 
 **Installation:**
 - Download and run the installer
@@ -20,25 +20,12 @@ Alternative: [Windows MSI Installer](https://github.com/berkbankoglu/BankoSpace/
 
 ---
 
-### macOS
-**[⬇️ Download for macOS (Apple Silicon)](https://github.com/berkbankoglu/BankoSpace/releases/latest/download/BankoSpace_7.0.1_aarch64.dmg)**
-
-**[⬇️ Download for macOS (Intel)](https://github.com/berkbankoglu/BankoSpace/releases/latest/download/BankoSpace_7.0.1_x64.dmg)**
+### macOS (Apple Silicon)
+**[⬇️ Download for macOS](https://github.com/berkbankoglu/BankoSpace/releases/download/v1.0.0/BankoSpace_1.0.0_aarch64.dmg)**
 
 **Installation:**
 - Download the .dmg file
 - Open and drag to Applications folder
-
----
-
-### Linux
-**[⬇️ Download AppImage](https://github.com/berkbankoglu/BankoSpace/releases/latest/download/BankoSpace_7.0.1_amd64.AppImage)**
-
-Alternative: [Debian Package (.deb)](https://github.com/berkbankoglu/BankoSpace/releases/latest/download/BankoSpace_7.0.1_amd64.deb)
-
-**Installation:**
-- Make executable: `chmod +x BankoSpace*.AppImage`
-- Run: `./BankoSpace*.AppImage`
 
 ---
 
@@ -52,31 +39,14 @@ Alternative: [Debian Package (.deb)](https://github.com/berkbankoglu/BankoSpace/
 - 🔥 **Productivity Heatmap** - Visualize your daily achievements
 - ☁️ **Cloud Sync** - Sync data across all devices with Firebase
 - 🌙 **Dark/Light Theme** - Beautiful themes for any time of day
-- 🔄 **Auto-Update** - Automatic updates (v7.0.1+)
 
 ---
 
-## 🔄 Auto-Update System
+## 🔒 About This Repository
 
-Starting from **v7.0.1**, BankoSpace automatically updates itself!
+This repository contains only download links for BankoSpace.
 
-- ✅ Install once, updates come automatically
-- ✅ No need to manually download new versions
-- ✅ Update notifications appear in-app
-- ✅ One-click update with app restart
-
-**How it works:**
-1. App checks for updates on startup
-2. Checks every hour in the background
-3. Notifies you when new version is available
-4. Downloads and installs with one click
-5. Restarts automatically after update
-
----
-
-## 📋 All Releases
-
-**[View All Versions](https://github.com/berkbankoglu/BankoSpace/releases)**
+**Source code is private** - Only installer files are publicly available.
 
 ---
 
@@ -86,4 +56,4 @@ Found a bug? [Open an issue](https://github.com/berkbankoglu/BankoSpace/issues)
 
 ---
 
-**Created by Berk Bankoglu** | **Latest Version: 7.0.1** | [Download](https://github.com/berkbankoglu/BankoSpace/releases/latest)
+**Created by Berk Bankoglu** | [Download](https://github.com/berkbankoglu/BankoSpace/releases)
