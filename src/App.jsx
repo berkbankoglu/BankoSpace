@@ -12,7 +12,7 @@ import ProductivityHeatmap from './components/ProductivityHeatmap';
 import Auth from './components/Auth';
 import { FirebaseSync, syncLocalStorageToFirebase, syncFirebaseToLocalStorage } from './services/firebaseSync';
 
-const APP_VERSION = '7.0.5';
+const APP_VERSION = '7.0.6';
 
 function App() {
   const [user, setUser] = useState(null);
