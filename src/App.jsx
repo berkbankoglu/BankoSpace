@@ -12,7 +12,7 @@ import ProductivityHeatmap from './components/ProductivityHeatmap';
 import Auth from './components/Auth';
 import { FirebaseSync, syncLocalStorageToFirebase, syncFirebaseToLocalStorage } from './services/firebaseSync';
 
-const APP_VERSION = '6.9.1';
+const APP_VERSION = '7.0.0';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -138,12 +138,13 @@ function App() {
       return;
     }
 
-    // Firebase'e de kaydet (only for real users, not offline mode)
-    if (firebaseSync && user && user.uid !== 'offline-user') {
-      console.log('Saving to Firebase in 500ms...');
+    // Firebase'e de kaydet - her durumda dene, başarısız olursa offline göster
+    if (firebaseSync && user) {
+      console.log('Saving to Firebase in 500ms... (user:', user.email || user.uid, ')');
       // Debounce: 500ms bekle, ardışık değişikliklerde son değişikliği gönder
       const timer = setTimeout(async () => {
         try {
+          console.log('Starting Firebase save...');
           setSyncStatus('syncing');
 
           // Add timeout to prevent infinite syncing
@@ -163,6 +164,7 @@ function App() {
             timeoutPromise
           ]);
 
+          console.log('Firebase save successful!');
           setSyncStatus('synced');
           setTimeout(() => setSyncStatus('idle'), 1500);
         } catch (error) {
@@ -173,8 +175,35 @@ function App() {
       }, 500);
 
       return () => clearTimeout(timer);
+    } else {
+      console.log('Not saving to Firebase - firebaseSync:', !!firebaseSync, 'user:', !!user);
     }
   }, [todos, firebaseSync, user]);
+
+  // Uygulama kapanmadan önce Firebase'e son kez kaydet
+  useEffect(() => {
+    const handleBeforeUnload = async () => {
+      if (firebaseSync && user) {
+        console.log('App closing, saving to Firebase...');
+        try {
+          await firebaseSync.saveData({
+            todos,
+            goals: JSON.parse(localStorage.getItem('goals') || '[]'),
+            reminders: JSON.parse(localStorage.getItem('reminders') || '[]'),
+            dailyChecklistItems: JSON.parse(localStorage.getItem('dailyChecklistItems') || '[]'),
+            dailyChecklistLastReset: localStorage.getItem('dailyChecklistLastReset') || new Date().toDateString(),
+            achievements: JSON.parse(localStorage.getItem('achievements') || '{}')
+          });
+          console.log('Final save to Firebase successful!');
+        } catch (error) {
+          console.error('Error during final save:', error);
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [firebaseSync, user, todos]);
 
   // Theme değiştiğinde localStorage'a kaydet ve body'ye class ekle
   useEffect(() => {
