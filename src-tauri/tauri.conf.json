@@ -1,6 +1,6 @@
 {
   "productName": "BankoSpace",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "identifier": "com.berkbankoglu.bankospace",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -10,13 +10,21 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["dmg", "app"],
+    "targets": "all",
     "publisher": "Berk Bankoglu",
     "icon": [
       "icons/icon.png"
     ],
     "macOS": {
       "minimumSystemVersion": "10.13"
+    },
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": "",
+      "wix": {
+        "language": "en-US"
+      }
     }
   },
   "app": {
