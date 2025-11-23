@@ -1,6 +1,6 @@
 {
   "productName": "BankoSpace",
-  "version": "1.0.0",
+  "version": "7.0.1",
   "identifier": "com.berkbankoglu.bankospace",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -19,6 +19,16 @@
       "minimumSystemVersion": "10.13"
     }
   },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "endpoints": [
+        "https://github.com/berkbankoglu/BankoSpace/releases/latest/download/latest.json"
+      ],
+      "dialog": true,
+      "pubkey": ""
+    }
+  },
   "app": {
     "windows": [
       {
@@ -35,7 +45,7 @@
     ],
     "withGlobalTauri": true,
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' https://accounts.google.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com https://*.cloudfunctions.net; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; frame-src https://accounts.google.com https://*.firebaseapp.com",
+      "csp": "default-src 'self'; connect-src 'self' https://accounts.google.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com https://*.cloudfunctions.net https://github.com; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; frame-src https://accounts.google.com https://*.firebaseapp.com",
       "capabilities": [
         {
           "identifier": "main-capability",
@@ -47,7 +57,10 @@
             "fs:allow-read-text-file",
             "fs:allow-write-text-file",
             "fs:default",
-            "notification:default"
+            "notification:default",
+            "updater:default",
+            "updater:allow-check",
+            "updater:allow-download-and-install"
           ]
         }
       ]
