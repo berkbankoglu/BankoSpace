@@ -12,10 +12,27 @@ import ProductivityHeatmap from './components/ProductivityHeatmap';
 import Auth from './components/Auth';
 import { FirebaseSync, syncLocalStorageToFirebase, syncFirebaseToLocalStorage } from './services/firebaseSync';
 
+const APP_VERSION = '6.7.1';
+
 function App() {
   const [user, setUser] = useState(null);
   const [firebaseSync, setFirebaseSync] = useState(null);
   const [syncStatus, setSyncStatus] = useState('offline'); // 'offline', 'syncing', 'synced'
+
+  // Version check - otomatik güncelleme için
+  useEffect(() => {
+    const savedVersion = localStorage.getItem('appVersion');
+    if (savedVersion && savedVersion !== APP_VERSION) {
+      console.log(`Version updated from ${savedVersion} to ${APP_VERSION}`);
+      // Cache'i temizle
+      if ('caches' in window) {
+        caches.keys().then(names => {
+          names.forEach(name => caches.delete(name));
+        });
+      }
+    }
+    localStorage.setItem('appVersion', APP_VERSION);
+  }, []);
   const [showSettings, setShowSettings] = useState(false);
   const [todos, setTodos] = useState(() => {
     const saved = localStorage.getItem('todos');
@@ -773,7 +790,7 @@ function App() {
   return (
     <div className="container">
       <div className="header-row">
-        <h1>BankoSpace <span className="version-badge">v6.7.0</span></h1>
+        <h1>BankoSpace <span className="version-badge">v{APP_VERSION}</span></h1>
         <div className="header-middle">
           {syncStatus === 'syncing' && <span className="sync-status">Syncing...</span>}
           {syncStatus === 'synced' && <span className="sync-status synced">Synced ✓</span>}

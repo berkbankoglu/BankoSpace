@@ -1411,6 +1411,9 @@ h1 {
     color: #e0e0e0;
     font-size: 28px;
     font-weight: 600;
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
 }
 
 .header-right {
@@ -1466,13 +1469,16 @@ h1 {
 }
 
 .version-badge {
-    font-size: 12px;
+    display: inline-block;
+    font-size: 11px;
     color: #888;
     font-weight: normal;
     background: #2a2a2a;
-    padding: 2px 8px;
-    border-radius: 12px;
-    margin-left: 10px;
+    padding: 3px 8px;
+    border-radius: 10px;
+    margin-left: 8px;
+    vertical-align: middle;
+    line-height: 1;
 }
 
 .settings-dropdown {
