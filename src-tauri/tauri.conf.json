@@ -1,6 +1,6 @@
 {
   "productName": "BankoSpace",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "identifier": "com.berkbankoglu.bankospace",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -10,7 +10,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis", "msi", "dmg", "app"],
+    "targets": ["nsis", "dmg", "app"],
     "publisher": "Berk Bankoglu",
     "icon": [
       "icons/icon.png"
