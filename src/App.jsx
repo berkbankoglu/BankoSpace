@@ -12,7 +12,7 @@ import ProductivityHeatmap from './components/ProductivityHeatmap';
 import Auth from './components/Auth';
 import { FirebaseSync, syncLocalStorageToFirebase, syncFirebaseToLocalStorage } from './services/firebaseSync';
 
-const APP_VERSION = '7.0.0';
+const APP_VERSION = '7.0.1';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -317,14 +317,35 @@ function App() {
         ]);
 
         if (firebaseData) {
-          // Firebase'de veri var, localStorage'ı güncelle
-          syncFirebaseToLocalStorage(firebaseData);
+          console.log('Firebase data found, comparing with localStorage...');
 
-          // State'leri güncelle
-          if (firebaseData.todos) setTodos(firebaseData.todos);
+          // localStorage'daki mevcut todos'u al
+          const localTodos = JSON.parse(localStorage.getItem('todos') || '[]');
+          console.log('Local todos:', localTodos.length, 'Firebase todos:', firebaseData.todos?.length || 0);
+
+          // Firebase'deki veri ile localStorage'daki veriyi karşılaştır
+          // Hangisi daha fazla todo içeriyorsa veya daha güncel ise onu kullan
+          const useFirebaseData = !localTodos.length ||
+                                  (firebaseData.lastUpdated &&
+                                   new Date(firebaseData.lastUpdated) > new Date(localStorage.getItem('lastUpdated') || 0));
+
+          if (useFirebaseData && firebaseData.todos && firebaseData.todos.length > 0) {
+            console.log('Using Firebase data (newer or more complete)');
+            // Firebase verisi daha güncel, localStorage'ı güncelle
+            syncFirebaseToLocalStorage(firebaseData);
+            if (firebaseData.todos) {
+              isRemoteUpdate.current = true; // Prevent write back
+              setTodos(firebaseData.todos);
+            }
+          } else {
+            console.log('Using localStorage data (newer or Firebase empty), syncing to Firebase...');
+            // localStorage verisi daha güncel veya Firebase boş, Firebase'i güncelle
+            await syncLocalStorageToFirebase(currentUser.uid);
+          }
 
           setSyncStatus('synced');
         } else {
+          console.log('No Firebase data, uploading localStorage...');
           // Firebase'de veri yok, localStorage'daki veriyi Firebase'e yükle
           await syncLocalStorageToFirebase(currentUser.uid);
           setSyncStatus('synced');
