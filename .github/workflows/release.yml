@@ -33,12 +33,6 @@ jobs:
         with:
           targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin' || '' }}
 
-      - name: Install WiX (Windows only)
-        if: matrix.platform == 'windows-latest'
-        run: |
-          dotnet tool install --global wix
-          wix --version
-
       - name: Install frontend dependencies
         run: npm install
 
