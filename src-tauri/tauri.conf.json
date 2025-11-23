@@ -1,6 +1,6 @@
 {
   "productName": "BankoSpace",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "identifier": "com.berkbankoglu.bankospace",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -24,6 +24,12 @@
       "timestampUrl": "",
       "wix": {
         "language": "en-US"
+      },
+      "nsis": {
+        "installerIcon": "icons/icon.ico",
+        "installMode": "perUser",
+        "languages": ["en-US"],
+        "displayLanguageSelector": false
       }
     }
   },
