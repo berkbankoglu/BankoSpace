@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import './App.css';
 import CategoryColumn from './components/CategoryColumn';
 import ReferencePanel from './components/ReferencePanel';
@@ -12,12 +12,13 @@ import ProductivityHeatmap from './components/ProductivityHeatmap';
 import Auth from './components/Auth';
 import { FirebaseSync, syncLocalStorageToFirebase, syncFirebaseToLocalStorage } from './services/firebaseSync';
 
-const APP_VERSION = '6.7.1';
+const APP_VERSION = '6.8.0';
 
 function App() {
   const [user, setUser] = useState(null);
   const [firebaseSync, setFirebaseSync] = useState(null);
   const [syncStatus, setSyncStatus] = useState('offline'); // 'offline', 'syncing', 'synced'
+  const isRemoteUpdate = useRef(false); // Real-time güncellemeleri takip için
 
   // Version check - otomatik güncelleme için
   useEffect(() => {
@@ -126,10 +127,16 @@ function App() {
   useEffect(() => {
     localStorage.setItem('todos', JSON.stringify(todos));
 
+    // Eğer bu remote update ise, Firebase'e geri yazma
+    if (isRemoteUpdate.current) {
+      isRemoteUpdate.current = false;
+      return;
+    }
+
     // Firebase'e de kaydet (only for real users, not offline mode)
-    // Instant sync - no debounce
     if (firebaseSync && user && user.uid !== 'offline-user') {
-      (async () => {
+      // Debounce: 500ms bekle, ardışık değişikliklerde son değişikliği gönder
+      const timer = setTimeout(async () => {
         try {
           setSyncStatus('syncing');
 
@@ -151,13 +158,15 @@ function App() {
           ]);
 
           setSyncStatus('synced');
-          setTimeout(() => setSyncStatus('idle'), 1000);
+          setTimeout(() => setSyncStatus('idle'), 1500);
         } catch (error) {
           console.error('Firebase sync error:', error);
           setSyncStatus('offline');
-          setTimeout(() => setSyncStatus('idle'), 1000);
+          setTimeout(() => setSyncStatus('idle'), 2000);
         }
-      })();
+      }, 500);
+
+      return () => clearTimeout(timer);
     }
   }, [todos, firebaseSync, user]);
 
@@ -290,6 +299,9 @@ function App() {
         sync.subscribeToChanges((data) => {
           console.log('Real-time update received from Firebase:', data);
 
+          // Remote update flag'ini set et (böylece geri yazma olmaz)
+          isRemoteUpdate.current = true;
+
           // LocalStorage'ı güncelle
           syncFirebaseToLocalStorage(data);
 
@@ -298,9 +310,9 @@ function App() {
             setTodos(data.todos);
           }
 
-          // Sync status'u göster
+          // Sync status'u kısa süre göster
           setSyncStatus('synced');
-          setTimeout(() => setSyncStatus('idle'), 1000);
+          setTimeout(() => setSyncStatus('idle'), 800);
         });
 
         setTimeout(() => setSyncStatus('idle'), 2000);
