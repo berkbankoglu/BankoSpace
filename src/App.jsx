@@ -11,6 +11,8 @@ import Achievements from './components/Achievements';
 import ProductivityHeatmap from './components/ProductivityHeatmap';
 import Auth from './components/Auth';
 import { FirebaseSync, syncLocalStorageToFirebase, syncFirebaseToLocalStorage } from './services/firebaseSync';
+import { check } from '@tauri-apps/plugin-updater';
+import { relaunch } from '@tauri-apps/plugin-process';
 
 const APP_VERSION = '7.0.1';
 
@@ -20,6 +22,39 @@ function App() {
   const [syncStatus, setSyncStatus] = useState('offline'); // 'offline', 'syncing', 'synced'
   const [showUpdateWarning, setShowUpdateWarning] = useState(false);
   const isRemoteUpdate = useRef(false); // Real-time güncellemeleri takip için
+
+  // Auto-update check - Tauri updater
+  useEffect(() => {
+    async function checkForUpdates() {
+      try {
+        const update = await check();
+        if (update?.available) {
+          console.log(`Yeni sürüm mevcut: v${update.version}`);
+          const userResponse = confirm(
+            `Yeni sürüm mevcut! (v${update.version})\n\nŞimdi güncelleme yapılsın mı? Uygulama yeniden başlatılacak.`
+          );
+
+          if (userResponse) {
+            console.log('Güncelleme indiriliyor...');
+            await update.downloadAndInstall();
+            console.log('Güncelleme tamamlandı, yeniden başlatılıyor...');
+            await relaunch();
+          }
+        } else {
+          console.log('Uygulama güncel.');
+        }
+      } catch (error) {
+        console.error('Güncelleme kontrolü hatası:', error);
+      }
+    }
+
+    // İlk açılışta güncelleme kontrolü
+    checkForUpdates();
+
+    // Her 1 saatte bir kontrol et
+    const interval = setInterval(checkForUpdates, 60 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Version check - otomatik güncelleme için
   useEffect(() => {
