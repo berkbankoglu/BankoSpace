@@ -1455,6 +1455,11 @@ h1 {
     animation: none;
 }
 
+.sync-status.offline {
+    color: #ff9800;
+    animation: none;
+}
+
 @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }

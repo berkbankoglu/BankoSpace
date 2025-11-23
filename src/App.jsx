@@ -234,8 +234,17 @@ function App() {
 
       try {
         setSyncStatus('syncing');
-        // Load data from Firebase
-        const firebaseData = await sync.loadData();
+
+        // Add timeout to prevent infinite syncing state
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Sync timeout')), 10000)
+        );
+
+        // Load data from Firebase with timeout
+        const firebaseData = await Promise.race([
+          sync.loadData(),
+          timeoutPromise
+        ]);
 
         if (firebaseData) {
           // Firebase'de veri var, localStorage'ı güncelle
@@ -261,6 +270,7 @@ function App() {
       } catch (error) {
         console.error('Error during Firebase sync:', error);
         setSyncStatus('offline');
+        setTimeout(() => setSyncStatus('idle'), 2000);
       }
     } else {
       // User logged out
@@ -286,17 +296,29 @@ function App() {
 
     try {
       setSyncStatus('syncing');
-      const firebaseData = await firebaseSync.loadData();
+
+      // Add timeout to prevent infinite syncing state
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Sync timeout')), 10000)
+      );
+
+      const firebaseData = await Promise.race([
+        firebaseSync.loadData(),
+        timeoutPromise
+      ]);
 
       if (firebaseData) {
         syncFirebaseToLocalStorage(firebaseData);
         if (firebaseData.todos) setTodos(firebaseData.todos);
         setSyncStatus('synced');
         setTimeout(() => setSyncStatus('idle'), 2000);
+      } else {
+        setSyncStatus('offline');
       }
     } catch (error) {
       console.error('Error refreshing from Firebase:', error);
       setSyncStatus('offline');
+      setTimeout(() => setSyncStatus('idle'), 2000);
     }
   };
 
@@ -735,6 +757,7 @@ function App() {
         <div className="header-middle">
           {syncStatus === 'syncing' && <span className="sync-status">Syncing...</span>}
           {syncStatus === 'synced' && <span className="sync-status synced">Synced ✓</span>}
+          {syncStatus === 'offline' && user && user.uid !== 'offline-user' && <span className="sync-status offline">Offline</span>}
         </div>
         <div className="header-right">
           {user && user.uid !== 'offline-user' && (
