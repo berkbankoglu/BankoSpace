@@ -12,12 +12,13 @@ import ProductivityHeatmap from './components/ProductivityHeatmap';
 import Auth from './components/Auth';
 import { FirebaseSync, syncLocalStorageToFirebase, syncFirebaseToLocalStorage } from './services/firebaseSync';
 
-const APP_VERSION = '6.8.0';
+const APP_VERSION = '6.9.0';
 
 function App() {
   const [user, setUser] = useState(null);
   const [firebaseSync, setFirebaseSync] = useState(null);
   const [syncStatus, setSyncStatus] = useState('offline'); // 'offline', 'syncing', 'synced'
+  const [showUpdateWarning, setShowUpdateWarning] = useState(false);
   const isRemoteUpdate = useRef(false); // Real-time güncellemeleri takip için
 
   // Version check - otomatik güncelleme için
@@ -25,6 +26,8 @@ function App() {
     const savedVersion = localStorage.getItem('appVersion');
     if (savedVersion && savedVersion !== APP_VERSION) {
       console.log(`Version updated from ${savedVersion} to ${APP_VERSION}`);
+      // Eski versiyon uyarısı göster
+      setShowUpdateWarning(true);
       // Cache'i temizle
       if ('caches' in window) {
         caches.keys().then(names => {
@@ -1021,6 +1024,33 @@ function App() {
         </div>
         </div>
       </div>
+
+      {/* Update Warning Modal */}
+      {showUpdateWarning && (
+        <div className="update-warning-overlay" onClick={() => setShowUpdateWarning(false)}>
+          <div className="update-warning-modal" onClick={(e) => e.stopPropagation()}>
+            <h2>🎉 Yeni Güncelleme Mevcut!</h2>
+            <p>BankoSpace v{APP_VERSION} sürümüne güncellendi!</p>
+            <p className="update-message">
+              Lütfen uygulamayı kapatıp yeniden açın veya sayfayı yenileyin.
+            </p>
+            <div className="update-buttons">
+              <button
+                className="update-btn-primary"
+                onClick={() => window.location.reload()}
+              >
+                Şimdi Yenile
+              </button>
+              <button
+                className="update-btn-secondary"
+                onClick={() => setShowUpdateWarning(false)}
+              >
+                Daha Sonra
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

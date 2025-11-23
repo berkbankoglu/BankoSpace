@@ -6233,3 +6233,98 @@ body.light .sync-status.synced {
     font-size: 11px;
     color: #e0e0e0;
 }
+
+/* Update Warning Modal */
+.update-warning-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    animation: fadeIn 0.3s;
+}
+
+.update-warning-modal {
+    background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+    border: 2px solid #4CAF50;
+    border-radius: 16px;
+    padding: 30px;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 10px 40px rgba(76, 175, 80, 0.3);
+    animation: slideUp 0.3s ease-out;
+}
+
+.update-warning-modal h2 {
+    color: #4CAF50;
+    margin: 0 0 15px 0;
+    font-size: 24px;
+    text-align: center;
+}
+
+.update-warning-modal p {
+    color: #e0e0e0;
+    margin: 10px 0;
+    font-size: 16px;
+    text-align: center;
+}
+
+.update-message {
+    color: #aaa;
+    font-size: 14px;
+    margin: 20px 0;
+}
+
+.update-buttons {
+    display: flex;
+    gap: 15px;
+    margin-top: 25px;
+}
+
+.update-btn-primary,
+.update-btn-secondary {
+    flex: 1;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.update-btn-primary {
+    background: #4CAF50;
+    color: white;
+}
+
+.update-btn-primary:hover {
+    background: #45a049;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
+}
+
+.update-btn-secondary {
+    background: #444;
+    color: #e0e0e0;
+}
+
+.update-btn-secondary:hover {
+    background: #555;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(50px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
