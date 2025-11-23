@@ -110,28 +110,37 @@ function App() {
     localStorage.setItem('todos', JSON.stringify(todos));
 
     // Firebase'e de kaydet (only for real users, not offline mode)
-    // Debounce: Wait 1.5 seconds before syncing to avoid continuous "syncing..." text
+    // Instant sync - no debounce
     if (firebaseSync && user && user.uid !== 'offline-user') {
-      const timer = setTimeout(async () => {
+      (async () => {
         try {
           setSyncStatus('syncing');
-          await firebaseSync.saveData({
-            todos,
-            goals: JSON.parse(localStorage.getItem('goals') || '[]'),
-            reminders: JSON.parse(localStorage.getItem('reminders') || '[]'),
-            dailyChecklistItems: JSON.parse(localStorage.getItem('dailyChecklistItems') || '[]'),
-            dailyChecklistLastReset: localStorage.getItem('dailyChecklistLastReset') || new Date().toDateString(),
-            achievements: JSON.parse(localStorage.getItem('achievements') || '{}')
-          });
+
+          // Add timeout to prevent infinite syncing
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Sync timeout')), 5000)
+          );
+
+          await Promise.race([
+            firebaseSync.saveData({
+              todos,
+              goals: JSON.parse(localStorage.getItem('goals') || '[]'),
+              reminders: JSON.parse(localStorage.getItem('reminders') || '[]'),
+              dailyChecklistItems: JSON.parse(localStorage.getItem('dailyChecklistItems') || '[]'),
+              dailyChecklistLastReset: localStorage.getItem('dailyChecklistLastReset') || new Date().toDateString(),
+              achievements: JSON.parse(localStorage.getItem('achievements') || '{}')
+            }),
+            timeoutPromise
+          ]);
+
           setSyncStatus('synced');
-          setTimeout(() => setSyncStatus('idle'), 1500);
+          setTimeout(() => setSyncStatus('idle'), 1000);
         } catch (error) {
           console.error('Firebase sync error:', error);
-          setSyncStatus('error');
+          setSyncStatus('offline');
+          setTimeout(() => setSyncStatus('idle'), 1000);
         }
-      }, 1500);
-
-      return () => clearTimeout(timer);
+      })();
     }
   }, [todos, firebaseSync, user]);
 
@@ -260,10 +269,21 @@ function App() {
           setSyncStatus('synced');
         }
 
-        // Real-time sync'i başlat
+        // Real-time sync'i başlat - tüm veriler için
         sync.subscribeToChanges((data) => {
+          console.log('Real-time update received from Firebase:', data);
+
+          // LocalStorage'ı güncelle
           syncFirebaseToLocalStorage(data);
-          if (data.todos) setTodos(data.todos);
+
+          // Todos state'ini güncelle
+          if (data.todos) {
+            setTodos(data.todos);
+          }
+
+          // Sync status'u göster
+          setSyncStatus('synced');
+          setTimeout(() => setSyncStatus('idle'), 1000);
         });
 
         setTimeout(() => setSyncStatus('idle'), 2000);
@@ -753,7 +773,7 @@ function App() {
   return (
     <div className="container">
       <div className="header-row">
-        <h1>BankoSpace <span className="version-badge">v6.6.0</span></h1>
+        <h1>BankoSpace <span className="version-badge">v6.7.0</span></h1>
         <div className="header-middle">
           {syncStatus === 'syncing' && <span className="sync-status">Syncing...</span>}
           {syncStatus === 'synced' && <span className="sync-status synced">Synced ✓</span>}
