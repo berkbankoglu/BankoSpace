@@ -12,7 +12,7 @@ import ProductivityHeatmap from './components/ProductivityHeatmap';
 import Auth from './components/Auth';
 import { FirebaseSync, syncLocalStorageToFirebase, syncFirebaseToLocalStorage } from './services/firebaseSync';
 
-const APP_VERSION = '6.9.0';
+const APP_VERSION = '6.9.1';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -128,16 +128,19 @@ function App() {
 
   // Todo'lar değiştiğinde localStorage ve Firebase'e kaydet
   useEffect(() => {
+    console.log('Todos changed, saving to localStorage:', todos.length, 'items');
     localStorage.setItem('todos', JSON.stringify(todos));
 
     // Eğer bu remote update ise, Firebase'e geri yazma
     if (isRemoteUpdate.current) {
+      console.log('Skipping Firebase save - this was a remote update');
       isRemoteUpdate.current = false;
       return;
     }
 
     // Firebase'e de kaydet (only for real users, not offline mode)
     if (firebaseSync && user && user.uid !== 'offline-user') {
+      console.log('Saving to Firebase in 500ms...');
       // Debounce: 500ms bekle, ardışık değişikliklerde son değişikliği gönder
       const timer = setTimeout(async () => {
         try {
