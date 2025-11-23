@@ -1009,8 +1009,6 @@ function App() {
         </div>
         </div>
       </div>
-
-      <div className="version-badge">v4.3</div>
     </div>
   );
 }
