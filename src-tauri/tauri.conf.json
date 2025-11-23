@@ -1,0 +1,69 @@
+{
+  "productName": "BankoSpace",
+  "version": "1.1.0",
+  "identifier": "com.berkbankoglu.bankospace",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devUrl": "http://localhost:3000",
+    "frontendDist": "../dist"
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["dmg", "app"],
+    "publisher": "Berk Bankoglu",
+    "icon": [
+      "icons/icon.png"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "10.13"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "endpoints": [
+        "https://github.com/berkbankoglu/BankoSpace/releases/latest/download/latest.json"
+      ],
+      "dialog": true,
+      "pubkey": ""
+    }
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "BankoSpace",
+        "width": 1400,
+        "height": 800,
+        "minWidth": 1200,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true,
+        "url": "index.html"
+      }
+    ],
+    "withGlobalTauri": true,
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' https://accounts.google.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com https://*.cloudfunctions.net https://github.com; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; frame-src https://accounts.google.com https://*.firebaseapp.com",
+      "capabilities": [
+        {
+          "identifier": "main-capability",
+          "description": "Main app capabilities",
+          "windows": ["main"],
+          "permissions": [
+            "dialog:allow-save",
+            "dialog:allow-open",
+            "fs:allow-read-text-file",
+            "fs:allow-write-text-file",
+            "fs:default",
+            "notification:default",
+            "updater:default",
+            "updater:allow-check",
+            "updater:allow-download-and-install"
+          ]
+        }
+      ]
+    }
+  }
+}
