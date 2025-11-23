@@ -1,0 +1,77 @@
+name: Release Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'macos-latest'
+            args: '--target universal-apple-darwin'
+          - platform: 'windows-latest'
+            args: ''
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'BankoSpace ${{ github.ref_name }}'
+          releaseBody: |
+            ## 🎉 BankoSpace ${{ github.ref_name }}
+
+            ### ✨ Features
+            - 📝 Smart Todo Lists with subtasks
+            - 🎯 Goals & Reminders
+            - 🗂️ References & Notes
+            - 🎴 Flashcards with spaced repetition
+            - ⏱️ Pomodoro Timer
+            - 🔥 Productivity Heatmap
+            - ☁️ Cloud Sync with Firebase
+            - 🔄 Auto-Update Support
+
+            ### 📥 Installation
+            **Windows:** Download `.msi` or `.exe` installer
+            **macOS:** Download `.dmg` file
+
+            If Windows Defender shows a warning: "More info" → "Run anyway"
+
+            ---
+
+            **Enjoy using BankoSpace! 🎉**
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}
