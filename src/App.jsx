@@ -58,20 +58,8 @@ function App() {
     const saved = localStorage.getItem('flashCardsCollapsed');
     return saved === 'true';
   });
-  const [goalsCollapsed, setGoalsCollapsed] = useState(() => {
-    const saved = localStorage.getItem('goalsCollapsed');
-    return saved === 'true';
-  });
   const [remindersCollapsed, setRemindersCollapsed] = useState(() => {
     const saved = localStorage.getItem('remindersCollapsed');
-    return saved === 'true';
-  });
-  const [achievementsCollapsed, setAchievementsCollapsed] = useState(() => {
-    const saved = localStorage.getItem('achievementsCollapsed');
-    return saved === 'true';
-  });
-  const [heatmapCollapsed, setHeatmapCollapsed] = useState(() => {
-    const saved = localStorage.getItem('heatmapCollapsed');
     return saved === 'true';
   });
   const [timerCollapsed, setTimerCollapsed] = useState(() => {
@@ -225,20 +213,8 @@ function App() {
   }, [flashCardsCollapsed]);
 
   useEffect(() => {
-    localStorage.setItem('goalsCollapsed', goalsCollapsed);
-  }, [goalsCollapsed]);
-
-  useEffect(() => {
     localStorage.setItem('remindersCollapsed', remindersCollapsed);
   }, [remindersCollapsed]);
-
-  useEffect(() => {
-    localStorage.setItem('achievementsCollapsed', achievementsCollapsed);
-  }, [achievementsCollapsed]);
-
-  useEffect(() => {
-    localStorage.setItem('heatmapCollapsed', heatmapCollapsed);
-  }, [heatmapCollapsed]);
 
   useEffect(() => {
     localStorage.setItem('timerCollapsed', timerCollapsed);
