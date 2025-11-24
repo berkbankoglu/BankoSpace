@@ -927,33 +927,55 @@ function App() {
 
       <div className="content-wrapper">
         <div className="left-sidebar">
-          <div className="app-section sidebar-section">
+          {sectionOrder.map((sectionId) => {
+            const section = sections[sectionId];
+            if (!section) return null;
+
+            return (
+              <div key={sectionId} className="app-section">
+                <div
+                  className="section-unified-header"
+                  onClick={() => section.setCollapsed(!section.collapsed)}
+                >
+                  <div className="section-header-left">
+                    <h2>{section.title}</h2>
+                    <span className="collapse-indicator">{section.collapsed ? '▼' : '▲'}</span>
+                  </div>
+                </div>
+                <div className={`section-content ${section.collapsed ? 'collapsed' : ''}`}>
+                  {section.content}
+                </div>
+              </div>
+            );
+          })}
+
+          <div className="app-section">
             <div
               className="section-unified-header"
-              onClick={() => setTimerCollapsed(!timerCollapsed)}
+              onClick={() => setReferencesCollapsed(!referencesCollapsed)}
             >
               <div className="section-header-left">
-                <h2>Timer</h2>
-                <span className="collapse-indicator">{timerCollapsed ? '▼' : '▲'}</span>
+                <h2>References</h2>
+                <span className="collapse-indicator">{referencesCollapsed ? '▼' : '▲'}</span>
               </div>
             </div>
-            <div className={`section-content ${timerCollapsed ? 'collapsed' : ''}`}>
-              <Timer />
+            <div className={`section-content ${referencesCollapsed ? 'collapsed' : ''}`}>
+              <ReferencePanel />
             </div>
           </div>
 
-          <div className="app-section sidebar-section">
+          <div className="app-section">
             <div
               className="section-unified-header"
-              onClick={() => setRemindersCollapsed(!remindersCollapsed)}
+              onClick={() => setFlashCardsCollapsed(!flashCardsCollapsed)}
             >
               <div className="section-header-left">
-                <h2>Study Reminders</h2>
-                <span className="collapse-indicator">{remindersCollapsed ? '▼' : '▲'}</span>
+                <h2>Flash Cards</h2>
+                <span className="collapse-indicator">{flashCardsCollapsed ? '▼' : '▲'}</span>
               </div>
             </div>
-            <div className={`section-content ${remindersCollapsed ? 'collapsed' : ''}`}>
-              <StudyReminders />
+            <div className={`section-content ${flashCardsCollapsed ? 'collapsed' : ''}`}>
+              <FlashCards />
             </div>
           </div>
         </div>
@@ -986,30 +1008,30 @@ function App() {
         <div className="app-section sidebar-section">
           <div
             className="section-unified-header"
-            onClick={() => setReferencesCollapsed(!referencesCollapsed)}
+            onClick={() => setTimerCollapsed(!timerCollapsed)}
           >
             <div className="section-header-left">
-              <h2>References</h2>
-              <span className="collapse-indicator">{referencesCollapsed ? '▼' : '▲'}</span>
+              <h2>Timer</h2>
+              <span className="collapse-indicator">{timerCollapsed ? '▼' : '▲'}</span>
             </div>
           </div>
-          <div className={`section-content ${referencesCollapsed ? 'collapsed' : ''}`}>
-            <ReferencePanel />
+          <div className={`section-content ${timerCollapsed ? 'collapsed' : ''}`}>
+            <Timer />
           </div>
         </div>
 
         <div className="app-section sidebar-section">
           <div
             className="section-unified-header"
-            onClick={() => setFlashCardsCollapsed(!flashCardsCollapsed)}
+            onClick={() => setRemindersCollapsed(!remindersCollapsed)}
           >
             <div className="section-header-left">
-              <h2>Flash Cards</h2>
-              <span className="collapse-indicator">{flashCardsCollapsed ? '▼' : '▲'}</span>
+              <h2>Study Reminders</h2>
+              <span className="collapse-indicator">{remindersCollapsed ? '▼' : '▲'}</span>
             </div>
           </div>
-          <div className={`section-content ${flashCardsCollapsed ? 'collapsed' : ''}`}>
-            <FlashCards />
+          <div className={`section-content ${remindersCollapsed ? 'collapsed' : ''}`}>
+            <StudyReminders />
           </div>
         </div>
 
