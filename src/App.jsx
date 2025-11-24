@@ -11,7 +11,7 @@ import { FirebaseSync, syncLocalStorageToFirebase, syncFirebaseToLocalStorage } 
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 
-const APP_VERSION = '2.1.5';
+const APP_VERSION = '2.1.6';
 
 function App() {
   const [user, setUser] = useState(null);
