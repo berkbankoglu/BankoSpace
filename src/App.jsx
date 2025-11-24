@@ -4,11 +4,8 @@ import CategoryColumn from './components/CategoryColumn';
 import ReferencePanel from './components/ReferencePanel';
 import Timer from './components/Timer';
 import FlashCards from './components/FlashCards';
-import Goals from './components/Goals';
 import StudyReminders from './components/StudyReminders';
 import DailyChecklist from './components/DailyChecklist';
-import Achievements from './components/Achievements';
-import ProductivityHeatmap from './components/ProductivityHeatmap';
 import Auth from './components/Auth';
 import { FirebaseSync, syncLocalStorageToFirebase, syncFirebaseToLocalStorage } from './services/firebaseSync';
 import { check } from '@tauri-apps/plugin-updater';
@@ -965,21 +962,6 @@ function App() {
           <div className="app-section sidebar-section">
             <div
               className="section-unified-header"
-              onClick={() => setGoalsCollapsed(!goalsCollapsed)}
-            >
-              <div className="section-header-left">
-                <h2>Goals</h2>
-                <span className="collapse-indicator">{goalsCollapsed ? '▼' : '▲'}</span>
-              </div>
-            </div>
-            <div className={`section-content ${goalsCollapsed ? 'collapsed' : ''}`}>
-              <Goals />
-            </div>
-          </div>
-
-          <div className="app-section sidebar-section">
-            <div
-              className="section-unified-header"
               onClick={() => setTimerCollapsed(!timerCollapsed)}
             >
               <div className="section-header-left">
@@ -995,15 +977,15 @@ function App() {
           <div className="app-section sidebar-section">
             <div
               className="section-unified-header"
-              onClick={() => setHeatmapCollapsed(!heatmapCollapsed)}
+              onClick={() => setRemindersCollapsed(!remindersCollapsed)}
             >
               <div className="section-header-left">
-                <h2>Login Heat</h2>
-                <span className="collapse-indicator">{heatmapCollapsed ? '▼' : '▲'}</span>
+                <h2>Study Reminders</h2>
+                <span className="collapse-indicator">{remindersCollapsed ? '▼' : '▲'}</span>
               </div>
             </div>
-            <div className={`section-content ${heatmapCollapsed ? 'collapsed' : ''}`}>
-              <ProductivityHeatmap />
+            <div className={`section-content ${remindersCollapsed ? 'collapsed' : ''}`}>
+              <StudyReminders />
             </div>
           </div>
         </div>
@@ -1033,21 +1015,6 @@ function App() {
         </div>
 
         <div className="right-sidebar">
-        <div className="app-section sidebar-section">
-          <div
-            className="section-unified-header"
-            onClick={() => setRemindersCollapsed(!remindersCollapsed)}
-          >
-            <div className="section-header-left">
-              <h2>Study Reminders</h2>
-              <span className="collapse-indicator">{remindersCollapsed ? '▼' : '▲'}</span>
-            </div>
-          </div>
-          <div className={`section-content ${remindersCollapsed ? 'collapsed' : ''}`}>
-            <StudyReminders />
-          </div>
-        </div>
-
         <div className="app-section sidebar-section">
           <div
             className="section-unified-header"
@@ -1111,21 +1078,6 @@ function App() {
           </div>
           <div className={`section-content ${longtermChecklistCollapsed ? 'collapsed' : ''}`}>
             <DailyChecklist storageKey="longtermChecklist" />
-          </div>
-        </div>
-
-        <div className="app-section sidebar-section">
-          <div
-            className="section-unified-header"
-            onClick={() => setAchievementsCollapsed(!achievementsCollapsed)}
-          >
-            <div className="section-header-left">
-              <h2>Achievements</h2>
-              <span className="collapse-indicator">{achievementsCollapsed ? '▼' : '▲'}</span>
-            </div>
-          </div>
-          <div className={`section-content ${achievementsCollapsed ? 'collapsed' : ''}`}>
-            <Achievements />
           </div>
         </div>
         </div>
