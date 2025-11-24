@@ -1,6 +1,6 @@
 [package]
 name = "todo-app"
-version = "2.0.7"
+version = "2.0.9"
 description = "A Tauri Todo Application"
 authors = ["berkbankoglu"]
 edition = "2021"
