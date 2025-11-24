@@ -5436,11 +5436,9 @@ body.light .reset-btn:hover {
 
 /* Main content and sidebar layout */
 .content-wrapper {
-    display: flex;
-    flex-direction: row;
+    display: grid;
+    grid-template-columns: 2fr 1fr;
     gap: 15px;
-    align-items: flex-start;
-    justify-content: center;
     width: 100%;
     max-width: 100%;
     padding: 0 15px;
@@ -5449,37 +5447,55 @@ body.light .reset-btn:hover {
 }
 
 .left-sidebar {
-    flex: 0 0 auto;
-    width: clamp(220px, 18%, 280px);
-    align-self: flex-start;
-    position: relative;
-    max-height: calc(100vh - 40px);
+    grid-column: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    max-height: calc(100vh - 100px);
     overflow-y: auto;
-    scrollbar-width: none;
+    overflow-x: hidden;
 }
 
 .left-sidebar::-webkit-scrollbar {
-    display: none;
+    width: 6px;
+}
+
+.left-sidebar::-webkit-scrollbar-track {
+    background: #2a2a2a;
+    border-radius: 3px;
+}
+
+.left-sidebar::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 3px;
 }
 
 .main-content-area {
-    flex: 1 1 auto;
-    min-width: 0;
-    align-self: flex-start;
+    display: none;
 }
 
 .right-sidebar {
-    flex: 0 0 auto;
-    width: clamp(280px, 22%, 360px);
-    align-self: flex-start;
-    position: relative;
-    max-height: calc(100vh - 40px);
+    grid-column: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    max-height: calc(100vh - 100px);
     overflow-y: auto;
-    scrollbar-width: none;
+    overflow-x: hidden;
 }
 
 .right-sidebar::-webkit-scrollbar {
-    display: none;
+    width: 6px;
+}
+
+.right-sidebar::-webkit-scrollbar-track {
+    background: #2a2a2a;
+    border-radius: 3px;
+}
+
+.right-sidebar::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 3px;
 }
 
 /* Removed responsive breakpoints - maintaining 3-column layout always */
