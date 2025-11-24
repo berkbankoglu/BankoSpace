@@ -26,6 +26,7 @@ function ReferencePanel() {
 
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
+  const lastDragPosRef = useRef({ x: 0, y: 0 });
 
   const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0];
   const items = activeTab.items;
@@ -389,6 +390,7 @@ function ReferencePanel() {
     const coords = getCanvasCoords(e.clientX, e.clientY);
     setDraggedItem(item);
     setDragOffset({ x: coords.x - item.x, y: coords.y - item.y });
+    lastDragPosRef.current = { x: item.x, y: item.y };
   };
 
   const handleItemMouseMove = (e) => {
@@ -397,21 +399,20 @@ function ReferencePanel() {
       const newX = coords.x - dragOffset.x;
       const newY = coords.y - dragOffset.y;
 
+      const deltaX = newX - lastDragPosRef.current.x;
+      const deltaY = newY - lastDragPosRef.current.y;
+
       setItems(prev => prev.map(item => {
         if (item.id === draggedItem.id) {
           return { ...item, x: newX, y: newY };
         }
         if (selectedItems.includes(item.id) && item.id !== draggedItem.id) {
-          const deltaX = newX - draggedItem.x;
-          const deltaY = newY - draggedItem.y;
           return { ...item, x: item.x + deltaX, y: item.y + deltaY };
         }
         return item;
       }));
 
-      // Don't update draggedItem state, just track position internally
-      draggedItem.x = newX;
-      draggedItem.y = newY;
+      lastDragPosRef.current = { x: newX, y: newY };
     }
 
     if (resizingItem) {
