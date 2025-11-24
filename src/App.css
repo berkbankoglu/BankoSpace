@@ -5192,6 +5192,7 @@ body.light .reset-btn:hover {
 
 .daily-checklist-items {
     padding: 15px 20px;
+    max-height: 300px;
     overflow-y: auto;
 }
 
