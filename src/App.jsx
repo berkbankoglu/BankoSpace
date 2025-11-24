@@ -8,15 +8,65 @@ import StudyReminders from './components/StudyReminders';
 import DailyChecklist from './components/DailyChecklist';
 import Auth from './components/Auth';
 import { FirebaseSync, syncLocalStorageToFirebase, syncFirebaseToLocalStorage } from './services/firebaseSync';
+import { check } from '@tauri-apps/plugin-updater';
+import { relaunch } from '@tauri-apps/plugin-process';
 
-const APP_VERSION = '2.0.4';
+const APP_VERSION = '2.0.8';
 
 function App() {
   const [user, setUser] = useState(null);
   const [firebaseSync, setFirebaseSync] = useState(null);
   const [syncStatus, setSyncStatus] = useState('offline'); // 'offline', 'syncing', 'synced'
   const [showUpdateWarning, setShowUpdateWarning] = useState(false);
+  const [updateAvailable, setUpdateAvailable] = useState(null);
+  const [isUpdating, setIsUpdating] = useState(false);
   const isRemoteUpdate = useRef(false); // Real-time güncellemeleri takip için
+
+  // Auto-update check on app start
+  useEffect(() => {
+    const checkForUpdates = async () => {
+      try {
+        console.log('Checking for updates...');
+        const update = await check();
+
+        if (update) {
+          console.log(`Update available: ${update.version} (current: ${update.currentVersion})`);
+          setUpdateAvailable(update);
+        } else {
+          console.log('No updates available');
+        }
+      } catch (error) {
+        console.error('Failed to check for updates:', error);
+      }
+    };
+
+    // Check for updates when app starts
+    checkForUpdates();
+
+    // Check for updates every 10 minutes
+    const interval = setInterval(checkForUpdates, 10 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Install update function
+  const installUpdate = async () => {
+    if (!updateAvailable) return;
+
+    try {
+      setIsUpdating(true);
+      console.log('Downloading and installing update...');
+
+      await updateAvailable.downloadAndInstall();
+
+      console.log('Update installed, relaunching app...');
+      await relaunch();
+    } catch (error) {
+      console.error('Failed to install update:', error);
+      setIsUpdating(false);
+      alert('Update failed. Please try again or download manually from GitHub.');
+    }
+  };
 
   // Version check - otomatik güncelleme için
   useEffect(() => {
@@ -858,6 +908,33 @@ function App() {
             <button onClick={() => { resetAllData(); setShowSettings(false); }} className="settings-item danger">
               🗑️ Reset All Data
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Auto-update notification modal */}
+      {updateAvailable && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h2>Update Available</h2>
+            <p>A new version ({updateAvailable.version}) is available.</p>
+            <p>Current version: {updateAvailable.currentVersion}</p>
+            <div className="modal-buttons">
+              <button
+                onClick={installUpdate}
+                disabled={isUpdating}
+                className="btn-primary"
+              >
+                {isUpdating ? 'Installing...' : 'Install Update'}
+              </button>
+              <button
+                onClick={() => setUpdateAvailable(null)}
+                disabled={isUpdating}
+                className="btn-secondary"
+              >
+                Later
+              </button>
+            </div>
           </div>
         </div>
       )}
