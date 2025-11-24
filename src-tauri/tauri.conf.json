@@ -12,14 +12,6 @@
     "active": true,
     "targets": ["nsis", "dmg", "app"],
     "publisher": "Berk Bankoglu",
-    "updater": {
-      "active": true,
-      "endpoints": [
-        "https://github.com/berkbankoglu/BankoSpace/releases/latest/download/latest.json"
-      ],
-      "dialog": true,
-      "pubkey": ""
-    },
     "icon": [
       "icons/icon.png",
       "icons/icon.ico"
@@ -65,6 +57,16 @@
           ]
         }
       ]
+    }
+  },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "endpoints": [
+        "https://github.com/berkbankoglu/BankoSpace/releases/latest/download/latest.json"
+      ],
+      "dialog": true,
+      "pubkey": ""
     }
   }
 }
