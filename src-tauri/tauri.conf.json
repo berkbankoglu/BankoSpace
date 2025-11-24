@@ -1,6 +1,6 @@
 {
   "productName": "BankoSpace",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "identifier": "com.berkbankoglu.bankospace",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -57,16 +57,6 @@
           ]
         }
       ]
-    }
-  },
-  "plugins": {
-    "updater": {
-      "active": true,
-      "endpoints": [
-        "https://github.com/berkbankoglu/BankoSpace/releases/latest/download/latest.json"
-      ],
-      "dialog": true,
-      "pubkey": ""
     }
   }
 }
