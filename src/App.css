@@ -2148,6 +2148,27 @@ body.light .reset-btn:hover {
     display: flex;
     flex-direction: column;
     gap: 8px;
+    max-height: 600px;
+    overflow-y: auto;
+    padding-right: 5px;
+}
+
+.todo-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.todo-list::-webkit-scrollbar-track {
+    background: #2a2a2a;
+    border-radius: 3px;
+}
+
+.todo-list::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 3px;
+}
+
+.todo-list::-webkit-scrollbar-thumb:hover {
+    background: #666;
 }
 
 .todo-item {
@@ -5432,6 +5453,7 @@ body.light .reset-btn:hover {
 /* Main content and sidebar layout */
 .content-wrapper {
     display: flex;
+    flex-direction: row-reverse;
     gap: 15px;
     align-items: flex-start;
     justify-content: center;
@@ -5460,7 +5482,6 @@ body.light .reset-btn:hover {
 .main-content-area {
     flex: 1 1 auto;
     min-width: 0;
-    max-width: 55%;
     align-self: flex-start;
 }
 

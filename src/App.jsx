@@ -802,13 +802,6 @@ function App() {
       collapsed: flashCardsCollapsed,
       setCollapsed: setFlashCardsCollapsed,
       content: <FlashCards />
-    },
-    reminders: {
-      id: 'reminders',
-      title: 'Study Reminders',
-      collapsed: remindersCollapsed,
-      setCollapsed: setRemindersCollapsed,
-      content: <StudyReminders />
     }
   };
 
