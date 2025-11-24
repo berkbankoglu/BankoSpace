@@ -4,72 +4,19 @@ import CategoryColumn from './components/CategoryColumn';
 import ReferencePanel from './components/ReferencePanel';
 import Timer from './components/Timer';
 import FlashCards from './components/FlashCards';
-import Goals from './components/Goals';
 import StudyReminders from './components/StudyReminders';
 import DailyChecklist from './components/DailyChecklist';
-import Achievements from './components/Achievements';
-import ProductivityHeatmap from './components/ProductivityHeatmap';
 import Auth from './components/Auth';
 import { FirebaseSync, syncLocalStorageToFirebase, syncFirebaseToLocalStorage } from './services/firebaseSync';
-import { check } from '@tauri-apps/plugin-updater';
-import { relaunch } from '@tauri-apps/plugin-process';
 
-const APP_VERSION = '2.0.1';
+const APP_VERSION = '2.0.4';
 
 function App() {
   const [user, setUser] = useState(null);
   const [firebaseSync, setFirebaseSync] = useState(null);
   const [syncStatus, setSyncStatus] = useState('offline'); // 'offline', 'syncing', 'synced'
   const [showUpdateWarning, setShowUpdateWarning] = useState(false);
-  const [updateAvailable, setUpdateAvailable] = useState(null);
-  const [isUpdating, setIsUpdating] = useState(false);
   const isRemoteUpdate = useRef(false); // Real-time güncellemeleri takip için
-
-  // Auto-update check on app start
-  useEffect(() => {
-    const checkForUpdates = async () => {
-      try {
-        console.log('Checking for updates...');
-        const update = await check();
-
-        if (update) {
-          console.log(`Update available: ${update.version} (current: ${update.currentVersion})`);
-          setUpdateAvailable(update);
-        } else {
-          console.log('No updates available');
-        }
-      } catch (error) {
-        console.error('Failed to check for updates:', error);
-      }
-    };
-
-    // Check for updates when app starts
-    checkForUpdates();
-
-    // Check for updates every 10 minutes
-    const interval = setInterval(checkForUpdates, 10 * 60 * 1000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  // Install update function
-  const installUpdate = async () => {
-    if (!updateAvailable) return;
-
-    try {
-      setIsUpdating(true);
-      console.log('Downloading and installing update...');
-
-      await updateAvailable.downloadAndInstall();
-
-      console.log('Update installed, relaunching app...');
-      await relaunch();
-    } catch (error) {
-      console.error('Failed to install update:', error);
-      setIsUpdating(false);
-      alert('Update failed. Please try again or download manually from GitHub.');
-    }
-  };
 
   // Version check - otomatik güncelleme için
   useEffect(() => {
@@ -880,26 +827,12 @@ function App() {
       setCollapsed: setFlashCardsCollapsed,
       content: <FlashCards />
     },
-    goals: {
-      id: 'goals',
-      title: 'Goals',
-      collapsed: goalsCollapsed,
-      setCollapsed: setGoalsCollapsed,
-      content: <Goals />
-    },
     reminders: {
       id: 'reminders',
       title: 'Study Reminders',
       collapsed: remindersCollapsed,
       setCollapsed: setRemindersCollapsed,
       content: <StudyReminders />
-    },
-    achievements: {
-      id: 'achievements',
-      title: 'Achievements',
-      collapsed: achievementsCollapsed,
-      setCollapsed: setAchievementsCollapsed,
-      content: <Achievements />
     }
   };
 
@@ -965,21 +898,6 @@ function App() {
           <div className="app-section sidebar-section">
             <div
               className="section-unified-header"
-              onClick={() => setGoalsCollapsed(!goalsCollapsed)}
-            >
-              <div className="section-header-left">
-                <h2>Goals</h2>
-                <span className="collapse-indicator">{goalsCollapsed ? '▼' : '▲'}</span>
-              </div>
-            </div>
-            <div className={`section-content ${goalsCollapsed ? 'collapsed' : ''}`}>
-              <Goals />
-            </div>
-          </div>
-
-          <div className="app-section sidebar-section">
-            <div
-              className="section-unified-header"
               onClick={() => setTimerCollapsed(!timerCollapsed)}
             >
               <div className="section-header-left">
@@ -995,15 +913,15 @@ function App() {
           <div className="app-section sidebar-section">
             <div
               className="section-unified-header"
-              onClick={() => setHeatmapCollapsed(!heatmapCollapsed)}
+              onClick={() => setRemindersCollapsed(!remindersCollapsed)}
             >
               <div className="section-header-left">
-                <h2>Login Heat</h2>
-                <span className="collapse-indicator">{heatmapCollapsed ? '▼' : '▲'}</span>
+                <h2>Study Reminders</h2>
+                <span className="collapse-indicator">{remindersCollapsed ? '▼' : '▲'}</span>
               </div>
             </div>
-            <div className={`section-content ${heatmapCollapsed ? 'collapsed' : ''}`}>
-              <ProductivityHeatmap />
+            <div className={`section-content ${remindersCollapsed ? 'collapsed' : ''}`}>
+              <StudyReminders />
             </div>
           </div>
         </div>
@@ -1113,79 +1031,8 @@ function App() {
             <DailyChecklist storageKey="longtermChecklist" />
           </div>
         </div>
-
-        <div className="app-section sidebar-section">
-          <div
-            className="section-unified-header"
-            onClick={() => setAchievementsCollapsed(!achievementsCollapsed)}
-          >
-            <div className="section-header-left">
-              <h2>Achievements</h2>
-              <span className="collapse-indicator">{achievementsCollapsed ? '▼' : '▲'}</span>
-            </div>
-          </div>
-          <div className={`section-content ${achievementsCollapsed ? 'collapsed' : ''}`}>
-            <Achievements />
-          </div>
-        </div>
         </div>
       </div>
-
-      {/* Auto-Update Available Modal */}
-      {updateAvailable && (
-        <div className="update-warning-overlay">
-          <div className="update-warning-modal" onClick={(e) => e.stopPropagation()}>
-            <h2>🎉 Yeni Güncelleme Mevcut!</h2>
-            <p>BankoSpace v{updateAvailable.version} sürümü yayınlandı!</p>
-            <p className="update-message">
-              {isUpdating ? 'Güncelleme indiriliyor ve kuruluyor...' : 'Güncellemek için aşağıdaki butona tıklayın.'}
-            </p>
-            <div className="update-buttons">
-              <button
-                className="update-btn-primary"
-                onClick={installUpdate}
-                disabled={isUpdating}
-              >
-                {isUpdating ? '⏳ Güncelleniyor...' : '🚀 Şimdi Güncelle'}
-              </button>
-              <button
-                className="update-btn-secondary"
-                onClick={() => setUpdateAvailable(null)}
-                disabled={isUpdating}
-              >
-                Daha Sonra
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Update Warning Modal */}
-      {showUpdateWarning && (
-        <div className="update-warning-overlay" onClick={() => setShowUpdateWarning(false)}>
-          <div className="update-warning-modal" onClick={(e) => e.stopPropagation()}>
-            <h2>🎉 Yeni Güncelleme Mevcut!</h2>
-            <p>BankoSpace v{APP_VERSION} sürümüne güncellendi!</p>
-            <p className="update-message">
-              Lütfen uygulamayı kapatıp yeniden açın veya sayfayı yenileyin.
-            </p>
-            <div className="update-buttons">
-              <button
-                className="update-btn-primary"
-                onClick={() => window.location.reload()}
-              >
-                Şimdi Yenile
-              </button>
-              <button
-                className="update-btn-secondary"
-                onClick={() => setShowUpdateWarning(false)}
-              >
-                Daha Sonra
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
