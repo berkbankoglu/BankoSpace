@@ -1,6 +1,6 @@
 {
   "productName": "BankoSpace",
-  "version": "2.1.7",
+  "version": "2.1.8",
   "identifier": "com.berkbankoglu.bankospace",
   "build": {
     "beforeDevCommand": "npm run dev",
