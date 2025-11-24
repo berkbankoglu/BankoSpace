@@ -628,7 +628,7 @@ function ReferencePanel() {
               return (
                 <div
                   key={item.id}
-                  className={`freeform-item freeform-text ${!isEditing && (isSelected || isHovered) ? 'selected' : ''}`}
+                  className={`freeform-item freeform-text ${(isSelected || isHovered) ? 'selected' : ''}`}
                   style={{
                     left: `${item.x}px`,
                     top: `${item.y}px`,
@@ -643,20 +643,23 @@ function ReferencePanel() {
                     }
                   }}
                 >
-                  {editingTextId === item.id ? (
-                    <textarea
-                      className="freeform-text-input"
-                      value={item.content}
-                      onChange={(e) => setItems(prev => prev.map(i =>
-                        i.id === item.id ? { ...i, content: e.target.value } : i
-                      ))}
-                      onBlur={() => setEditingTextId(null)}
-                      autoFocus
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                  ) : (
-                    <div className="freeform-text-content">{item.content || 'Double-click to edit'}</div>
-                  )}
+                  <div
+                    className="freeform-text-content"
+                    contentEditable={isEditing}
+                    suppressContentEditableWarning
+                    onInput={(e) => {
+                      if (isEditing) {
+                        setItems(prev => prev.map(i =>
+                          i.id === item.id ? { ...i, content: e.currentTarget.textContent } : i
+                        ));
+                      }
+                    }}
+                    onBlur={() => setEditingTextId(null)}
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ outline: 'none' }}
+                  >
+                    {item.content || 'Click to edit'}
+                  </div>
                 </div>
               );
             }
