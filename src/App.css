@@ -6153,7 +6153,7 @@ body.light .sync-status.synced {
 }
 
 .freeform-text {
-    padding: 8px;
+    padding: 0;
     background: transparent;
     min-width: 100px;
     max-width: 400px;
@@ -6168,14 +6168,15 @@ body.light .sync-status.synced {
     width: 100%;
     min-width: 200px;
     min-height: 30px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 2px solid #667eea;
-    border-radius: 4px;
+    background: transparent;
+    border: none;
+    border-radius: 0;
     color: #ffffff;
     font-size: 16px;
-    padding: 8px;
-    resize: both;
+    padding: 0;
+    resize: none;
     font-family: inherit;
+    outline: none;
 }
 
 .freeform-sticky {
