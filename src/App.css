@@ -2149,7 +2149,6 @@ body.light .reset-btn:hover {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    max-height: 600px;
     overflow-y: auto;
     padding-right: 5px;
 }
@@ -4871,7 +4870,6 @@ body.light .reset-btn:hover {
     border-radius: 12px;
     padding: 0;
     padding-bottom: 12px;
-    max-height: 600px;
     overflow-y: auto;
     overflow-x: hidden;
     display: flex;
@@ -5194,7 +5192,6 @@ body.light .reset-btn:hover {
 
 .daily-checklist-items {
     padding: 15px 20px;
-    max-height: 400px;
     overflow-y: auto;
 }
 
