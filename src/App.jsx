@@ -159,7 +159,7 @@ function App() {
   });
 
   // Section order for vertical layout (achievements and goals are in sidebars)
-  const [sectionOrder] = useState(['todos', 'references', 'flashcards']);
+  const [sectionOrder] = useState(['todos']);
 
   // Todo'lar değiştiğinde localStorage ve Firebase'e kaydet
   useEffect(() => {
@@ -838,20 +838,6 @@ function App() {
           </div>
         </>
       )
-    },
-    references: {
-      id: 'references',
-      title: 'References',
-      collapsed: referencesCollapsed,
-      setCollapsed: setReferencesCollapsed,
-      content: <ReferencePanel />
-    },
-    flashcards: {
-      id: 'flashcards',
-      title: 'Flash Cards',
-      collapsed: flashCardsCollapsed,
-      setCollapsed: setFlashCardsCollapsed,
-      content: <FlashCards />
     }
   };
 
@@ -1000,15 +986,30 @@ function App() {
         <div className="app-section sidebar-section">
           <div
             className="section-unified-header"
-            onClick={() => setRemindersCollapsed(!remindersCollapsed)}
+            onClick={() => setReferencesCollapsed(!referencesCollapsed)}
           >
             <div className="section-header-left">
-              <h2>Study Reminders</h2>
-              <span className="collapse-indicator">{remindersCollapsed ? '▼' : '▲'}</span>
+              <h2>References</h2>
+              <span className="collapse-indicator">{referencesCollapsed ? '▼' : '▲'}</span>
             </div>
           </div>
-          <div className={`section-content ${remindersCollapsed ? 'collapsed' : ''}`}>
-            <StudyReminders />
+          <div className={`section-content ${referencesCollapsed ? 'collapsed' : ''}`}>
+            <ReferencePanel />
+          </div>
+        </div>
+
+        <div className="app-section sidebar-section">
+          <div
+            className="section-unified-header"
+            onClick={() => setFlashCardsCollapsed(!flashCardsCollapsed)}
+          >
+            <div className="section-header-left">
+              <h2>Flash Cards</h2>
+              <span className="collapse-indicator">{flashCardsCollapsed ? '▼' : '▲'}</span>
+            </div>
+          </div>
+          <div className={`section-content ${flashCardsCollapsed ? 'collapsed' : ''}`}>
+            <FlashCards />
           </div>
         </div>
 

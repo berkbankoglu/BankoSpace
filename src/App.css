@@ -5437,7 +5437,7 @@ body.light .reset-btn:hover {
 /* Main content and sidebar layout */
 .content-wrapper {
     display: flex;
-    flex-direction: row-reverse;
+    flex-direction: row;
     gap: 15px;
     align-items: flex-start;
     justify-content: center;
