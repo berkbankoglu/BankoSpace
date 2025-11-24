@@ -11,15 +11,65 @@ import Achievements from './components/Achievements';
 import ProductivityHeatmap from './components/ProductivityHeatmap';
 import Auth from './components/Auth';
 import { FirebaseSync, syncLocalStorageToFirebase, syncFirebaseToLocalStorage } from './services/firebaseSync';
+import { check } from '@tauri-apps/plugin-updater';
+import { relaunch } from '@tauri-apps/plugin-process';
 
-const APP_VERSION = '7.0.8';
+const APP_VERSION = '2.0.0';
 
 function App() {
   const [user, setUser] = useState(null);
   const [firebaseSync, setFirebaseSync] = useState(null);
   const [syncStatus, setSyncStatus] = useState('offline'); // 'offline', 'syncing', 'synced'
   const [showUpdateWarning, setShowUpdateWarning] = useState(false);
+  const [updateAvailable, setUpdateAvailable] = useState(null);
+  const [isUpdating, setIsUpdating] = useState(false);
   const isRemoteUpdate = useRef(false); // Real-time güncellemeleri takip için
+
+  // Auto-update check on app start
+  useEffect(() => {
+    const checkForUpdates = async () => {
+      try {
+        console.log('Checking for updates...');
+        const update = await check();
+
+        if (update) {
+          console.log(`Update available: ${update.version} (current: ${update.currentVersion})`);
+          setUpdateAvailable(update);
+        } else {
+          console.log('No updates available');
+        }
+      } catch (error) {
+        console.error('Failed to check for updates:', error);
+      }
+    };
+
+    // Check for updates when app starts
+    checkForUpdates();
+
+    // Check for updates every 10 minutes
+    const interval = setInterval(checkForUpdates, 10 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Install update function
+  const installUpdate = async () => {
+    if (!updateAvailable) return;
+
+    try {
+      setIsUpdating(true);
+      console.log('Downloading and installing update...');
+
+      await updateAvailable.downloadAndInstall();
+
+      console.log('Update installed, relaunching app...');
+      await relaunch();
+    } catch (error) {
+      console.error('Failed to install update:', error);
+      setIsUpdating(false);
+      alert('Update failed. Please try again or download manually from GitHub.');
+    }
+  };
 
   // Version check - otomatik güncelleme için
   useEffect(() => {
@@ -1080,6 +1130,35 @@ function App() {
         </div>
         </div>
       </div>
+
+      {/* Auto-Update Available Modal */}
+      {updateAvailable && (
+        <div className="update-warning-overlay">
+          <div className="update-warning-modal" onClick={(e) => e.stopPropagation()}>
+            <h2>🎉 Yeni Güncelleme Mevcut!</h2>
+            <p>BankoSpace v{updateAvailable.version} sürümü yayınlandı!</p>
+            <p className="update-message">
+              {isUpdating ? 'Güncelleme indiriliyor ve kuruluyor...' : 'Güncellemek için aşağıdaki butona tıklayın.'}
+            </p>
+            <div className="update-buttons">
+              <button
+                className="update-btn-primary"
+                onClick={installUpdate}
+                disabled={isUpdating}
+              >
+                {isUpdating ? '⏳ Güncelleniyor...' : '🚀 Şimdi Güncelle'}
+              </button>
+              <button
+                className="update-btn-secondary"
+                onClick={() => setUpdateAvailable(null)}
+                disabled={isUpdating}
+              >
+                Daha Sonra
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Update Warning Modal */}
       {showUpdateWarning && (
