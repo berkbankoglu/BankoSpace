@@ -5451,8 +5451,6 @@ body.light .reset-btn:hover {
     display: flex;
     flex-direction: column;
     gap: 15px;
-    max-height: calc(100vh - 100px);
-    overflow-y: auto;
     overflow-x: hidden;
 }
 
@@ -5479,8 +5477,6 @@ body.light .reset-btn:hover {
     display: flex;
     flex-direction: column;
     gap: 15px;
-    max-height: calc(100vh - 100px);
-    overflow-y: auto;
     overflow-x: hidden;
 }
 
