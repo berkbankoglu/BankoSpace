@@ -581,20 +581,6 @@ function ReferencePanel() {
         ref={canvasRef}
         className="freeform-canvas"
         onMouseDown={handleCanvasMouseDown}
-        onDoubleClick={(e) => {
-          const coords = getCanvasCoords(e.clientX, e.clientY);
-          const newItem = {
-            id: Date.now(),
-            type: 'text',
-            content: '',
-            x: coords.x,
-            y: coords.y,
-            fontSize: 16,
-            color: '#ffffff'
-          };
-          setItems(prev => [...prev, newItem]);
-          setEditingTextId(newItem.id);
-        }}
         onContextMenu={(e) => e.preventDefault()}
         style={{ cursor: spaceKeyPressed || isPanning ? 'grab' : tool === 'text' ? 'text' : 'default' }}
       >
@@ -639,6 +625,20 @@ function ReferencePanel() {
 
             if (item.type === 'text') {
               const isEditing = editingTextId === item.id;
+              const textRef = useRef(null);
+
+              useEffect(() => {
+                if (isEditing && textRef.current) {
+                  textRef.current.focus();
+                  const range = document.createRange();
+                  const sel = window.getSelection();
+                  range.selectNodeContents(textRef.current);
+                  range.collapse(false);
+                  sel.removeAllRanges();
+                  sel.addRange(range);
+                }
+              }, [isEditing]);
+
               return (
                 <div
                   key={item.id}
@@ -656,20 +656,26 @@ function ReferencePanel() {
                   }}
                 >
                   <div
+                    ref={textRef}
                     className="freeform-text-content"
                     contentEditable={isEditing}
                     suppressContentEditableWarning
                     onInput={(e) => {
                       if (isEditing) {
+                        const newContent = e.currentTarget.textContent || '';
                         setItems(prev => prev.map(i =>
-                          i.id === item.id ? { ...i, content: e.currentTarget.textContent } : i
+                          i.id === item.id ? { ...i, content: newContent } : i
                         ));
                       }
                     }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
-                        setEditingTextId(null);
+                        e.currentTarget.blur();
+                      }
+                      if (e.key === 'Escape') {
+                        e.preventDefault();
+                        e.currentTarget.blur();
                       }
                     }}
                     onBlur={() => setEditingTextId(null)}
