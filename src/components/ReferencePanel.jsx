@@ -581,6 +581,20 @@ function ReferencePanel() {
         ref={canvasRef}
         className="freeform-canvas"
         onMouseDown={handleCanvasMouseDown}
+        onDoubleClick={(e) => {
+          const coords = getCanvasCoords(e.clientX, e.clientY);
+          const newItem = {
+            id: Date.now(),
+            type: 'text',
+            content: '',
+            x: coords.x,
+            y: coords.y,
+            fontSize: 16,
+            color: '#ffffff'
+          };
+          setItems(prev => [...prev, newItem]);
+          setEditingTextId(newItem.id);
+        }}
         onContextMenu={(e) => e.preventDefault()}
         style={{ cursor: spaceKeyPressed || isPanning ? 'grab' : tool === 'text' ? 'text' : 'default' }}
       >
@@ -636,11 +650,9 @@ function ReferencePanel() {
                     color: item.color
                   }}
                   onMouseDown={(e) => !isEditing && handleItemMouseDown(e, item)}
-                  onClick={(e) => {
-                    if (!isEditing) {
-                      e.stopPropagation();
-                      setEditingTextId(item.id);
-                    }
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    setEditingTextId(item.id);
                   }}
                 >
                   <div
@@ -661,10 +673,9 @@ function ReferencePanel() {
                       }
                     }}
                     onBlur={() => setEditingTextId(null)}
-                    onClick={(e) => e.stopPropagation()}
-                    style={{ outline: 'none', whiteSpace: 'nowrap' }}
+                    style={{ outline: 'none', whiteSpace: 'nowrap', cursor: isEditing ? 'text' : 'pointer' }}
                   >
-                    {item.content || 'Click to edit'}
+                    {item.content || 'Double-click to edit'}
                   </div>
                 </div>
               );
