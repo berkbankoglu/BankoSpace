@@ -654,9 +654,15 @@ function ReferencePanel() {
                         ));
                       }
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        setEditingTextId(null);
+                      }
+                    }}
                     onBlur={() => setEditingTextId(null)}
                     onClick={(e) => e.stopPropagation()}
-                    style={{ outline: 'none' }}
+                    style={{ outline: 'none', whiteSpace: 'nowrap' }}
                   >
                     {item.content || 'Click to edit'}
                   </div>
