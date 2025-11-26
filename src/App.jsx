@@ -11,7 +11,7 @@ import { FirebaseSync, syncLocalStorageToFirebase, syncFirebaseToLocalStorage } 
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 
-const APP_VERSION = '2.2.4';
+const APP_VERSION = '2.2.6';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -197,7 +197,9 @@ function App() {
               reminders: JSON.parse(localStorage.getItem('reminders') || '[]'),
               dailyChecklistItems: JSON.parse(localStorage.getItem('dailyChecklistItems') || '[]'),
               dailyChecklistLastReset: localStorage.getItem('dailyChecklistLastReset') || new Date().toDateString(),
-              achievements: JSON.parse(localStorage.getItem('achievements') || '{}')
+              achievements: JSON.parse(localStorage.getItem('achievements') || '{}'),
+              freeformTabs: JSON.parse(localStorage.getItem('freeformTabs') || '[]'),
+              flashCards: JSON.parse(localStorage.getItem('flashCards') || '[]')
             }),
             timeoutPromise
           ]);
@@ -230,7 +232,9 @@ function App() {
             reminders: JSON.parse(localStorage.getItem('reminders') || '[]'),
             dailyChecklistItems: JSON.parse(localStorage.getItem('dailyChecklistItems') || '[]'),
             dailyChecklistLastReset: localStorage.getItem('dailyChecklistLastReset') || new Date().toDateString(),
-            achievements: JSON.parse(localStorage.getItem('achievements') || '{}')
+            achievements: JSON.parse(localStorage.getItem('achievements') || '{}'),
+            freeformTabs: JSON.parse(localStorage.getItem('freeformTabs') || '[]'),
+            flashCards: JSON.parse(localStorage.getItem('flashCards') || '[]')
           });
           console.log('Final save to Firebase successful!');
         } catch (error) {

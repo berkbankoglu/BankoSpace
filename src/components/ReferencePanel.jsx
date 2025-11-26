@@ -23,6 +23,9 @@ function ReferencePanel() {
   const [isDrawingSelection, setIsDrawingSelection] = useState(false);
   const [hoveredItems, setHoveredItems] = useState([]);
   const [tool, setTool] = useState('select'); // 'select', 'text', 'sticky'
+  const [history, setHistory] = useState([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [clipboard, setClipboard] = useState(null);
 
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -31,20 +34,96 @@ function ReferencePanel() {
   const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0];
   const items = activeTab.items;
 
+  // Add to history when items change
+  const saveToHistory = (newItems) => {
+    const currentState = JSON.stringify(newItems);
+    const lastState = history[historyIndex];
+
+    // Don't save if state hasn't changed
+    if (lastState && JSON.stringify(lastState) === currentState) {
+      return;
+    }
+
+    // Remove any history after current index (when undoing then making new changes)
+    const newHistory = history.slice(0, historyIndex + 1);
+    newHistory.push(newItems);
+
+    // Limit history to 50 states
+    if (newHistory.length > 50) {
+      newHistory.shift();
+      setHistory(newHistory);
+      setHistoryIndex(newHistory.length - 1);
+    } else {
+      setHistory(newHistory);
+      setHistoryIndex(newHistory.length - 1);
+    }
+  };
+
   const setItems = (updateFn) => {
-    setTabs(prev => prev.map(tab =>
-      tab.id === activeTabId
-        ? { ...tab, items: typeof updateFn === 'function' ? updateFn(tab.items) : updateFn }
-        : tab
-    ));
+    setTabs(prev => prev.map(tab => {
+      if (tab.id === activeTabId) {
+        const newItems = typeof updateFn === 'function' ? updateFn(tab.items) : updateFn;
+        saveToHistory(newItems);
+        return { ...tab, items: newItems };
+      }
+      return tab;
+    }));
+  };
+
+  const undo = () => {
+    if (historyIndex > 0) {
+      const newIndex = historyIndex - 1;
+      setHistoryIndex(newIndex);
+      const previousState = history[newIndex];
+      setTabs(prev => prev.map(tab =>
+        tab.id === activeTabId ? { ...tab, items: previousState } : tab
+      ));
+    }
+  };
+
+  const redo = () => {
+    if (historyIndex < history.length - 1) {
+      const newIndex = historyIndex + 1;
+      setHistoryIndex(newIndex);
+      const nextState = history[newIndex];
+      setTabs(prev => prev.map(tab =>
+        tab.id === activeTabId ? { ...tab, items: nextState } : tab
+      ));
+    }
   };
 
   // Load from localStorage
   useEffect(() => {
     const saved = localStorage.getItem('freeformTabs');
+    console.log('Loading tabs from localStorage:', saved);
+
+    // Try to recover from backup if exists
+    const backup = localStorage.getItem('freeformTabs_backup');
+
     if (saved) {
       try {
         const loadedTabs = JSON.parse(saved);
+        console.log('Loaded tabs:', loadedTabs);
+
+        // Check if tabs have content
+        const hasContent = loadedTabs.some(tab => tab.items && tab.items.length > 0);
+
+        if (!hasContent && backup) {
+          // Try to restore from backup
+          console.log('No content in current tabs, trying backup...');
+          try {
+            const backupTabs = JSON.parse(backup);
+            console.log('Restored from backup:', backupTabs);
+            setTabs(backupTabs);
+            if (backupTabs.length > 0) {
+              setActiveTabId(backupTabs[0].id);
+            }
+            return;
+          } catch (e) {
+            console.error('Failed to load backup:', e);
+          }
+        }
+
         setTabs(loadedTabs);
         if (loadedTabs.length > 0) {
           setActiveTabId(loadedTabs[0].id);
@@ -52,18 +131,49 @@ function ReferencePanel() {
       } catch (e) {
         console.error('Failed to load tabs:', e);
       }
+    } else {
+      console.log('No saved tabs found in localStorage');
+
+      // Try backup
+      if (backup) {
+        try {
+          const backupTabs = JSON.parse(backup);
+          console.log('Loaded from backup:', backupTabs);
+          setTabs(backupTabs);
+          if (backupTabs.length > 0) {
+            setActiveTabId(backupTabs[0].id);
+          }
+        } catch (e) {
+          console.error('Failed to load backup:', e);
+        }
+      }
     }
   }, []);
 
-  // Save to localStorage
+  // Save to localStorage with backup
   useEffect(() => {
-    localStorage.setItem('freeformTabs', JSON.stringify(tabs));
+    const tabsJson = JSON.stringify(tabs);
+
+    // Create backup before saving if tabs have content
+    const hasContent = tabs.some(tab => tab.items && tab.items.length > 0);
+    if (hasContent) {
+      const existingBackup = localStorage.getItem('freeformTabs_backup');
+      if (existingBackup) {
+        // Keep old backup as second backup
+        localStorage.setItem('freeformTabs_backup_old', existingBackup);
+      }
+      localStorage.setItem('freeformTabs_backup', tabsJson);
+    }
+
+    localStorage.setItem('freeformTabs', tabsJson);
   }, [tabs]);
+
 
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (e.target.contentEditable === 'true') return;
 
       // Space for pan mode
       if (e.code === 'Space') {
@@ -101,6 +211,50 @@ function ReferencePanel() {
         setSelectedItems(items.map(item => item.id));
       }
 
+      // Cmd/Ctrl + C - Copy selected items
+      if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
+        if (selectedItems.length > 0) {
+          e.preventDefault();
+          const itemsToCopy = items.filter(item => selectedItems.includes(item.id));
+          setClipboard(itemsToCopy);
+        }
+      }
+
+      // Cmd/Ctrl + V - Paste copied items
+      if ((e.metaKey || e.ctrlKey) && e.key === 'v') {
+        if (clipboard && clipboard.length > 0) {
+          e.preventDefault();
+          const now = Date.now();
+          const pastedItems = clipboard.map((item, index) => ({
+            ...item,
+            id: now + index,
+            x: item.x + 20, // Offset by 20px
+            y: item.y + 20
+          }));
+          setItems(prev => [...prev, ...pastedItems]);
+          // Select the newly pasted items
+          setSelectedItems(pastedItems.map(item => item.id));
+        }
+      }
+
+      // Cmd/Ctrl + Z - Undo
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      }
+
+      // Cmd/Ctrl + Shift + Z - Redo
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'z') {
+        e.preventDefault();
+        redo();
+      }
+
+      // Cmd/Ctrl + Y - Redo (alternative)
+      if ((e.metaKey || e.ctrlKey) && e.key === 'y') {
+        e.preventDefault();
+        redo();
+      }
+
       // Escape - Deselect all
       if (e.key === 'Escape') {
         setSelectedItems([]);
@@ -136,7 +290,7 @@ function ReferencePanel() {
       document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selectedItems, items]);
+  }, [selectedItems, items, clipboard]);
 
   // Mouse wheel zoom
   useEffect(() => {
@@ -218,24 +372,26 @@ function ReferencePanel() {
 
   const getItemsInBox = (box) => {
     return items.filter(item => {
-      // Get item dimensions with padding for easier selection
+      // Get item dimensions using the same function as alignment
+      const dims = getItemDimensions(item);
+      const padding = 1; // Minimal padding for precise selection
+
       let itemWidth, itemHeight, itemX, itemY;
-      const padding = 20; // Extra padding for text items
 
       if (item.type === 'image' || item.type === 'sticky') {
-        itemWidth = item.width || 100;
-        itemHeight = item.height || 100;
+        itemWidth = dims.width;
+        itemHeight = dims.height;
         itemX = item.x;
         itemY = item.y;
       } else if (item.type === 'text') {
-        // Add padding around text for easier selection
-        itemWidth = Math.max(50, (item.content?.length || 5) * 8) + padding * 2;
-        itemHeight = 30 + padding * 2;
+        // Use calculated dimensions for text, add small padding for easier selection
+        itemWidth = dims.width + padding * 2;
+        itemHeight = dims.height + padding * 2;
         itemX = item.x - padding;
         itemY = item.y - padding;
       } else {
-        itemWidth = 100;
-        itemHeight = 30;
+        itemWidth = dims.width;
+        itemHeight = dims.height;
         itemX = item.x;
         itemY = item.y;
       }
@@ -264,6 +420,9 @@ function ReferencePanel() {
 
     // Text tool - create text
     if (tool === 'text') {
+      e.preventDefault();
+      e.stopPropagation();
+
       const newItem = {
         id: Date.now(),
         type: 'text',
@@ -273,8 +432,14 @@ function ReferencePanel() {
         fontSize: 16,
         color: '#ffffff'
       };
+
       setItems(prev => [...prev, newItem]);
-      setEditingTextId(newItem.id);
+
+      // Use setTimeout to ensure state is updated before editing
+      setTimeout(() => {
+        setEditingTextId(newItem.id);
+      }, 0);
+
       setTool('select');
       return;
     }
@@ -479,6 +644,183 @@ function ReferencePanel() {
     setTabs(prev => prev.map(tab => tab.id === tabId ? { ...tab, name: newName } : tab));
   };
 
+  // Helper function to get item dimensions
+  const getItemDimensions = (item) => {
+    if (item.type === 'text') {
+      // Calculate text dimensions based on content
+      const fontSize = item.fontSize || 16;
+      const lineHeight = fontSize * 1.5;
+      const content = item.content || '';
+
+      // Count actual lines in the content
+      const lines = content.split('\n');
+      const lineCount = lines.length || 1;
+
+      // Calculate width - use the longest line
+      const maxLineLength = Math.max(...lines.map(line => line.length), 1);
+      const estimatedWidth = maxLineLength * fontSize * 0.6; // Approximate char width
+
+      return {
+        width: estimatedWidth,
+        height: lineCount * lineHeight
+      };
+    }
+    return {
+      width: item.width || 0,
+      height: item.height || 0
+    };
+  };
+
+  // Align functions
+  const alignLeft = () => {
+    if (selectedItems.length < 2) return;
+    const selectedItemsData = items.filter(item => selectedItems.includes(item.id));
+    const minX = Math.min(...selectedItemsData.map(item => item.x));
+    setItems(prev => prev.map(item =>
+      selectedItems.includes(item.id) ? { ...item, x: minX } : item
+    ));
+  };
+
+  const alignRight = () => {
+    if (selectedItems.length < 2) return;
+    const selectedItemsData = items.filter(item => selectedItems.includes(item.id));
+    const maxX = Math.max(...selectedItemsData.map(item => {
+      const dims = getItemDimensions(item);
+      return item.x + dims.width;
+    }));
+    setItems(prev => prev.map(item => {
+      if (selectedItems.includes(item.id)) {
+        const dims = getItemDimensions(item);
+        return { ...item, x: maxX - dims.width };
+      }
+      return item;
+    }));
+  };
+
+  const alignTop = () => {
+    if (selectedItems.length < 2) return;
+    const selectedItemsData = items.filter(item => selectedItems.includes(item.id));
+    const minY = Math.min(...selectedItemsData.map(item => item.y));
+    setItems(prev => prev.map(item =>
+      selectedItems.includes(item.id) ? { ...item, y: minY } : item
+    ));
+  };
+
+  const alignBottom = () => {
+    if (selectedItems.length < 2) return;
+    const selectedItemsData = items.filter(item => selectedItems.includes(item.id));
+    const maxY = Math.max(...selectedItemsData.map(item => {
+      const dims = getItemDimensions(item);
+      return item.y + dims.height;
+    }));
+    setItems(prev => prev.map(item => {
+      if (selectedItems.includes(item.id)) {
+        const dims = getItemDimensions(item);
+        return { ...item, y: maxY - dims.height };
+      }
+      return item;
+    }));
+  };
+
+  const alignCenterHorizontal = () => {
+    if (selectedItems.length < 2) return;
+    const selectedItemsData = items.filter(item => selectedItems.includes(item.id));
+    const centerX = selectedItemsData.reduce((sum, item) => {
+      const dims = getItemDimensions(item);
+      return sum + item.x + dims.width / 2;
+    }, 0) / selectedItemsData.length;
+    setItems(prev => prev.map(item => {
+      if (selectedItems.includes(item.id)) {
+        const dims = getItemDimensions(item);
+        return { ...item, x: centerX - dims.width / 2 };
+      }
+      return item;
+    }));
+  };
+
+  const alignCenterVertical = () => {
+    if (selectedItems.length < 2) return;
+    const selectedItemsData = items.filter(item => selectedItems.includes(item.id));
+    const centerY = selectedItemsData.reduce((sum, item) => {
+      const dims = getItemDimensions(item);
+      return sum + item.y + dims.height / 2;
+    }, 0) / selectedItemsData.length;
+    setItems(prev => prev.map(item => {
+      if (selectedItems.includes(item.id)) {
+        const dims = getItemDimensions(item);
+        return { ...item, y: centerY - dims.height / 2 };
+      }
+      return item;
+    }));
+  };
+
+  // Distribute functions
+  const distributeHorizontal = () => {
+    if (selectedItems.length < 3) return;
+    const selectedItemsData = items.filter(item => selectedItems.includes(item.id));
+
+    // Sort by x position
+    const sorted = [...selectedItemsData].sort((a, b) => a.x - b.x);
+    const first = sorted[0];
+    const last = sorted[sorted.length - 1];
+
+    const firstDims = getItemDimensions(first);
+    const lastDims = getItemDimensions(last);
+
+    const totalSpace = (last.x + lastDims.width) - first.x;
+    const totalItemWidth = sorted.reduce((sum, item) => {
+      const dims = getItemDimensions(item);
+      return sum + dims.width;
+    }, 0);
+    const spacing = (totalSpace - totalItemWidth) / (sorted.length - 1);
+
+    let currentX = first.x + firstDims.width + spacing;
+
+    setItems(prev => prev.map(item => {
+      const index = sorted.findIndex(s => s.id === item.id);
+      if (index > 0 && index < sorted.length - 1) {
+        const newX = currentX;
+        const dims = getItemDimensions(item);
+        currentX = newX + dims.width + spacing;
+        return { ...item, x: newX };
+      }
+      return item;
+    }));
+  };
+
+  const distributeVertical = () => {
+    if (selectedItems.length < 3) return;
+    const selectedItemsData = items.filter(item => selectedItems.includes(item.id));
+
+    // Sort by y position
+    const sorted = [...selectedItemsData].sort((a, b) => a.y - b.y);
+    const first = sorted[0];
+    const last = sorted[sorted.length - 1];
+
+    const firstDims = getItemDimensions(first);
+    const lastDims = getItemDimensions(last);
+
+    const totalSpace = (last.y + lastDims.height) - first.y;
+    const totalItemHeight = sorted.reduce((sum, item) => {
+      const dims = getItemDimensions(item);
+      return sum + dims.height;
+    }, 0);
+    const spacing = (totalSpace - totalItemHeight) / (sorted.length - 1);
+
+    let currentY = first.y + firstDims.height + spacing;
+
+    setItems(prev => prev.map(item => {
+      const index = sorted.findIndex(s => s.id === item.id);
+      if (index > 0 && index < sorted.length - 1) {
+        const newY = currentY;
+        const dims = getItemDimensions(item);
+        currentY = newY + dims.height + spacing;
+        return { ...item, y: newY };
+      }
+      return item;
+    }));
+  };
+
   return (
     <div className="freeform-container">
       {/* Toolbar */}
@@ -522,6 +864,23 @@ function ReferencePanel() {
           />
         </div>
 
+        <div className="freeform-history-tools">
+          <button
+            onClick={undo}
+            disabled={historyIndex <= 0}
+            title="Undo (Cmd/Ctrl + Z)"
+          >
+            ↶
+          </button>
+          <button
+            onClick={redo}
+            disabled={historyIndex >= history.length - 1}
+            title="Redo (Cmd/Ctrl + Shift + Z)"
+          >
+            ↷
+          </button>
+        </div>
+
         <div className="freeform-zoom">
           <button onClick={() => setZoomLevel(prev => Math.max(prev - 0.1, 0.25))}>−</button>
           <span>{Math.round(zoomLevel * 100)}%</span>
@@ -538,6 +897,145 @@ function ReferencePanel() {
             }}>Delete</button>
           </div>
         )}
+
+        <div className="freeform-align-tools">
+          <div className="align-section">
+            <span className="align-label">Text:</span>
+            <button
+              onClick={() => {
+                setItems(prev => prev.map(item => {
+                  if (selectedItems.includes(item.id) && item.type === 'text') {
+                    return { ...item, fontSize: Math.max(8, (item.fontSize || 16) - 2) };
+                  }
+                  return item;
+                }));
+              }}
+              className="align-btn"
+              title="Decrease Font Size"
+              disabled={!(selectedItems.length > 0 && items.filter(item => selectedItems.includes(item.id) && item.type === 'text').length > 0)}
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16">
+                <text x="2" y="12" fontSize="10" fill="currentColor" fontWeight="bold">A</text>
+              </svg>
+            </button>
+            <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.6)' }}>
+              {(() => {
+                const textItems = items.filter(item => selectedItems.includes(item.id) && item.type === 'text');
+                const fontSize = textItems.length > 0 ? textItems[0].fontSize || 16 : 16;
+                return fontSize;
+              })()}
+            </span>
+            <button
+              onClick={() => {
+                setItems(prev => prev.map(item => {
+                  if (selectedItems.includes(item.id) && item.type === 'text') {
+                    return { ...item, fontSize: Math.min(72, (item.fontSize || 16) + 2) };
+                  }
+                  return item;
+                }));
+              }}
+              className="align-btn"
+              title="Increase Font Size"
+              disabled={!(selectedItems.length > 0 && items.filter(item => selectedItems.includes(item.id) && item.type === 'text').length > 0)}
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16">
+                <text x="1" y="13" fontSize="14" fill="currentColor" fontWeight="bold">A</text>
+              </svg>
+            </button>
+            <span className="align-divider">|</span>
+            <button
+              onClick={() => {
+                setItems(prev => prev.map(item => {
+                  if (selectedItems.includes(item.id) && item.type === 'text') {
+                    return { ...item, fontWeight: item.fontWeight === 'bold' ? 'normal' : 'bold' };
+                  }
+                  return item;
+                }));
+              }}
+              className={`align-btn ${items.some(item => selectedItems.includes(item.id) && item.type === 'text' && item.fontWeight === 'bold') ? 'active' : ''}`}
+              title="Bold"
+              disabled={!(selectedItems.length > 0 && items.filter(item => selectedItems.includes(item.id) && item.type === 'text').length > 0)}
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16">
+                <text x="4" y="12" fontSize="12" fill="currentColor" fontWeight="bold">B</text>
+              </svg>
+            </button>
+            <span className="align-divider">|</span>
+          </div>
+          <div className="align-section">
+            <span className="align-label">Align:</span>
+            <button onClick={alignLeft} title="Align Left" className="align-btn" disabled={selectedItems.length < 2}>
+              <svg width="16" height="16" viewBox="0 0 16 16">
+                <line x1="2" y1="2" x2="2" y2="14" stroke="currentColor" strokeWidth="2"/>
+                <rect x="4" y="3" width="8" height="2" fill="currentColor"/>
+                <rect x="4" y="7" width="10" height="2" fill="currentColor"/>
+                <rect x="4" y="11" width="6" height="2" fill="currentColor"/>
+              </svg>
+            </button>
+            <button onClick={alignCenterHorizontal} title="Align Center Horizontal" className="align-btn" disabled={selectedItems.length < 2}>
+              <svg width="16" height="16" viewBox="0 0 16 16">
+                <line x1="8" y1="2" x2="8" y2="14" stroke="currentColor" strokeWidth="2"/>
+                <rect x="5" y="3" width="6" height="2" fill="currentColor"/>
+                <rect x="3" y="7" width="10" height="2" fill="currentColor"/>
+                <rect x="6" y="11" width="4" height="2" fill="currentColor"/>
+              </svg>
+            </button>
+            <button onClick={alignRight} title="Align Right" className="align-btn" disabled={selectedItems.length < 2}>
+              <svg width="16" height="16" viewBox="0 0 16 16">
+                <line x1="14" y1="2" x2="14" y2="14" stroke="currentColor" strokeWidth="2"/>
+                <rect x="4" y="3" width="8" height="2" fill="currentColor"/>
+                <rect x="2" y="7" width="10" height="2" fill="currentColor"/>
+                <rect x="6" y="11" width="6" height="2" fill="currentColor"/>
+              </svg>
+            </button>
+            <span className="align-divider">|</span>
+            <button onClick={alignTop} title="Align Top" className="align-btn" disabled={selectedItems.length < 2}>
+              <svg width="16" height="16" viewBox="0 0 16 16">
+                <line x1="2" y1="2" x2="14" y2="2" stroke="currentColor" strokeWidth="2"/>
+                <rect x="3" y="4" width="2" height="8" fill="currentColor"/>
+                <rect x="7" y="4" width="2" height="10" fill="currentColor"/>
+                <rect x="11" y="4" width="2" height="6" fill="currentColor"/>
+              </svg>
+            </button>
+            <button onClick={alignCenterVertical} title="Align Center Vertical" className="align-btn" disabled={selectedItems.length < 2}>
+              <svg width="16" height="16" viewBox="0 0 16 16">
+                <line x1="2" y1="8" x2="14" y2="8" stroke="currentColor" strokeWidth="2"/>
+                <rect x="3" y="5" width="2" height="6" fill="currentColor"/>
+                <rect x="7" y="3" width="2" height="10" fill="currentColor"/>
+                <rect x="11" y="6" width="2" height="4" fill="currentColor"/>
+              </svg>
+            </button>
+            <button onClick={alignBottom} title="Align Bottom" className="align-btn" disabled={selectedItems.length < 2}>
+              <svg width="16" height="16" viewBox="0 0 16 16">
+                <line x1="2" y1="14" x2="14" y2="14" stroke="currentColor" strokeWidth="2"/>
+                <rect x="3" y="4" width="2" height="8" fill="currentColor"/>
+                <rect x="7" y="2" width="2" height="10" fill="currentColor"/>
+                <rect x="11" y="6" width="2" height="6" fill="currentColor"/>
+              </svg>
+            </button>
+          </div>
+          <div className="align-section">
+            <span className="align-label">Distribute:</span>
+            <button onClick={distributeHorizontal} title="Distribute Horizontal" className="align-btn" disabled={selectedItems.length < 3}>
+              <svg width="16" height="16" viewBox="0 0 16 16">
+                <rect x="2" y="5" width="2" height="6" fill="currentColor"/>
+                <rect x="7" y="5" width="2" height="6" fill="currentColor"/>
+                <rect x="12" y="5" width="2" height="6" fill="currentColor"/>
+                <line x1="4" y1="8" x2="7" y2="8" stroke="currentColor" strokeWidth="1" strokeDasharray="2,2"/>
+                <line x1="9" y1="8" x2="12" y2="8" stroke="currentColor" strokeWidth="1" strokeDasharray="2,2"/>
+              </svg>
+            </button>
+            <button onClick={distributeVertical} title="Distribute Vertical" className="align-btn" disabled={selectedItems.length < 3}>
+              <svg width="16" height="16" viewBox="0 0 16 16">
+                <rect x="5" y="2" width="6" height="2" fill="currentColor"/>
+                <rect x="5" y="7" width="6" height="2" fill="currentColor"/>
+                <rect x="5" y="12" width="6" height="2" fill="currentColor"/>
+                <line x1="8" y1="4" x2="8" y2="7" stroke="currentColor" strokeWidth="1" strokeDasharray="2,2"/>
+                <line x1="8" y1="9" x2="8" y2="12" stroke="currentColor" strokeWidth="1" strokeDasharray="2,2"/>
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -625,19 +1123,77 @@ function ReferencePanel() {
 
             if (item.type === 'text') {
               const isEditing = editingTextId === item.id;
-              const textRef = useRef(null);
 
-              useEffect(() => {
-                if (isEditing && textRef.current) {
-                  textRef.current.focus();
-                  const range = document.createRange();
-                  const sel = window.getSelection();
-                  range.selectNodeContents(textRef.current);
-                  range.collapse(false);
-                  sel.removeAllRanges();
-                  sel.addRange(range);
-                }
-              }, [isEditing]);
+              if (isEditing) {
+                return (
+                  <div
+                    key={item.id}
+                    className="freeform-item"
+                    style={{
+                      position: 'absolute',
+                      left: `${item.x}px`,
+                      top: `${item.y}px`,
+                      zIndex: 1000
+                    }}
+                  >
+                    <textarea
+                      value={item.content}
+                      onChange={(e) => {
+                        setItems(prev => prev.map(i =>
+                          i.id === item.id ? { ...i, content: e.target.value } : i
+                        ));
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') {
+                          e.preventDefault();
+                          setEditingTextId(null);
+                          // Delete if empty - check current input value
+                          if (!e.target.value.trim()) {
+                            setItems(prev => prev.filter(i => i.id !== item.id));
+                          }
+                        }
+                        // Cmd/Ctrl + Enter to finish editing
+                        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                          e.preventDefault();
+                          setEditingTextId(null);
+                          if (!e.target.value.trim()) {
+                            setItems(prev => prev.filter(i => i.id !== item.id));
+                          }
+                        }
+                      }}
+                      onBlur={(e) => {
+                        setEditingTextId(null);
+                        // Delete if empty - check current input value
+                        if (!e.target.value.trim()) {
+                          setItems(prev => prev.filter(i => i.id !== item.id));
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      autoFocus
+                      placeholder="Type here..."
+                      rows={item.content.split('\n').length || 1}
+                      style={{
+                        fontSize: `${item.fontSize}px`,
+                        color: item.color || '#ffffff',
+                        border: '1px solid rgba(255, 255, 255, 0.3)',
+                        outline: 'none',
+                        background: 'rgba(0, 0, 0, 0.3)',
+                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+                        padding: '4px 8px',
+                        margin: 0,
+                        width: `${Math.max(200, Math.max(...(item.content.split('\n').map(line => line.length))) * (item.fontSize * 0.6))}px`,
+                        maxWidth: '1200px',
+                        borderRadius: '4px',
+                        boxSizing: 'border-box',
+                        resize: 'none',
+                        overflow: 'hidden',
+                        lineHeight: '1.5'
+                      }}
+                    />
+                  </div>
+                );
+              }
 
               return (
                 <div
@@ -647,42 +1203,21 @@ function ReferencePanel() {
                     left: `${item.x}px`,
                     top: `${item.y}px`,
                     fontSize: `${item.fontSize}px`,
-                    color: item.color
+                    color: item.color,
+                    cursor: 'pointer',
+                    whiteSpace: 'pre-wrap',
+                    lineHeight: '1.5',
+                    display: 'inline-block',
+                    verticalAlign: 'top',
+                    fontWeight: item.fontWeight || 'normal'
                   }}
-                  onMouseDown={(e) => !isEditing && handleItemMouseDown(e, item)}
+                  onMouseDown={(e) => handleItemMouseDown(e, item)}
                   onDoubleClick={(e) => {
                     e.stopPropagation();
                     setEditingTextId(item.id);
                   }}
                 >
-                  <div
-                    ref={textRef}
-                    className="freeform-text-content"
-                    contentEditable={isEditing}
-                    suppressContentEditableWarning
-                    onInput={(e) => {
-                      if (isEditing) {
-                        const newContent = e.currentTarget.textContent || '';
-                        setItems(prev => prev.map(i =>
-                          i.id === item.id ? { ...i, content: newContent } : i
-                        ));
-                      }
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        e.currentTarget.blur();
-                      }
-                      if (e.key === 'Escape') {
-                        e.preventDefault();
-                        e.currentTarget.blur();
-                      }
-                    }}
-                    onBlur={() => setEditingTextId(null)}
-                    style={{ outline: 'none', whiteSpace: 'nowrap', cursor: isEditing ? 'text' : 'pointer' }}
-                  >
-                    {item.content || 'Double-click to edit'}
-                  </div>
+                  {item.content || ' '}
                 </div>
               );
             }
@@ -757,6 +1292,7 @@ function ReferencePanel() {
         <div><kbd>N</kbd> Note</div>
         <div><kbd>Space</kbd> Pan</div>
         <div><kbd>Shift</kbd> Multi-select</div>
+        <div><kbd>Cmd/Ctrl + C/V</kbd> Copy/Paste</div>
         <div><kbd>Cmd/Ctrl + Wheel</kbd> Zoom</div>
       </div>
     </div>

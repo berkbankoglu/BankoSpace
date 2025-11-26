@@ -18,6 +18,8 @@ export class FirebaseSync {
         dailyChecklistItems: data.dailyChecklistItems || [],
         dailyChecklistLastReset: data.dailyChecklistLastReset || new Date().toDateString(),
         achievements: data.achievements || {},
+        freeformTabs: data.freeformTabs || [],
+        flashCards: data.flashCards || [],
         lastUpdated: new Date().toISOString()
       }, { merge: true });
     } catch (error) {
@@ -71,7 +73,9 @@ export const syncLocalStorageToFirebase = async (userId) => {
     reminders: JSON.parse(localStorage.getItem('reminders') || '[]'),
     dailyChecklistItems: JSON.parse(localStorage.getItem('dailyChecklistItems') || '[]'),
     dailyChecklistLastReset: localStorage.getItem('dailyChecklistLastReset') || new Date().toDateString(),
-    achievements: JSON.parse(localStorage.getItem('achievements') || '{}')
+    achievements: JSON.parse(localStorage.getItem('achievements') || '{}'),
+    freeformTabs: JSON.parse(localStorage.getItem('freeformTabs') || '[]'),
+    flashCards: JSON.parse(localStorage.getItem('flashCards') || '[]')
   };
 
   await sync.saveData(localData);
@@ -86,4 +90,6 @@ export const syncFirebaseToLocalStorage = (data) => {
   if (data.dailyChecklistItems) localStorage.setItem('dailyChecklistItems', JSON.stringify(data.dailyChecklistItems));
   if (data.dailyChecklistLastReset) localStorage.setItem('dailyChecklistLastReset', data.dailyChecklistLastReset);
   if (data.achievements) localStorage.setItem('achievements', JSON.stringify(data.achievements));
+  if (data.freeformTabs) localStorage.setItem('freeformTabs', JSON.stringify(data.freeformTabs));
+  if (data.flashCards) localStorage.setItem('flashCards', JSON.stringify(data.flashCards));
 };
