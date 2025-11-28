@@ -90,6 +90,10 @@ export const syncFirebaseToLocalStorage = (data) => {
   if (data.dailyChecklistItems) localStorage.setItem('dailyChecklistItems', JSON.stringify(data.dailyChecklistItems));
   if (data.dailyChecklistLastReset) localStorage.setItem('dailyChecklistLastReset', data.dailyChecklistLastReset);
   if (data.achievements) localStorage.setItem('achievements', JSON.stringify(data.achievements));
-  if (data.freeformTabs) localStorage.setItem('freeformTabs', JSON.stringify(data.freeformTabs));
+  if (data.freeformTabs) {
+    localStorage.setItem('freeformTabs', JSON.stringify(data.freeformTabs));
+    // Dispatch custom event to notify ReferencePanel
+    window.dispatchEvent(new CustomEvent('storage-updated', { detail: { key: 'freeformTabs' } }));
+  }
   if (data.flashCards) localStorage.setItem('flashCards', JSON.stringify(data.flashCards));
 };
