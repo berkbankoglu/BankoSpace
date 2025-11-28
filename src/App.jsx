@@ -11,7 +11,7 @@ import { FirebaseSync, syncLocalStorageToFirebase, syncFirebaseToLocalStorage } 
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 
-const APP_VERSION = '2.2.7';
+const APP_VERSION = '2.2.8';
 
 function App() {
   // Check if this is a popup window
