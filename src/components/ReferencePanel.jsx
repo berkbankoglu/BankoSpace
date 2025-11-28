@@ -18,11 +18,12 @@ function ReferencePanel() {
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const [editingTabId, setEditingTabId] = useState(null);
   const [editingTextId, setEditingTextId] = useState(null);
+  const [editingCanvasId, setEditingCanvasId] = useState(null);
   const [spaceKeyPressed, setSpaceKeyPressed] = useState(false);
   const [selectionBox, setSelectionBox] = useState(null);
   const [isDrawingSelection, setIsDrawingSelection] = useState(false);
   const [hoveredItems, setHoveredItems] = useState([]);
-  const [tool, setTool] = useState('select'); // 'select', 'text', 'sticky'
+  const [tool, setTool] = useState('select'); // 'select', 'text', 'canvas'
   const [history, setHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [clipboard, setClipboard] = useState(null);
@@ -200,7 +201,21 @@ function ReferencePanel() {
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedItems.length > 0) {
           e.preventDefault();
-          setItems(prev => prev.filter(item => !selectedItems.includes(item.id)));
+          setItems(prev => {
+            // Filter out top-level selected items
+            const filteredTopLevel = prev.filter(item => !selectedItems.includes(item.id));
+
+            // Also remove selected items from canvas children
+            return filteredTopLevel.map(item => {
+              if (item.type === 'canvas' && item.items) {
+                return {
+                  ...item,
+                  items: item.items.filter(child => !selectedItems.includes(child.id))
+                };
+              }
+              return item;
+            });
+          });
           setSelectedItems([]);
         }
       }
@@ -208,14 +223,44 @@ function ReferencePanel() {
       // Cmd/Ctrl + A - Select all
       if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
         e.preventDefault();
-        setSelectedItems(items.map(item => item.id));
+        const allIds = [];
+        items.forEach(item => {
+          allIds.push(item.id);
+          // Also add canvas children
+          if (item.type === 'canvas' && item.items) {
+            item.items.forEach(child => allIds.push(child.id));
+          }
+        });
+        setSelectedItems(allIds);
       }
 
       // Cmd/Ctrl + C - Copy selected items
       if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
         if (selectedItems.length > 0) {
           e.preventDefault();
-          const itemsToCopy = items.filter(item => selectedItems.includes(item.id));
+          const itemsToCopy = [];
+
+          // Get top-level selected items
+          items.forEach(item => {
+            if (selectedItems.includes(item.id)) {
+              itemsToCopy.push(item);
+            }
+            // Also check canvas children
+            if (item.type === 'canvas' && item.items) {
+              item.items.forEach(child => {
+                if (selectedItems.includes(child.id)) {
+                  // Convert to absolute coordinates for copying
+                  itemsToCopy.push({
+                    ...child,
+                    x: item.x + child.x,
+                    y: item.y + child.y,
+                    parentId: null // Remove parent when copying
+                  });
+                }
+              });
+            }
+          });
+
           setClipboard(itemsToCopy);
         }
       }
@@ -370,21 +415,38 @@ function ReferencePanel() {
     };
   };
 
+  // Find which canvas contains a point
+  const getCanvasAt = (x, y) => {
+    // Find canvas items, sorted by z-index (last one is on top)
+    const canvases = items.filter(item => item.type === 'canvas');
+
+    // Check from top to bottom (reverse order)
+    for (let i = canvases.length - 1; i >= 0; i--) {
+      const canvas = canvases[i];
+      if (x >= canvas.x && x <= canvas.x + canvas.width &&
+          y >= canvas.y && y <= canvas.y + canvas.height) {
+        return canvas;
+      }
+    }
+    return null;
+  };
+
   const getItemsInBox = (box) => {
-    return items.filter(item => {
-      // Get item dimensions using the same function as alignment
+    const selectedIds = [];
+    const padding = 1;
+
+    items.forEach(item => {
+      // Check top-level items
       const dims = getItemDimensions(item);
-      const padding = 1; // Minimal padding for precise selection
 
       let itemWidth, itemHeight, itemX, itemY;
 
-      if (item.type === 'image' || item.type === 'sticky') {
+      if (item.type === 'image' || item.type === 'sticky' || item.type === 'canvas') {
         itemWidth = dims.width;
         itemHeight = dims.height;
         itemX = item.x;
         itemY = item.y;
       } else if (item.type === 'text') {
-        // Use calculated dimensions for text, add small padding for easier selection
         itemWidth = dims.width + padding * 2;
         itemHeight = dims.height + padding * 2;
         itemX = item.x - padding;
@@ -399,10 +461,56 @@ function ReferencePanel() {
       const itemRight = itemX + itemWidth;
       const itemBottom = itemY + itemHeight;
 
-      // Check if there's any overlap (even 1px)
-      return !(itemRight <= box.left || itemX >= box.right ||
-               itemBottom <= box.top || itemY >= box.bottom);
-    }).map(item => item.id);
+      // Check if top-level item overlaps
+      const overlaps = !(itemRight <= box.left || itemX >= box.right ||
+                         itemBottom <= box.top || itemY >= box.bottom);
+
+      if (overlaps) {
+        selectedIds.push(item.id);
+      }
+
+      // Check canvas children
+      if (item.type === 'canvas' && item.items && item.items.length > 0) {
+        item.items.forEach(child => {
+          // Convert child coordinates to absolute
+          const absX = item.x + child.x;
+          const absY = item.y + child.y;
+
+          const childDims = getItemDimensions(child);
+          let childWidth, childHeight, childX, childY;
+
+          if (child.type === 'text') {
+            childWidth = childDims.width + padding * 2;
+            childHeight = childDims.height + padding * 2;
+            childX = absX - padding;
+            childY = absY - padding;
+          } else if (child.type === 'image') {
+            childWidth = childDims.width;
+            childHeight = childDims.height;
+            childX = absX;
+            childY = absY;
+          } else {
+            childWidth = childDims.width;
+            childHeight = childDims.height;
+            childX = absX;
+            childY = absY;
+          }
+
+          const childRight = childX + childWidth;
+          const childBottom = childY + childHeight;
+
+          // Check if child overlaps with selection box
+          const childOverlaps = !(childRight <= box.left || childX >= box.right ||
+                                  childBottom <= box.top || childY >= box.bottom);
+
+          if (childOverlaps) {
+            selectedIds.push(child.id);
+          }
+        });
+      }
+    });
+
+    return selectedIds;
   };
 
   const handleCanvasMouseDown = (e) => {
@@ -423,17 +531,29 @@ function ReferencePanel() {
       e.preventDefault();
       e.stopPropagation();
 
+      const parentCanvas = getCanvasAt(coords.x, coords.y);
+
       const newItem = {
         id: Date.now(),
         type: 'text',
         content: '',
-        x: coords.x,
-        y: coords.y,
+        x: parentCanvas ? coords.x - parentCanvas.x : coords.x,
+        y: parentCanvas ? coords.y - parentCanvas.y : coords.y,
         fontSize: 16,
-        color: '#ffffff'
+        color: '#ffffff',
+        parentId: parentCanvas ? parentCanvas.id : null
       };
 
-      setItems(prev => [...prev, newItem]);
+      if (parentCanvas) {
+        // Add to canvas's items array
+        setItems(prev => prev.map(item =>
+          item.id === parentCanvas.id
+            ? { ...item, items: [...(item.items || []), newItem] }
+            : item
+        ));
+      } else {
+        setItems(prev => [...prev, newItem]);
+      }
 
       // Use setTimeout to ensure state is updated before editing
       setTimeout(() => {
@@ -444,21 +564,10 @@ function ReferencePanel() {
       return;
     }
 
-    // Sticky note tool
-    if (tool === 'sticky') {
-      const newItem = {
-        id: Date.now(),
-        type: 'sticky',
-        content: '',
-        x: coords.x,
-        y: coords.y,
-        width: 200,
-        height: 200,
-        color: '#fef08a' // yellow
-      };
-      setItems(prev => [...prev, newItem]);
-      setEditingTextId(newItem.id);
-      setTool('select');
+    // Canvas tool - create a draggable canvas area
+    if (tool === 'canvas') {
+      setIsDrawingSelection(true);
+      setSelectionBox({ startX: coords.x, startY: coords.y, currentX: coords.x, currentY: coords.y });
       return;
     }
 
@@ -507,6 +616,33 @@ function ReferencePanel() {
         bottom: Math.max(selectionBox.startY, selectionBox.currentY)
       };
 
+      // If canvas tool, create a canvas item
+      if (tool === 'canvas') {
+        const width = box.right - box.left;
+        const height = box.bottom - box.top;
+
+        // Only create canvas if it has meaningful size
+        if (width > 50 && height > 50) {
+          const newCanvas = {
+            id: Date.now(),
+            type: 'canvas',
+            name: 'Canvas',
+            x: box.left,
+            y: box.top,
+            width: width,
+            height: height,
+            items: [], // Canvas içindeki öğeler
+            backgroundColor: 'rgba(40, 40, 40, 0.8)'
+          };
+          setItems(prev => [...prev, newCanvas]);
+        }
+
+        setTool('select');
+        setSelectionBox(null);
+        setIsDrawingSelection(false);
+        return;
+      }
+
       const selected = getItemsInBox(box);
 
       setSelectedItems(selected);
@@ -526,6 +662,11 @@ function ReferencePanel() {
   }, [isPanning, panStart, selectionBox, isDrawingSelection, items]);
 
   const handleItemMouseDown = (e, item) => {
+    // If space key is pressed or panning, don't handle - allow pan instead
+    if (spaceKeyPressed || isPanning) {
+      return;
+    }
+
     // Don't interfere with other tools
     if (tool !== 'select') {
       e.stopPropagation();
@@ -534,7 +675,6 @@ function ReferencePanel() {
 
     // Stop event propagation so canvas mousedown doesn't trigger
     e.stopPropagation();
-    e.preventDefault();
 
     if (e.shiftKey || e.metaKey || e.ctrlKey) {
       // Multi-select with modifier keys
@@ -549,6 +689,11 @@ function ReferencePanel() {
     // Single select - only select if not already selected
     if (!selectedItems.includes(item.id)) {
       setSelectedItems([item.id]);
+    }
+
+    // Don't start dragging if item is locked
+    if (item.locked) {
+      return;
     }
 
     // Start dragging
@@ -567,15 +712,42 @@ function ReferencePanel() {
       const deltaX = newX - lastDragPosRef.current.x;
       const deltaY = newY - lastDragPosRef.current.y;
 
-      setItems(prev => prev.map(item => {
-        if (item.id === draggedItem.id) {
-          return { ...item, x: newX, y: newY };
+      setItems(prev => {
+        // If dragged item has a parentId, we need to update it within the parent's items array
+        if (draggedItem.parentId) {
+          return prev.map(item => {
+            if (item.id === draggedItem.parentId && item.type === 'canvas') {
+              // Update child item within canvas and move all selected siblings
+              return {
+                ...item,
+                items: (item.items || []).map(child => {
+                  if (child.id === draggedItem.id) {
+                    // Convert back to relative coordinates
+                    return { ...child, x: newX - item.x, y: newY - item.y };
+                  }
+                  // Move other selected children together with the dragged one
+                  if (selectedItems.includes(child.id) && child.id !== draggedItem.id) {
+                    return { ...child, x: child.x + deltaX, y: child.y + deltaY };
+                  }
+                  return child;
+                })
+              };
+            }
+            return item;
+          });
         }
-        if (selectedItems.includes(item.id) && item.id !== draggedItem.id) {
-          return { ...item, x: item.x + deltaX, y: item.y + deltaY };
-        }
-        return item;
-      }));
+
+        // Otherwise update top-level items
+        return prev.map(item => {
+          if (item.id === draggedItem.id) {
+            return { ...item, x: newX, y: newY };
+          }
+          if (selectedItems.includes(item.id) && item.id !== draggedItem.id) {
+            return { ...item, x: item.x + deltaX, y: item.y + deltaY };
+          }
+          return item;
+        });
+      });
 
       lastDragPosRef.current = { x: newX, y: newY };
     }
@@ -587,13 +759,97 @@ function ReferencePanel() {
       const newWidth = Math.max(50, resizeStart.width + deltaX);
       const newHeight = Math.max(50, resizeStart.height + deltaY);
 
-      setItems(prev => prev.map(item =>
-        item.id === resizingItem.id ? { ...item, width: newWidth, height: newHeight } : item
-      ));
+      setItems(prev => prev.map(item => {
+        if (item.id === resizingItem.id) {
+          return { ...item, width: newWidth, height: newHeight };
+        }
+        return item;
+      }));
     }
   };
 
-  const handleItemMouseUp = () => {
+  const handleItemMouseUp = (e) => {
+    if (draggedItem) {
+      // Check if the dragged item is dropped on a canvas
+      const coords = e ? getCanvasCoords(e.clientX, e.clientY) : null;
+
+      if (coords && draggedItem.type === 'text') {
+        const targetCanvas = getCanvasAt(coords.x, coords.y);
+        const currentParentId = draggedItem.parentId;
+
+        // Moving from one canvas to another, or from top-level to canvas
+        if (targetCanvas && currentParentId !== targetCanvas.id) {
+          // Convert coordinates to be relative to the target canvas
+          const relativeX = draggedItem.x - targetCanvas.x;
+          const relativeY = draggedItem.y - targetCanvas.y;
+
+          setItems(prev => {
+            let updated = [...prev];
+
+            // Remove from current parent if it has one
+            if (currentParentId) {
+              updated = updated.map(item => {
+                if (item.id === currentParentId && item.type === 'canvas') {
+                  return {
+                    ...item,
+                    items: (item.items || []).filter(ci => ci.id !== draggedItem.id)
+                  };
+                }
+                return item;
+              });
+            } else {
+              // Remove from top level
+              updated = updated.filter(item => item.id !== draggedItem.id);
+            }
+
+            // Add to target canvas
+            updated = updated.map(item => {
+              if (item.id === targetCanvas.id) {
+                return {
+                  ...item,
+                  items: [
+                    ...(item.items || []),
+                    {
+                      ...draggedItem,
+                      x: relativeX,
+                      y: relativeY,
+                      parentId: targetCanvas.id
+                    }
+                  ]
+                };
+              }
+              return item;
+            });
+
+            return updated;
+          });
+        }
+        // Moving from canvas to top-level (outside all canvases)
+        else if (!targetCanvas && currentParentId) {
+          setItems(prev => {
+            // Remove from parent canvas
+            const withoutFromParent = prev.map(item => {
+              if (item.id === currentParentId) {
+                return {
+                  ...item,
+                  items: (item.items || []).filter(ci => ci.id !== draggedItem.id)
+                };
+              }
+              return item;
+            });
+
+            // Add to top level with absolute coordinates
+            return [...withoutFromParent, {
+              ...draggedItem,
+              x: draggedItem.x,
+              y: draggedItem.y,
+              parentId: null
+            }];
+          });
+        }
+      }
+    }
+
     setDraggedItem(null);
     setResizingItem(null);
   };
@@ -604,18 +860,29 @@ function ReferencePanel() {
       handleItemMouseMove(e);
     };
 
-    const handleUp = () => {
+    const handleUp = (e) => {
       if (!draggedItem && !resizingItem) return;
-      handleItemMouseUp();
+      handleItemMouseUp(e);
     };
+
+    // Prevent text selection while dragging
+    if (draggedItem || resizingItem) {
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = draggedItem ? 'grabbing' : 'nwse-resize';
+    } else {
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    }
 
     document.addEventListener('mousemove', handleMove);
     document.addEventListener('mouseup', handleUp);
     return () => {
       document.removeEventListener('mousemove', handleMove);
       document.removeEventListener('mouseup', handleUp);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
     };
-  }, [draggedItem, resizingItem, selectedItems, dragOffset, resizeStart]);
+  }, [draggedItem, resizingItem]);
 
   const handleResizeMouseDown = (e, item) => {
     e.stopPropagation();
@@ -674,24 +941,85 @@ function ReferencePanel() {
   // Align functions
   const alignLeft = () => {
     if (selectedItems.length < 2) return;
-    const selectedItemsData = items.filter(item => selectedItems.includes(item.id));
-    const minX = Math.min(...selectedItemsData.map(item => item.x));
-    setItems(prev => prev.map(item =>
-      selectedItems.includes(item.id) ? { ...item, x: minX } : item
-    ));
+
+    // Get all selected items including canvas children (with absolute coordinates)
+    // Skip canvas items themselves
+    const selectedItemsData = [];
+    items.forEach(item => {
+      if (selectedItems.includes(item.id) && item.type !== 'canvas') {
+        selectedItemsData.push({ ...item, parentId: null, parentX: 0, parentY: 0 });
+      }
+      if (item.type === 'canvas' && item.items) {
+        item.items.forEach(child => {
+          if (selectedItems.includes(child.id)) {
+            selectedItemsData.push({ ...child, parentId: item.id, parentX: item.x, parentY: item.y, absX: item.x + child.x });
+          }
+        });
+      }
+    });
+
+    if (selectedItemsData.length < 2) return;
+
+    const minX = Math.min(...selectedItemsData.map(item => item.parentId ? item.absX : item.x));
+
+    setItems(prev => prev.map(item => {
+      if (selectedItems.includes(item.id) && !item.parentId && item.type !== 'canvas') {
+        return { ...item, x: minX };
+      }
+      if (item.type === 'canvas' && item.items) {
+        return {
+          ...item,
+          items: item.items.map(child => {
+            if (selectedItems.includes(child.id)) {
+              return { ...child, x: minX - item.x };
+            }
+            return child;
+          })
+        };
+      }
+      return item;
+    }));
   };
 
   const alignRight = () => {
     if (selectedItems.length < 2) return;
-    const selectedItemsData = items.filter(item => selectedItems.includes(item.id));
-    const maxX = Math.max(...selectedItemsData.map(item => {
-      const dims = getItemDimensions(item);
-      return item.x + dims.width;
-    }));
+
+    const selectedItemsData = [];
+    items.forEach(item => {
+      if (selectedItems.includes(item.id) && item.type !== 'canvas') {
+        const dims = getItemDimensions(item);
+        selectedItemsData.push({ ...item, parentId: null, parentX: 0, absX: item.x, dims });
+      }
+      if (item.type === 'canvas' && item.items) {
+        item.items.forEach(child => {
+          if (selectedItems.includes(child.id)) {
+            const dims = getItemDimensions(child);
+            selectedItemsData.push({ ...child, parentId: item.id, parentX: item.x, absX: item.x + child.x, dims });
+          }
+        });
+      }
+    });
+
+    if (selectedItemsData.length < 2) return;
+
+    const maxX = Math.max(...selectedItemsData.map(item => item.absX + item.dims.width));
+
     setItems(prev => prev.map(item => {
-      if (selectedItems.includes(item.id)) {
+      if (selectedItems.includes(item.id) && !item.parentId && item.type !== 'canvas') {
         const dims = getItemDimensions(item);
         return { ...item, x: maxX - dims.width };
+      }
+      if (item.type === 'canvas' && item.items) {
+        return {
+          ...item,
+          items: item.items.map(child => {
+            if (selectedItems.includes(child.id)) {
+              const dims = getItemDimensions(child);
+              return { ...child, x: maxX - dims.width - item.x };
+            }
+            return child;
+          })
+        };
       }
       return item;
     }));
@@ -699,24 +1027,79 @@ function ReferencePanel() {
 
   const alignTop = () => {
     if (selectedItems.length < 2) return;
-    const selectedItemsData = items.filter(item => selectedItems.includes(item.id));
-    const minY = Math.min(...selectedItemsData.map(item => item.y));
-    setItems(prev => prev.map(item =>
-      selectedItems.includes(item.id) ? { ...item, y: minY } : item
-    ));
+
+    const selectedItemsData = [];
+    items.forEach(item => {
+      if (selectedItems.includes(item.id)) {
+        selectedItemsData.push({ ...item, parentId: null, absY: item.y });
+      }
+      if (item.type === 'canvas' && item.items) {
+        item.items.forEach(child => {
+          if (selectedItems.includes(child.id)) {
+            selectedItemsData.push({ ...child, parentId: item.id, parentY: item.y, absY: item.y + child.y });
+          }
+        });
+      }
+    });
+
+    const minY = Math.min(...selectedItemsData.map(item => item.absY));
+
+    setItems(prev => prev.map(item => {
+      if (selectedItems.includes(item.id) && !item.parentId) {
+        return { ...item, y: minY };
+      }
+      if (item.type === 'canvas' && item.items) {
+        return {
+          ...item,
+          items: item.items.map(child => {
+            if (selectedItems.includes(child.id)) {
+              return { ...child, y: minY - item.y };
+            }
+            return child;
+          })
+        };
+      }
+      return item;
+    }));
   };
 
   const alignBottom = () => {
     if (selectedItems.length < 2) return;
-    const selectedItemsData = items.filter(item => selectedItems.includes(item.id));
-    const maxY = Math.max(...selectedItemsData.map(item => {
-      const dims = getItemDimensions(item);
-      return item.y + dims.height;
-    }));
-    setItems(prev => prev.map(item => {
+
+    const selectedItemsData = [];
+    items.forEach(item => {
       if (selectedItems.includes(item.id)) {
         const dims = getItemDimensions(item);
+        selectedItemsData.push({ ...item, parentId: null, absY: item.y, dims });
+      }
+      if (item.type === 'canvas' && item.items) {
+        item.items.forEach(child => {
+          if (selectedItems.includes(child.id)) {
+            const dims = getItemDimensions(child);
+            selectedItemsData.push({ ...child, parentId: item.id, parentY: item.y, absY: item.y + child.y, dims });
+          }
+        });
+      }
+    });
+
+    const maxY = Math.max(...selectedItemsData.map(item => item.absY + item.dims.height));
+
+    setItems(prev => prev.map(item => {
+      if (selectedItems.includes(item.id) && !item.parentId) {
+        const dims = getItemDimensions(item);
         return { ...item, y: maxY - dims.height };
+      }
+      if (item.type === 'canvas' && item.items) {
+        return {
+          ...item,
+          items: item.items.map(child => {
+            if (selectedItems.includes(child.id)) {
+              const dims = getItemDimensions(child);
+              return { ...child, y: maxY - dims.height - item.y };
+            }
+            return child;
+          })
+        };
       }
       return item;
     }));
@@ -724,15 +1107,43 @@ function ReferencePanel() {
 
   const alignCenterHorizontal = () => {
     if (selectedItems.length < 2) return;
-    const selectedItemsData = items.filter(item => selectedItems.includes(item.id));
-    const centerX = selectedItemsData.reduce((sum, item) => {
-      const dims = getItemDimensions(item);
-      return sum + item.x + dims.width / 2;
-    }, 0) / selectedItemsData.length;
-    setItems(prev => prev.map(item => {
+
+    const selectedItemsData = [];
+    items.forEach(item => {
       if (selectedItems.includes(item.id)) {
         const dims = getItemDimensions(item);
+        selectedItemsData.push({ ...item, parentId: null, absX: item.x, dims });
+      }
+      if (item.type === 'canvas' && item.items) {
+        item.items.forEach(child => {
+          if (selectedItems.includes(child.id)) {
+            const dims = getItemDimensions(child);
+            selectedItemsData.push({ ...child, parentId: item.id, parentX: item.x, absX: item.x + child.x, dims });
+          }
+        });
+      }
+    });
+
+    const centerX = selectedItemsData.reduce((sum, item) => {
+      return sum + item.absX + item.dims.width / 2;
+    }, 0) / selectedItemsData.length;
+
+    setItems(prev => prev.map(item => {
+      if (selectedItems.includes(item.id) && !item.parentId) {
+        const dims = getItemDimensions(item);
         return { ...item, x: centerX - dims.width / 2 };
+      }
+      if (item.type === 'canvas' && item.items) {
+        return {
+          ...item,
+          items: item.items.map(child => {
+            if (selectedItems.includes(child.id)) {
+              const dims = getItemDimensions(child);
+              return { ...child, x: centerX - dims.width / 2 - item.x };
+            }
+            return child;
+          })
+        };
       }
       return item;
     }));
@@ -740,15 +1151,43 @@ function ReferencePanel() {
 
   const alignCenterVertical = () => {
     if (selectedItems.length < 2) return;
-    const selectedItemsData = items.filter(item => selectedItems.includes(item.id));
-    const centerY = selectedItemsData.reduce((sum, item) => {
-      const dims = getItemDimensions(item);
-      return sum + item.y + dims.height / 2;
-    }, 0) / selectedItemsData.length;
-    setItems(prev => prev.map(item => {
+
+    const selectedItemsData = [];
+    items.forEach(item => {
       if (selectedItems.includes(item.id)) {
         const dims = getItemDimensions(item);
+        selectedItemsData.push({ ...item, parentId: null, absY: item.y, dims });
+      }
+      if (item.type === 'canvas' && item.items) {
+        item.items.forEach(child => {
+          if (selectedItems.includes(child.id)) {
+            const dims = getItemDimensions(child);
+            selectedItemsData.push({ ...child, parentId: item.id, parentY: item.y, absY: item.y + child.y, dims });
+          }
+        });
+      }
+    });
+
+    const centerY = selectedItemsData.reduce((sum, item) => {
+      return sum + item.absY + item.dims.height / 2;
+    }, 0) / selectedItemsData.length;
+
+    setItems(prev => prev.map(item => {
+      if (selectedItems.includes(item.id) && !item.parentId) {
+        const dims = getItemDimensions(item);
         return { ...item, y: centerY - dims.height / 2 };
+      }
+      if (item.type === 'canvas' && item.items) {
+        return {
+          ...item,
+          items: item.items.map(child => {
+            if (selectedItems.includes(child.id)) {
+              const dims = getItemDimensions(child);
+              return { ...child, y: centerY - dims.height / 2 - item.y };
+            }
+            return child;
+          })
+        };
       }
       return item;
     }));
@@ -823,8 +1262,48 @@ function ReferencePanel() {
 
   return (
     <div className="freeform-container">
-      {/* Toolbar */}
-      <div className="freeform-toolbar">
+      {/* Left Sidebar with Tabs */}
+      <div className="freeform-sidebar">
+        <div className="freeform-sidebar-tabs">
+          {tabs.map(tab => (
+            <div
+              key={tab.id}
+              className={`freeform-sidebar-tab ${tab.id === activeTabId ? 'active' : ''}`}
+              onClick={() => setActiveTabId(tab.id)}
+            >
+              {editingTabId === tab.id ? (
+                <input
+                  className="freeform-tab-input"
+                  value={tab.name}
+                  onChange={(e) => renameTab(tab.id, e.target.value)}
+                  onBlur={() => setEditingTabId(null)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === 'Escape') setEditingTabId(null);
+                  }}
+                  autoFocus
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <span onDoubleClick={(e) => { e.stopPropagation(); setEditingTabId(tab.id); }}>
+                  {tab.name}
+                </span>
+              )}
+              {tabs.length > 1 && (
+                <button
+                  className="freeform-tab-close"
+                  onClick={(e) => { e.stopPropagation(); deleteTab(tab.id); }}
+                >×</button>
+              )}
+            </div>
+          ))}
+          <button className="freeform-tab-add" onClick={addNewTab}>+</button>
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="freeform-main-content">
+        {/* Toolbar */}
+        <div className="freeform-toolbar">
         <div className="freeform-tools">
           <button
             className={`freeform-tool-btn ${tool === 'select' ? 'active' : ''}`}
@@ -841,18 +1320,23 @@ function ReferencePanel() {
             T
           </button>
           <button
-            className={`freeform-tool-btn ${tool === 'sticky' ? 'active' : ''}`}
-            onClick={() => setTool('sticky')}
-            title="Sticky Note (N)"
+            className={`freeform-tool-btn ${tool === 'canvas' ? 'active' : ''}`}
+            onClick={() => setTool('canvas')}
+            title="Canvas (C)"
           >
-            📝
+            🎨
           </button>
           <button
-            className="freeform-tool-btn"
-            onClick={() => fileInputRef.current?.click()}
-            title="Add Image"
+            className="freeform-popup-btn"
+            onClick={() => {
+              window.open(
+                window.location.origin + '?popup=reference',
+                '_blank'
+              );
+            }}
+            title="Open in New Tab"
           >
-            🖼️
+            🗗
           </button>
           <input
             ref={fileInputRef}
@@ -888,6 +1372,19 @@ function ReferencePanel() {
           <button onClick={() => { setZoomLevel(1); setPanOffset({ x: 0, y: 0 }); }}>Reset</button>
         </div>
 
+        <button
+          className="freeform-popup-btn"
+          onClick={() => {
+            window.open(
+              window.location.origin + '?popup=reference',
+              '_blank'
+            );
+          }}
+          title="Open in New Tab"
+        >
+          🗗
+        </button>
+
         {selectedItems.length > 0 && (
           <div className="freeform-selection-info">
             {selectedItems.length} selected
@@ -907,12 +1404,24 @@ function ReferencePanel() {
                   if (selectedItems.includes(item.id) && item.type === 'text') {
                     return { ...item, fontSize: Math.max(8, (item.fontSize || 16) - 2) };
                   }
+                  // Update canvas children
+                  if (item.type === 'canvas' && item.items) {
+                    return {
+                      ...item,
+                      items: item.items.map(child => {
+                        if (selectedItems.includes(child.id) && child.type === 'text') {
+                          return { ...child, fontSize: Math.max(8, (child.fontSize || 16) - 2) };
+                        }
+                        return child;
+                      })
+                    };
+                  }
                   return item;
                 }));
               }}
               className="align-btn"
               title="Decrease Font Size"
-              disabled={!(selectedItems.length > 0 && items.filter(item => selectedItems.includes(item.id) && item.type === 'text').length > 0)}
+              disabled={!(selectedItems.length > 0)}
             >
               <svg width="16" height="16" viewBox="0 0 16 16">
                 <text x="2" y="12" fontSize="10" fill="currentColor" fontWeight="bold">A</text>
@@ -931,12 +1440,24 @@ function ReferencePanel() {
                   if (selectedItems.includes(item.id) && item.type === 'text') {
                     return { ...item, fontSize: Math.min(72, (item.fontSize || 16) + 2) };
                   }
+                  // Update canvas children
+                  if (item.type === 'canvas' && item.items) {
+                    return {
+                      ...item,
+                      items: item.items.map(child => {
+                        if (selectedItems.includes(child.id) && child.type === 'text') {
+                          return { ...child, fontSize: Math.min(72, (child.fontSize || 16) + 2) };
+                        }
+                        return child;
+                      })
+                    };
+                  }
                   return item;
                 }));
               }}
               className="align-btn"
               title="Increase Font Size"
-              disabled={!(selectedItems.length > 0 && items.filter(item => selectedItems.includes(item.id) && item.type === 'text').length > 0)}
+              disabled={!(selectedItems.length > 0)}
             >
               <svg width="16" height="16" viewBox="0 0 16 16">
                 <text x="1" y="13" fontSize="14" fill="currentColor" fontWeight="bold">A</text>
@@ -949,12 +1470,24 @@ function ReferencePanel() {
                   if (selectedItems.includes(item.id) && item.type === 'text') {
                     return { ...item, fontWeight: item.fontWeight === 'bold' ? 'normal' : 'bold' };
                   }
+                  // Update canvas children
+                  if (item.type === 'canvas' && item.items) {
+                    return {
+                      ...item,
+                      items: item.items.map(child => {
+                        if (selectedItems.includes(child.id) && child.type === 'text') {
+                          return { ...child, fontWeight: child.fontWeight === 'bold' ? 'normal' : 'bold' };
+                        }
+                        return child;
+                      })
+                    };
+                  }
                   return item;
                 }));
               }}
-              className={`align-btn ${items.some(item => selectedItems.includes(item.id) && item.type === 'text' && item.fontWeight === 'bold') ? 'active' : ''}`}
+              className={`align-btn`}
               title="Bold"
-              disabled={!(selectedItems.length > 0 && items.filter(item => selectedItems.includes(item.id) && item.type === 'text').length > 0)}
+              disabled={!(selectedItems.length > 0)}
             >
               <svg width="16" height="16" viewBox="0 0 16 16">
                 <text x="4" y="12" fontSize="12" fill="currentColor" fontWeight="bold">B</text>
@@ -1038,42 +1571,6 @@ function ReferencePanel() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="freeform-tabs">
-        {tabs.map(tab => (
-          <div
-            key={tab.id}
-            className={`freeform-tab ${tab.id === activeTabId ? 'active' : ''}`}
-            onClick={() => setActiveTabId(tab.id)}
-          >
-            {editingTabId === tab.id ? (
-              <input
-                className="freeform-tab-input"
-                value={tab.name}
-                onChange={(e) => renameTab(tab.id, e.target.value)}
-                onBlur={() => setEditingTabId(null)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === 'Escape') setEditingTabId(null);
-                }}
-                autoFocus
-                onClick={(e) => e.stopPropagation()}
-              />
-            ) : (
-              <span onDoubleClick={(e) => { e.stopPropagation(); setEditingTabId(tab.id); }}>
-                {tab.name}
-              </span>
-            )}
-            {tabs.length > 1 && (
-              <button
-                className="freeform-tab-close"
-                onClick={(e) => { e.stopPropagation(); deleteTab(tab.id); }}
-              >×</button>
-            )}
-          </div>
-        ))}
-        <button className="freeform-tab-add" onClick={addNewTab}>+</button>
-      </div>
-
       {/* Canvas */}
       <div
         ref={canvasRef}
@@ -1093,7 +1590,7 @@ function ReferencePanel() {
           <div className="freeform-grid"></div>
 
           {/* Items */}
-          {items.map(item => {
+          {items.filter(item => !item.parentId).map(item => {
             const isSelected = selectedItems.includes(item.id);
             const isHovered = hoveredItems.includes(item.id);
 
@@ -1209,15 +1706,376 @@ function ReferencePanel() {
                     lineHeight: '1.5',
                     display: 'inline-block',
                     verticalAlign: 'top',
-                    fontWeight: item.fontWeight || 'normal'
+                    fontWeight: item.fontWeight || 'normal',
+                    userSelect: 'none',
+                    WebkitUserSelect: 'none'
                   }}
-                  onMouseDown={(e) => handleItemMouseDown(e, item)}
+                  onMouseDown={(e) => {
+                    handleItemMouseDown(e, item);
+                  }}
                   onDoubleClick={(e) => {
                     e.stopPropagation();
                     setEditingTextId(item.id);
                   }}
                 >
                   {item.content || ' '}
+                </div>
+              );
+            }
+
+            if (item.type === 'canvas') {
+              return (
+                <div
+                  key={item.id}
+                  className={`freeform-item freeform-canvas-item ${!item.locked && (isSelected || isHovered) ? 'selected' : ''}`}
+                  style={{
+                    left: `${item.x}px`,
+                    top: `${item.y}px`,
+                    width: `${item.width}px`,
+                    height: `${item.height}px`,
+                    backgroundColor: item.backgroundColor || 'rgba(40, 40, 40, 0.8)',
+                    border: item.locked ? '2px solid rgba(102, 126, 234, 0.2)' : '2px solid rgba(102, 126, 234, 0.5)',
+                    borderRadius: '8px',
+                    position: 'absolute',
+                    overflow: 'hidden',
+                    opacity: item.locked ? 0.7 : 1
+                  }}
+                  onMouseDown={(e) => {
+                    // If space key is pressed or panning, don't handle - allow pan instead
+                    if (spaceKeyPressed || isPanning) return;
+
+                    // Only handle if clicking the canvas itself (not children)
+                    if (e.target !== e.currentTarget) return;
+
+                    // If using text tool or canvas tool, let it bubble
+                    if (tool !== 'select') return;
+
+                    // If canvas is locked, don't allow selection
+                    if (item.locked) return;
+
+                    // If shift/cmd key is pressed, handle multi-select
+                    if (e.shiftKey || e.metaKey || e.ctrlKey) {
+                      e.stopPropagation();
+                      handleItemMouseDown(e, item);
+                      return;
+                    }
+
+                    // If canvas is not selected, select it
+                    if (!selectedItems.includes(item.id)) {
+                      e.stopPropagation();
+                      handleItemMouseDown(e, item);
+                      return;
+                    }
+
+                    // If canvas is already selected, allow selection box inside
+                    // Don't stop propagation - let it bubble to canvas background
+                  }}
+                >
+                  <div
+                    className="canvas-inner-container"
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      position: 'relative',
+                      padding: '8px',
+                      pointerEvents: tool === 'text' ? 'none' : 'auto'
+                    }}
+                    onMouseDown={(e) => {
+                      // If space key is pressed or panning, don't handle - allow pan instead
+                      if (spaceKeyPressed || isPanning) return;
+
+                      // Check if clicked on a text, image, label, or corner handle
+                      const clickedElement = e.target;
+                      const isChildElement = clickedElement.closest('.freeform-text') ||
+                                            clickedElement.closest('.freeform-image') ||
+                                            clickedElement.closest('.canvas-label') ||
+                                            clickedElement.closest('.canvas-corner-handle');
+
+                      // If clicked on child elements, don't start selection box
+                      if (isChildElement) return;
+
+                      // If using text tool, let it bubble
+                      if (tool === 'text') return;
+
+                      // If canvas is locked, don't allow any interaction
+                      if (item.locked) return;
+
+                      // If using select tool, start selection box inside canvas
+                      if (tool === 'select') {
+                        const coords = getCanvasCoords(e.clientX, e.clientY);
+                        setIsDrawingSelection(true);
+                        setSelectionBox({ startX: coords.x, startY: coords.y, currentX: coords.x, currentY: coords.y });
+                        // Clear selected items when starting new selection box
+                        setSelectedItems([]);
+                        setHoveredItems([]);
+                        return;
+                      }
+
+                      // Otherwise, select the canvas
+                      e.stopPropagation();
+                      handleItemMouseDown(e, item);
+                    }}
+                  >
+                    {/* Sticky note corner handle - top right (only visible when unlocked) */}
+                    {!item.locked && (
+                      <div
+                        className="canvas-corner-handle"
+                        style={{
+                          position: 'absolute',
+                          top: '0',
+                          right: '0',
+                          width: '0',
+                          height: '0',
+                          borderStyle: 'solid',
+                          borderWidth: '0 40px 40px 0',
+                          borderColor: 'transparent rgba(102, 126, 234, 0.7) transparent transparent',
+                          cursor: 'grab',
+                          zIndex: 1002,
+                          filter: 'drop-shadow(-2px 2px 3px rgba(0, 0, 0, 0.3))',
+                          transition: 'border-color 0.2s',
+                          pointerEvents: 'auto'
+                        }}
+                        onMouseDown={(e) => {
+                          // If space key is pressed or panning, don't handle - allow pan instead
+                          if (spaceKeyPressed || isPanning) return;
+
+                          e.stopPropagation();
+                          handleItemMouseDown(e, item);
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = 'transparent rgba(102, 126, 234, 0.9) transparent transparent';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = 'transparent rgba(102, 126, 234, 0.7) transparent transparent';
+                        }}
+                        title="Drag to move canvas"
+                      >
+                        {/* Small icon in the corner */}
+                        <div style={{
+                          position: 'absolute',
+                          top: '-32px',
+                          right: '-32px',
+                          fontSize: '14px',
+                          pointerEvents: 'none',
+                          transform: 'rotate(0deg)',
+                          color: '#fff'
+                        }}>
+                          ✋
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Canvas label with lock button */}
+                    <div
+                      className="canvas-label"
+                      style={{
+                        position: 'absolute',
+                        top: '8px',
+                        left: '8px',
+                        padding: '4px 8px',
+                        background: 'rgba(102, 126, 234, 0.3)',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        color: '#e0e0e0',
+                        zIndex: 1000,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        backdropFilter: 'blur(4px)',
+                        pointerEvents: 'auto'
+                      }}
+                      onMouseDown={(e) => e.stopPropagation()}
+                    >
+                      {editingCanvasId === item.id ? (
+                        <input
+                          type="text"
+                          value={item.name || 'Canvas'}
+                          onChange={(e) => {
+                            setItems(prev => prev.map(i =>
+                              i.id === item.id ? { ...i, name: e.target.value } : i
+                            ));
+                          }}
+                          onBlur={() => setEditingCanvasId(null)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === 'Escape') {
+                              setEditingCanvasId(null);
+                            }
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          onMouseDown={(e) => e.stopPropagation()}
+                          autoFocus
+                          style={{
+                            fontSize: '10px',
+                            background: 'rgba(0, 0, 0, 0.5)',
+                            border: '1px solid rgba(255, 255, 255, 0.3)',
+                            borderRadius: '3px',
+                            color: '#ffffff',
+                            padding: '2px 4px',
+                            width: '100px'
+                          }}
+                        />
+                      ) : (
+                        <span
+                          style={{ fontSize: '10px', cursor: 'text' }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingCanvasId(item.id);
+                          }}
+                        >
+                          {item.name || 'Canvas'} ({(item.items || []).length})
+                        </span>
+                      )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setItems(prev => prev.map(i =>
+                            i.id === item.id ? { ...i, locked: !i.locked } : i
+                          ));
+                        }}
+                        style={{
+                          background: item.locked ? 'rgba(255, 193, 7, 0.4)' : 'rgba(76, 175, 80, 0.4)',
+                          border: `1px solid ${item.locked ? '#ffc107' : '#4caf50'}`,
+                          borderRadius: '3px',
+                          color: item.locked ? '#ffc107' : '#4caf50',
+                          cursor: 'pointer',
+                          padding: '2px 6px',
+                          fontSize: '10px',
+                          fontWeight: 'bold',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = item.locked ? 'rgba(255, 193, 7, 0.6)' : 'rgba(76, 175, 80, 0.6)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = item.locked ? 'rgba(255, 193, 7, 0.4)' : 'rgba(76, 175, 80, 0.4)';
+                        }}
+                        title={item.locked ? 'Click to unlock' : 'Click to lock'}
+                      >
+                        {item.locked ? '🔒' : '🔓'}
+                      </button>
+                    </div>
+
+                    {/* Render canvas child items */}
+                    {(item.items || []).map(childItem => {
+                      if (childItem.type === 'text') {
+                        const isChildEditing = editingTextId === childItem.id;
+                        if (isChildEditing) {
+                          return (
+                            <div
+                              key={childItem.id}
+                              style={{
+                                position: 'absolute',
+                                left: `${childItem.x}px`,
+                                top: `${childItem.y}px`,
+                                zIndex: 100
+                              }}
+                            >
+                              <input
+                                type="text"
+                                value={childItem.content}
+                                onChange={(e) => {
+                                  setItems(prev => prev.map(i =>
+                                    i.id === item.id
+                                      ? {
+                                          ...i,
+                                          items: i.items.map(ci =>
+                                            ci.id === childItem.id ? { ...ci, content: e.target.value } : ci
+                                          )
+                                        }
+                                      : i
+                                  ));
+                                }}
+                                onBlur={() => setEditingTextId(null)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === 'Escape') setEditingTextId(null);
+                                }}
+                                autoFocus
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  outline: 'none',
+                                  color: childItem.color,
+                                  fontSize: `${childItem.fontSize}px`,
+                                  fontWeight: childItem.fontWeight || 'normal',
+                                  minWidth: '100px'
+                                }}
+                              />
+                            </div>
+                          );
+                        }
+                        return (
+                          <div
+                            key={childItem.id}
+                            className={`freeform-item freeform-text ${selectedItems.includes(childItem.id) ? 'selected' : ''}`}
+                            style={{
+                              position: 'absolute',
+                              left: `${childItem.x}px`,
+                              top: `${childItem.y}px`,
+                              fontSize: `${childItem.fontSize}px`,
+                              color: childItem.color,
+                              fontWeight: childItem.fontWeight || 'normal',
+                              cursor: 'pointer',
+                              whiteSpace: 'pre-wrap',
+                              lineHeight: '1.5',
+                              userSelect: 'none',
+                              WebkitUserSelect: 'none'
+                            }}
+                            onMouseDown={(e) => {
+                              e.stopPropagation();
+                              // Convert child coordinates to absolute coordinates for dragging
+                              const absoluteChildItem = {
+                                ...childItem,
+                                x: item.x + childItem.x,
+                                y: item.y + childItem.y
+                              };
+                              handleItemMouseDown(e, absoluteChildItem);
+                            }}
+                            onDoubleClick={(e) => {
+                              e.stopPropagation();
+                              setEditingTextId(childItem.id);
+                            }}
+                          >
+                            {childItem.content || ' '}
+                          </div>
+                        );
+                      }
+                      if (childItem.type === 'image') {
+                        return (
+                          <div
+                            key={childItem.id}
+                            style={{
+                              position: 'absolute',
+                              left: `${childItem.x}px`,
+                              top: `${childItem.y}px`,
+                              width: `${childItem.width}px`,
+                              height: `${childItem.height}px`
+                            }}
+                          >
+                            <img src={childItem.src} alt="" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                          </div>
+                        );
+                      }
+                      return null;
+                    })}
+                  </div>
+                  {isSelected && !item.locked && (
+                    <div
+                      className="freeform-resize-handle"
+                      onMouseDown={(e) => handleResizeMouseDown(e, item)}
+                      style={{
+                        position: 'absolute',
+                        right: '-4px',
+                        bottom: '-4px',
+                        width: '12px',
+                        height: '12px',
+                        background: 'rgba(102, 126, 234, 0.8)',
+                        border: '2px solid #667eea',
+                        borderRadius: '50%',
+                        cursor: 'nwse-resize',
+                        zIndex: 1001
+                      }}
+                    />
+                  )}
                 </div>
               );
             }
@@ -1285,15 +2143,16 @@ function ReferencePanel() {
         </div>
       </div>
 
-      {/* Keyboard hints */}
-      <div className="freeform-hints">
-        <div><kbd>V</kbd> Select</div>
-        <div><kbd>T</kbd> Text</div>
-        <div><kbd>N</kbd> Note</div>
-        <div><kbd>Space</kbd> Pan</div>
-        <div><kbd>Shift</kbd> Multi-select</div>
-        <div><kbd>Cmd/Ctrl + C/V</kbd> Copy/Paste</div>
-        <div><kbd>Cmd/Ctrl + Wheel</kbd> Zoom</div>
+        {/* Keyboard hints */}
+        <div className="freeform-hints">
+          <div><kbd>V</kbd> Select</div>
+          <div><kbd>T</kbd> Text</div>
+          <div><kbd>N</kbd> Note</div>
+          <div><kbd>Space</kbd> Pan</div>
+          <div><kbd>Shift</kbd> Multi-select</div>
+          <div><kbd>Cmd/Ctrl + C/V</kbd> Copy/Paste</div>
+          <div><kbd>Cmd/Ctrl + Wheel</kbd> Zoom</div>
+        </div>
       </div>
     </div>
   );
