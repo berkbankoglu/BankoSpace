@@ -14,6 +14,18 @@ import { relaunch } from '@tauri-apps/plugin-process';
 const APP_VERSION = '2.2.6';
 
 function App() {
+  // Check if this is a popup window
+  const isPopup = new URLSearchParams(window.location.search).get('popup') === 'reference';
+
+  // If popup mode, just show Reference Panel
+  if (isPopup) {
+    return (
+      <div style={{ width: '100vw', height: '100vh', background: '#1a1a1a' }}>
+        <ReferencePanel />
+      </div>
+    );
+  }
+
   const [user, setUser] = useState(null);
   const [firebaseSync, setFirebaseSync] = useState(null);
   const [syncStatus, setSyncStatus] = useState('offline'); // 'offline', 'syncing', 'synced'
