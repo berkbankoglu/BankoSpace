@@ -95,60 +95,80 @@ function ReferencePanel() {
 
   // Load from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem('freeformTabs');
-    console.log('Loading tabs from localStorage:', saved);
+    const loadTabs = () => {
+      const saved = localStorage.getItem('freeformTabs');
+      console.log('Loading tabs from localStorage:', saved);
 
-    // Try to recover from backup if exists
-    const backup = localStorage.getItem('freeformTabs_backup');
+      // Try to recover from backup if exists
+      const backup = localStorage.getItem('freeformTabs_backup');
 
-    if (saved) {
-      try {
-        const loadedTabs = JSON.parse(saved);
-        console.log('Loaded tabs:', loadedTabs);
+      if (saved) {
+        try {
+          const loadedTabs = JSON.parse(saved);
+          console.log('Loaded tabs:', loadedTabs);
 
-        // Check if tabs have content
-        const hasContent = loadedTabs.some(tab => tab.items && tab.items.length > 0);
+          // Check if tabs have content
+          const hasContent = loadedTabs.some(tab => tab.items && tab.items.length > 0);
 
-        if (!hasContent && backup) {
-          // Try to restore from backup
-          console.log('No content in current tabs, trying backup...');
+          if (!hasContent && backup) {
+            // Try to restore from backup
+            console.log('No content in current tabs, trying backup...');
+            try {
+              const backupTabs = JSON.parse(backup);
+              console.log('Restored from backup:', backupTabs);
+              setTabs(backupTabs);
+              if (backupTabs.length > 0) {
+                setActiveTabId(backupTabs[0].id);
+              }
+              return;
+            } catch (e) {
+              console.error('Failed to load backup:', e);
+            }
+          }
+
+          setTabs(loadedTabs);
+          if (loadedTabs.length > 0) {
+            setActiveTabId(loadedTabs[0].id);
+          }
+        } catch (e) {
+          console.error('Failed to load tabs:', e);
+        }
+      } else {
+        console.log('No saved tabs found in localStorage');
+
+        // Try backup
+        if (backup) {
           try {
             const backupTabs = JSON.parse(backup);
-            console.log('Restored from backup:', backupTabs);
+            console.log('Loaded from backup:', backupTabs);
             setTabs(backupTabs);
             if (backupTabs.length > 0) {
               setActiveTabId(backupTabs[0].id);
             }
-            return;
           } catch (e) {
             console.error('Failed to load backup:', e);
           }
         }
-
-        setTabs(loadedTabs);
-        if (loadedTabs.length > 0) {
-          setActiveTabId(loadedTabs[0].id);
-        }
-      } catch (e) {
-        console.error('Failed to load tabs:', e);
       }
-    } else {
-      console.log('No saved tabs found in localStorage');
+    };
 
-      // Try backup
-      if (backup) {
-        try {
-          const backupTabs = JSON.parse(backup);
-          console.log('Loaded from backup:', backupTabs);
-          setTabs(backupTabs);
-          if (backupTabs.length > 0) {
-            setActiveTabId(backupTabs[0].id);
-          }
-        } catch (e) {
-          console.error('Failed to load backup:', e);
-        }
+    // Initial load
+    loadTabs();
+
+    // Listen for changes from Firebase sync (via custom event)
+    const handleStorageUpdate = (e) => {
+      if (e.key === 'freeformTabs' || e.detail?.key === 'freeformTabs') {
+        console.log('freeformTabs updated from Firebase, reloading...');
+        loadTabs();
       }
-    }
+    };
+
+    // Listen for custom storage update events (triggered by Firebase sync)
+    window.addEventListener('storage-updated', handleStorageUpdate);
+
+    return () => {
+      window.removeEventListener('storage-updated', handleStorageUpdate);
+    };
   }, []);
 
   // Save to localStorage with backup
