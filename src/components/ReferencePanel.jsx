@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
+import StorageService from '../services/storageService';
 
-function ReferencePanel() {
+function ReferencePanel({ user }) {
   const [tabs, setTabs] = useState([{
     id: 1,
     name: 'Board 1',
@@ -27,13 +28,25 @@ function ReferencePanel() {
   const [history, setHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [clipboard, setClipboard] = useState(null);
+  const [storageService, setStorageService] = useState(null);
 
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
   const lastDragPosRef = useRef({ x: 0, y: 0 });
+  const zoomLevelRef = useRef(zoomLevel);
+  const panOffsetRef = useRef(panOffset);
 
   const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0];
   const items = activeTab.items;
+
+  // Ref'leri güncel tut
+  useEffect(() => {
+    zoomLevelRef.current = zoomLevel;
+  }, [zoomLevel]);
+
+  useEffect(() => {
+    panOffsetRef.current = panOffset;
+  }, [panOffset]);
 
   // Add to history when items change
   const saveToHistory = (newItems) => {
@@ -171,6 +184,15 @@ function ReferencePanel() {
     };
   }, []);
 
+  // Initialize storage service when user changes
+  useEffect(() => {
+    if (user && user.uid) {
+      setStorageService(new StorageService(user.uid));
+    } else {
+      setStorageService(null);
+    }
+  }, [user]);
+
   // Save to localStorage with backup
   useEffect(() => {
     const tabsJson = JSON.stringify(tabs);
@@ -195,6 +217,11 @@ function ReferencePanel() {
     const handleKeyDown = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
       if (e.target.contentEditable === 'true') return;
+
+      // Text düzenleme modunda CTRL+C/V için native clipboard kullan
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'v')) {
+        if (editingTextId !== null || editingCanvasId !== null) return;
+      }
 
       // Space for pan mode
       if (e.code === 'Space') {
@@ -360,18 +387,42 @@ function ReferencePanel() {
   // Mouse wheel zoom
   useEffect(() => {
     const handleWheel = (e) => {
-      if (e.ctrlKey || e.metaKey) {
+      const isOverCanvas = canvasRef.current?.contains(e.target);
+
+      if (isOverCanvas) {
+        // Canvas içinde: zoom (CTRL'ye gerek yok)
         e.preventDefault();
+
+        const rect = canvasRef.current.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
         const delta = e.deltaY > 0 ? -0.1 : 0.1;
-        setZoomLevel(prev => Math.max(0.25, Math.min(3, prev + delta)));
+
+        // Mevcut değerleri ref'ten al
+        const currentZoom = zoomLevelRef.current;
+        const currentPan = panOffsetRef.current;
+
+        // Yeni zoom seviyesini hesapla
+        const newZoom = Math.max(0.25, Math.min(3, currentZoom + delta));
+
+        // İmlecin işaret ettiği world koordinatını hesapla
+        const worldX = (mouseX - currentPan.x) / currentZoom;
+        const worldY = (mouseY - currentPan.y) / currentZoom;
+
+        // Yeni pan offset: aynı world noktası imleçte kalacak
+        const newPanX = mouseX - worldX * newZoom;
+        const newPanY = mouseY - worldY * newZoom;
+
+        // State'leri güncelle
+        setZoomLevel(newZoom);
+        setPanOffset({ x: newPanX, y: newPanY });
       }
+      // Canvas dışında: normal scroll (preventDefault yok)
     };
 
-    const canvas = canvasRef.current;
-    if (canvas) {
-      canvas.addEventListener('wheel', handleWheel, { passive: false });
-      return () => canvas.removeEventListener('wheel', handleWheel);
-    }
+    document.addEventListener('wheel', handleWheel, { passive: false });
+    return () => document.removeEventListener('wheel', handleWheel);
   }, []);
 
   // Paste images
@@ -382,17 +433,36 @@ function ReferencePanel() {
         if (items[i].type.indexOf('image') !== -1) {
           const blob = items[i].getAsFile();
           const reader = new FileReader();
-          reader.onload = (event) => {
-            const newItem = {
-              id: Date.now(),
-              type: 'image',
-              src: event.target.result,
-              x: -panOffset.x / zoomLevel + 100,
-              y: -panOffset.y / zoomLevel + 100,
-              width: 300,
-              height: 300
+          reader.onload = async (event) => {
+            const img = new Image();
+            img.onload = async () => {
+              const base64 = event.target.result;
+              let imageSrc = base64;
+
+              // Firebase Storage'a yükle
+              if (storageService) {
+                try {
+                  const itemId = Date.now();
+                  imageSrc = await storageService.uploadBase64(base64, itemId);
+                  console.log('Image uploaded to Firebase Storage:', imageSrc);
+                } catch (error) {
+                  console.error('Upload failed, using base64:', error);
+                  // base64 olarak kalır
+                }
+              }
+
+              const newItem = {
+                id: Date.now(),
+                type: 'image',
+                src: imageSrc,  // URL veya base64
+                x: -panOffset.x / zoomLevel + 100,
+                y: -panOffset.y / zoomLevel + 100,
+                width: img.width,
+                height: img.height
+              };
+              setItems(prev => [...prev, newItem]);
             };
-            setItems(prev => [...prev, newItem]);
+            img.src = event.target.result;
           };
           reader.readAsDataURL(blob);
           e.preventDefault();
@@ -400,6 +470,12 @@ function ReferencePanel() {
         }
       }
     };
+
+    const canvas = canvasRef.current;
+    if (canvas) {
+      canvas.addEventListener('paste', handlePaste);
+      return () => canvas.removeEventListener('paste', handlePaste);
+    }
 
     document.addEventListener('paste', handlePaste);
     return () => document.removeEventListener('paste', handlePaste);
@@ -776,8 +852,14 @@ function ReferencePanel() {
       const coords = getCanvasCoords(e.clientX, e.clientY);
       const deltaX = coords.x - resizeStart.x;
       const deltaY = coords.y - resizeStart.y;
-      const newWidth = Math.max(50, resizeStart.width + deltaX);
-      const newHeight = Math.max(50, resizeStart.height + deltaY);
+      let newWidth = Math.max(50, resizeStart.width + deltaX);
+      let newHeight = Math.max(50, resizeStart.height + deltaY);
+
+      // Görseller için aspect ratio her zaman korunur
+      if (resizingItem.type === 'image' && resizeStart.width > 0 && resizeStart.height > 0) {
+        const aspectRatio = resizeStart.width / resizeStart.height;
+        newHeight = newWidth / aspectRatio;
+      }
 
       setItems(prev => prev.map(item => {
         if (item.id === resizingItem.id) {
@@ -793,7 +875,7 @@ function ReferencePanel() {
       // Check if the dragged item is dropped on a canvas
       const coords = e ? getCanvasCoords(e.clientX, e.clientY) : null;
 
-      if (coords && draggedItem.type === 'text') {
+      if (coords && (draggedItem.type === 'text' || draggedItem.type === 'image')) {
         const targetCanvas = getCanvasAt(coords.x, coords.y);
         const currentParentId = draggedItem.parentId;
 
@@ -945,7 +1027,7 @@ function ReferencePanel() {
 
       // Calculate width - use the longest line
       const maxLineLength = Math.max(...lines.map(line => line.length), 1);
-      const estimatedWidth = maxLineLength * fontSize * 0.6; // Approximate char width
+      const estimatedWidth = maxLineLength * fontSize * 0.5; // Approximate char width
 
       return {
         width: estimatedWidth,
@@ -1346,18 +1428,6 @@ function ReferencePanel() {
           >
             🎨
           </button>
-          <button
-            className="freeform-popup-btn"
-            onClick={() => {
-              window.open(
-                window.location.origin + '?popup=reference',
-                '_blank'
-              );
-            }}
-            title="Open in New Tab"
-          >
-            🗗
-          </button>
           <input
             ref={fileInputRef}
             type="file"
@@ -1389,21 +1459,7 @@ function ReferencePanel() {
           <button onClick={() => setZoomLevel(prev => Math.max(prev - 0.1, 0.25))}>−</button>
           <span>{Math.round(zoomLevel * 100)}%</span>
           <button onClick={() => setZoomLevel(prev => Math.min(prev + 0.1, 3))}>+</button>
-          <button onClick={() => { setZoomLevel(1); setPanOffset({ x: 0, y: 0 }); }}>Reset</button>
         </div>
-
-        <button
-          className="freeform-popup-btn"
-          onClick={() => {
-            window.open(
-              window.location.origin + '?popup=reference',
-              '_blank'
-            );
-          }}
-          title="Open in New Tab"
-        >
-          🗗
-        </button>
 
         {selectedItems.length > 0 && (
           <div className="freeform-selection-info">
@@ -1595,6 +1651,7 @@ function ReferencePanel() {
       <div
         ref={canvasRef}
         className="freeform-canvas"
+        tabIndex={0}
         onMouseDown={handleCanvasMouseDown}
         onContextMenu={(e) => e.preventDefault()}
         style={{ cursor: spaceKeyPressed || isPanning ? 'grab' : tool === 'text' ? 'text' : 'default' }}
@@ -1689,7 +1746,7 @@ function ReferencePanel() {
                       onMouseDown={(e) => e.stopPropagation()}
                       autoFocus
                       placeholder="Type here..."
-                      rows={item.content.split('\n').length || 1}
+                      rows={1}
                       style={{
                         fontSize: `${item.fontSize}px`,
                         color: item.color || '#ffffff',
@@ -1697,15 +1754,21 @@ function ReferencePanel() {
                         outline: 'none',
                         background: 'rgba(0, 0, 0, 0.3)',
                         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-                        padding: '4px 8px',
+                        padding: '8px 12px',
                         margin: 0,
-                        width: `${Math.max(200, Math.max(...(item.content.split('\n').map(line => line.length))) * (item.fontSize * 0.6))}px`,
-                        maxWidth: '1200px',
+                        width: `${item.content.trim() ? Math.max(80, Math.max(...(item.content.split('\n').map(line => line.length))) * (item.fontSize * 0.5)) : 80}px`,
+                        height: `${Math.max(item.fontSize * 1.5 + 16, (item.content.split('\n').length) * (item.fontSize * 1.5) + 16)}px`,
+                        maxWidth: 'none',
                         borderRadius: '4px',
                         boxSizing: 'border-box',
                         resize: 'none',
                         overflow: 'hidden',
-                        lineHeight: '1.5'
+                        overflowWrap: 'normal',
+                        wordWrap: 'normal',
+                        whiteSpace: 'pre',
+                        lineHeight: '1.5',
+                        display: 'block',
+                        verticalAlign: 'top'
                       }}
                     />
                   </div>

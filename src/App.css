@@ -2173,7 +2173,7 @@ body.light .reset-btn:hover {
 }
 
 .todo-item {
-    padding: 12px;
+    padding: 8px 10px;
     background: #333;
     border-radius: 4px;
     transition: all 0.4s ease-out;
@@ -2181,6 +2181,17 @@ body.light .reset-btn:hover {
     display: flex;
     flex-direction: column;
     width: 100%;
+    cursor: grab;
+    user-select: none;
+}
+
+.todo-item:active {
+    cursor: grabbing;
+}
+
+.todo-item.dragging {
+    opacity: 0.5;
+    cursor: grabbing;
 }
 
 .todo-item.completed {
@@ -2216,22 +2227,24 @@ body.light .reset-btn:hover {
 
 .todo-header-top {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-end;
     align-items: center;
     width: 100%;
+    margin-bottom: 4px;
 }
 
 .checkbox {
     flex-shrink: 0;
-    width: 18px;
-    height: 18px;
-    min-width: 18px;
+    width: 16px;
+    height: 16px;
+    min-width: 16px;
     border: 2px solid #555;
     border-radius: 3px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
+    margin-left: 8px;
 }
 
 .checkbox.checked {
@@ -2252,37 +2265,40 @@ body.light .reset-btn:hover {
 }
 
 .todo-text {
-    font-size: 14px;
-    color: #e0e0e0;
-    line-height: 1.4;
+    font-size: 16px;
+    color: #f0f0f0;
+    line-height: 1.5;
     word-wrap: break-word;
     word-break: break-word;
     overflow-wrap: break-word;
     font-weight: 500;
     flex: 1;
+    letter-spacing: 0.01em;
 }
 
 .todo-meta {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-top: 6px;
-    font-size: 11px;
-    color: #666;
+    margin-top: 4px;
+    font-size: 10px;
+    color: #555;
 }
 
 .delete-btn {
     background: transparent;
-    color: #666;
+    color: #555;
     border: none;
-    padding: 2px 6px;
+    padding: 1px 4px;
     cursor: pointer;
-    font-size: 16px;
+    font-size: 13px;
     line-height: 1;
+    opacity: 0.6;
 }
 
 .delete-btn:hover {
     color: #999;
+    opacity: 1;
 }
 
 /* Drag & Drop Styles */
@@ -2294,13 +2310,14 @@ body.light .reset-btn:hover {
 
 .todo-drag-handle {
     flex-shrink: 0;
-    width: 20px;
-    color: #666;
+    width: 16px;
+    color: #555;
     cursor: grab;
-    font-size: 14px;
+    font-size: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
+    opacity: 0.5;
     user-select: none;
 }
 
@@ -2310,6 +2327,7 @@ body.light .reset-btn:hover {
 
 .todo-item:hover .todo-drag-handle {
     color: #999;
+    opacity: 1;
 }
 
 /* Reorder Buttons */
@@ -2321,13 +2339,13 @@ body.light .reset-btn:hover {
 }
 
 .todo-move-btn {
-    width: 20px;
-    height: 16px;
-    background: #444;
-    border: 1px solid #555;
-    border-radius: 3px;
-    color: #999;
-    font-size: 12px;
+    width: 16px;
+    height: 14px;
+    background: transparent;
+    border: 1px solid #444;
+    border-radius: 2px;
+    color: #666;
+    font-size: 10px;
     line-height: 1;
     cursor: pointer;
     display: flex;
@@ -2335,12 +2353,14 @@ body.light .reset-btn:hover {
     justify-content: center;
     padding: 0;
     transition: all 0.2s ease;
+    opacity: 0.5;
 }
 
 .todo-move-btn:hover {
-    background: #667eea;
-    border-color: #667eea;
-    color: white;
+    background: #555;
+    border-color: #666;
+    color: #ddd;
+    opacity: 1;
 }
 
 .todo-move-btn:active {
@@ -2351,35 +2371,38 @@ body.light .reset-btn:hover {
 .todo-text-row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
 }
 
 .subtask-progress {
-    font-size: 12px;
+    font-size: 10px;
     color: #667eea;
     font-weight: 600;
-    padding: 2px 6px;
+    padding: 1px 4px;
     background: rgba(102, 126, 234, 0.1);
-    border-radius: 3px;
+    border-radius: 2px;
+    opacity: 0.8;
 }
 
 .subtask-toggle-btn,
 .subtask-collapse-btn {
     background: transparent;
-    border: 1px solid #555;
-    color: #999;
-    padding: 2px 8px;
-    border-radius: 3px;
-    font-size: 11px;
+    border: 1px solid #444;
+    color: #777;
+    padding: 1px 6px;
+    border-radius: 2px;
+    font-size: 9px;
     cursor: pointer;
     transition: all 0.2s ease;
+    opacity: 0.6;
 }
 
 .subtask-toggle-btn:hover,
 .subtask-collapse-btn:hover {
-    background: #444;
-    border-color: #667eea;
-    color: #667eea;
+    background: #3a3a3a;
+    border-color: #555;
+    color: #999;
+    opacity: 1;
 }
 
 .subtask-input-container {
@@ -6645,4 +6668,342 @@ body.light .sync-status.synced {
     to {
         opacity: 1;
     }
+}
+
+/* === FLASH CARDS - MINIMAL === */
+.flashcards-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Group Tabs */
+.fc-group-tabs {
+  display: flex;
+  gap: 4px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #333;
+}
+
+.fc-group-tab {
+  padding: 4px 8px;
+  background: #2a2a2a;
+  border: 1px solid #333;
+  border-radius: 3px;
+  font-size: 11px;
+  color: #888;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s;
+}
+
+.fc-group-tab:hover {
+  background: #333;
+  color: #aaa;
+}
+
+.fc-group-tab.active {
+  background: #667eea;
+  border-color: #667eea;
+  color: white;
+}
+
+.fc-group-delete {
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0;
+  opacity: 0.5;
+}
+
+.fc-group-delete:hover {
+  opacity: 1;
+  color: #ff4757;
+}
+
+.fc-group-add {
+  padding: 4px 10px;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 3px;
+  color: #888;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.fc-group-add:hover {
+  background: #333;
+  color: #aaa;
+}
+
+.fc-group-input {
+  background: #2a2a2a;
+  border: 1px solid #667eea;
+  color: #e0e0e0;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  outline: none;
+  width: 80px;
+}
+
+/* Study Mode */
+.fc-study-mode {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 0;
+}
+
+.fc-card {
+  background: #2a2a2a;
+  border: 1px solid #333;
+  border-radius: 6px;
+  min-height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  cursor: pointer;
+  transition: transform 0.3s;
+  position: relative;
+}
+
+.fc-card-inner {
+  width: 100%;
+  text-align: center;
+}
+
+.fc-card-front,
+.fc-card-back {
+  font-size: 14px;
+  color: #e0e0e0;
+  line-height: 1.5;
+}
+
+.fc-card-back {
+  display: none;
+}
+
+.fc-card.flipped .fc-card-front {
+  display: none;
+}
+
+.fc-card.flipped .fc-card-back {
+  display: block;
+}
+
+/* Navigation */
+.fc-nav {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+
+.fc-nav-btn,
+.fc-list-btn {
+  padding: 6px 12px;
+  background: #2a2a2a;
+  border: 1px solid #333;
+  border-radius: 4px;
+  color: #aaa;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.fc-nav-btn:hover,
+.fc-list-btn:hover {
+  background: #333;
+}
+
+/* Know Buttons */
+.fc-know-btns {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.fc-no,
+.fc-yes {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.fc-no {
+  background: #ff4757;
+  color: white;
+}
+
+.fc-no:hover {
+  background: #e63946;
+}
+
+.fc-yes {
+  background: #48bb78;
+  color: white;
+}
+
+.fc-yes:hover {
+  background: #38a169;
+}
+
+/* Add Form */
+.fc-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  background: #2a2a2a;
+  border: 1px solid #333;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.fc-front-input,
+.fc-back-input {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  color: #e0e0e0;
+  padding: 6px 8px;
+  border-radius: 3px;
+  font-size: 12px;
+  outline: none;
+  resize: vertical;
+}
+
+.fc-front-input:focus,
+.fc-back-input:focus {
+  border-color: #667eea;
+}
+
+.fc-save {
+  padding: 6px;
+  background: #667eea;
+  border: none;
+  border-radius: 3px;
+  color: white;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.fc-save:hover {
+  background: #5568d3;
+}
+
+/* List */
+.fc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fc-list-header {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.fc-add-btn {
+  padding: 6px 12px;
+  background: #667eea;
+  border: none;
+  border-radius: 3px;
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.fc-add-btn:hover {
+  background: #5568d3;
+}
+
+.fc-study-btn {
+  padding: 6px 12px;
+  background: #48bb78;
+  border: none;
+  border-radius: 3px;
+  color: white;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.fc-study-btn:hover {
+  background: #38a169;
+}
+
+.fc-empty {
+  text-align: center;
+  color: #666;
+  padding: 20px;
+  font-size: 12px;
+}
+
+.fc-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fc-item {
+  background: #2a2a2a;
+  border: 1px solid #333;
+  border-radius: 4px;
+  padding: 8px;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.fc-item-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fc-item-front {
+  font-size: 12px;
+  color: #e0e0e0;
+  font-weight: 500;
+}
+
+.fc-item-back {
+  font-size: 11px;
+  color: #999;
+}
+
+.fc-item-status {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.fc-item-status.known {
+  color: #48bb78;
+}
+
+.fc-item-status.unknown {
+  color: #ff4757;
+}
+
+.fc-delete {
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+
+.fc-delete:hover {
+  color: #ff4757;
 }

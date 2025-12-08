@@ -77,15 +77,16 @@ function TodoItem({ todo, index, onToggle, onDelete, onAddSubtask, onToggleSubta
     >
       <div className="todo-header">
         <div className="todo-header-top">
-          <div
-            className={`checkbox ${todo.completed ? 'checked' : ''}`}
-            onClick={handleToggle}
-          />
           <div className="todo-reorder-buttons">
             {!isFirst && (
               <button
                 className="todo-move-btn todo-move-up"
-                onClick={() => onMoveUp(index)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  console.log('Move up clicked, index:', index);
+                  onMoveUp(index);
+                }}
                 title="Move up"
               >
                 ↑
@@ -94,7 +95,12 @@ function TodoItem({ todo, index, onToggle, onDelete, onAddSubtask, onToggleSubta
             {!isLast && (
               <button
                 className="todo-move-btn todo-move-down"
-                onClick={() => onMoveDown(index)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  console.log('Move down clicked, index:', index);
+                  onMoveDown(index);
+                }}
                 title="Move down"
               >
                 ↓
@@ -105,6 +111,10 @@ function TodoItem({ todo, index, onToggle, onDelete, onAddSubtask, onToggleSubta
         <div className="todo-content">
           <div className="todo-text-row">
             <div className="todo-text">{todo.text}</div>
+            <div
+              className={`checkbox ${todo.completed ? 'checked' : ''}`}
+              onClick={handleToggle}
+            />
             {hasSubtasks && (
               <div className="subtask-progress">
                 ({completedSubtasks}/{subtasks.length})

@@ -21,7 +21,7 @@ function App() {
   if (isPopup) {
     return (
       <div style={{ width: '100vw', height: '100vh', background: '#1a1a1a' }}>
-        <ReferencePanel />
+        <ReferencePanel user={null} />
       </div>
     );
   }
@@ -524,8 +524,22 @@ function App() {
   };
 
   const reorderTodos = (category, startIndex, endIndex) => {
+    console.log('Reorder called:', { category, startIndex, endIndex });
+
     const categoryTodos = todos.filter(t => t.category === category);
     const otherTodos = todos.filter(t => t.category !== category);
+
+    console.log('Category todos count:', categoryTodos.length);
+
+    // Sınır kontrolü
+    if (endIndex < 0 || endIndex >= categoryTodos.length) {
+      console.log('Invalid endIndex');
+      return;
+    }
+    if (startIndex < 0 || startIndex >= categoryTodos.length) {
+      console.log('Invalid startIndex');
+      return;
+    }
 
     const [removed] = categoryTodos.splice(startIndex, 1);
     categoryTodos.splice(endIndex, 0, removed);
@@ -535,6 +549,7 @@ function App() {
       order: index
     }));
 
+    console.log('Reordered successfully');
     setTodos([...reorderedCategoryTodos, ...otherTodos]);
   };
 
@@ -897,18 +912,11 @@ function App() {
       {showSettings && (
         <div className="settings-dropdown">
           <div className="settings-dropdown-content">
-            <button onClick={() => { toggleTheme(); setShowSettings(false); }} className="settings-item">
-              {theme === 'dark' ? '☀️' : '🌙'} Toggle Theme ({theme === 'dark' ? 'Light' : 'Dark'})
-            </button>
             <button onClick={() => { exportData(); setShowSettings(false); }} className="settings-item">
               📥 Export Data
             </button>
             <button onClick={() => { importData(); setShowSettings(false); }} className="settings-item">
               📤 Import Data
-            </button>
-            <div className="settings-divider"></div>
-            <button onClick={() => { resetAllData(); setShowSettings(false); }} className="settings-item danger">
-              🗑️ Reset All Data
             </button>
           </div>
         </div>
@@ -976,22 +984,7 @@ function App() {
               </div>
             </div>
             <div className={`section-content ${referencesCollapsed ? 'collapsed' : ''}`}>
-              <ReferencePanel />
-            </div>
-          </div>
-
-          <div className="app-section">
-            <div
-              className="section-unified-header"
-              onClick={() => setFlashCardsCollapsed(!flashCardsCollapsed)}
-            >
-              <div className="section-header-left">
-                <h2>Flash Cards</h2>
-                <span className="collapse-indicator">{flashCardsCollapsed ? '▼' : '▲'}</span>
-              </div>
-            </div>
-            <div className={`section-content ${flashCardsCollapsed ? 'collapsed' : ''}`}>
-              <FlashCards />
+              <ReferencePanel user={user} />
             </div>
           </div>
         </div>
@@ -1033,6 +1026,21 @@ function App() {
           </div>
           <div className={`section-content ${timerCollapsed ? 'collapsed' : ''}`}>
             <Timer />
+          </div>
+        </div>
+
+        <div className="app-section sidebar-section">
+          <div
+            className="section-unified-header"
+            onClick={() => setFlashCardsCollapsed(!flashCardsCollapsed)}
+          >
+            <div className="section-header-left">
+              <h2>Flash Cards</h2>
+              <span className="collapse-indicator">{flashCardsCollapsed ? '▼' : '▲'}</span>
+            </div>
+          </div>
+          <div className={`section-content ${flashCardsCollapsed ? 'collapsed' : ''}`}>
+            <FlashCards />
           </div>
         </div>
 
