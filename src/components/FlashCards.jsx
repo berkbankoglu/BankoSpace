@@ -1,309 +1,510 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import './FlashCards.css';
 
-function FlashCards() {
+function FlashCards({ fullscreen = false }) {
   const [cards, setCards] = useState([]);
-  const [currentCard, setCurrentCard] = useState(null);
+  const [decks, setDecks] = useState([]);
+  const [selectedDeck, setSelectedDeck] = useState(null);
+  const [mode, setMode] = useState('decks'); // 'decks', 'cards', 'study', 'add'
+  const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
-  const [showAddForm, setShowAddForm] = useState(false);
   const [newFront, setNewFront] = useState('');
   const [newBack, setNewBack] = useState('');
-  const [selectedGroup, setSelectedGroup] = useState('General');
-  const [editingGroupId, setEditingGroupId] = useState(null);
-  const [editingGroupName, setEditingGroupName] = useState('');
-  const [allGroups, setAllGroups] = useState([]);
+  const [editingDeckId, setEditingDeckId] = useState(null);
+  const [editingDeckName, setEditingDeckName] = useState('');
+  const [studyStats, setStudyStats] = useState({ known: 0, unknown: 0 });
+  const [shuffledCards, setShuffledCards] = useState([]);
+  const frontInputRef = useRef(null);
 
-  // Load cards from localStorage
+  // Load data
   useEffect(() => {
-    const saved = localStorage.getItem('flashCards');
-    if (saved) {
-      const loadedCards = JSON.parse(saved);
-      const migratedCards = loadedCards.map(card => ({
+    const savedCards = localStorage.getItem('flashCards');
+    const savedDecks = localStorage.getItem('flashCardGroups');
+
+    if (savedCards) {
+      const loadedCards = JSON.parse(savedCards);
+      setCards(loadedCards.map(card => ({
         ...card,
         group: card.group || 'General',
         known: card.known !== undefined ? card.known : null,
-      }));
-      setCards(migratedCards);
+      })));
     }
 
-    const savedGroups = localStorage.getItem('flashCardGroups');
-    if (savedGroups) {
-      setAllGroups(JSON.parse(savedGroups));
+    if (savedDecks) {
+      setDecks(JSON.parse(savedDecks));
     }
   }, []);
 
-  // Save cards and groups
+  // Save data
   useEffect(() => {
     localStorage.setItem('flashCards', JSON.stringify(cards));
   }, [cards]);
 
   useEffect(() => {
-    localStorage.setItem('flashCardGroups', JSON.stringify(allGroups));
-  }, [allGroups]);
-
-  const nextCard = () => {
-    const filteredCards = cards.filter(c => c.group === selectedGroup);
-    if (filteredCards.length === 0) return;
-    const currentIndex = filteredCards.findIndex(c => c.id === currentCard?.id);
-    const nextIndex = (currentIndex + 1) % filteredCards.length;
-    setCurrentCard(filteredCards[nextIndex]);
-    setIsFlipped(false);
-  };
-
-  const prevCard = () => {
-    const filteredCards = cards.filter(c => c.group === selectedGroup);
-    if (filteredCards.length === 0) return;
-    const currentIndex = filteredCards.findIndex(c => c.id === currentCard?.id);
-    const prevIndex = currentIndex === -1 || currentIndex === 0 ? filteredCards.length - 1 : currentIndex - 1;
-    setCurrentCard(filteredCards[prevIndex]);
-    setIsFlipped(false);
-  };
+    localStorage.setItem('flashCardGroups', JSON.stringify(decks));
+  }, [decks]);
 
   // Keyboard shortcuts
   useEffect(() => {
-    const handleKeyPress = (e) => {
-      if (!currentCard || showAddForm || editingGroupId !== null) return;
+    if (mode !== 'study') return;
 
+    const handleKeyPress = (e) => {
       if (e.code === 'Space') {
         e.preventDefault();
         setIsFlipped(prev => !prev);
-      } else if (e.code === 'ArrowRight') {
+      } else if (e.code === 'ArrowRight' || e.code === 'KeyD') {
         e.preventDefault();
-        nextCard();
-      } else if (e.code === 'ArrowLeft') {
+        handleKnown();
+      } else if (e.code === 'ArrowLeft' || e.code === 'KeyA') {
         e.preventDefault();
-        prevCard();
+        handleUnknown();
+      } else if (e.code === 'Escape') {
+        e.preventDefault();
+        endStudy();
       }
     };
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [currentCard, showAddForm, editingGroupId]);
+  }, [mode, currentCardIndex, shuffledCards]);
 
-  const getGroups = () => {
-    const groupsFromCards = [...new Set(cards.map(card => card.group))];
-    const allUniqueGroups = [...new Set([...allGroups, ...groupsFromCards])];
-    return allUniqueGroups.sort();
+  // Get all unique decks
+  const getAllDecks = () => {
+    const deckNames = [...new Set([...decks, ...cards.map(c => c.group)])];
+    return deckNames.filter(Boolean).sort();
   };
 
-  const filteredCards = cards.filter(card => card.group === selectedGroup);
+  // Get cards for selected deck
+  const getDeckCards = () => cards.filter(c => c.group === selectedDeck);
 
+  // Create new deck
+  const createDeck = () => {
+    let num = 1;
+    let name = `Deck ${num}`;
+    const existing = getAllDecks();
+    while (existing.includes(name)) {
+      num++;
+      name = `Deck ${num}`;
+    }
+    setDecks([...decks, name]);
+    setSelectedDeck(name);
+    setMode('cards');
+  };
+
+  // Delete deck
+  const deleteDeck = (deckName, e) => {
+    e.stopPropagation();
+    const cardCount = cards.filter(c => c.group === deckName).length;
+    if (window.confirm(`Delete "${deckName}" and its ${cardCount} cards?`)) {
+      setCards(cards.filter(c => c.group !== deckName));
+      setDecks(decks.filter(d => d !== deckName));
+      if (selectedDeck === deckName) {
+        setSelectedDeck(null);
+        setMode('decks');
+      }
+    }
+  };
+
+  // Rename deck
+  const renameDeck = (oldName, newName) => {
+    if (newName && newName.trim() && newName !== oldName && !getAllDecks().includes(newName.trim())) {
+      setCards(cards.map(c => c.group === oldName ? { ...c, group: newName.trim() } : c));
+      setDecks(decks.map(d => d === oldName ? newName.trim() : d));
+      if (selectedDeck === oldName) setSelectedDeck(newName.trim());
+    }
+    setEditingDeckId(null);
+    setEditingDeckName('');
+  };
+
+  // Add card
   const addCard = () => {
     if (newFront.trim() && newBack.trim()) {
       const card = {
         id: Date.now(),
         front: newFront.trim(),
         back: newBack.trim(),
-        group: selectedGroup,
+        group: selectedDeck,
         known: null,
+        createdAt: Date.now()
       };
       setCards([...cards, card]);
       setNewFront('');
       setNewBack('');
-      setTimeout(() => {
-        document.querySelector('.fc-front-input')?.focus();
-      }, 0);
+      frontInputRef.current?.focus();
     }
   };
 
+  // Delete card
   const deleteCard = (id) => {
-    setCards(cards.filter(card => card.id !== id));
-    if (currentCard?.id === id) {
-      setCurrentCard(null);
-    }
+    setCards(cards.filter(c => c.id !== id));
   };
 
+  // Start study
   const startStudy = () => {
-    if (filteredCards.length > 0) {
-      setCurrentCard(filteredCards[0]);
-      setIsFlipped(false);
-    }
+    const deckCards = getDeckCards();
+    if (deckCards.length === 0) return;
+
+    // Shuffle cards
+    const shuffled = [...deckCards].sort(() => Math.random() - 0.5);
+    setShuffledCards(shuffled);
+    setCurrentCardIndex(0);
+    setIsFlipped(false);
+    setStudyStats({ known: 0, unknown: 0 });
+    setMode('study');
   };
 
-  const markCardKnown = (known) => {
-    if (!currentCard) return;
-    setCards(cards.map(card =>
-      card.id === currentCard.id ? { ...card, known } : card
-    ));
+  // Handle known/unknown
+  const handleKnown = () => {
+    if (currentCardIndex >= shuffledCards.length) return;
+
+    const currentCard = shuffledCards[currentCardIndex];
+    setCards(cards.map(c => c.id === currentCard.id ? { ...c, known: true } : c));
+    setStudyStats(prev => ({ ...prev, known: prev.known + 1 }));
     nextCard();
   };
 
-  const addNewGroup = () => {
-    let groupNumber = 1;
-    let groupName = `Group ${groupNumber}`;
-    const existingGroups = getGroups();
+  const handleUnknown = () => {
+    if (currentCardIndex >= shuffledCards.length) return;
 
-    while (existingGroups.includes(groupName)) {
-      groupNumber++;
-      groupName = `Group ${groupNumber}`;
-    }
-
-    setAllGroups([...allGroups, groupName]);
-    setSelectedGroup(groupName);
+    const currentCard = shuffledCards[currentCardIndex];
+    setCards(cards.map(c => c.id === currentCard.id ? { ...c, known: false } : c));
+    setStudyStats(prev => ({ ...prev, unknown: prev.unknown + 1 }));
+    nextCard();
   };
 
-  const deleteGroup = (groupName) => {
-    if (window.confirm(`Delete group "${groupName}" and all its ${cards.filter(c => c.group === groupName).length} cards?`)) {
-      setCards(cards.filter(card => card.group !== groupName));
-      setAllGroups(allGroups.filter(g => g !== groupName));
-      if (selectedGroup === groupName) {
-        const groups = getGroups().filter(g => g !== groupName);
-        setSelectedGroup(groups[0] || 'General');
-      }
-      setCurrentCard(null);
+  const nextCard = () => {
+    if (currentCardIndex < shuffledCards.length - 1) {
+      setCurrentCardIndex(prev => prev + 1);
+      setIsFlipped(false);
+    } else {
+      setMode('results');
     }
   };
 
-  const renameGroup = (oldName, newName) => {
-    if (newName && newName.trim() && newName !== oldName && !getGroups().includes(newName.trim())) {
-      setCards(cards.map(card =>
-        card.group === oldName ? { ...card, group: newName.trim() } : card
-      ));
-      setAllGroups(allGroups.map(g => g === oldName ? newName.trim() : g));
-      if (selectedGroup === oldName) {
-        setSelectedGroup(newName.trim());
-      }
-    }
-    setEditingGroupId(null);
-    setEditingGroupName('');
+  const endStudy = () => {
+    setMode('cards');
+    setShuffledCards([]);
+    setCurrentCardIndex(0);
   };
+
+  // Reset deck progress
+  const resetDeckProgress = () => {
+    setCards(cards.map(c => c.group === selectedDeck ? { ...c, known: null } : c));
+  };
+
+  const currentCard = shuffledCards[currentCardIndex];
+  const deckCards = getDeckCards();
+  const knownCount = deckCards.filter(c => c.known === true).length;
+  const unknownCount = deckCards.filter(c => c.known === false).length;
 
   return (
-    <div className="flashcards-container">
-      {/* Group Tabs */}
-      <div className="fc-group-tabs">
-        {getGroups().map(group => (
-          <div
-            key={group}
-            className={`fc-group-tab ${selectedGroup === group ? 'active' : ''}`}
-            onClick={() => {
-              if (editingGroupId !== group) {
-                setSelectedGroup(group);
-                setCurrentCard(null);
-              }
-            }}
-            onDoubleClick={() => {
-              setEditingGroupId(group);
-              setEditingGroupName(group);
-            }}
-          >
-            {editingGroupId === group ? (
-              <input
-                type="text"
-                value={editingGroupName}
-                onChange={(e) => setEditingGroupName(e.target.value)}
-                onBlur={() => renameGroup(group, editingGroupName)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') renameGroup(group, editingGroupName);
-                  if (e.key === 'Escape') {
-                    setEditingGroupId(null);
-                    setEditingGroupName('');
-                  }
-                }}
-                autoFocus
-                className="fc-group-input"
-              />
-            ) : (
-              <>
-                {group} ({cards.filter(c => c.group === group).length})
-                <button
-                  className="fc-group-delete"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteGroup(group);
+    <div className={`fc-wrapper ${fullscreen ? 'fullscreen' : ''}`}>
+      {/* Decks View */}
+      {mode === 'decks' && (
+        <div className="fc-decks-view">
+          <div className="fc-decks-header">
+            <h2>Flash Card Decks</h2>
+            <button className="fc-create-deck-btn" onClick={createDeck}>
+              + New Deck
+            </button>
+          </div>
+
+          <div className="fc-decks-grid">
+            {getAllDecks().map(deckName => {
+              const deckCardCount = cards.filter(c => c.group === deckName).length;
+              const deckKnown = cards.filter(c => c.group === deckName && c.known === true).length;
+              const progress = deckCardCount > 0 ? Math.round((deckKnown / deckCardCount) * 100) : 0;
+
+              return (
+                <div
+                  key={deckName}
+                  className="fc-deck-card"
+                  onClick={() => {
+                    setSelectedDeck(deckName);
+                    setMode('cards');
                   }}
                 >
-                  ×
-                </button>
-              </>
-            )}
-          </div>
-        ))}
-        <button className="fc-group-add" onClick={addNewGroup}>+</button>
-      </div>
+                  {editingDeckId === deckName ? (
+                    <input
+                      type="text"
+                      value={editingDeckName}
+                      onChange={(e) => setEditingDeckName(e.target.value)}
+                      onBlur={() => renameDeck(deckName, editingDeckName)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') renameDeck(deckName, editingDeckName);
+                        if (e.key === 'Escape') { setEditingDeckId(null); setEditingDeckName(''); }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      autoFocus
+                      className="fc-deck-name-input"
+                    />
+                  ) : (
+                    <h3
+                      className="fc-deck-name"
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        setEditingDeckId(deckName);
+                        setEditingDeckName(deckName);
+                      }}
+                    >
+                      {deckName}
+                    </h3>
+                  )}
 
-      {/* Study Mode */}
-      {currentCard ? (
-        <div className="fc-study-mode">
-          <div
-            className={`fc-card ${isFlipped ? 'flipped' : ''}`}
-            onClick={() => setIsFlipped(!isFlipped)}
-          >
-            <div className="fc-card-inner">
-              <div className="fc-card-front">{currentCard.front}</div>
-              <div className="fc-card-back">{currentCard.back}</div>
-            </div>
-          </div>
-
-          <div className="fc-nav">
-            <button onClick={prevCard} className="fc-nav-btn">←</button>
-            <button onClick={() => setCurrentCard(null)} className="fc-list-btn">List</button>
-            <button onClick={nextCard} className="fc-nav-btn">→</button>
-          </div>
-
-          <div className="fc-know-btns">
-            <button onClick={() => markCardKnown(false)} className="fc-no">✗</button>
-            <button onClick={() => markCardKnown(true)} className="fc-yes">✓</button>
-          </div>
-        </div>
-      ) : (
-        <>
-          {/* Add Card Form */}
-          {showAddForm && (
-            <div className="fc-add-form">
-              <input
-                className="fc-front-input"
-                placeholder="Question"
-                value={newFront}
-                onChange={(e) => setNewFront(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && document.querySelector('.fc-back-input')?.focus()}
-              />
-              <textarea
-                className="fc-back-input"
-                placeholder="Answer"
-                value={newBack}
-                onChange={(e) => setNewBack(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && addCard()}
-                rows="2"
-              />
-              <button onClick={addCard} className="fc-save">Save</button>
-            </div>
-          )}
-
-          {/* Card List */}
-          <div className="fc-list">
-            <div className="fc-list-header">
-              <button onClick={() => setShowAddForm(!showAddForm)} className="fc-add-btn">
-                {showAddForm ? '×' : '+'}
-              </button>
-              {filteredCards.length > 0 && (
-                <button onClick={startStudy} className="fc-study-btn">
-                  Study ({filteredCards.length})
-                </button>
-              )}
-            </div>
-
-            {filteredCards.length === 0 ? (
-              <div className="fc-empty">No cards yet</div>
-            ) : (
-              <div className="fc-items">
-                {filteredCards.map((card) => (
-                  <div key={card.id} className="fc-item">
-                    <div className="fc-item-content">
-                      <div className="fc-item-front">{card.front}</div>
-                      <div className="fc-item-back">{card.back}</div>
-                    </div>
-                    {card.known !== null && (
-                      <div className={`fc-item-status ${card.known ? 'known' : 'unknown'}`}>
-                        {card.known ? '✓' : '✗'}
+                  <div className="fc-deck-stats">
+                    <span className="fc-deck-count">{deckCardCount} cards</span>
+                    {deckCardCount > 0 && (
+                      <div className="fc-deck-progress">
+                        <div className="fc-progress-bar">
+                          <div className="fc-progress-fill" style={{ width: `${progress}%` }} />
+                        </div>
+                        <span className="fc-progress-text">{progress}% mastered</span>
                       </div>
                     )}
-                    <button onClick={() => deleteCard(card.id)} className="fc-delete">×</button>
                   </div>
-                ))}
+
+                  <button
+                    className="fc-deck-delete"
+                    onClick={(e) => deleteDeck(deckName, e)}
+                    title="Delete deck"
+                  >
+                    ×
+                  </button>
+                </div>
+              );
+            })}
+
+            {getAllDecks().length === 0 && (
+              <div className="fc-empty-state">
+                <span className="fc-empty-icon">📚</span>
+                <p>No decks yet</p>
+                <p className="fc-empty-hint">Create your first deck to start learning!</p>
               </div>
             )}
           </div>
-        </>
+        </div>
+      )}
+
+      {/* Cards View */}
+      {mode === 'cards' && selectedDeck && (
+        <div className="fc-cards-view">
+          <div className="fc-cards-header">
+            <button className="fc-back-btn" onClick={() => setMode('decks')}>
+              ← Back
+            </button>
+            <h2>{selectedDeck}</h2>
+            <div className="fc-cards-actions">
+              {deckCards.length > 0 && (
+                <>
+                  <button className="fc-reset-btn" onClick={resetDeckProgress} title="Reset progress">
+                    ↺
+                  </button>
+                  <button className="fc-study-btn" onClick={startStudy}>
+                    Study ({deckCards.length})
+                  </button>
+                </>
+              )}
+              <button className="fc-add-card-btn" onClick={() => setMode('add')}>
+                + Add Card
+              </button>
+            </div>
+          </div>
+
+          <div className="fc-deck-overview">
+            <div className="fc-stat-box known">
+              <span className="fc-stat-num">{knownCount}</span>
+              <span className="fc-stat-label">Mastered</span>
+            </div>
+            <div className="fc-stat-box unknown">
+              <span className="fc-stat-num">{unknownCount}</span>
+              <span className="fc-stat-label">Learning</span>
+            </div>
+            <div className="fc-stat-box total">
+              <span className="fc-stat-num">{deckCards.length - knownCount - unknownCount}</span>
+              <span className="fc-stat-label">New</span>
+            </div>
+          </div>
+
+          <div className="fc-cards-list">
+            {deckCards.length === 0 ? (
+              <div className="fc-empty-state">
+                <span className="fc-empty-icon">🎴</span>
+                <p>No cards in this deck</p>
+                <button className="fc-add-first-btn" onClick={() => setMode('add')}>
+                  Add your first card
+                </button>
+              </div>
+            ) : (
+              deckCards.map((card, index) => (
+                <div key={card.id} className={`fc-card-item ${card.known === true ? 'known' : card.known === false ? 'unknown' : ''}`}>
+                  <div className="fc-card-number">{index + 1}</div>
+                  <div className="fc-card-content">
+                    <div className="fc-card-front-text">{card.front}</div>
+                    <div className="fc-card-back-text">{card.back}</div>
+                  </div>
+                  <div className="fc-card-status">
+                    {card.known === true && <span className="status-known">✓</span>}
+                    {card.known === false && <span className="status-unknown">✗</span>}
+                  </div>
+                  <button className="fc-card-delete" onClick={() => deleteCard(card.id)}>×</button>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Add Card View */}
+      {mode === 'add' && (
+        <div className="fc-add-view">
+          <div className="fc-add-header">
+            <button className="fc-back-btn" onClick={() => setMode('cards')}>
+              ← Back to {selectedDeck}
+            </button>
+            <h2>Add New Card</h2>
+          </div>
+
+          <div className="fc-add-form">
+            <div className="fc-form-group">
+              <label>Front (Question)</label>
+              <textarea
+                ref={frontInputRef}
+                value={newFront}
+                onChange={(e) => setNewFront(e.target.value)}
+                placeholder="Enter the question or term..."
+                rows={3}
+                autoFocus
+              />
+            </div>
+
+            <div className="fc-form-group">
+              <label>Back (Answer)</label>
+              <textarea
+                value={newBack}
+                onChange={(e) => setNewBack(e.target.value)}
+                placeholder="Enter the answer or definition..."
+                rows={4}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                    addCard();
+                  }
+                }}
+              />
+            </div>
+
+            <div className="fc-form-actions">
+              <button
+                className="fc-save-card-btn"
+                onClick={addCard}
+                disabled={!newFront.trim() || !newBack.trim()}
+              >
+                Save Card
+              </button>
+              <span className="fc-form-hint">Ctrl+Enter to save</span>
+            </div>
+          </div>
+
+          <div className="fc-recent-cards">
+            <h3>Recently Added</h3>
+            {deckCards.slice(-3).reverse().map(card => (
+              <div key={card.id} className="fc-recent-card">
+                <span className="fc-recent-front">{card.front}</span>
+                <span className="fc-recent-arrow">→</span>
+                <span className="fc-recent-back">{card.back}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Study Mode */}
+      {mode === 'study' && currentCard && (
+        <div className="fc-study-view">
+          <div className="fc-study-header">
+            <button className="fc-exit-study" onClick={endStudy}>
+              ✕ Exit
+            </button>
+            <div className="fc-study-progress">
+              <span>{currentCardIndex + 1} / {shuffledCards.length}</span>
+              <div className="fc-study-progress-bar">
+                <div
+                  className="fc-study-progress-fill"
+                  style={{ width: `${((currentCardIndex) / shuffledCards.length) * 100}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div
+            className={`fc-study-card ${isFlipped ? 'flipped' : ''}`}
+            onClick={() => setIsFlipped(!isFlipped)}
+          >
+            <div className="fc-study-card-inner">
+              <div className="fc-study-card-front">
+                <span className="fc-card-label">Question</span>
+                <p>{currentCard.front}</p>
+              </div>
+              <div className="fc-study-card-back">
+                <span className="fc-card-label">Answer</span>
+                <p>{currentCard.back}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="fc-study-hint">
+            {!isFlipped ? 'Click card or press Space to reveal answer' : 'Rate your knowledge'}
+          </div>
+
+          {isFlipped && (
+            <div className="fc-study-actions">
+              <button className="fc-action-unknown" onClick={handleUnknown}>
+                <span className="fc-action-icon">✗</span>
+                <span>Still Learning</span>
+                <span className="fc-action-key">← or A</span>
+              </button>
+              <button className="fc-action-known" onClick={handleKnown}>
+                <span className="fc-action-icon">✓</span>
+                <span>Got It!</span>
+                <span className="fc-action-key">→ or D</span>
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Results View */}
+      {mode === 'results' && (
+        <div className="fc-results-view">
+          <div className="fc-results-content">
+            <h2>Study Complete! 🎉</h2>
+
+            <div className="fc-results-stats">
+              <div className="fc-result-stat known">
+                <span className="fc-result-num">{studyStats.known}</span>
+                <span className="fc-result-label">Mastered</span>
+              </div>
+              <div className="fc-result-stat unknown">
+                <span className="fc-result-num">{studyStats.unknown}</span>
+                <span className="fc-result-label">Need Review</span>
+              </div>
+            </div>
+
+            <div className="fc-results-message">
+              {studyStats.unknown === 0
+                ? "Perfect! You've mastered all cards! 🌟"
+                : `Keep practicing! ${studyStats.unknown} cards need more review.`}
+            </div>
+
+            <div className="fc-results-actions">
+              <button className="fc-study-again" onClick={startStudy}>
+                Study Again
+              </button>
+              <button className="fc-back-to-deck" onClick={endStudy}>
+                Back to Deck
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

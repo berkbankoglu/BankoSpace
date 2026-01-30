@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import StorageService from '../services/storageService';
 
-function ReferencePanel({ user }) {
+function ReferencePanel() {
   const [tabs, setTabs] = useState([{
     id: 1,
     name: 'Board 1',
@@ -184,14 +184,10 @@ function ReferencePanel({ user }) {
     };
   }, []);
 
-  // Initialize storage service when user changes
+  // Initialize storage service
   useEffect(() => {
-    if (user && user.uid) {
-      setStorageService(new StorageService(user.uid));
-    } else {
-      setStorageService(null);
-    }
-  }, [user]);
+    setStorageService(new StorageService('local-user'));
+  }, []);
 
   // Save to localStorage with backup
   useEffect(() => {
@@ -1363,14 +1359,14 @@ function ReferencePanel({ user }) {
   };
 
   return (
-    <div className="freeform-container">
-      {/* Left Sidebar with Tabs */}
-      <div className="freeform-sidebar">
-        <div className="freeform-sidebar-tabs">
+    <div className="freeform-container vertical-layout">
+      {/* Board Tabs - Chrome style tab bar */}
+      <div className="freeform-tab-bar">
+        <div className="freeform-board-tabs">
           {tabs.map(tab => (
             <div
               key={tab.id}
-              className={`freeform-sidebar-tab ${tab.id === activeTabId ? 'active' : ''}`}
+              className={`freeform-board-tab ${tab.id === activeTabId ? 'active' : ''}`}
               onClick={() => setActiveTabId(tab.id)}
             >
               {editingTabId === tab.id ? (
@@ -1398,13 +1394,12 @@ function ReferencePanel({ user }) {
               )}
             </div>
           ))}
-          <button className="freeform-tab-add" onClick={addNewTab}>+</button>
+          <button className="freeform-board-add" onClick={addNewTab}>+</button>
         </div>
       </div>
 
-      {/* Main Content Area */}
-      <div className="freeform-main-content">
-        {/* Toolbar */}
+      {/* Toolbar */}
+      <div className="freeform-toolbar-container">
         <div className="freeform-toolbar">
         <div className="freeform-tools">
           <button
@@ -1644,6 +1639,7 @@ function ReferencePanel({ user }) {
               </svg>
             </button>
           </div>
+        </div>
         </div>
       </div>
 
@@ -2226,16 +2222,15 @@ function ReferencePanel({ user }) {
         </div>
       </div>
 
-        {/* Keyboard hints */}
-        <div className="freeform-hints">
-          <div><kbd>V</kbd> Select</div>
-          <div><kbd>T</kbd> Text</div>
-          <div><kbd>N</kbd> Note</div>
-          <div><kbd>Space</kbd> Pan</div>
-          <div><kbd>Shift</kbd> Multi-select</div>
-          <div><kbd>Cmd/Ctrl + C/V</kbd> Copy/Paste</div>
-          <div><kbd>Cmd/Ctrl + Wheel</kbd> Zoom</div>
-        </div>
+      {/* Keyboard hints */}
+      <div className="freeform-hints">
+        <div><kbd>V</kbd> Select</div>
+        <div><kbd>T</kbd> Text</div>
+        <div><kbd>N</kbd> Note</div>
+        <div><kbd>Space</kbd> Pan</div>
+        <div><kbd>Shift</kbd> Multi-select</div>
+        <div><kbd>Cmd/Ctrl + C/V</kbd> Copy/Paste</div>
+        <div><kbd>Cmd/Ctrl + Wheel</kbd> Zoom</div>
       </div>
     </div>
   );

@@ -1,0 +1,448 @@
+/* CategoryColumn v2 - DailyChecklist Style */
+
+.category-column-v2 {
+  background: #2a2a2a;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  border: 1px solid #333;
+}
+
+/* Header */
+.cc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #333;
+}
+
+.cc-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #e0e0e0;
+  margin: 0;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.cc-title:hover {
+  opacity: 0.7;
+}
+
+.cc-title-input {
+  font-size: 15px;
+  font-weight: 600;
+  background: #1a1a1a;
+  border: 1px solid #667eea;
+  border-radius: 6px;
+  padding: 4px 8px;
+  color: #e0e0e0;
+  outline: none;
+  width: 100%;
+  max-width: 150px;
+}
+
+.cc-count {
+  background: #333;
+  color: #888;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+/* Progress */
+.cc-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.cc-progress-bar {
+  flex: 1;
+  height: 4px;
+  background: #333;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.cc-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #667eea, #764ba2);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.cc-progress-text {
+  font-size: 11px;
+  color: #666;
+  min-width: 35px;
+  text-align: right;
+}
+
+/* Items Container */
+.cc-items {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  padding-right: 4px;
+}
+
+.cc-items::-webkit-scrollbar {
+  width: 4px;
+}
+
+.cc-items::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.cc-items::-webkit-scrollbar-thumb {
+  background: #444;
+  border-radius: 2px;
+}
+
+.cc-items::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Item */
+.cc-item {
+  background: #333;
+  border-radius: 8px;
+  padding: 10px 12px;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.cc-item:hover {
+  border-color: #444;
+}
+
+.cc-item.completed {
+  opacity: 0.6;
+}
+
+.cc-item.completed .cc-text {
+  text-decoration: line-through;
+  color: #666;
+}
+
+.cc-item-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* Label & Checkbox */
+.cc-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  flex: 1;
+  min-width: 0;
+}
+
+.cc-checkbox {
+  display: none;
+}
+
+.cc-checkmark {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #555;
+  border-radius: 4px;
+  flex-shrink: 0;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.cc-checkmark.small {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+}
+
+.cc-checkbox:checked + .cc-checkmark {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  border-color: transparent;
+}
+
+.cc-checkbox:checked + .cc-checkmark::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 2px;
+  width: 4px;
+  height: 8px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.cc-checkmark.small.cc-checkbox:checked + .cc-checkmark::after {
+  left: 4px;
+  top: 1px;
+  width: 3px;
+  height: 6px;
+}
+
+.cc-text {
+  font-size: 13px;
+  color: #e0e0e0;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+/* Item Meta */
+.cc-item-meta {
+  margin-top: 6px;
+  padding-left: 28px;
+}
+
+.cc-time {
+  font-size: 11px;
+  color: #666;
+}
+
+/* Item Actions */
+.cc-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.cc-item:hover .cc-item-actions {
+  opacity: 1;
+}
+
+.cc-subtask-badge {
+  font-size: 10px;
+  background: rgba(102, 126, 234, 0.2);
+  color: #667eea;
+  padding: 2px 6px;
+  border-radius: 8px;
+  margin-right: 4px;
+}
+
+.cc-action-btn {
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+  line-height: 1;
+}
+
+.cc-action-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e0e0e0;
+}
+
+.cc-action-btn.delete:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.cc-action-btn.small {
+  font-size: 14px;
+  padding: 1px 4px;
+}
+
+/* Subtasks */
+.cc-subtasks {
+  margin-top: 10px;
+  padding-left: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cc-subtask {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  background: #2a2a2a;
+  border-radius: 6px;
+}
+
+.cc-subtask.completed .cc-text {
+  text-decoration: line-through;
+  color: #666;
+}
+
+.cc-subtask .cc-label {
+  gap: 8px;
+}
+
+.cc-subtask .cc-text {
+  font-size: 12px;
+}
+
+.cc-subtask-add {
+  margin-top: 4px;
+}
+
+.cc-subtask-input {
+  width: 100%;
+  background: #252525;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #e0e0e0;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.cc-subtask-input:focus {
+  border-color: #667eea;
+}
+
+.cc-subtask-input::placeholder {
+  color: #555;
+}
+
+
+.cc-add-input {
+  width: 100%;
+  background: #252525;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #e0e0e0;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.cc-add-input:focus {
+  border-color: #667eea;
+  background: #2a2a2a;
+}
+
+.cc-add-input::placeholder {
+  color: #555;
+}
+
+/* Empty State */
+.cc-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #555;
+  font-size: 13px;
+}
+
+/* Add Row - Always at bottom */
+.cc-add-row {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid #333;
+}
+
+/* ==========================================
+   LIGHT THEME
+   ========================================== */
+
+body.light .category-column-v2 {
+  background: #ffffff;
+  border-color: #e8e8e8;
+}
+
+body.light .cc-header {
+  border-bottom-color: #eee;
+}
+
+body.light .cc-title {
+  color: #37352f;
+}
+
+body.light .cc-title-input {
+  background: #f7f7f7;
+  color: #37352f;
+}
+
+body.light .cc-count {
+  background: #f0f0f0;
+  color: #666;
+}
+
+body.light .cc-progress-bar {
+  background: #e8e8e8;
+}
+
+body.light .cc-item {
+  background: #f7f7f7;
+}
+
+body.light .cc-item:hover {
+  border-color: #ddd;
+}
+
+body.light .cc-checkmark {
+  border-color: #ccc;
+}
+
+body.light .cc-text {
+  color: #37352f;
+}
+
+body.light .cc-item.completed .cc-text,
+body.light .cc-subtask.completed .cc-text {
+  color: #999;
+}
+
+body.light .cc-time {
+  color: #999;
+}
+
+body.light .cc-action-btn {
+  color: #999;
+}
+
+body.light .cc-action-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #37352f;
+}
+
+body.light .cc-subtask {
+  background: #fff;
+}
+
+body.light .cc-subtask-input,
+body.light .cc-add-input {
+  background: #f7f7f7;
+  border-color: #e8e8e8;
+  color: #37352f;
+}
+
+body.light .cc-subtask-input:focus,
+body.light .cc-add-input:focus {
+  background: #fff;
+}
+
+body.light .cc-add-row {
+  border-top-color: #eee;
+}
+
+body.light .cc-empty {
+  color: #999;
+}

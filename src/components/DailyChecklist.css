@@ -1,0 +1,270 @@
+/* ==========================================
+   CHECKLIST - Modern Design
+   ========================================== */
+
+.checklist-wrapper {
+  width: 100%;
+}
+
+/* Progress Bar */
+.checklist-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.checklist-progress-bar {
+  flex: 1;
+  height: 6px;
+  background: #1a1a1a;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.checklist-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #667eea, #764ba2);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.checklist-progress-text {
+  font-size: 12px;
+  color: #888;
+  white-space: nowrap;
+}
+
+/* Items List */
+.checklist-items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.checklist-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: #2a2a2a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.checklist-item:hover {
+  border-color: #444;
+}
+
+.checklist-item.completed {
+  opacity: 0.6;
+}
+
+.checklist-item.completed .checklist-text {
+  text-decoration: line-through;
+  color: #666;
+}
+
+/* Checkbox Label */
+.checklist-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.checklist-checkbox {
+  display: none;
+}
+
+.checklist-checkmark {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #555;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.checklist-checkbox:checked + .checklist-checkmark {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  border-color: #667eea;
+}
+
+.checklist-checkbox:checked + .checklist-checkmark::after {
+  content: '✓';
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.checklist-label:hover .checklist-checkmark {
+  border-color: #667eea;
+}
+
+.checklist-text {
+  font-size: 14px;
+  color: #e0e0e0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Actions */
+.checklist-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.checklist-item:hover .checklist-actions {
+  opacity: 1;
+}
+
+.checklist-action-btn {
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: none;
+  color: #666;
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.checklist-action-btn.edit:hover {
+  background: rgba(102, 126, 234, 0.2);
+  color: #667eea;
+}
+
+.checklist-action-btn.delete:hover {
+  background: rgba(255, 82, 82, 0.2);
+  color: #ff5252;
+}
+
+/* Edit Row */
+.checklist-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.checklist-edit-input {
+  flex: 1;
+  background: #1a1a1a;
+  border: 1px solid #667eea;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 14px;
+  color: #e0e0e0;
+  outline: none;
+}
+
+.checklist-save-btn {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  border: none;
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.checklist-save-btn:hover {
+  transform: scale(1.05);
+}
+
+/* Add Row */
+.checklist-add-row {
+  margin-top: 8px;
+}
+
+.checklist-add-input {
+  width: 100%;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 14px;
+  color: #e0e0e0;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.checklist-add-input:focus {
+  border-color: #667eea;
+}
+
+.checklist-add-input::placeholder {
+  color: #555;
+}
+
+/* Empty State */
+.checklist-empty {
+  text-align: center;
+  padding: 24px;
+  color: #666;
+  font-size: 14px;
+}
+
+/* ==========================================
+   LIGHT THEME
+   ========================================== */
+
+body.light .checklist-item {
+  background: #ffffff;
+  border-color: #e0e0e0;
+}
+
+body.light .checklist-item:hover {
+  border-color: #ccc;
+}
+
+body.light .checklist-text {
+  color: #37352f;
+}
+
+body.light .checklist-item.completed .checklist-text {
+  color: #aaa;
+}
+
+body.light .checklist-checkmark {
+  border-color: #ccc;
+}
+
+body.light .checklist-progress-bar {
+  background: #e0e0e0;
+}
+
+body.light .checklist-add-input,
+body.light .checklist-edit-input {
+  background: #f7f7f7;
+  border-color: #e0e0e0;
+  color: #37352f;
+}
+
+body.light .checklist-add-input:focus,
+body.light .checklist-edit-input:focus {
+  border-color: #667eea;
+}
+
+body.light .checklist-add-input::placeholder {
+  color: #999;
+}

@@ -249,26 +249,28 @@ function Timer() {
                   🔁 Repeat
                 </button>
                 <button className="timer-btn-large timer-btn-reset" onClick={handleStop}>
-                  ⏹ Stop
+                  ⏹ Reset
+                </button>
+              </>
+            ) : isRunning ? (
+              <>
+                <button className="timer-btn-large timer-btn-pause-large" onClick={handlePause}>
+                  ⏸ Pause
+                </button>
+                <button className="timer-btn-large timer-btn-restart" onClick={handleRestart}>
+                  🔄 Restart
                 </button>
               </>
             ) : (
               <>
-                {!isRunning ? (
-                  <button className="timer-btn-large timer-btn-play" onClick={handleStart}>
-                    ▶ Start
-                  </button>
-                ) : (
-                  <button className="timer-btn-large timer-btn-pause-large" onClick={handlePause}>
-                    ⏸ Pause
+                <button className="timer-btn-large timer-btn-play" onClick={handleStart}>
+                  ▶ Start
+                </button>
+                {timeLeft > 0 && timeLeft < initialTime && (
+                  <button className="timer-btn-large timer-btn-reset" onClick={handleStop}>
+                    ⏹ Reset
                   </button>
                 )}
-                <button className="timer-btn-large timer-btn-restart" onClick={handleRestart}>
-                  🔄 Restart
-                </button>
-                <button className="timer-btn-large timer-btn-reset" onClick={handleStop}>
-                  ⏹ Stop
-                </button>
               </>
             )}
           </div>
