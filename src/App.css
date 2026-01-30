@@ -2012,6 +2012,8 @@ body.light .reset-btn:hover {
     width: 100%;
     max-width: 100%;
     box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
 }
 
 .new-task-btn {
@@ -2149,9 +2151,10 @@ body.light .reset-btn:hover {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    max-height: 400px;
+    flex: 1;
     overflow-y: auto;
     padding-right: 5px;
+    min-height: 0;
 }
 
 .todo-list::-webkit-scrollbar {
@@ -5493,9 +5496,7 @@ body.light .reset-btn:hover {
     border-radius: 3px;
 }
 
-.main-content-area {
-    display: none;
-}
+/* main-content-area styles moved to bottom */
 
 .right-sidebar {
     grid-column: 2;
@@ -5978,46 +5979,110 @@ body.light .sync-status.synced {
     overflow: hidden;
 }
 
-.freeform-sidebar {
-    width: 200px;
-    background: #252525;
-    border-right: 1px solid #333;
-    display: flex;
+/* Vertical layout for freeform */
+.freeform-container.vertical-layout {
     flex-direction: column;
-    overflow-y: auto;
 }
 
-.freeform-sidebar-tabs {
+/* Tab bar - Chrome style - sits above toolbar */
+.freeform-tab-bar {
     display: flex;
-    flex-direction: column;
-    padding: 8px 0;
+    align-items: flex-end;
+    padding: 0 15px;
+    background: #1e1e1e;
+    min-height: 36px;
 }
 
-.freeform-sidebar-tab {
+/* Board tabs - horizontal Chrome style */
+.freeform-board-tabs {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+}
+
+.freeform-board-tab {
     padding: 8px 16px;
-    color: #e0e0e0;
+    color: #888;
     cursor: pointer;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    transition: background 0.2s;
-    border-left: 3px solid transparent;
+    gap: 8px;
+    transition: all 0.2s;
+    border-radius: 8px 8px 0 0;
+    background: #252525;
+    font-size: 13px;
+    border: 1px solid transparent;
+    border-bottom: none;
+    position: relative;
+    margin-bottom: -1px;
 }
 
-.freeform-sidebar-tab:hover {
-    background: rgba(255, 255, 255, 0.05);
+.freeform-board-tab:hover {
+    background: #333;
+    color: #ccc;
 }
 
-.freeform-sidebar-tab.active {
-    background: rgba(102, 126, 234, 0.2);
-    border-left-color: #667eea;
+.freeform-board-tab.active {
+    background: #2a2a2a;
+    color: #e0e0e0;
+    border-color: #333;
 }
 
-.freeform-main-content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
+.freeform-board-tab .freeform-tab-close {
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 0 2px;
+    line-height: 1;
+    margin-left: 4px;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.freeform-board-tab:hover .freeform-tab-close,
+.freeform-board-tab.active .freeform-tab-close {
+    opacity: 1;
+}
+
+.freeform-board-tab .freeform-tab-close:hover {
+    color: #ff6b6b;
+}
+
+.freeform-board-add {
+    padding: 4px 10px;
+    background: transparent;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    font-size: 18px;
+    margin-left: 4px;
+    margin-bottom: 4px;
+}
+
+.freeform-board-add:hover {
+    color: #e0e0e0;
+}
+
+/* Toolbar container */
+.freeform-toolbar-container {
+    background: #2a2a2a;
+    border-bottom: 1px solid #333;
+    padding: 8px 15px;
+}
+
+/* Old sidebar - hidden in vertical layout */
+.freeform-sidebar {
+    display: none;
+}
+
+.freeform-sidebar-tabs {
+    display: none;
+}
+
+.freeform-sidebar-tab {
+    display: none;
 }
 
 .freeform-toolbar {
@@ -6025,9 +6090,6 @@ body.light .sync-status.synced {
     flex-wrap: wrap;
     align-items: center;
     gap: 12px;
-    padding: 10px 15px;
-    background: #2a2a2a;
-    border-bottom: 1px solid #333;
 }
 
 .freeform-tools {
@@ -7006,4 +7068,820 @@ body.light .sync-status.synced {
 
 .fc-delete:hover {
   color: #ff4757;
+}
+
+/* Folder Sidebar Navigation */
+.folder-sidebar {
+  width: 220px;
+  background: #2a2a2a;
+  border-right: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.folder-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.folder-item {
+  padding: 12px 15px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-left: 3px solid transparent;
+  color: #e0e0e0;
+}
+
+.folder-item:hover {
+  background: rgba(102, 126, 234, 0.1);
+}
+
+.folder-item.active {
+  background: rgba(102, 126, 234, 0.2);
+  border-left-color: #667eea;
+  color: #667eea;
+}
+
+.folder-icon {
+  font-size: 18px;
+}
+
+.folder-name {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* View Container */
+.view-container {
+  padding: 20px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.view-title {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: #e0e0e0;
+}
+
+/* Light theme adjustments */
+body.light .folder-sidebar {
+  background: #ffffff;
+  border-right-color: #d1dce6;
+}
+
+body.light .folder-item {
+  color: #2c3e50;
+}
+
+body.light .folder-item:hover {
+  background: rgba(102, 126, 234, 0.05);
+}
+
+body.light .folder-item.active {
+  background: rgba(102, 126, 234, 0.15);
+  color: #667eea;
+}
+
+body.light .view-title {
+  color: #2c3e50;
+}
+
+/* ============================================
+   NOTION-STYLE SIDEBAR
+   ============================================ */
+
+.notion-sidebar {
+  width: 240px;
+  min-width: 240px;
+  background: #202020;
+  border-right: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  transition: width 0.2s ease, min-width 0.2s ease;
+}
+
+.notion-sidebar.collapsed {
+  width: 50px;
+  min-width: 50px;
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 10px;
+  border-bottom: 1px solid #333;
+}
+
+.sidebar-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  color: #e0e0e0;
+}
+
+.sidebar-icon {
+  font-size: 18px;
+}
+
+.sidebar-toggle {
+  background: none;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.sidebar-toggle:hover {
+  background: #333;
+  color: #e0e0e0;
+}
+
+.sidebar-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+/* Sidebar Section */
+.sidebar-section {
+  margin-bottom: 4px;
+}
+
+.sidebar-section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+  color: #888;
+  font-size: 13px;
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.sidebar-section-header:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #e0e0e0;
+}
+
+.section-arrow {
+  font-size: 10px;
+  width: 12px;
+  color: #666;
+}
+
+.section-icon {
+  font-size: 16px;
+}
+
+.section-title {
+  font-weight: 500;
+}
+
+/* Sidebar Items */
+.sidebar-section-items {
+  padding-left: 12px;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 20px;
+  cursor: pointer;
+  color: #999;
+  font-size: 13px;
+  border-radius: 4px;
+  margin: 1px 8px;
+  transition: all 0.15s;
+}
+
+.sidebar-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #e0e0e0;
+}
+
+.sidebar-item.active {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e0e0e0;
+}
+
+.item-icon {
+  font-size: 15px;
+  width: 20px;
+  text-align: center;
+}
+
+.item-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Sidebar Bottom */
+.sidebar-bottom {
+  margin-top: auto;
+  border-top: 1px solid #333;
+  padding: 8px 0;
+}
+
+/* Settings Modal Styles */
+.settings-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 20px 0;
+}
+
+.settings-btn-large {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 8px;
+  color: #e0e0e0;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+}
+
+.settings-btn-large:hover {
+  background: #333;
+  border-color: #555;
+}
+
+.settings-btn-large.danger {
+  border-color: #dc3545;
+  color: #ff6b6b;
+}
+
+.settings-btn-large.danger:hover {
+  background: rgba(220, 53, 69, 0.2);
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px solid #333;
+}
+
+.version-info {
+  color: #666;
+  font-size: 12px;
+}
+
+/* Light Theme Notion Sidebar */
+body.light .notion-sidebar {
+  background: #f7f6f3;
+  border-right-color: #e0e0e0;
+}
+
+body.light .sidebar-header {
+  border-bottom-color: #e0e0e0;
+}
+
+body.light .sidebar-title {
+  color: #37352f;
+}
+
+body.light .sidebar-toggle {
+  color: #999;
+}
+
+body.light .sidebar-toggle:hover {
+  background: #e0e0e0;
+  color: #37352f;
+}
+
+body.light .sidebar-section-header {
+  color: #787774;
+}
+
+body.light .sidebar-section-header:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color: #37352f;
+}
+
+body.light .sidebar-item {
+  color: #787774;
+}
+
+body.light .sidebar-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color: #37352f;
+}
+
+body.light .sidebar-item.active {
+  background: rgba(0, 0, 0, 0.06);
+  color: #37352f;
+}
+
+body.light .sidebar-bottom {
+  border-top-color: #e0e0e0;
+}
+
+/* Main content area adjustments */
+.content-wrapper {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.main-content-area {
+  flex: 1;
+  overflow-y: auto;
+  background: #1a1a1a;
+}
+
+body.light .main-content-area {
+  background: #ffffff;
+}
+
+/* Container adjustments */
+.container {
+  padding: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+body {
+  padding: 0;
+  margin: 0;
+}
+
+/* ============================================
+   DASHBOARD LAYOUT
+   ============================================ */
+
+/* References Full Screen */
+.references-fullscreen {
+  padding: 20px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.references-header {
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #333;
+}
+
+.page-title {
+  font-size: 28px;
+  font-weight: 600;
+  color: #e0e0e0;
+  margin: 0;
+}
+
+body.light .page-title {
+  color: #37352f;
+}
+
+body.light .references-header {
+  border-bottom-color: #e0e0e0;
+}
+
+.references-content {
+  height: calc(100% - 80px);
+}
+
+/* Flash Cards Full Screen */
+.flashcards-fullscreen {
+  padding: 20px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.flashcards-fullscreen .flashcards-container {
+  max-width: 100%;
+  height: 100%;
+}
+
+/* Checklists Full Screen */
+.checklists-fullscreen {
+  padding: 20px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.checklists-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 30px;
+  max-width: 1400px;
+}
+
+.checklist-section {
+  background: #2a2a2a;
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid #333;
+}
+
+.checklist-section h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #e0e0e0;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #333;
+}
+
+body.light .checklist-section {
+  background: #ffffff;
+  border-color: #e0e0e0;
+}
+
+body.light .checklist-section h2 {
+  color: #37352f;
+  border-bottom-color: #e0e0e0;
+}
+
+.dashboard-container {
+  padding: 20px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #333;
+}
+
+.dashboard-title {
+  font-size: 28px;
+  font-weight: 600;
+  color: #e0e0e0;
+  margin: 0;
+}
+
+body.light .dashboard-title {
+  color: #37352f;
+}
+
+body.light .dashboard-header {
+  border-bottom-color: #e0e0e0;
+}
+
+.dashboard-layout {
+  display: flex;
+  gap: 20px;
+  height: calc(100% - 80px);
+}
+
+.dashboard-layout.vertical {
+  flex-direction: column;
+}
+
+.dashboard-top {
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.dashboard-top .tool-section {
+  flex: 1;
+  min-width: 200px;
+  max-width: 300px;
+}
+
+.dashboard-bottom {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.dashboard-left {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+.dashboard-right {
+  width: 320px;
+  min-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  overflow-y: auto;
+}
+
+.todo-columns {
+  display: flex;
+  gap: 15px;
+  width: 100%;
+  flex: 1;
+}
+
+.todo-columns .category-column,
+.todo-columns .category-column-v2 {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Sidebar main item styling */
+.sidebar-item.main-item {
+  font-weight: 600;
+  padding: 10px 12px;
+  margin: 4px 8px;
+  font-size: 14px;
+}
+
+.sidebar-item.main-item.active {
+  background: rgba(102, 126, 234, 0.2);
+  color: #667eea;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .dashboard-layout {
+    flex-direction: column;
+  }
+  
+  .dashboard-right {
+    width: 100%;
+    min-width: unset;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  
+  .dashboard-right .app-section {
+    flex: 1;
+    min-width: 280px;
+  }
+}
+
+@media (max-width: 900px) {
+  .todo-columns {
+    flex-direction: column;
+  }
+}
+
+/* ==========================================
+   SEARCH BAR STYLES
+   ========================================== */
+
+.sidebar-search {
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  position: relative;
+}
+
+.search-input-wrapper {
+  display: flex;
+  align-items: center;
+  background: #2a2a2a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 8px 12px;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.search-input-wrapper:focus-within {
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
+}
+
+.search-icon {
+  font-size: 14px;
+  opacity: 0.6;
+}
+
+.search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #e0e0e0;
+  font-size: 14px;
+}
+
+.search-input::placeholder {
+  color: #666;
+}
+
+.search-clear {
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.search-clear:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e0e0e0;
+}
+
+.search-results {
+  position: absolute;
+  top: 100%;
+  left: 12px;
+  right: 12px;
+  background: #2a2a2a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 100;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  margin-top: 4px;
+}
+
+.search-result-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  border-bottom: 1px solid #333;
+}
+
+.search-result-item:last-child {
+  border-bottom: none;
+}
+
+.search-result-item:hover {
+  background: rgba(102, 126, 234, 0.15);
+}
+
+.result-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.result-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.result-title {
+  font-size: 13px;
+  color: #e0e0e0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.result-subtitle {
+  font-size: 11px;
+  color: #888;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.result-badge {
+  display: inline-block;
+  font-size: 10px;
+  padding: 2px 6px;
+  background: rgba(102, 126, 234, 0.2);
+  color: #667eea;
+  border-radius: 4px;
+  margin-top: 2px;
+  width: fit-content;
+}
+
+.search-no-results {
+  padding: 16px;
+  text-align: center;
+  color: #666;
+  font-size: 13px;
+}
+
+/* Light theme search */
+body.light .search-input-wrapper {
+  background: #f7f7f7;
+  border-color: #e0e0e0;
+}
+
+body.light .search-input-wrapper:focus-within {
+  border-color: #667eea;
+}
+
+body.light .search-input {
+  color: #37352f;
+}
+
+body.light .search-input::placeholder {
+  color: #999;
+}
+
+body.light .search-results {
+  background: #ffffff;
+  border-color: #e0e0e0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+body.light .search-result-item {
+  border-bottom-color: #eee;
+}
+
+body.light .search-result-item:hover {
+  background: rgba(102, 126, 234, 0.1);
+}
+
+body.light .result-title {
+  color: #37352f;
+}
+
+body.light .result-subtitle {
+  color: #999;
+}
+
+body.light .search-no-results {
+  color: #999;
+}
+
+/* ==========================================
+   DASHBOARD TO-DO LIST FULL HEIGHT
+   ========================================== */
+
+.dashboard-left {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.dashboard-left .app-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.dashboard-left .app-section .section-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.dashboard-left .todo-columns {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  height: 100%;
+}
+
+.dashboard-left .todo-columns .category-column,
+.dashboard-left .todo-columns .category-column-v2 {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+.dashboard-left .todo-columns .category-column .todo-list,
+.dashboard-left .todo-columns .category-column-v2 .cc-items {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }

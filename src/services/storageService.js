@@ -1,33 +1,60 @@
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { storage } from '../firebase';
-
+// Local storage service - stores images as base64 in localStorage
 class StorageService {
   constructor(userId) {
     this.userId = userId;
-    this.basePath = `users/${userId}/reference-images`;
+    this.storageKey = `reference-images-${userId}`;
   }
 
+  // Get all images from localStorage
+  _getImages() {
+    const stored = localStorage.getItem(this.storageKey);
+    return stored ? JSON.parse(stored) : {};
+  }
+
+  // Save images to localStorage
+  _saveImages(images) {
+    localStorage.setItem(this.storageKey, JSON.stringify(images));
+  }
+
+  // Upload image: convert to base64 and store locally
   async uploadImage(file, itemId) {
-    const storageRef = ref(storage, `${this.basePath}/${itemId}`);
-    await uploadBytes(storageRef, file);
-    const url = await getDownloadURL(storageRef);
-    return url;
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64String = reader.result;
+        const images = this._getImages();
+        images[itemId] = base64String;
+        this._saveImages(images);
+        resolve(base64String);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
   }
 
+  // Store base64 directly
   async uploadBase64(base64String, itemId) {
-    // Base64'ü blob'a çevir
-    const response = await fetch(base64String);
-    const blob = await response.blob();
-    return this.uploadImage(blob, itemId);
+    const images = this._getImages();
+    images[itemId] = base64String;
+    this._saveImages(images);
+    return base64String;
   }
 
+  // Delete image from localStorage
   async deleteImage(itemId) {
-    const storageRef = ref(storage, `${this.basePath}/${itemId}`);
     try {
-      await deleteObject(storageRef);
+      const images = this._getImages();
+      delete images[itemId];
+      this._saveImages(images);
     } catch (error) {
       console.error('Error deleting image:', error);
     }
+  }
+
+  // Get image URL (returns base64 directly)
+  getImageUrl(itemId) {
+    const images = this._getImages();
+    return images[itemId] || null;
   }
 }
 

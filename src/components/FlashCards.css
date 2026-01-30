@@ -1,0 +1,977 @@
+/* ==========================================
+   FLASH CARDS - Modern Design
+   ========================================== */
+
+.fc-wrapper {
+  width: 100%;
+  min-height: 400px;
+  color: #e0e0e0;
+}
+
+.fc-wrapper.fullscreen {
+  height: 100%;
+  padding: 20px;
+}
+
+/* ==========================================
+   DECKS VIEW
+   ========================================== */
+
+.fc-decks-view {
+  width: 100%;
+}
+
+.fc-decks-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #333;
+}
+
+.fc-decks-header h2 {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.fc-create-deck-btn {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.fc-create-deck-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.fc-decks-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.fc-deck-card {
+  background: #2a2a2a;
+  border: 1px solid #333;
+  border-radius: 12px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.fc-deck-card:hover {
+  border-color: #667eea;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.fc-deck-name {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+  color: #e0e0e0;
+}
+
+.fc-deck-name-input {
+  font-size: 18px;
+  font-weight: 600;
+  background: #1a1a1a;
+  border: 1px solid #667eea;
+  border-radius: 6px;
+  padding: 4px 8px;
+  color: #e0e0e0;
+  width: 100%;
+  outline: none;
+}
+
+.fc-deck-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fc-deck-count {
+  font-size: 14px;
+  color: #888;
+}
+
+.fc-deck-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fc-progress-bar {
+  height: 6px;
+  background: #1a1a1a;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.fc-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #667eea, #764ba2);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.fc-progress-text {
+  font-size: 12px;
+  color: #888;
+}
+
+.fc-deck-delete {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  border: none;
+  color: #666;
+  font-size: 18px;
+  cursor: pointer;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  opacity: 0;
+}
+
+.fc-deck-card:hover .fc-deck-delete {
+  opacity: 1;
+}
+
+.fc-deck-delete:hover {
+  background: rgba(255, 82, 82, 0.2);
+  color: #ff5252;
+}
+
+/* ==========================================
+   CARDS VIEW
+   ========================================== */
+
+.fc-cards-view {
+  width: 100%;
+}
+
+.fc-cards-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #333;
+}
+
+.fc-cards-header h2 {
+  flex: 1;
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.fc-back-btn {
+  background: transparent;
+  border: 1px solid #444;
+  color: #888;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.fc-back-btn:hover {
+  border-color: #667eea;
+  color: #667eea;
+}
+
+.fc-cards-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.fc-reset-btn {
+  background: transparent;
+  border: 1px solid #444;
+  color: #888;
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s ease;
+}
+
+.fc-reset-btn:hover {
+  border-color: #ffa726;
+  color: #ffa726;
+}
+
+.fc-study-btn {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.fc-study-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.fc-add-card-btn {
+  background: #2a2a2a;
+  border: 1px solid #444;
+  color: #e0e0e0;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.fc-add-card-btn:hover {
+  border-color: #667eea;
+  background: #333;
+}
+
+/* Deck Overview Stats */
+.fc-deck-overview {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.fc-stat-box {
+  flex: 1;
+  background: #2a2a2a;
+  border-radius: 10px;
+  padding: 16px;
+  text-align: center;
+  border: 1px solid #333;
+}
+
+.fc-stat-box.known {
+  border-color: rgba(102, 187, 106, 0.3);
+}
+
+.fc-stat-box.unknown {
+  border-color: rgba(255, 167, 38, 0.3);
+}
+
+.fc-stat-num {
+  display: block;
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.fc-stat-box.known .fc-stat-num {
+  color: #66bb6a;
+}
+
+.fc-stat-box.unknown .fc-stat-num {
+  color: #ffa726;
+}
+
+.fc-stat-box.total .fc-stat-num {
+  color: #888;
+}
+
+.fc-stat-label {
+  font-size: 12px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Cards List */
+.fc-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: calc(100vh - 350px);
+  overflow-y: auto;
+}
+
+.fc-card-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #2a2a2a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 12px 16px;
+  transition: all 0.2s ease;
+}
+
+.fc-card-item:hover {
+  border-color: #444;
+}
+
+.fc-card-item.known {
+  border-left: 3px solid #66bb6a;
+}
+
+.fc-card-item.unknown {
+  border-left: 3px solid #ffa726;
+}
+
+.fc-card-number {
+  width: 28px;
+  height: 28px;
+  background: #1a1a1a;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: #666;
+  flex-shrink: 0;
+}
+
+.fc-card-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.fc-card-front-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: #e0e0e0;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fc-card-back-text {
+  font-size: 13px;
+  color: #888;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fc-card-status {
+  flex-shrink: 0;
+}
+
+.status-known {
+  color: #66bb6a;
+  font-size: 16px;
+}
+
+.status-unknown {
+  color: #ffa726;
+  font-size: 16px;
+}
+
+.fc-card-delete {
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: none;
+  color: #666;
+  font-size: 18px;
+  cursor: pointer;
+  border-radius: 4px;
+  opacity: 0;
+  transition: all 0.2s ease;
+}
+
+.fc-card-item:hover .fc-card-delete {
+  opacity: 1;
+}
+
+.fc-card-delete:hover {
+  background: rgba(255, 82, 82, 0.2);
+  color: #ff5252;
+}
+
+/* ==========================================
+   ADD CARD VIEW
+   ========================================== */
+
+.fc-add-view {
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.fc-add-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #333;
+}
+
+.fc-add-header h2 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.fc-add-form {
+  background: #2a2a2a;
+  border: 1px solid #333;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.fc-form-group {
+  margin-bottom: 20px;
+}
+
+.fc-form-group label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #888;
+  margin-bottom: 8px;
+}
+
+.fc-form-group textarea {
+  width: 100%;
+  background: #1a1a1a;
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 15px;
+  color: #e0e0e0;
+  resize: vertical;
+  font-family: inherit;
+  transition: border-color 0.2s ease;
+}
+
+.fc-form-group textarea:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.fc-form-group textarea::placeholder {
+  color: #555;
+}
+
+.fc-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.fc-save-card-btn {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.fc-save-card-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.fc-save-card-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.fc-form-hint {
+  font-size: 12px;
+  color: #666;
+}
+
+/* Recent Cards */
+.fc-recent-cards {
+  background: #2a2a2a;
+  border: 1px solid #333;
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.fc-recent-cards h3 {
+  font-size: 14px;
+  font-weight: 500;
+  color: #888;
+  margin: 0 0 12px 0;
+}
+
+.fc-recent-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #333;
+  font-size: 13px;
+}
+
+.fc-recent-card:last-child {
+  border-bottom: none;
+}
+
+.fc-recent-front {
+  color: #e0e0e0;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fc-recent-arrow {
+  color: #555;
+}
+
+.fc-recent-back {
+  color: #888;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fc-add-first-btn {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  margin-top: 16px;
+}
+
+/* ==========================================
+   STUDY MODE
+   ========================================== */
+
+.fc-study-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  height: 100%;
+  min-height: 500px;
+}
+
+.fc-study-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 600px;
+  margin-bottom: 40px;
+}
+
+.fc-exit-study {
+  background: transparent;
+  border: 1px solid #444;
+  color: #888;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.fc-exit-study:hover {
+  border-color: #ff5252;
+  color: #ff5252;
+}
+
+.fc-study-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #888;
+  font-size: 14px;
+}
+
+.fc-study-progress-bar {
+  width: 150px;
+  height: 6px;
+  background: #333;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.fc-study-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #667eea, #764ba2);
+  transition: width 0.3s ease;
+}
+
+/* Study Card */
+.fc-study-card {
+  width: 100%;
+  max-width: 500px;
+  height: 300px;
+  perspective: 1000px;
+  cursor: pointer;
+  margin-bottom: 24px;
+}
+
+.fc-study-card-inner {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fc-study-card.flipped .fc-study-card-inner {
+  transform: rotateY(180deg);
+}
+
+.fc-study-card-front,
+.fc-study-card-back {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  border-radius: 16px;
+  text-align: center;
+}
+
+.fc-study-card-front {
+  background: linear-gradient(135deg, #2a2a2a, #333);
+  border: 1px solid #444;
+}
+
+.fc-study-card-back {
+  background: linear-gradient(135deg, #1a1a2e, #16213e);
+  border: 1px solid #334;
+  transform: rotateY(180deg);
+}
+
+.fc-card-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #667eea;
+  margin-bottom: 16px;
+}
+
+.fc-study-card-front p,
+.fc-study-card-back p {
+  font-size: 22px;
+  line-height: 1.5;
+  margin: 0;
+  color: #e0e0e0;
+}
+
+.fc-study-hint {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 24px;
+}
+
+/* Study Actions */
+.fc-study-actions {
+  display: flex;
+  gap: 24px;
+  width: 100%;
+  max-width: 500px;
+}
+
+.fc-action-unknown,
+.fc-action-known {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 2px solid transparent;
+}
+
+.fc-action-unknown {
+  background: rgba(255, 167, 38, 0.1);
+  border-color: rgba(255, 167, 38, 0.3);
+  color: #ffa726;
+}
+
+.fc-action-unknown:hover {
+  background: rgba(255, 167, 38, 0.2);
+  border-color: #ffa726;
+  transform: translateY(-2px);
+}
+
+.fc-action-known {
+  background: rgba(102, 187, 106, 0.1);
+  border-color: rgba(102, 187, 106, 0.3);
+  color: #66bb6a;
+}
+
+.fc-action-known:hover {
+  background: rgba(102, 187, 106, 0.2);
+  border-color: #66bb6a;
+  transform: translateY(-2px);
+}
+
+.fc-action-icon {
+  font-size: 28px;
+}
+
+.fc-action-key {
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+/* ==========================================
+   RESULTS VIEW
+   ========================================== */
+
+.fc-results-view {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 400px;
+}
+
+.fc-results-content {
+  text-align: center;
+  max-width: 400px;
+}
+
+.fc-results-content h2 {
+  font-size: 28px;
+  margin-bottom: 32px;
+}
+
+.fc-results-stats {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.fc-result-stat {
+  padding: 24px 32px;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.fc-result-stat.known {
+  background: rgba(102, 187, 106, 0.1);
+  border: 1px solid rgba(102, 187, 106, 0.3);
+}
+
+.fc-result-stat.unknown {
+  background: rgba(255, 167, 38, 0.1);
+  border: 1px solid rgba(255, 167, 38, 0.3);
+}
+
+.fc-result-num {
+  display: block;
+  font-size: 36px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.fc-result-stat.known .fc-result-num {
+  color: #66bb6a;
+}
+
+.fc-result-stat.unknown .fc-result-num {
+  color: #ffa726;
+}
+
+.fc-result-label {
+  font-size: 14px;
+  color: #888;
+}
+
+.fc-results-message {
+  font-size: 16px;
+  color: #888;
+  margin-bottom: 32px;
+}
+
+.fc-results-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.fc-study-again {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.fc-study-again:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.fc-back-to-deck {
+  background: #2a2a2a;
+  border: 1px solid #444;
+  color: #e0e0e0;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.fc-back-to-deck:hover {
+  border-color: #667eea;
+}
+
+/* ==========================================
+   EMPTY STATE
+   ========================================== */
+
+.fc-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+  color: #888;
+}
+
+.fc-empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.fc-empty-state p {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+}
+
+.fc-empty-hint {
+  font-size: 14px !important;
+  color: #666 !important;
+}
+
+/* ==========================================
+   LIGHT THEME
+   ========================================== */
+
+body.light .fc-wrapper {
+  color: #37352f;
+}
+
+body.light .fc-decks-header,
+body.light .fc-cards-header,
+body.light .fc-add-header {
+  border-bottom-color: #e0e0e0;
+}
+
+body.light .fc-deck-card,
+body.light .fc-card-item,
+body.light .fc-add-form,
+body.light .fc-recent-cards,
+body.light .fc-stat-box {
+  background: #ffffff;
+  border-color: #e0e0e0;
+}
+
+body.light .fc-deck-card:hover {
+  border-color: #667eea;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+body.light .fc-deck-name,
+body.light .fc-card-front-text,
+body.light .fc-recent-front {
+  color: #37352f;
+}
+
+body.light .fc-deck-name-input,
+body.light .fc-form-group textarea {
+  background: #f7f7f7;
+  border-color: #e0e0e0;
+  color: #37352f;
+}
+
+body.light .fc-progress-bar,
+body.light .fc-study-progress-bar {
+  background: #e0e0e0;
+}
+
+body.light .fc-card-number {
+  background: #f0f0f0;
+  color: #888;
+}
+
+body.light .fc-back-btn,
+body.light .fc-reset-btn,
+body.light .fc-exit-study {
+  border-color: #e0e0e0;
+}
+
+body.light .fc-add-card-btn,
+body.light .fc-back-to-deck {
+  background: #f7f7f7;
+  border-color: #e0e0e0;
+  color: #37352f;
+}
+
+body.light .fc-study-card-front {
+  background: linear-gradient(135deg, #ffffff, #f7f7f7);
+  border-color: #e0e0e0;
+}
+
+body.light .fc-study-card-back {
+  background: linear-gradient(135deg, #f0f4ff, #e8eeff);
+  border-color: #c5d5ff;
+}
+
+body.light .fc-study-card-front p,
+body.light .fc-study-card-back p {
+  color: #37352f;
+}
+
+body.light .fc-recent-card {
+  border-bottom-color: #e0e0e0;
+}
+
+body.light .fc-results-content h2 {
+  color: #37352f;
+}
