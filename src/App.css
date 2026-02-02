@@ -7487,6 +7487,12 @@ body.light .references-header {
   overflow-y: auto;
 }
 
+/* Income Tracker Full Screen */
+.income-fullscreen {
+  height: 100%;
+  overflow-y: auto;
+}
+
 .checklists-container {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));

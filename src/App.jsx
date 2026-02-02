@@ -6,6 +6,7 @@ import Timer from './components/Timer';
 import FlashCards from './components/FlashCards';
 import StudyReminders from './components/StudyReminders';
 import DailyChecklist from './components/DailyChecklist';
+import IncomeTracker from './components/IncomeTracker';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 
@@ -852,6 +853,15 @@ function App() {
                 <span className="item-name">Checklists</span>
               </div>
 
+              {/* Income Tracker */}
+              <div
+                className={`sidebar-item ${activeView === 'income' ? 'active' : ''}`}
+                onClick={() => setActiveView('income')}
+              >
+                <span className="item-icon">💰</span>
+                <span className="item-name">Gelir Takibi</span>
+              </div>
+
               {/* Settings at bottom */}
               <div className="sidebar-bottom">
                 <div
@@ -899,6 +909,13 @@ function App() {
                   <StudyReminders />
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Income Tracker Full Screen View */}
+          {activeView === 'income' && (
+            <div className="income-fullscreen">
+              <IncomeTracker />
             </div>
           )}
 
