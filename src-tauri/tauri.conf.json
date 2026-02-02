@@ -48,11 +48,14 @@
           "description": "Main app capabilities",
           "windows": ["main"],
           "permissions": [
+            "dialog:default",
             "dialog:allow-save",
             "dialog:allow-open",
+            "fs:default",
             "fs:allow-read-text-file",
             "fs:allow-write-text-file",
-            "fs:default",
+            "fs:allow-read-file",
+            "fs:allow-read-dir",
             "notification:default"
           ]
         }
