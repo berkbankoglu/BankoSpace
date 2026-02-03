@@ -968,12 +968,6 @@ function IncomeTracker() {
           >
             + Ekle
           </button>
-          <button
-            className={`it-tab ${view === 'map' ? 'active' : ''}`}
-            onClick={() => setView('map')}
-          >
-            🌍 Harita
-          </button>
         </div>
       </div>
 
@@ -1379,6 +1373,13 @@ function IncomeTracker() {
             </div>
           </div>
 
+          {/* World Map Section */}
+          <div className="it-charts">
+            <div className="it-chart-card wide">
+              <WorldMap invoices={invoices} />
+            </div>
+          </div>
+
           {/* Action Buttons */}
           <div className="it-actions">
             <button
@@ -1674,12 +1675,6 @@ function IncomeTracker() {
         </div>
       )}
 
-      {/* Map View */}
-      {view === 'map' && (
-        <div className="it-map-view">
-          <WorldMap invoices={invoices} />
-        </div>
-      )}
     </div>
   );
 }

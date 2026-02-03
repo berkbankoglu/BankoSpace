@@ -7,6 +7,7 @@ import FlashCards from './components/FlashCards';
 import StudyReminders from './components/StudyReminders';
 import DailyChecklist from './components/DailyChecklist';
 import IncomeTracker from './components/IncomeTracker';
+import Notes from './components/Notes';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 
@@ -745,7 +746,6 @@ function App() {
           {/* Sidebar Header */}
           <div className="sidebar-header">
             <div className="sidebar-title">
-              <span className="sidebar-icon">🏠</span>
               {!sidebarCollapsed && <span>BankoSpace</span>}
             </div>
             <button
@@ -822,7 +822,6 @@ function App() {
                 className={`sidebar-item main-item ${activeView === 'dashboard' ? 'active' : ''}`}
                 onClick={() => setActiveView('dashboard')}
               >
-                <span className="item-icon">☑️</span>
                 <span className="item-name">Dashboard</span>
               </div>
 
@@ -831,7 +830,6 @@ function App() {
                 className={`sidebar-item ${activeView === 'references' ? 'active' : ''}`}
                 onClick={() => setActiveView('references')}
               >
-                <span className="item-icon">📚</span>
                 <span className="item-name">References</span>
               </div>
 
@@ -840,7 +838,6 @@ function App() {
                 className={`sidebar-item ${activeView === 'flashcards' ? 'active' : ''}`}
                 onClick={() => setActiveView('flashcards')}
               >
-                <span className="item-icon">🎴</span>
                 <span className="item-name">Flash Cards</span>
               </div>
 
@@ -849,7 +846,6 @@ function App() {
                 className={`sidebar-item ${activeView === 'checklists' ? 'active' : ''}`}
                 onClick={() => setActiveView('checklists')}
               >
-                <span className="item-icon">✅</span>
                 <span className="item-name">Checklists</span>
               </div>
 
@@ -858,8 +854,15 @@ function App() {
                 className={`sidebar-item ${activeView === 'income' ? 'active' : ''}`}
                 onClick={() => setActiveView('income')}
               >
-                <span className="item-icon">💰</span>
                 <span className="item-name">Gelir Takibi</span>
+              </div>
+
+              {/* Notes */}
+              <div
+                className={`sidebar-item ${activeView === 'notes' ? 'active' : ''}`}
+                onClick={() => setActiveView('notes')}
+              >
+                <span className="item-name">Notlar</span>
               </div>
 
               {/* Settings at bottom */}
@@ -868,7 +871,6 @@ function App() {
                   className="sidebar-item"
                   onClick={() => setShowSettings(!showSettings)}
                 >
-                  <span className="item-icon">⚙️</span>
                   <span className="item-name">Settings</span>
                 </div>
               </div>
@@ -916,6 +918,13 @@ function App() {
           {activeView === 'income' && (
             <div className="income-fullscreen">
               <IncomeTracker />
+            </div>
+          )}
+
+          {/* Notes Full Screen View */}
+          {activeView === 'notes' && (
+            <div className="notes-fullscreen">
+              <Notes />
             </div>
           )}
 

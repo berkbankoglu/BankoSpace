@@ -1,14 +1,14 @@
 /* CategoryColumn v2 - DailyChecklist Style */
 
 .category-column-v2 {
-  background: #2a2a2a;
-  border-radius: 12px;
+  background: #161b22;
+  border-radius: 6px;
   padding: 16px;
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  border: 1px solid #333;
+  border: 1px solid #21262d;
 }
 
 /* Header */
@@ -18,13 +18,13 @@
   justify-content: space-between;
   margin-bottom: 12px;
   padding-bottom: 12px;
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid #21262d;
 }
 
 .cc-title {
   font-size: 15px;
   font-weight: 600;
-  color: #e0e0e0;
+  color: #c9d1d9;
   margin: 0;
   cursor: pointer;
   transition: opacity 0.2s;
@@ -37,22 +37,22 @@
 .cc-title-input {
   font-size: 15px;
   font-weight: 600;
-  background: #1a1a1a;
-  border: 1px solid #667eea;
+  background: #0d1117;
+  border: 1px solid #58a6ff;
   border-radius: 6px;
   padding: 4px 8px;
-  color: #e0e0e0;
+  color: #c9d1d9;
   outline: none;
   width: 100%;
   max-width: 150px;
 }
 
 .cc-count {
-  background: #333;
-  color: #888;
+  background: #1c2128;
+  color: #484f58;
   font-size: 12px;
   padding: 2px 8px;
-  border-radius: 10px;
+  border-radius: 4px;
   font-weight: 500;
 }
 
@@ -67,21 +67,21 @@
 .cc-progress-bar {
   flex: 1;
   height: 4px;
-  background: #333;
+  background: #1c2128;
   border-radius: 2px;
   overflow: hidden;
 }
 
 .cc-progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #667eea, #764ba2);
+  background: #e3b341;
   border-radius: 2px;
   transition: width 0.3s ease;
 }
 
 .cc-progress-text {
   font-size: 11px;
-  color: #666;
+  color: #484f58;
   min-width: 35px;
   text-align: right;
 }
@@ -106,25 +106,25 @@
 }
 
 .cc-items::-webkit-scrollbar-thumb {
-  background: #444;
+  background: #21262d;
   border-radius: 2px;
 }
 
 .cc-items::-webkit-scrollbar-thumb:hover {
-  background: #555;
+  background: #30363d;
 }
 
 /* Item */
 .cc-item {
-  background: #333;
-  border-radius: 8px;
+  background: #1c2128;
+  border-radius: 4px;
   padding: 10px 12px;
   transition: all 0.2s ease;
   border: 1px solid transparent;
 }
 
 .cc-item:hover {
-  border-color: #444;
+  border-color: #30363d;
 }
 
 .cc-item.completed {
@@ -133,7 +133,7 @@
 
 .cc-item.completed .cc-text {
   text-decoration: line-through;
-  color: #666;
+  color: #484f58;
 }
 
 .cc-item-main {
@@ -160,7 +160,7 @@
 .cc-checkmark {
   width: 18px;
   height: 18px;
-  border: 2px solid #555;
+  border: 2px solid #30363d;
   border-radius: 4px;
   flex-shrink: 0;
   position: relative;
@@ -174,7 +174,7 @@
 }
 
 .cc-checkbox:checked + .cc-checkmark {
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: #7ee787;
   border-color: transparent;
 }
 
@@ -199,7 +199,7 @@
 
 .cc-text {
   font-size: 13px;
-  color: #e0e0e0;
+  color: #c9d1d9;
   line-height: 1.4;
   word-break: break-word;
 }
@@ -212,7 +212,7 @@
 
 .cc-time {
   font-size: 11px;
-  color: #666;
+  color: #484f58;
 }
 
 /* Item Actions */
@@ -230,17 +230,17 @@
 
 .cc-subtask-badge {
   font-size: 10px;
-  background: rgba(102, 126, 234, 0.2);
-  color: #667eea;
+  background: rgba(88, 166, 255, 0.2);
+  color: #58a6ff;
   padding: 2px 6px;
-  border-radius: 8px;
+  border-radius: 4px;
   margin-right: 4px;
 }
 
 .cc-action-btn {
   background: none;
   border: none;
-  color: #666;
+  color: #484f58;
   font-size: 16px;
   cursor: pointer;
   padding: 2px 6px;
@@ -251,11 +251,11 @@
 
 .cc-action-btn:hover {
   background: rgba(255, 255, 255, 0.1);
-  color: #e0e0e0;
+  color: #c9d1d9;
 }
 
 .cc-action-btn.delete:hover {
-  background: rgba(239, 68, 68, 0.2);
+  background: rgba(248, 81, 73, 0.2);
   color: #ef4444;
 }
 
@@ -278,13 +278,13 @@
   align-items: center;
   justify-content: space-between;
   padding: 6px 8px;
-  background: #2a2a2a;
+  background: #161b22;
   border-radius: 6px;
 }
 
 .cc-subtask.completed .cc-text {
   text-decoration: line-through;
-  color: #666;
+  color: #484f58;
 }
 
 .cc-subtask .cc-label {
@@ -301,44 +301,44 @@
 
 .cc-subtask-input {
   width: 100%;
-  background: #252525;
-  border: 1px solid #333;
+  background: #161b22;
+  border: 1px solid #21262d;
   border-radius: 6px;
   padding: 6px 10px;
   font-size: 12px;
-  color: #e0e0e0;
+  color: #c9d1d9;
   outline: none;
   transition: border-color 0.2s ease;
 }
 
 .cc-subtask-input:focus {
-  border-color: #667eea;
+  border-color: #58a6ff;
 }
 
 .cc-subtask-input::placeholder {
-  color: #555;
+  color: #484f58;
 }
 
 
 .cc-add-input {
   width: 100%;
-  background: #252525;
-  border: 1px solid #333;
-  border-radius: 8px;
+  background: #161b22;
+  border: 1px solid #21262d;
+  border-radius: 4px;
   padding: 10px 14px;
   font-size: 13px;
-  color: #e0e0e0;
+  color: #c9d1d9;
   outline: none;
   transition: all 0.2s ease;
 }
 
 .cc-add-input:focus {
-  border-color: #667eea;
-  background: #2a2a2a;
+  border-color: #58a6ff;
+  background: #161b22;
 }
 
 .cc-add-input::placeholder {
-  color: #555;
+  color: #484f58;
 }
 
 /* Empty State */
@@ -347,7 +347,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #555;
+  color: #484f58;
   font-size: 13px;
 }
 
@@ -355,7 +355,7 @@
 .cc-add-row {
   margin-top: auto;
   padding-top: 12px;
-  border-top: 1px solid #333;
+  border-top: 1px solid #21262d;
 }
 
 /* ==========================================
@@ -382,7 +382,7 @@ body.light .cc-title-input {
 
 body.light .cc-count {
   background: #f0f0f0;
-  color: #666;
+  color: #484f58;
 }
 
 body.light .cc-progress-bar {
