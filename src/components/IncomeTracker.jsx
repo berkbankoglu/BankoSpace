@@ -3,6 +3,7 @@ import { open, ask } from '@tauri-apps/plugin-dialog';
 import { readDir, readFile } from '@tauri-apps/plugin-fs';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import WorldMap from './WorldMap';
 import './IncomeTracker.css';
 
 // PDF.js worker - use local bundled worker
@@ -262,38 +263,97 @@ function IncomeTracker() {
       client = 'Bilinmiyor';
     }
 
-    // Ülke bilgisini çıkar
+    // Ülke bilgisini çıkar - sadece ALICI BİLGİLERİ bölümünden
     let country = '';
+
+    // Önce ALICI BİLGİLERİ bölümünü bul
+    const aliciSection = text.match(/ALICI\s*B[İI]LG[İI]LER[İI][\s\S]{0,500}/i);
+    let searchText = aliciSection ? aliciSection[0] : '';
+
+    // Eğer ALICI bölümü yoksa müşteri isminden sonraki 200 karaktere bak
+    if (!searchText && fullClientInfo) {
+      const clientIndex = text.indexOf(fullClientInfo);
+      if (clientIndex !== -1) {
+        searchText = text.substring(clientIndex, clientIndex + 300);
+      }
+    }
+
+    // Eğer hala bulamadıysak tüm metinde ara ama Türkiye'yi atla
+    if (!searchText) {
+      searchText = text;
+    }
+
     const countryPatterns = [
-      // Tam ülke isimleri
-      /(United States|USA|United Kingdom|UK|Germany|Deutschland|France|Netherlands|Holland|Switzerland|Schweiz|Canada|Australia|Belgium|Belgique|Austria|Österreich|Ireland|Spain|España|Italy|Italia|Sweden|Sverige|Norway|Norge|Denmark|Danmark|Finland|Suomi|Poland|Polska|Czech Republic|Czechia|Hungary|Romania|Bulgaria|Greece|Portugal|Turkey|Türkiye|India|China|Japan|South Korea|Korea|Singapore|Hong Kong|Dubai|UAE|United Arab Emirates|Saudi Arabia|Israel|Brazil|Brasil|Mexico|México|Argentina|Chile|Colombia|Peru)/i,
-      // Kısaltmalar
-      /\b(US|GB|DE|FR|NL|CH|CA|AU|BE|AT|IE|ES|IT|SE|NO|DK|FI|PL|CZ|HU|RO|BG|GR|PT|TR|IN|CN|JP|KR|SG|HK|AE|SA|IL|BR|MX|AR|CL|CO|PE)\b/,
+      // Önce spesifik etiketlerle ülke ara (en yüksek öncelik)
+      /(?:Ülke|Ulke|Country|Nation|País|Pays|Land)[:\s]+([A-Za-zÀ-ÿ\s\-]+?)(?:\n|$|[,;])/i,
+      /(?:Country|Ülke|Ulke)[:\s]*\n?\s*([A-Za-zÀ-ÿ\s\-]+?)(?:\n|$)/i,
+      // Adres satırındaki ülke
+      /(?:Address|Adres)[:\s]*[^\n]*[\n\r]+[^\n]*[\n\r]+[^\n]*?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*$/im,
+      // Tam ülke isimleri (Türkiye HARİÇ - çünkü GİB formatında her yerde geçiyor)
+      /\b(United States of America|United States|United Kingdom|USA|UK|Germany|Deutschland|France|Netherlands|Holland|Switzerland|Schweiz|Canada|Australia|Belgium|Belgique|Austria|Österreich|Ireland|Spain|España|Italy|Italia|Sweden|Sverige|Norway|Norge|Denmark|Danmark|Finland|Suomi|Poland|Polska|Czech Republic|Czechia|Hungary|Romania|Bulgaria|Greece|Portugal|India|China|Japan|South Korea|Korea|Singapore|Hong Kong|Dubai|UAE|United Arab Emirates|Saudi Arabia|Israel|Brazil|Brasil|Mexico|México|Argentina|Chile|Colombia|Peru)\b/i,
+      // Kısaltmalar (TR HARİÇ)
+      /\b(US|GB|DE|FR|NL|CH|CA|AU|BE|AT|IE|ES|IT|SE|NO|DK|FI|PL|CZ|HU|RO|BG|GR|PT|IN|CN|JP|KR|SG|HK|AE|SA|IL|BR|MX|AR|CL|CO|PE)\b/,
     ];
 
     for (const pattern of countryPatterns) {
-      const match = text.match(pattern);
+      const match = searchText.match(pattern);
       if (match) {
-        country = match[1] || match[0];
-        // Kısa kodları tam isme çevir
+        country = (match[1] || match[0]).trim();
+
+        // Geçersiz değerleri temizle
+        if (/^(bilgi|info|n\/a|none|-|\.|\s*|turkey|türkiye|tr)$/i.test(country)) {
+          continue;
+        }
+
+        // Kısa kodları ve alternatif isimleri tam isme çevir - MUST match world-atlas names
         const countryMap = {
-          'US': 'USA', 'GB': 'UK', 'DE': 'Germany', 'FR': 'France', 'NL': 'Netherlands',
-          'CH': 'Switzerland', 'CA': 'Canada', 'AU': 'Australia', 'BE': 'Belgium',
-          'AT': 'Austria', 'IE': 'Ireland', 'ES': 'Spain', 'IT': 'Italy', 'SE': 'Sweden',
-          'NO': 'Norway', 'DK': 'Denmark', 'FI': 'Finland', 'PL': 'Poland', 'CZ': 'Czech',
-          'HU': 'Hungary', 'RO': 'Romania', 'BG': 'Bulgaria', 'GR': 'Greece', 'PT': 'Portugal',
-          'TR': 'Turkey', 'IN': 'India', 'CN': 'China', 'JP': 'Japan', 'KR': 'Korea',
-          'SG': 'Singapore', 'HK': 'Hong Kong', 'AE': 'UAE', 'SA': 'Saudi Arabia',
-          'IL': 'Israel', 'BR': 'Brazil', 'MX': 'Mexico', 'AR': 'Argentina',
-          'CL': 'Chile', 'CO': 'Colombia', 'PE': 'Peru',
-          'Deutschland': 'Germany', 'Schweiz': 'Switzerland', 'Österreich': 'Austria',
-          'España': 'Spain', 'Italia': 'Italy', 'Sverige': 'Sweden', 'Norge': 'Norway',
-          'Danmark': 'Denmark', 'Suomi': 'Finland', 'Polska': 'Poland', 'Türkiye': 'Turkey',
-          'Brasil': 'Brazil', 'México': 'Mexico', 'Holland': 'Netherlands',
-          'Belgique': 'Belgium', 'Czechia': 'Czech', 'Czech Republic': 'Czech'
+          'US': 'United States', 'USA': 'United States', 'United States of America': 'United States',
+          'GB': 'United Kingdom', 'UK': 'United Kingdom',
+          'DE': 'Germany', 'Deutschland': 'Germany',
+          'FR': 'France',
+          'NL': 'Netherlands', 'Holland': 'Netherlands',
+          'CH': 'Switzerland', 'Schweiz': 'Switzerland',
+          'CA': 'Canada',
+          'AU': 'Australia',
+          'BE': 'Belgium', 'Belgique': 'Belgium',
+          'AT': 'Austria', 'Österreich': 'Austria',
+          'IE': 'Ireland',
+          'ES': 'Spain', 'España': 'Spain',
+          'IT': 'Italy', 'Italia': 'Italy',
+          'SE': 'Sweden', 'Sverige': 'Sweden',
+          'NO': 'Norway', 'Norge': 'Norway',
+          'DK': 'Denmark', 'Danmark': 'Denmark',
+          'FI': 'Finland', 'Suomi': 'Finland',
+          'PL': 'Poland', 'Polska': 'Poland',
+          'CZ': 'Czech Republic', 'Czech': 'Czech Republic', 'Czechia': 'Czech Republic',
+          'HU': 'Hungary',
+          'RO': 'Romania',
+          'BG': 'Bulgaria',
+          'GR': 'Greece',
+          'PT': 'Portugal',
+          'IN': 'India',
+          'CN': 'China',
+          'JP': 'Japan',
+          'KR': 'South Korea', 'Korea': 'South Korea',
+          'SG': 'Singapore',
+          'HK': 'Hong Kong',
+          'AE': 'United Arab Emirates', 'UAE': 'United Arab Emirates', 'Dubai': 'United Arab Emirates',
+          'SA': 'Saudi Arabia',
+          'IL': 'Israel',
+          'BR': 'Brazil', 'Brasil': 'Brazil',
+          'MX': 'Mexico', 'México': 'Mexico',
+          'AR': 'Argentina',
+          'CL': 'Chile',
+          'CO': 'Colombia',
+          'PE': 'Peru'
         };
         country = countryMap[country] || country;
-        break;
+
+        // Eğer geçerli bir ülke bulduysak döngüden çık
+        if (country && country.length > 1) {
+          console.log('Found country:', country, 'in section:', aliciSection ? 'ALICI' : 'other');
+          break;
+        }
       }
     }
 
@@ -907,6 +967,12 @@ function IncomeTracker() {
             onClick={() => setView('add')}
           >
             + Ekle
+          </button>
+          <button
+            className={`it-tab ${view === 'map' ? 'active' : ''}`}
+            onClick={() => setView('map')}
+          >
+            🌍 Harita
           </button>
         </div>
       </div>
@@ -1605,6 +1671,13 @@ function IncomeTracker() {
               İptal
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Map View */}
+      {view === 'map' && (
+        <div className="it-map-view">
+          <WorldMap invoices={invoices} />
         </div>
       )}
     </div>
