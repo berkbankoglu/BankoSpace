@@ -1,0 +1,319 @@
+/* World Map Styles - Matching IncomeTracker theme */
+
+.world-map-container {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  overflow-y: auto;
+  color: #e0e0e0;
+}
+
+.map-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.map-title h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #e0e0e0;
+}
+
+.current-location {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #888;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.location-dot {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.map-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-toggle-stats {
+  padding: 8px 16px;
+  border: 1px solid #333;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #2a2a2a;
+  color: #e0e0e0;
+}
+
+.btn-toggle-stats:hover {
+  background: #333;
+  border-color: #667eea;
+  transform: translateY(-1px);
+}
+
+.map-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 15px;
+  margin-bottom: 25px;
+}
+
+.stat-card {
+  background: #2a2a2a;
+  padding: 20px;
+  border-radius: 12px;
+  text-align: center;
+  border: 1px solid #333;
+}
+
+.stat-value {
+  font-size: 32px;
+  font-weight: bold;
+  color: #667eea;
+  margin-bottom: 5px;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.map-wrapper {
+  position: relative;
+  background: #2a2a2a;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 25px;
+  border: 1px solid #333;
+  min-height: 500px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.map-loading,
+.map-error {
+  text-align: center;
+  padding: 40px;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #333;
+  border-top-color: #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 20px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.map-loading p {
+  color: #888;
+  font-size: 14px;
+}
+
+.map-error {
+  color: #ef4444;
+}
+
+.map-error button {
+  margin-top: 15px;
+  padding: 10px 20px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.map-error button:hover {
+  background: #5568d3;
+}
+
+.country-tooltip {
+  position: fixed;
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  pointer-events: none;
+  z-index: 1000;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+}
+
+.countries-list {
+  margin-top: 30px;
+}
+
+.countries-list h3 {
+  font-size: 17px;
+  color: #e0e0e0;
+  margin-bottom: 15px;
+  font-weight: 600;
+}
+
+.countries-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 15px;
+}
+
+.country-card {
+  background: #2a2a2a;
+  border: 1px solid #333;
+  border-radius: 10px;
+  overflow: hidden;
+  transition: all 0.2s;
+}
+
+.country-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border-color: #667eea;
+}
+
+.country-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 15px;
+  background: #222;
+  border-bottom: 1px solid #333;
+}
+
+.country-flag {
+  font-size: 11px;
+  background: #667eea;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-weight: bold;
+}
+
+.country-name {
+  flex: 1;
+  font-weight: 500;
+  color: #e0e0e0;
+  font-size: 14px;
+}
+
+
+.country-card-body {
+  padding: 12px 15px;
+}
+
+.country-total {
+  font-size: 13px;
+  font-weight: bold;
+  color: #10b981;
+  margin-left: auto;
+}
+
+.country-clients {
+  font-size: 13px;
+}
+
+.country-clients strong {
+  display: block;
+  margin-bottom: 8px;
+  color: #e0e0e0;
+}
+
+.client-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  margin: 4px 0;
+  background: #1f1f1f;
+  border-radius: 4px;
+  gap: 8px;
+}
+
+.client-name {
+  flex: 1;
+  color: #e0e0e0;
+  font-weight: 500;
+}
+
+.client-stats {
+  font-size: 11px;
+  color: #888;
+  white-space: nowrap;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: #888;
+}
+
+.empty-state p {
+  margin: 8px 0;
+  font-size: 13px;
+}
+
+.map-instructions {
+  margin-top: 20px;
+  padding: 15px;
+  background: #2a2a2a;
+  border-radius: 8px;
+  border-left: 4px solid #667eea;
+}
+
+.map-instructions p {
+  margin: 5px 0;
+  color: #888;
+  font-size: 13px;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .map-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .map-stats {
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  }
+
+  .countries-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .map-wrapper {
+    padding: 10px;
+  }
+}
