@@ -1,10 +1,39 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense, Component } from 'react';
 import { open, ask } from '@tauri-apps/plugin-dialog';
 import { readDir, readFile } from '@tauri-apps/plugin-fs';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-import WorldMap from './WorldMap';
 import './IncomeTracker.css';
+
+// Lazy load WorldMap to prevent crashes if react-simple-maps is not installed
+const WorldMap = lazy(() => import('./WorldMap').catch(() => ({ default: () => <WorldMapFallback /> })));
+
+// Fallback component when WorldMap fails to load
+const WorldMapFallback = () => (
+  <div style={{ padding: '40px', textAlign: 'center', color: '#888' }}>
+    <p>⚠️ Harita bileşeni yüklenemedi</p>
+    <p style={{ fontSize: '12px', marginTop: '10px' }}>
+      Terminal'de: <code style={{ background: '#333', padding: '4px 8px', borderRadius: '4px' }}>npm install react-simple-maps</code>
+    </p>
+  </div>
+);
+
+// Error boundary for WorldMap
+class MapErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true };
+  }
+  render() {
+    if (this.state.hasError) {
+      return <WorldMapFallback />;
+    }
+    return this.props.children;
+  }
+}
 
 // PDF.js worker - use local bundled worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
@@ -1376,7 +1405,11 @@ function IncomeTracker() {
           {/* World Map Section */}
           <div className="it-charts">
             <div className="it-chart-card wide">
-              <WorldMap invoices={invoices} />
+              <MapErrorBoundary>
+                <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#888' }}>Harita yükleniyor...</div>}>
+                  <WorldMap invoices={invoices} />
+                </Suspense>
+              </MapErrorBoundary>
             </div>
           </div>
 
