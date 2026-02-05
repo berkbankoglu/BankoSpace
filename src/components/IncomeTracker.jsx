@@ -1,39 +1,10 @@
-import React, { useState, useEffect, lazy, Suspense, Component } from 'react';
+import React, { useState, useEffect } from 'react';
 import { open, ask } from '@tauri-apps/plugin-dialog';
 import { readDir, readFile } from '@tauri-apps/plugin-fs';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import './IncomeTracker.css';
 
-// Lazy load WorldMap to prevent crashes if react-simple-maps is not installed
-const WorldMap = lazy(() => import('./WorldMap').catch(() => ({ default: () => <WorldMapFallback /> })));
-
-// Fallback component when WorldMap fails to load
-const WorldMapFallback = () => (
-  <div style={{ padding: '40px', textAlign: 'center', color: '#888' }}>
-    <p>⚠️ Harita bileşeni yüklenemedi</p>
-    <p style={{ fontSize: '12px', marginTop: '10px' }}>
-      Terminal'de: <code style={{ background: '#333', padding: '4px 8px', borderRadius: '4px' }}>npm install react-simple-maps</code>
-    </p>
-  </div>
-);
-
-// Error boundary for WorldMap
-class MapErrorBoundary extends Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false };
-  }
-  static getDerivedStateFromError(error) {
-    return { hasError: true };
-  }
-  render() {
-    if (this.state.hasError) {
-      return <WorldMapFallback />;
-    }
-    return this.props.children;
-  }
-}
 
 // PDF.js worker - use local bundled worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
@@ -563,7 +534,7 @@ function IncomeTracker() {
   const selectFolder = async () => {
     const selected = await open({
       directory: true,
-      title: 'Fatura Klasörünü Seç'
+      title: 'Select Invoice Folder'
     });
     if (selected) {
       setBasePath(selected);
@@ -579,10 +550,10 @@ function IncomeTracker() {
 
   // Clear all data
   const clearAllData = async () => {
-    const confirmed = await ask('Tüm fatura verilerini silmek istediğinize emin misiniz?\n\nBu işlem geri alınamaz!', {
-      title: 'Verileri Sil',
+    const confirmed = await ask('Are you sure you want to delete all invoice data?\n\nThis action cannot be undone!', {
+      title: 'Delete Data',
       kind: 'warning',
-      okLabel: 'Evet, Sil',
+      okLabel: 'Yes, Delete',
       cancelLabel: 'İptal'
     });
 
@@ -636,7 +607,7 @@ function IncomeTracker() {
     if (pdfFiles.length === 0) {
       setIsScanning(false);
       setScanProgress({ phase: '', total: 0, current: 0, currentFile: '', success: [], failed: [] });
-      alert('Yeni fatura bulunamadı.\nKlasörde GIB ile başlayan PDF dosyaları olduğundan emin olun.');
+      alert('No new invoices found.\nMake sure the folder contains PDF files starting with GIB.');
       return;
     }
 
@@ -955,14 +926,14 @@ function IncomeTracker() {
       {/* Header */}
       <div className="it-header">
         <div className="it-header-left">
-          <h2>Gelir Takibi</h2>
+          <h2>Income Tracker</h2>
           <div className="it-filters">
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(e.target.value)}
               className="it-select"
             >
-              <option value="all">Tüm Yıllar</option>
+              <option value="all">All Years</option>
               {years.map(year => (
                 <option key={year} value={year}>{year}</option>
               ))}
@@ -989,13 +960,13 @@ function IncomeTracker() {
             className={`it-tab ${view === 'list' ? 'active' : ''}`}
             onClick={() => setView('list')}
           >
-            Faturalar
+            Invoices
           </button>
           <button
             className={`it-tab ${view === 'add' ? 'active' : ''}`}
             onClick={() => setView('add')}
           >
-            + Ekle
+            + Add
           </button>
         </div>
       </div>
@@ -1004,7 +975,7 @@ function IncomeTracker() {
       {isScanning && (
         <div className="it-scan-overlay">
           <div className="it-scan-modal">
-            <h3>{scanProgress.phase === 'searching' ? 'PDF Dosyaları Aranıyor...' : 'PDF Dosyaları Okunuyor...'}</h3>
+            <h3>{scanProgress.phase === 'searching' ? 'Searching PDF Files...' : 'Reading PDF Files...'}</h3>
 
             {/* Progress Bar */}
             <div className="it-progress-section">
@@ -1020,7 +991,7 @@ function IncomeTracker() {
               </div>
               <div className="it-progress-text">
                 {scanProgress.phase === 'searching'
-                  ? `${scanProgress.total} dosya bulundu`
+                  ? `${scanProgress.total} files found`
                   : `${scanProgress.current} / ${scanProgress.total}`
                 }
               </div>
@@ -1083,10 +1054,10 @@ function IncomeTracker() {
                 <span className="it-stat-value">{formatCurrency(stats.totalUSD)}</span>
                 <span className="it-stat-label">
                   {selectedYear !== 'all' && selectedMonth !== 'all'
-                    ? `${months.find(m => m.value === selectedMonth)?.label} ${selectedYear} Geliri`
+                    ? `${months.find(m => m.value === selectedMonth)?.label} ${selectedYear} Income`
                     : selectedYear !== 'all'
-                      ? `${selectedYear} Toplam Gelir`
-                      : 'Toplam Gelir (USD)'}
+                      ? `${selectedYear} Total Income`
+                      : 'Total Income (USD)'}
                 </span>
               </div>
             </div>
@@ -1099,7 +1070,7 @@ function IncomeTracker() {
                     ? `${months.find(m => m.value === selectedMonth)?.label} ${selectedYear}`
                     : selectedYear !== 'all'
                       ? `${selectedYear} Fatura`
-                      : 'Toplam Fatura'}
+                      : 'Total Invoices'}
                 </span>
               </div>
             </div>
@@ -1109,7 +1080,7 @@ function IncomeTracker() {
                 <span className="it-stat-value">
                   {invoices.filter(inv => inv.amountUSD > 0).length} / {invoices.length}
                 </span>
-                <span className="it-stat-label">Okunan / Toplam</span>
+                <span className="it-stat-label">Read / Total</span>
               </div>
             </div>
             {trend && (
@@ -1127,15 +1098,15 @@ function IncomeTracker() {
           <div className="it-charts">
             <div className="it-chart-card wide">
               <div className="it-chart-header">
-                <h3>Gelir Grafiği</h3>
+                <h3>Income Chart</h3>
                 <div className="it-chart-controls">
-                  {/* Aylık/Yıllık Seçimi */}
+                  {/* Monthly/Yıllık Seçimi */}
                   <div className="it-chart-mode-selector">
                     <button
                       className={`it-mode-btn ${chartMode === 'monthly' ? 'active' : ''}`}
                       onClick={() => setChartMode('monthly')}
                     >
-                      Aylık
+                      Monthly
                     </button>
                     <button
                       className={`it-mode-btn ${chartMode === 'yearly' ? 'active' : ''}`}
@@ -1168,7 +1139,7 @@ function IncomeTracker() {
                   let totalAmount = 0;
 
                   if (chartMode === 'monthly') {
-                    // Aylık veri
+                    // Monthly veri
                     const yearData = stats.byYear[chartYear]?.byMonth || {};
                     chartData = months.slice(1).map(m => ({
                       label: m.label.substring(0, 3),
@@ -1211,7 +1182,7 @@ function IncomeTracker() {
                         })}
                       </div>
                       <div className="it-chart-total">
-                        Toplam: {formatCurrency(totalAmount)}
+                        Total: {formatCurrency(totalAmount)}
                       </div>
                     </>
                   ) : (
@@ -1226,7 +1197,7 @@ function IncomeTracker() {
           <div className="it-charts">
             <div className="it-chart-card wide">
               <div className="it-chart-header">
-                <h3>Müşteri Bazlı Toplam Gelir</h3>
+                <h3>Total Income by Client</h3>
                 <div className="it-client-filter">
                   <select
                     value={clientFilter}
@@ -1306,7 +1277,7 @@ function IncomeTracker() {
 
             {/* By Client */}
             <div className="it-chart-card">
-              <h3>Müşteri Bazlı Gelir</h3>
+              <h3>Income by Client</h3>
               <div className="it-bar-chart">
                 {Object.entries(stats.byClient)
                   .sort((a, b) => b[1] - a[1])
@@ -1366,7 +1337,7 @@ function IncomeTracker() {
             {/* Monthly Comparison for Selected Year */}
             <div className="it-chart-card">
               <h3>
-                {selectedYear !== 'all' ? `${selectedYear} Aylık Dağılım` : 'Aylık Dağılım'}
+                {selectedYear !== 'all' ? `${selectedYear} Monthly Distribution` : 'Monthly Distribution'}
               </h3>
               <div className="it-mini-bars">
                 {(() => {
@@ -1395,21 +1366,10 @@ function IncomeTracker() {
                       })}
                     </div>
                   ) : (
-                    <div className="it-empty">Yıl seçin</div>
+                    <div className="it-empty">Select year</div>
                   );
                 })()}
               </div>
-            </div>
-          </div>
-
-          {/* World Map Section */}
-          <div className="it-charts">
-            <div className="it-chart-card wide">
-              <MapErrorBoundary>
-                <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#888' }}>Harita yükleniyor...</div>}>
-                  <WorldMap invoices={invoices} />
-                </Suspense>
-              </MapErrorBoundary>
             </div>
           </div>
 
@@ -1418,9 +1378,9 @@ function IncomeTracker() {
             <button
               className="it-action-btn primary"
               onClick={selectFolder}
-              title="Fatura klasörünü seç"
+              title="Select invoice folder"
             >
-              📁 {basePath ? 'Klasör Değiştir' : 'Klasör Seç'}
+              📁 {basePath ? 'Change Folder' : 'Select Folder'}
             </button>
             {basePath && (
               <>
@@ -1428,16 +1388,16 @@ function IncomeTracker() {
                   className="it-action-btn"
                   onClick={scanFolder}
                   disabled={isScanning}
-                  title="Faturaları tara"
+                  title="Scan invoices"
                 >
-                  🔄 {isScanning ? 'Taranıyor...' : 'Yenile'}
+                  🔄 {isScanning ? 'Scanning...' : 'Refresh'}
                 </button>
                 <button
                   className="it-action-btn danger"
                   onClick={clearPath}
-                  title="Klasör bağlantısını kaldır"
+                  title="Remove folder link"
                 >
-                  ✕ Klasörü Kaldır
+                  ✕ Remove Folder
                 </button>
               </>
             )}
@@ -1445,15 +1405,15 @@ function IncomeTracker() {
               <button
                 className="it-action-btn danger"
                 onClick={clearAllData}
-                title="Tüm verileri sil"
+                title="Delete all data"
               >
-                🗑️ Tüm Verileri Sil
+                🗑️ Delete All Data
               </button>
             )}
           </div>
           {basePath && (
             <div className="it-path-info">
-              <span className="it-path-label">Seçili Klasör:</span>
+              <span className="it-path-label">Selected Folder:</span>
               <span className="it-path">{basePath}</span>
             </div>
           )}
@@ -1480,7 +1440,7 @@ function IncomeTracker() {
             </select>
           </div>
 
-          {/* Okunan Faturalar */}
+          {/* Read Invoices */}
           {(() => {
             // Sıralama fonksiyonu
             const sortInvoices = (invList) => {
@@ -1553,7 +1513,7 @@ function IncomeTracker() {
                       <button
                         className="it-delete-btn"
                         onClick={() => deleteInvoice(invoice.id)}
-                        title="Sil"
+                        title="Delete"
                       >
                         ×
                       </button>
@@ -1565,7 +1525,7 @@ function IncomeTracker() {
 
             return (
               <>
-                {/* Okunan Faturalar */}
+                {/* Read Invoices */}
                 {readInvoices.length > 0 && (
                   <div className={`it-list-section ${collapsedSections.read ? 'collapsed' : ''}`}>
                     <div
@@ -1574,7 +1534,7 @@ function IncomeTracker() {
                     >
                       <span className={`it-section-arrow ${collapsedSections.read ? 'collapsed' : ''}`}>▼</span>
                       <span className="it-section-icon">✓</span>
-                      <span>Okunan Faturalar ({readInvoices.length})</span>
+                      <span>Read Invoices ({readInvoices.length})</span>
                       <span className="it-section-total">{formatCurrency(readInvoices.reduce((sum, inv) => sum + inv.amountUSD, 0))}</span>
                     </div>
                     {!collapsedSections.read && (
@@ -1594,7 +1554,7 @@ function IncomeTracker() {
                   </div>
                 )}
 
-                {/* Okunamayan Faturalar */}
+                {/* Unread Invoices */}
                 {unreadInvoices.length > 0 && (
                   <div className={`it-list-section ${collapsedSections.unread ? 'collapsed' : ''}`}>
                     <div
@@ -1603,7 +1563,7 @@ function IncomeTracker() {
                     >
                       <span className={`it-section-arrow ${collapsedSections.unread ? 'collapsed' : ''}`}>▼</span>
                       <span className="it-section-icon">!</span>
-                      <span>Okunamayan Faturalar ({unreadInvoices.length})</span>
+                      <span>Unread Invoices ({unreadInvoices.length})</span>
                       <span className="it-section-hint">Düzenlemek için kalem ikonuna tıklayın</span>
                     </div>
                     {!collapsedSections.unread && (
@@ -1625,9 +1585,9 @@ function IncomeTracker() {
 
                 {filteredInvoices.length === 0 && (
                   <div className="it-empty-list">
-                    <p>Henüz fatura yok</p>
+                    <p>No invoices yet</p>
                     <button onClick={() => setView('add')}>Manuel Ekle</button>
-                    <button onClick={scanFolder}>Klasörden Tara</button>
+                    <button onClick={scanFolder}>Scan from Folder</button>
                   </div>
                 )}
               </>
@@ -1639,7 +1599,7 @@ function IncomeTracker() {
       {/* Add View */}
       {view === 'add' && (
         <div className="it-add-form">
-          <h3>Manuel Fatura Ekle</h3>
+          <h3>Add Manual Invoice</h3>
           <div className="it-form-grid">
             <div className="it-form-group">
               <label>Tarih</label>
@@ -1650,7 +1610,7 @@ function IncomeTracker() {
               />
             </div>
             <div className="it-form-group">
-              <label>Fatura No (opsiyonel)</label>
+              <label>Invoice No (optional)</label>
               <input
                 type="text"
                 placeholder="GIB2025..."

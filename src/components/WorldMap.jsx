@@ -1,17 +1,11 @@
 import { useState, useEffect } from 'react';
+import {
+  ComposableMap,
+  Geographies,
+  Geography,
+  ZoomableGroup
+} from 'react-simple-maps';
 import './WorldMap.css';
-
-// Lazy load react-simple-maps to prevent crashes
-let ComposableMap, Geographies, Geography, ZoomableGroup;
-try {
-  const rsm = require('react-simple-maps');
-  ComposableMap = rsm.ComposableMap;
-  Geographies = rsm.Geographies;
-  Geography = rsm.Geography;
-  ZoomableGroup = rsm.ZoomableGroup;
-} catch (e) {
-  console.error('react-simple-maps not available:', e);
-}
 
 const geoUrl = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
 
@@ -228,43 +222,6 @@ function WorldMap({ invoices = [] }) {
   const workedCount = workedCountriesList.length;
   const percentage = ((workedCount / totalCountries) * 100).toFixed(1);
 
-  // If react-simple-maps is not available, show fallback
-  if (!ComposableMap || !Geographies || !Geography || !ZoomableGroup) {
-    return (
-      <div className="world-map-container">
-        <div className="map-header">
-          <div className="map-title">
-            <h2>🌍 Çalıştığım Ülkeler</h2>
-          </div>
-        </div>
-        <div className="map-error" style={{ padding: '40px', textAlign: 'center' }}>
-          <p>⚠️ Harita bileşeni yüklenemedi</p>
-          <p style={{ fontSize: '12px', color: '#888', marginTop: '10px' }}>
-            Terminal'de şu komutu çalıştırın: <code>npm install react-simple-maps</code>
-          </p>
-        </div>
-        {workedCountriesList.length > 0 && (
-          <div className="countries-list">
-            <h3>Çalıştığım Ülkeler ({workedCount})</h3>
-            <div className="countries-grid">
-              {workedCountriesList.map(({ code, name, clients = [] }) => {
-                const totalAmount = clients.reduce((sum, c) => sum + c.amount, 0);
-                return (
-                  <div key={code} className="country-card">
-                    <div className="country-card-header">
-                      <span className="country-name">{name}</span>
-                      <span className="country-total">${totalAmount.toFixed(2)}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
-
   return (
     <div className="world-map-container">
       <div className="map-header">
@@ -454,23 +411,6 @@ function WorldMap({ invoices = [] }) {
         </div>
       )}
 
-      <div className="map-instructions">
-        <p>💡 Ülkeler otomatik olarak yüklediğiniz faturalardan algılanır</p>
-        <p>📊 Haritadaki ülkelere tıklayarak müşteri detaylarını görebilirsiniz</p>
-      </div>
-
-      {/* Debug Info */}
-      <div style={{ marginTop: '20px', padding: '15px', background: '#1a1a1a', borderRadius: '8px', fontSize: '12px', fontFamily: 'monospace' }}>
-        <div style={{ color: '#888', marginBottom: '10px' }}>🐛 Debug Bilgisi:</div>
-        <div style={{ color: '#e0e0e0' }}>Toplam Fatura: {invoices?.length || 0}</div>
-        <div style={{ color: '#e0e0e0' }}>Haritada Gösterilen Ülke: {workedCount}</div>
-        <div style={{ color: '#888', marginTop: '8px' }}>
-          Unique Ülkeler: {[...new Set(invoices?.map(i => i.country).filter(c => c && c !== '-'))].join(', ') || 'Yok'}
-        </div>
-        <div style={{ color: '#e0e0e0', marginTop: '8px' }}>
-          Eşleşen: {Object.values(workedCountries).map(c => c.name).join(', ') || 'Yok'}
-        </div>
-      </div>
     </div>
   );
 }
