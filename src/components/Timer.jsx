@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
+import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 
-function Timer() {
+function Timer({ isPopup = false }) {
   const [timeLeft, setTimeLeft] = useState(0);
   const [initialTime, setInitialTime] = useState(25 * 60); // 25 dakika pomodoro varsayılan
   const [isRunning, setIsRunning] = useState(false);
@@ -160,6 +161,72 @@ function Timer() {
   // Preset times in minutes
   const presets = [5, 15, 25, 45, 60];
 
+  // Open timer in popup window
+  const openPopup = async () => {
+    try {
+      // Save current timer state to localStorage for popup to read
+      localStorage.setItem('timerPopupState', JSON.stringify({
+        timeLeft,
+        initialTime,
+        isRunning,
+        hasTimerRun
+      }));
+
+      const webview = new WebviewWindow('timer-popup', {
+        url: 'index.html?popup=timer',
+        title: 'Timer',
+        width: 320,
+        height: 420,
+        resizable: false,
+        alwaysOnTop: true,
+        decorations: false,
+        center: true,
+        transparent: false,
+        focus: true,
+      });
+
+      webview.once('tauri://created', () => {
+        console.log('Timer popup created');
+      });
+
+      webview.once('tauri://error', (e) => {
+        console.error('Timer popup error:', e);
+      });
+    } catch (err) {
+      console.error('Failed to open popup:', err);
+    }
+  };
+
+  // Initialize popup state from localStorage
+  useEffect(() => {
+    if (isPopup) {
+      const savedState = localStorage.getItem('timerPopupState');
+      if (savedState) {
+        try {
+          const state = JSON.parse(savedState);
+          setTimeLeft(state.timeLeft || 0);
+          setInitialTime(state.initialTime || 25 * 60);
+          setIsRunning(state.isRunning || false);
+          setHasTimerRun(state.hasTimerRun || false);
+        } catch (e) {
+          console.error('Failed to parse timer state:', e);
+        }
+      }
+    }
+  }, [isPopup]);
+
+  // Sync timer state to localStorage for popup
+  useEffect(() => {
+    if (isPopup) {
+      localStorage.setItem('timerPopupState', JSON.stringify({
+        timeLeft,
+        initialTime,
+        isRunning,
+        hasTimerRun
+      }));
+    }
+  }, [isPopup, timeLeft, initialTime, isRunning, hasTimerRun]);
+
   const setPresetTime = (minutes) => {
     const totalSeconds = minutes * 60;
     setInitialTime(totalSeconds);
@@ -170,7 +237,7 @@ function Timer() {
   };
 
   return (
-    <div className="timer-large">
+    <div className={`timer-large ${isPopup ? 'popup-mode' : ''}`}>
       {isSettingTime ? (
         <div className="timer-setting-panel">
           <div className="timer-input-group">
@@ -207,36 +274,69 @@ function Timer() {
       ) : (
         <>
           <div className={`timer-circle ${isAlarming ? 'alarming' : ''} ${isRunning ? 'running' : ''}`}>
-            <svg className="timer-progress-ring" width="200" height="200">
-              <circle
-                className="timer-progress-ring-circle-bg"
-                stroke="#2a2a2a"
-                strokeWidth="8"
-                fill="transparent"
-                r="90"
-                cx="100"
-                cy="100"
-              />
-              <circle
-                className="timer-progress-ring-circle"
-                stroke="url(#gradient)"
-                strokeWidth="8"
-                fill="transparent"
-                r="90"
-                cx="100"
-                cy="100"
-                style={{
-                  strokeDasharray: `${2 * Math.PI * 90}`,
-                  strokeDashoffset: `${2 * Math.PI * 90 * (1 - (progress / 100))}`,
-                }}
-              />
-              <defs>
-                <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#667eea" />
-                  <stop offset="100%" stopColor="#764ba2" />
-                </linearGradient>
-              </defs>
-            </svg>
+            {isPopup ? (
+              <svg className="timer-progress-ring" width="160" height="160" viewBox="0 0 160 160">
+                <circle
+                  className="timer-progress-ring-circle-bg"
+                  stroke="#2a2a2a"
+                  strokeWidth="7"
+                  fill="transparent"
+                  r="72"
+                  cx="80"
+                  cy="80"
+                />
+                <circle
+                  className="timer-progress-ring-circle"
+                  stroke="url(#gradient-popup)"
+                  strokeWidth="7"
+                  fill="transparent"
+                  r="72"
+                  cx="80"
+                  cy="80"
+                  style={{
+                    strokeDasharray: `${2 * Math.PI * 72}`,
+                    strokeDashoffset: `${2 * Math.PI * 72 * (1 - (progress / 100))}`,
+                  }}
+                />
+                <defs>
+                  <linearGradient id="gradient-popup" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#667eea" />
+                    <stop offset="100%" stopColor="#764ba2" />
+                  </linearGradient>
+                </defs>
+              </svg>
+            ) : (
+              <svg className="timer-progress-ring" width="200" height="200">
+                <circle
+                  className="timer-progress-ring-circle-bg"
+                  stroke="#2a2a2a"
+                  strokeWidth="8"
+                  fill="transparent"
+                  r="90"
+                  cx="100"
+                  cy="100"
+                />
+                <circle
+                  className="timer-progress-ring-circle"
+                  stroke="url(#gradient)"
+                  strokeWidth="8"
+                  fill="transparent"
+                  r="90"
+                  cx="100"
+                  cy="100"
+                  style={{
+                    strokeDasharray: `${2 * Math.PI * 90}`,
+                    strokeDashoffset: `${2 * Math.PI * 90 * (1 - (progress / 100))}`,
+                  }}
+                />
+                <defs>
+                  <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#667eea" />
+                    <stop offset="100%" stopColor="#764ba2" />
+                  </linearGradient>
+                </defs>
+              </svg>
+            )}
             <div className="timer-display-large" onClick={() => !isRunning && setIsSettingTime(true)}>
               {formatTime(displayTime)}
             </div>
@@ -286,6 +386,15 @@ function Timer() {
               </button>
             ))}
           </div>
+
+          {/* Popup button - only show in main window */}
+          {!isPopup && (
+            <div className="timer-popup-controls">
+              <button className="timer-popup-btn" onClick={openPopup} title="Open as popup">
+                ⬈ Popup
+              </button>
+            </div>
+          )}
         </>
       )}
     </div>

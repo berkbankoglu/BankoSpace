@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import './DailyChecklist.css';
 
-function DailyChecklist({ storageKey = 'dailyChecklist' }) {
+function DailyChecklist({ storageKey = 'dailyChecklist', title, onTitleChange }) {
   const [items, setItems] = useState(() => {
     const saved = localStorage.getItem(`${storageKey}Items`);
     return saved ? JSON.parse(saved) : [];
@@ -12,10 +12,33 @@ function DailyChecklist({ storageKey = 'dailyChecklist' }) {
     return saved || new Date().toDateString();
   });
 
+  const [color, setColor] = useState(() => {
+    const saved = localStorage.getItem(`${storageKey}Color`);
+    return saved || '#667eea';
+  });
+
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleValue, setTitleValue] = useState(title || 'Checklist');
   const [newItemText, setNewItemText] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editingText, setEditingText] = useState('');
   const inputRef = useRef(null);
+
+  const colors = [
+    '#667eea', '#f093fb', '#4ade80', '#60a5fa',
+    '#fb923c', '#f87171', '#58a6ff', '#9ca3af'
+  ];
+
+  // Save color to localStorage
+  useEffect(() => {
+    localStorage.setItem(`${storageKey}Color`, color);
+  }, [color, storageKey]);
+
+  // Update title value when prop changes
+  useEffect(() => {
+    setTitleValue(title || 'Checklist');
+  }, [title]);
 
   // Check if we need to reset for a new day (only for daily checklist)
   useEffect(() => {
@@ -79,85 +102,150 @@ function DailyChecklist({ storageKey = 'dailyChecklist' }) {
   const totalCount = items.length;
   const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
+  const handleTitleSave = () => {
+    setEditingTitle(false);
+    if (onTitleChange && titleValue.trim()) {
+      onTitleChange(titleValue.trim());
+    }
+  };
+
   return (
-    <div className="checklist-wrapper">
+    <div className="checklist-wrapper" style={{ '--checklist-color': color }}>
+      {/* Header with color and title */}
+      <div className="checklist-header">
+        <div className="checklist-header-left">
+          <div
+            className="checklist-color-dot"
+            style={{ background: color }}
+            onClick={() => setShowColorPicker(!showColorPicker)}
+          />
+          {editingTitle ? (
+            <input
+              type="text"
+              className="checklist-title-input"
+              value={titleValue}
+              onChange={(e) => setTitleValue(e.target.value)}
+              onBlur={handleTitleSave}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleTitleSave();
+                if (e.key === 'Escape') {
+                  setTitleValue(title || 'Checklist');
+                  setEditingTitle(false);
+                }
+              }}
+              autoFocus
+            />
+          ) : (
+            <h3
+              className="checklist-title"
+              onDoubleClick={() => setEditingTitle(true)}
+            >
+              {titleValue}
+            </h3>
+          )}
+        </div>
+        {totalCount > 0 && (
+          <span className="checklist-count">{completedCount}/{totalCount}</span>
+        )}
+      </div>
+
+      {/* Color Picker */}
+      {showColorPicker && (
+        <div className="checklist-color-picker">
+          {colors.map(c => (
+            <div
+              key={c}
+              className={`checklist-color-swatch ${color === c ? 'selected' : ''}`}
+              style={{ background: c }}
+              onClick={() => {
+                setColor(c);
+                setShowColorPicker(false);
+              }}
+            />
+          ))}
+        </div>
+      )}
+
       {/* Progress Bar */}
       {totalCount > 0 && (
         <div className="checklist-progress">
           <div className="checklist-progress-bar">
             <div
               className="checklist-progress-fill"
-              style={{ width: `${progress}%` }}
+              style={{ width: `${progress}%`, background: color }}
             />
           </div>
-          <span className="checklist-progress-text">
-            {completedCount}/{totalCount} completed
-          </span>
         </div>
       )}
 
-      {/* Items List */}
+      {/* Items List or Empty State */}
       <div className="checklist-items">
-        {items.map(item => (
-          <div
-            key={item.id}
-            className={`checklist-item ${item.completed ? 'completed' : ''}`}
-          >
-            {editingId === item.id ? (
-              <div className="checklist-edit-row">
-                <input
-                  type="text"
-                  className="checklist-edit-input"
-                  value={editingText}
-                  onChange={(e) => setEditingText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') saveEdit(item.id);
-                    if (e.key === 'Escape') {
-                      setEditingId(null);
-                      setEditingText('');
-                    }
-                  }}
-                  autoFocus
-                />
-                <button className="checklist-save-btn" onClick={() => saveEdit(item.id)}>
-                  ✓
-                </button>
-              </div>
-            ) : (
-              <>
-                <label className="checklist-label">
+        {items.length === 0 ? (
+          <div className="checklist-empty">
+            <span>No tasks yet. Add your first task below!</span>
+          </div>
+        ) : (
+          items.map(item => (
+            <div
+              key={item.id}
+              className={`checklist-item ${item.completed ? 'completed' : ''}`}
+            >
+              {editingId === item.id ? (
+                <div className="checklist-edit-row">
                   <input
-                    type="checkbox"
-                    className="checklist-checkbox"
-                    checked={item.completed}
-                    onChange={() => toggleItem(item.id)}
+                    type="text"
+                    className="checklist-edit-input"
+                    value={editingText}
+                    onChange={(e) => setEditingText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') saveEdit(item.id);
+                      if (e.key === 'Escape') {
+                        setEditingId(null);
+                        setEditingText('');
+                      }
+                    }}
+                    autoFocus
                   />
-                  <span className="checklist-checkmark"></span>
-                  <span className="checklist-text">{item.text}</span>
-                </label>
-                <div className="checklist-actions">
-                  <button
-                    className="checklist-action-btn edit"
-                    onClick={() => startEditing(item)}
-                    title="Edit"
-                  >
-                    ✎
-                  </button>
-                  <button
-                    className="checklist-action-btn delete"
-                    onClick={() => deleteItem(item.id)}
-                    title="Delete"
-                  >
-                    ×
+                  <button className="checklist-save-btn" onClick={() => saveEdit(item.id)}>
+                    ✓
                   </button>
                 </div>
-              </>
-            )}
-          </div>
-        ))}
+              ) : (
+                <>
+                  <label className="checklist-label">
+                    <input
+                      type="checkbox"
+                      className="checklist-checkbox"
+                      checked={item.completed}
+                      onChange={() => toggleItem(item.id)}
+                    />
+                    <span className="checklist-checkmark"></span>
+                    <span className="checklist-text">{item.text}</span>
+                  </label>
+                  <div className="checklist-actions">
+                    <button
+                      className="checklist-action-btn edit"
+                      onClick={() => startEditing(item)}
+                      title="Edit"
+                    >
+                      ✎
+                    </button>
+                    <button
+                      className="checklist-action-btn delete"
+                      onClick={() => deleteItem(item.id)}
+                      title="Delete"
+                    >
+                      ×
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          ))
+        )}
       </div>
 
-      {/* Add New Item - Always visible */}
+      {/* Add New Item - Always at bottom */}
       <div className="checklist-add-row">
         <input
           ref={inputRef}
@@ -174,13 +262,6 @@ function DailyChecklist({ storageKey = 'dailyChecklist' }) {
           }}
         />
       </div>
-
-      {/* Empty State */}
-      {items.length === 0 && (
-        <div className="checklist-empty">
-          <span>No tasks yet. Add your first task above!</span>
-        </div>
-      )}
     </div>
   );
 }

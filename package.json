@@ -30,6 +30,7 @@
     "@tauri-apps/plugin-updater": "^2.9.0",
     "pdfjs-dist": "^5.4.530",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "react-simple-maps": "^3.0.0"
   }
 }
