@@ -697,14 +697,14 @@ function App() {
   const maximizeWindow = async () => {
     try {
       const window = getCurrentWindow();
-      const isMaximized = await window.isMaximized();
-      if (isMaximized) {
-        await window.unmaximize();
+      const isFullscreen = await window.isFullscreen();
+      if (isFullscreen) {
+        await window.setFullscreen(false);
       } else {
-        await window.maximize();
+        await window.setFullscreen(true);
       }
     } catch (err) {
-      console.error('Failed to maximize:', err);
+      console.error('Failed to toggle fullscreen:', err);
     }
   };
 
@@ -719,8 +719,15 @@ function App() {
   return (
     <div className="container">
       {/* Custom Title Bar */}
-      <div className="custom-titlebar" data-tauri-drag-region>
-        <div className="titlebar-title" data-tauri-drag-region>BankoSpace</div>
+      <div
+        className="custom-titlebar"
+        onDoubleClick={(e) => {
+          if (e.target.closest('.titlebar-controls') === null) {
+            maximizeWindow();
+          }
+        }}
+      >
+        <div className="titlebar-title" onClick={() => setShowSettings(true)}>BankoSpace</div>
         <div className="titlebar-controls">
           <button className="titlebar-btn minimize" onClick={minimizeWindow}>─</button>
           <button className="titlebar-btn maximize" onClick={maximizeWindow}>□</button>
