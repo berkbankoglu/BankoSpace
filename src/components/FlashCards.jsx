@@ -1,20 +1,26 @@
 import { useState, useEffect, useRef } from 'react';
 import './FlashCards.css';
 
+const DECK_COLORS = [
+  '#58a6ff', '#7ee787', '#f85149', '#d29922', '#bc8cff',
+  '#ff7b72', '#79c0ff', '#ffa657', '#f778ba', '#3fb950'
+];
+
 function FlashCards({ fullscreen = false }) {
   const [cards, setCards] = useState([]);
-  const [decks, setDecks] = useState([]);
+  const [decks, setDecks] = useState([]); // Array of {name, color}
   const [selectedDeck, setSelectedDeck] = useState(null);
-  const [mode, setMode] = useState('decks'); // 'decks', 'cards', 'study', 'add'
+  const [activeView, setActiveView] = useState('decks'); // 'decks', 'cards', 'study', 'results'
+  const [editingCard, setEditingCard] = useState(null);
+  const [editingDeckName, setEditingDeckName] = useState(null);
+  const [editingDeckTitle, setEditingDeckTitle] = useState('');
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
-  const [newFront, setNewFront] = useState('');
-  const [newBack, setNewBack] = useState('');
-  const [editingDeckId, setEditingDeckId] = useState(null);
-  const [editingDeckName, setEditingDeckName] = useState('');
   const [studyStats, setStudyStats] = useState({ known: 0, unknown: 0 });
   const [shuffledCards, setShuffledCards] = useState([]);
-  const frontInputRef = useRef(null);
+  const [newDeckName, setNewDeckName] = useState('');
+  const [showNewDeckInput, setShowNewDeckInput] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(null);
 
   // Load data
   useEffect(() => {
@@ -31,7 +37,16 @@ function FlashCards({ fullscreen = false }) {
     }
 
     if (savedDecks) {
-      setDecks(JSON.parse(savedDecks));
+      const loaded = JSON.parse(savedDecks);
+      // Migrate old format (string array) to new format (object array)
+      if (loaded.length > 0 && typeof loaded[0] === 'string') {
+        setDecks(loaded.map((name, idx) => ({
+          name,
+          color: DECK_COLORS[idx % DECK_COLORS.length]
+        })));
+      } else {
+        setDecks(loaded);
+      }
     }
   }, []);
 
@@ -44,9 +59,9 @@ function FlashCards({ fullscreen = false }) {
     localStorage.setItem('flashCardGroups', JSON.stringify(decks));
   }, [decks]);
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts for study mode
   useEffect(() => {
-    if (mode !== 'study') return;
+    if (activeView !== 'study') return;
 
     const handleKeyPress = (e) => {
       if (e.code === 'Space') {
@@ -66,94 +81,132 @@ function FlashCards({ fullscreen = false }) {
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [mode, currentCardIndex, shuffledCards]);
+  }, [activeView, currentCardIndex, shuffledCards]);
 
-  // Get all unique decks
+  // Helper functions
   const getAllDecks = () => {
-    const deckNames = [...new Set([...decks, ...cards.map(c => c.group)])];
-    return deckNames.filter(Boolean).sort();
+    return decks;
   };
 
-  // Get cards for selected deck
-  const getDeckCards = () => cards.filter(c => c.group === selectedDeck);
+  const getDeckByName = (name) => {
+    return decks.find(d => d.name === name);
+  };
 
-  // Create new deck
+  const getDeckCards = (deckName = selectedDeck) =>
+    cards.filter(c => c.group === deckName);
+
+  const getDeckStats = (deckName) => {
+    const deckCards = getDeckCards(deckName);
+    const total = deckCards.length;
+    const known = deckCards.filter(c => c.known === true).length;
+    const unknown = deckCards.filter(c => c.known === false).length;
+    const fresh = total - known - unknown;
+    return { total, known, unknown, fresh };
+  };
+
+  // Deck operations
   const createDeck = () => {
-    let num = 1;
-    let name = `Deck ${num}`;
-    const existing = getAllDecks();
-    while (existing.includes(name)) {
-      num++;
-      name = `Deck ${num}`;
+    if (!newDeckName.trim()) return;
+
+    const existing = decks.map(d => d.name);
+    if (existing.includes(newDeckName.trim())) {
+      alert('A deck with this name already exists');
+      return;
     }
-    setDecks([...decks, name]);
-    setSelectedDeck(name);
-    setMode('cards');
+
+    const newDeck = {
+      name: newDeckName.trim(),
+      color: DECK_COLORS[decks.length % DECK_COLORS.length]
+    };
+    setDecks([...decks, newDeck]);
+    setSelectedDeck(newDeckName.trim());
+    setNewDeckName('');
+    setShowNewDeckInput(false);
+    setActiveView('cards');
   };
 
-  // Delete deck
-  const deleteDeck = (deckName, e) => {
-    e.stopPropagation();
-    const cardCount = cards.filter(c => c.group === deckName).length;
-    if (window.confirm(`Delete "${deckName}" and its ${cardCount} cards?`)) {
-      setCards(cards.filter(c => c.group !== deckName));
-      setDecks(decks.filter(d => d !== deckName));
-      if (selectedDeck === deckName) {
-        setSelectedDeck(null);
-        setMode('decks');
-      }
+  const deleteDeck = (deckName) => {
+    const cardCount = getDeckCards(deckName).length;
+    if (!window.confirm(`Delete "${deckName}" and its ${cardCount} cards?`)) return;
+
+    setCards(cards.filter(c => c.group !== deckName));
+    setDecks(decks.filter(d => d.name !== deckName));
+    if (selectedDeck === deckName) {
+      setSelectedDeck(null);
+      setActiveView('decks');
     }
   };
 
-  // Rename deck
   const renameDeck = (oldName, newName) => {
-    if (newName && newName.trim() && newName !== oldName && !getAllDecks().includes(newName.trim())) {
-      setCards(cards.map(c => c.group === oldName ? { ...c, group: newName.trim() } : c));
-      setDecks(decks.map(d => d === oldName ? newName.trim() : d));
-      if (selectedDeck === oldName) setSelectedDeck(newName.trim());
+    if (!newName || !newName.trim() || newName === oldName) return;
+    const existing = decks.map(d => d.name);
+    if (existing.includes(newName.trim())) {
+      alert('A deck with this name already exists');
+      return;
     }
-    setEditingDeckId(null);
-    setEditingDeckName('');
+
+    setCards(cards.map(c => c.group === oldName ? { ...c, group: newName.trim() } : c));
+    setDecks(decks.map(d => d.name === oldName ? { ...d, name: newName.trim() } : d));
+    if (selectedDeck === oldName) setSelectedDeck(newName.trim());
+    setEditingDeckName(null);
+    setEditingDeckTitle('');
   };
 
-  // Add card
-  const addCard = () => {
-    if (newFront.trim() && newBack.trim()) {
-      const card = {
-        id: Date.now(),
-        front: newFront.trim(),
-        back: newBack.trim(),
-        group: selectedDeck,
-        known: null,
-        createdAt: Date.now()
-      };
-      setCards([...cards, card]);
-      setNewFront('');
-      setNewBack('');
-      frontInputRef.current?.focus();
-    }
+  const updateDeckColor = (deckName, color) => {
+    setDecks(decks.map(d => d.name === deckName ? { ...d, color } : d));
+    setShowColorPicker(null);
   };
 
-  // Delete card
+  const resetDeckProgress = () => {
+    if (!window.confirm('Reset all progress for this deck?')) return;
+    setCards(cards.map(c => c.group === selectedDeck ? { ...c, known: null } : c));
+  };
+
+  // Card operations
+  const addCard = (front, back) => {
+    if (!front.trim() || !back.trim()) return;
+
+    const card = {
+      id: Date.now(),
+      front: front.trim(),
+      back: back.trim(),
+      group: selectedDeck,
+      known: null,
+      createdAt: Date.now()
+    };
+    setCards([...cards, card]);
+    setEditingCard(null);
+  };
+
+  const updateCard = (cardId, front, back) => {
+    if (!front.trim() || !back.trim()) return;
+
+    setCards(cards.map(c =>
+      c.id === cardId
+        ? { ...c, front: front.trim(), back: back.trim() }
+        : c
+    ));
+    setEditingCard(null);
+  };
+
   const deleteCard = (id) => {
+    if (!window.confirm('Delete this card?')) return;
     setCards(cards.filter(c => c.id !== id));
   };
 
-  // Start study
+  // Study operations
   const startStudy = () => {
     const deckCards = getDeckCards();
     if (deckCards.length === 0) return;
 
-    // Shuffle cards
     const shuffled = [...deckCards].sort(() => Math.random() - 0.5);
     setShuffledCards(shuffled);
     setCurrentCardIndex(0);
     setIsFlipped(false);
     setStudyStats({ known: 0, unknown: 0 });
-    setMode('study');
+    setActiveView('study');
   };
 
-  // Handle known/unknown
   const handleKnown = () => {
     if (currentCardIndex >= shuffledCards.length) return;
 
@@ -177,307 +230,356 @@ function FlashCards({ fullscreen = false }) {
       setCurrentCardIndex(prev => prev + 1);
       setIsFlipped(false);
     } else {
-      setMode('results');
+      setActiveView('results');
     }
   };
 
   const endStudy = () => {
-    setMode('cards');
+    setActiveView('cards');
     setShuffledCards([]);
     setCurrentCardIndex(0);
   };
 
-  // Reset deck progress
-  const resetDeckProgress = () => {
-    setCards(cards.map(c => c.group === selectedDeck ? { ...c, known: null } : c));
-  };
-
   const currentCard = shuffledCards[currentCardIndex];
   const deckCards = getDeckCards();
-  const knownCount = deckCards.filter(c => c.known === true).length;
-  const unknownCount = deckCards.filter(c => c.known === false).length;
+  const stats = selectedDeck ? getDeckStats(selectedDeck) : null;
 
   return (
     <div className={`fc-wrapper ${fullscreen ? 'fullscreen' : ''}`}>
-      {/* Decks View */}
-      {mode === 'decks' && (
-        <div className="fc-decks-view">
-          <div className="fc-decks-header">
-            <h2>Flash Card Decks</h2>
-            <button className="fc-create-deck-btn" onClick={createDeck}>
-              + New Deck
-            </button>
-          </div>
-
-          <div className="fc-decks-grid">
-            {getAllDecks().map(deckName => {
-              const deckCardCount = cards.filter(c => c.group === deckName).length;
-              const deckKnown = cards.filter(c => c.group === deckName && c.known === true).length;
-              const progress = deckCardCount > 0 ? Math.round((deckKnown / deckCardCount) * 100) : 0;
-
-              return (
-                <div
-                  key={deckName}
-                  className="fc-deck-card"
-                  onClick={() => {
-                    setSelectedDeck(deckName);
-                    setMode('cards');
-                  }}
-                >
-                  {editingDeckId === deckName ? (
-                    <input
-                      type="text"
-                      value={editingDeckName}
-                      onChange={(e) => setEditingDeckName(e.target.value)}
-                      onBlur={() => renameDeck(deckName, editingDeckName)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') renameDeck(deckName, editingDeckName);
-                        if (e.key === 'Escape') { setEditingDeckId(null); setEditingDeckName(''); }
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      autoFocus
-                      className="fc-deck-name-input"
-                    />
-                  ) : (
-                    <h3
-                      className="fc-deck-name"
-                      onDoubleClick={(e) => {
-                        e.stopPropagation();
-                        setEditingDeckId(deckName);
-                        setEditingDeckName(deckName);
-                      }}
-                    >
-                      {deckName}
-                    </h3>
-                  )}
-
-                  <div className="fc-deck-stats">
-                    <span className="fc-deck-count">{deckCardCount} cards</span>
-                    {deckCardCount > 0 && (
-                      <div className="fc-deck-progress">
-                        <div className="fc-progress-bar">
-                          <div className="fc-progress-fill" style={{ width: `${progress}%` }} />
-                        </div>
-                        <span className="fc-progress-text">{progress}% mastered</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <button
-                    className="fc-deck-delete"
-                    onClick={(e) => deleteDeck(deckName, e)}
-                    title="Delete deck"
-                  >
-                    ×
-                  </button>
-                </div>
-              );
-            })}
-
-            {getAllDecks().length === 0 && (
-              <div className="fc-empty-state">
-                <span className="fc-empty-icon">📚</span>
-                <p>No decks yet</p>
-                <p className="fc-empty-hint">Create your first deck to start learning!</p>
-              </div>
-            )}
-          </div>
+      {/* Left Sidebar Menu */}
+      <div className="fc-sidebar">
+        <div className="fc-sidebar-header">
+          <h2>Flash Cards</h2>
         </div>
-      )}
 
-      {/* Cards View */}
-      {mode === 'cards' && selectedDeck && (
-        <div className="fc-cards-view">
-          <div className="fc-cards-header">
-            <button className="fc-back-btn" onClick={() => setMode('decks')}>
-              ← Back
-            </button>
-            <h2>{selectedDeck}</h2>
-            <div className="fc-cards-actions">
-              {deckCards.length > 0 && (
-                <>
-                  <button className="fc-reset-btn" onClick={resetDeckProgress} title="Reset progress">
-                    ↺
-                  </button>
-                  <button className="fc-study-btn" onClick={startStudy}>
-                    Study ({deckCards.length})
-                  </button>
-                </>
-              )}
-              <button className="fc-add-card-btn" onClick={() => setMode('add')}>
-                + Add Card
-              </button>
-            </div>
-          </div>
-
-          <div className="fc-deck-overview">
-            <div className="fc-stat-box known">
-              <span className="fc-stat-num">{knownCount}</span>
-              <span className="fc-stat-label">Mastered</span>
-            </div>
-            <div className="fc-stat-box unknown">
-              <span className="fc-stat-num">{unknownCount}</span>
-              <span className="fc-stat-label">Learning</span>
-            </div>
-            <div className="fc-stat-box total">
-              <span className="fc-stat-num">{deckCards.length - knownCount - unknownCount}</span>
-              <span className="fc-stat-label">New</span>
-            </div>
-          </div>
-
-          <div className="fc-cards-list">
-            {deckCards.length === 0 ? (
-              <div className="fc-empty-state">
-                <span className="fc-empty-icon">🎴</span>
-                <p>No cards in this deck</p>
-                <button className="fc-add-first-btn" onClick={() => setMode('add')}>
-                  Add your first card
-                </button>
+        <div className="fc-menu">
+          {/* New Deck Section */}
+          <div className="fc-menu-section">
+            {showNewDeckInput ? (
+              <div className="fc-new-deck-form">
+                <input
+                  type="text"
+                  placeholder="Deck name..."
+                  value={newDeckName}
+                  onChange={(e) => setNewDeckName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') createDeck();
+                    if (e.key === 'Escape') {
+                      setShowNewDeckInput(false);
+                      setNewDeckName('');
+                    }
+                  }}
+                  autoFocus
+                />
+                <button onClick={createDeck}>Add</button>
+                <button onClick={() => {
+                  setShowNewDeckInput(false);
+                  setNewDeckName('');
+                }}>Cancel</button>
               </div>
             ) : (
-              deckCards.map((card, index) => (
-                <div key={card.id} className={`fc-card-item ${card.known === true ? 'known' : card.known === false ? 'unknown' : ''}`}>
-                  <div className="fc-card-number">{index + 1}</div>
-                  <div className="fc-card-content">
-                    <div className="fc-card-front-text">{card.front}</div>
-                    <div className="fc-card-back-text">{card.back}</div>
-                  </div>
-                  <div className="fc-card-status">
-                    {card.known === true && <span className="status-known">✓</span>}
-                    {card.known === false && <span className="status-unknown">✗</span>}
-                  </div>
-                  <button className="fc-card-delete" onClick={() => deleteCard(card.id)}>×</button>
-                </div>
-              ))
+              <button
+                className="fc-menu-btn fc-new-deck-btn"
+                onClick={() => setShowNewDeckInput(true)}
+              >
+                + New Deck
+              </button>
+            )}
+          </div>
+
+          {/* Decks List */}
+          <div className="fc-menu-section">
+            <div className="fc-menu-label">Your Decks</div>
+            {getAllDecks().length === 0 ? (
+              <div className="fc-menu-empty">No decks yet</div>
+            ) : (
+              <div className="fc-decks-menu">
+                {getAllDecks().map(deck => {
+                  const deckStats = getDeckStats(deck.name);
+                  return (
+                    <div
+                      key={deck.name}
+                      className={`fc-deck-item ${selectedDeck === deck.name ? 'active' : ''}`}
+                      onClick={() => {
+                        setSelectedDeck(deck.name);
+                        setActiveView('cards');
+                      }}
+                    >
+                      <div className="fc-deck-item-color" style={{ backgroundColor: deck.color }} />
+                      <div className="fc-deck-item-name">{deck.name}</div>
+                      <div className="fc-deck-item-count">{deckStats.total}</div>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
         </div>
-      )}
+      </div>
 
-      {/* Add Card View */}
-      {mode === 'add' && (
-        <div className="fc-add-view">
-          <div className="fc-add-header">
-            <button className="fc-back-btn" onClick={() => setMode('cards')}>
-              ← Back to {selectedDeck}
-            </button>
-            <h2>Add New Card</h2>
+      {/* Main Content Area */}
+      <div className="fc-content">
+        {/* Decks Overview */}
+        {activeView === 'decks' && (
+          <div className="fc-main-view">
+            <div className="fc-main-header">
+              <h1>Flash Card Decks</h1>
+            </div>
+            <div className="fc-decks-overview">
+              {getAllDecks().length === 0 ? (
+                <div className="fc-empty-state">
+                  <p>Create a deck to get started</p>
+                </div>
+              ) : (
+                getAllDecks().map(deck => {
+                  const deckStats = getDeckStats(deck.name);
+                  const progress = deckStats.total > 0
+                    ? Math.round((deckStats.known / deckStats.total) * 100)
+                    : 0;
+
+                  return (
+                    <div
+                      key={deck.name}
+                      className="fc-deck-overview-card"
+                      onClick={() => {
+                        setSelectedDeck(deck.name);
+                        setActiveView('cards');
+                      }}
+                      style={{ borderColor: deck.color }}
+                    >
+                      <h3 style={{ color: deck.color }}>{deck.name}</h3>
+                      <div className="fc-overview-stats">
+                        <span>{deckStats.total} cards</span>
+                        <span>{progress}% mastered</span>
+                      </div>
+                      <div className="fc-progress-bar">
+                        <div
+                          className="fc-progress-fill"
+                          style={{ width: `${progress}%`, background: deck.color }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
+        )}
 
-          <div className="fc-add-form">
-            <div className="fc-form-group">
-              <label>Front (Question)</label>
-              <textarea
-                ref={frontInputRef}
-                value={newFront}
-                onChange={(e) => setNewFront(e.target.value)}
-                placeholder="Enter the question or term..."
-                rows={3}
-                autoFocus
+        {/* Cards Management */}
+        {activeView === 'cards' && selectedDeck && (
+          <div className="fc-main-view">
+            <div className="fc-main-header">
+              <div className="fc-deck-title-section">
+                {editingDeckName === selectedDeck ? (
+                  <input
+                    type="text"
+                    className="fc-deck-title-input"
+                    value={editingDeckTitle}
+                    onChange={(e) => setEditingDeckTitle(e.target.value)}
+                    onBlur={() => {
+                      if (editingDeckTitle.trim()) {
+                        renameDeck(selectedDeck, editingDeckTitle);
+                      } else {
+                        setEditingDeckName(null);
+                        setEditingDeckTitle('');
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && editingDeckTitle.trim()) {
+                        renameDeck(selectedDeck, editingDeckTitle);
+                      }
+                      if (e.key === 'Escape') {
+                        setEditingDeckName(null);
+                        setEditingDeckTitle('');
+                      }
+                    }}
+                    autoFocus
+                  />
+                ) : (
+                  <h1
+                    onDoubleClick={() => {
+                      setEditingDeckName(selectedDeck);
+                      setEditingDeckTitle(selectedDeck);
+                    }}
+                    style={{ color: getDeckByName(selectedDeck)?.color }}
+                  >
+                    {selectedDeck}
+                  </h1>
+                )}
+                <div className="fc-color-picker-wrapper">
+                  <button
+                    className="fc-color-btn"
+                    onClick={() => setShowColorPicker(showColorPicker === selectedDeck ? null : selectedDeck)}
+                    style={{ backgroundColor: getDeckByName(selectedDeck)?.color }}
+                    title="Change color"
+                  />
+                  {showColorPicker === selectedDeck && (
+                    <div className="fc-color-picker">
+                      {DECK_COLORS.map(color => (
+                        <button
+                          key={color}
+                          className="fc-color-option"
+                          style={{ backgroundColor: color }}
+                          onClick={() => updateDeckColor(selectedDeck, color)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="fc-main-actions">
+                <button onClick={resetDeckProgress}>Reset Progress</button>
+                <button onClick={() => deleteDeck(selectedDeck)}>Delete Deck</button>
+                {deckCards.length > 0 && (
+                  <button className="fc-study-btn" onClick={startStudy}>
+                    Study
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Stats */}
+            {stats && (
+              <div className="fc-stats-bar">
+                <div className="fc-stat">
+                  <span className="fc-stat-value">{stats.total}</span>
+                  <span className="fc-stat-label">Total</span>
+                </div>
+                <div className="fc-stat known">
+                  <span className="fc-stat-value">{stats.known}</span>
+                  <span className="fc-stat-label">Mastered</span>
+                </div>
+                <div className="fc-stat unknown">
+                  <span className="fc-stat-value">{stats.unknown}</span>
+                  <span className="fc-stat-label">Learning</span>
+                </div>
+                <div className="fc-stat fresh">
+                  <span className="fc-stat-value">{stats.fresh}</span>
+                  <span className="fc-stat-label">New</span>
+                </div>
+              </div>
+            )}
+
+            {/* Add New Card Form */}
+            <div className="fc-add-card-section">
+              <h3>Add New Card</h3>
+              <CardForm
+                onSave={(front, back) => addCard(front, back)}
+                onCancel={() => {}}
               />
             </div>
 
-            <div className="fc-form-group">
-              <label>Back (Answer)</label>
-              <textarea
-                value={newBack}
-                onChange={(e) => setNewBack(e.target.value)}
-                placeholder="Enter the answer or definition..."
-                rows={4}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                    addCard();
-                  }
-                }}
-              />
-            </div>
-
-            <div className="fc-form-actions">
-              <button
-                className="fc-save-card-btn"
-                onClick={addCard}
-                disabled={!newFront.trim() || !newBack.trim()}
-              >
-                Save Card
-              </button>
-              <span className="fc-form-hint">Ctrl+Enter to save</span>
-            </div>
-          </div>
-
-          <div className="fc-recent-cards">
-            <h3>Recently Added</h3>
-            {deckCards.slice(-3).reverse().map(card => (
-              <div key={card.id} className="fc-recent-card">
-                <span className="fc-recent-front">{card.front}</span>
-                <span className="fc-recent-arrow">→</span>
-                <span className="fc-recent-back">{card.back}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Study Mode */}
-      {mode === 'study' && currentCard && (
-        <div className="fc-study-view">
-          <div className="fc-study-header">
-            <button className="fc-exit-study" onClick={endStudy}>
-              ✕ Exit
-            </button>
-            <div className="fc-study-progress">
-              <span>{currentCardIndex + 1} / {shuffledCards.length}</span>
-              <div className="fc-study-progress-bar">
-                <div
-                  className="fc-study-progress-fill"
-                  style={{ width: `${((currentCardIndex) / shuffledCards.length) * 100}%` }}
-                />
-              </div>
+            {/* Cards List */}
+            <div className="fc-cards-section">
+              <h3>Cards ({deckCards.length})</h3>
+              {deckCards.length === 0 ? (
+                <div className="fc-empty-state">
+                  <p>No cards yet. Add your first card above.</p>
+                </div>
+              ) : (
+                <table className="fc-cards-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Front</th>
+                      <th>Back</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {deckCards.map((card, index) => (
+                      <tr key={card.id}>
+                        {editingCard === card.id ? (
+                          <td colSpan="5">
+                            <CardForm
+                              initialFront={card.front}
+                              initialBack={card.back}
+                              onSave={(front, back) => updateCard(card.id, front, back)}
+                              onCancel={() => setEditingCard(null)}
+                            />
+                          </td>
+                        ) : (
+                          <>
+                            <td>{index + 1}</td>
+                            <td>{card.front}</td>
+                            <td>{card.back}</td>
+                            <td>
+                              <span className={`fc-status ${card.known === true ? 'known' : card.known === false ? 'unknown' : 'fresh'}`}>
+                                {card.known === true ? '✓ Mastered' : card.known === false ? '✗ Learning' : '○ New'}
+                              </span>
+                            </td>
+                            <td>
+                              <button onClick={() => setEditingCard(card.id)}>Edit</button>
+                              <button onClick={() => deleteCard(card.id)}>Delete</button>
+                            </td>
+                          </>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
+        )}
 
-          <div
-            className={`fc-study-card ${isFlipped ? 'flipped' : ''}`}
-            onClick={() => setIsFlipped(!isFlipped)}
-          >
-            <div className="fc-study-card-inner">
-              <div className="fc-study-card-front">
-                <span className="fc-card-label">Question</span>
-                <p>{currentCard.front}</p>
-              </div>
-              <div className="fc-study-card-back">
-                <span className="fc-card-label">Answer</span>
-                <p>{currentCard.back}</p>
+        {/* Study Mode */}
+        {activeView === 'study' && currentCard && (
+          <div className="fc-study-view">
+            <div className="fc-study-header">
+              <button onClick={endStudy}>✕ Exit Study</button>
+              <div className="fc-study-progress">
+                <span>{currentCardIndex + 1} / {shuffledCards.length}</span>
+                <div className="fc-study-progress-bar">
+                  <div
+                    className="fc-study-progress-fill"
+                    style={{ width: `${((currentCardIndex) / shuffledCards.length) * 100}%` }}
+                  />
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="fc-study-hint">
-            {!isFlipped ? 'Click card or press Space to reveal answer' : 'Rate your knowledge'}
-          </div>
-
-          {isFlipped && (
-            <div className="fc-study-actions">
-              <button className="fc-action-unknown" onClick={handleUnknown}>
-                <span className="fc-action-icon">✗</span>
-                <span>Still Learning</span>
-                <span className="fc-action-key">← or A</span>
-              </button>
-              <button className="fc-action-known" onClick={handleKnown}>
-                <span className="fc-action-icon">✓</span>
-                <span>Got It!</span>
-                <span className="fc-action-key">→ or D</span>
-              </button>
+            <div
+              className={`fc-study-card ${isFlipped ? 'flipped' : ''}`}
+              onClick={() => setIsFlipped(!isFlipped)}
+            >
+              <div className="fc-study-card-inner">
+                <div className="fc-study-card-front">
+                  <span className="fc-card-label">Question</span>
+                  <p>{currentCard.front}</p>
+                </div>
+                <div className="fc-study-card-back">
+                  <span className="fc-card-label">Answer</span>
+                  <p>{currentCard.back}</p>
+                </div>
+              </div>
             </div>
-          )}
-        </div>
-      )}
 
-      {/* Results View */}
-      {mode === 'results' && (
-        <div className="fc-results-view">
-          <div className="fc-results-content">
-            <h2>Study Complete! 🎉</h2>
+            <div className="fc-study-hint">
+              {!isFlipped ? 'Click card or press Space to reveal answer' : 'Rate your knowledge'}
+            </div>
 
+            {isFlipped && (
+              <div className="fc-study-actions">
+                <button className="fc-action-unknown" onClick={handleUnknown}>
+                  <span>✗ Still Learning</span>
+                  <span className="fc-action-key">← or A</span>
+                </button>
+                <button className="fc-action-known" onClick={handleKnown}>
+                  <span>✓ Got It!</span>
+                  <span className="fc-action-key">→ or D</span>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Results */}
+        {activeView === 'results' && (
+          <div className="fc-results-view">
+            <h1>Study Complete!</h1>
             <div className="fc-results-stats">
               <div className="fc-result-stat known">
                 <span className="fc-result-num">{studyStats.known}</span>
@@ -488,24 +590,65 @@ function FlashCards({ fullscreen = false }) {
                 <span className="fc-result-label">Need Review</span>
               </div>
             </div>
-
             <div className="fc-results-message">
               {studyStats.unknown === 0
-                ? "Perfect! You've mastered all cards! 🌟"
+                ? "Perfect! You've mastered all cards!"
                 : `Keep practicing! ${studyStats.unknown} cards need more review.`}
             </div>
-
             <div className="fc-results-actions">
-              <button className="fc-study-again" onClick={startStudy}>
-                Study Again
-              </button>
-              <button className="fc-back-to-deck" onClick={endStudy}>
-                Back to Deck
-              </button>
+              <button onClick={startStudy}>Study Again</button>
+              <button onClick={endStudy}>Back to Cards</button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Card Form Component
+function CardForm({ initialFront = '', initialBack = '', onSave, onCancel }) {
+  const [front, setFront] = useState(initialFront);
+  const [back, setBack] = useState(initialBack);
+
+  const handleSave = () => {
+    if (front.trim() && back.trim()) {
+      onSave(front, back);
+      setFront('');
+      setBack('');
+    }
+  };
+
+  return (
+    <div className="fc-card-form">
+      <input
+        type="text"
+        placeholder="Front (Question)"
+        value={front}
+        onChange={(e) => setFront(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && e.ctrlKey) handleSave();
+          if (e.key === 'Escape') onCancel();
+        }}
+      />
+      <input
+        type="text"
+        placeholder="Back (Answer)"
+        value={back}
+        onChange={(e) => setBack(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && e.ctrlKey) handleSave();
+          if (e.key === 'Escape') onCancel();
+        }}
+      />
+      <div className="fc-card-form-actions">
+        <button onClick={handleSave} disabled={!front.trim() || !back.trim()}>
+          Save
+        </button>
+        {initialFront && (
+          <button onClick={onCancel}>Cancel</button>
+        )}
+      </div>
     </div>
   );
 }
