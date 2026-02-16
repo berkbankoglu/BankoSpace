@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, forwardRef } from 'react';
 import './Notes.css';
+import { playTypeSoundThrottled, playClickSound, playAddSound, playDeleteSound } from '../utils/sounds';
 
 // Rich Text Editor Component
 const RichTextEditor = forwardRef(({ content, placeholder, onChange }, ref) => {
@@ -14,6 +15,7 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange }, ref) => {
   }, []);
 
   const handleInput = () => {
+    playTypeSoundThrottled();
     if (editorRef.current) {
       const html = editorRef.current.innerHTML;
       const textContent = editorRef.current.textContent;
@@ -54,11 +56,14 @@ function Notes() {
   const [isResizing, setIsResizing] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState({ show: false, type: null, id: null });
   const [activeFormats, setActiveFormats] = useState({});
+  const [showColorPresets, setShowColorPresets] = useState(false);
   const [draggedNote, setDraggedNote] = useState(null);
-  const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const [animatingNotes, setAnimatingNotes] = useState(new Set());
+  const [dragOverNoteId, setDragOverNoteId] = useState(null);
+  const noteDragPosRef = useRef({ x: 0, y: 0 });
+  const noteDragOffsetRef = useRef({ x: 0, y: 0 });
+  const noteGhostRef = useRef(null);
   const notePositionsRef = useRef({});
+  const dragOverNoteRef = useRef(null);
   const editorLeftRef = useRef(null);
   const editorRightRef = useRef(null);
   const sidebarRef = useRef(null);
@@ -83,6 +88,7 @@ function Notes() {
 
   // Text formatting functions
   const execFormat = (command, value = null) => {
+    playClickSound();
     document.execCommand(command, false, value);
     updateActiveFormats();
   };
@@ -168,6 +174,7 @@ function Notes() {
     setCurrentNote(newNote);
     setCurrentPageIndex(0);
     setEditingNoteTitle(newNote.id);
+    playAddSound();
   };
 
   // Double-click to edit note title in sidebar
@@ -207,6 +214,7 @@ function Notes() {
   };
 
   const confirmDelete = () => {
+    playDeleteSound();
     if (deleteConfirm.type === 'note') {
       setNotes(notes.filter(note => note.id !== deleteConfirm.id));
       if (currentNote?.id === deleteConfirm.id) {
@@ -275,92 +283,92 @@ function Notes() {
     note.pages?.some(p => p.content?.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  // Custom Drag & Drop with mouse events
+  // Custom Drag & Drop with mouse events - ref-based for smooth performance
   const handleNoteDragStart = useCallback((e, note, index) => {
-    if (e.button !== 0) return; // Only left click
-
-    // Don't start drag if editing title
+    if (e.button !== 0) return;
     if (editingNoteTitle === note.id) return;
-
-    // Don't start drag if clicking on input or interactive elements
     if (e.target.tagName === 'INPUT' || e.target.closest('.note-color-dot') || e.target.closest('.note-item-delete')) {
       return;
     }
 
     const rect = e.currentTarget.getBoundingClientRect();
-    setDragOffset({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
-    });
-    setDragPosition({ x: e.clientX, y: e.clientY });
+    noteDragOffsetRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    noteDragPosRef.current = { x: e.clientX, y: e.clientY };
     setDraggedNote({ note, index, width: rect.width, height: rect.height });
 
+    requestAnimationFrame(() => {
+      if (noteGhostRef.current) {
+        noteGhostRef.current.style.left = `${e.clientX - noteDragOffsetRef.current.x}px`;
+        noteGhostRef.current.style.top = `${e.clientY - noteDragOffsetRef.current.y}px`;
+      }
+    });
     e.preventDefault();
   }, [editingNoteTitle]);
 
   const handleNoteDragMove = useCallback((e) => {
     if (!draggedNote) return;
 
-    setDragPosition({ x: e.clientX, y: e.clientY });
+    // Move ghost directly via ref
+    if (noteGhostRef.current) {
+      noteGhostRef.current.style.left = `${e.clientX - noteDragOffsetRef.current.x}px`;
+      noteGhostRef.current.style.top = `${e.clientY - noteDragOffsetRef.current.y}px`;
+    }
 
-    // Find which note we're hovering over
+    // Find which note the cursor is hovering over
     const noteElements = document.querySelectorAll('.note-item:not(.note-drag-ghost)');
+    let hoveredId = null;
 
-    // Store current positions before reorder (FLIP technique)
-    const currentPositions = {};
-    noteElements.forEach((el) => {
-      const noteId = el.getAttribute('data-note-id');
-      if (noteId) {
-        currentPositions[noteId] = el.getBoundingClientRect();
-      }
-    });
-
-    noteElements.forEach((el, idx) => {
+    for (const el of noteElements) {
       const rect = el.getBoundingClientRect();
-
-      if (e.clientY > rect.top && e.clientY < rect.bottom) {
-        const noteId = filteredNotes[idx]?.id;
-        if (noteId && noteId !== draggedNote.note.id) {
-          const draggedIdx = notes.findIndex(n => n.id === draggedNote.note.id);
-          const targetIdx = notes.findIndex(n => n.id === noteId);
-
-          if (draggedIdx !== -1 && targetIdx !== -1 && draggedIdx !== targetIdx) {
-            // Store positions for animation
-            notePositionsRef.current = currentPositions;
-
-            const newNotes = [...notes];
-            const [removed] = newNotes.splice(draggedIdx, 1);
-            newNotes.splice(targetIdx, 0, removed);
-
-            // Mark notes that will animate
-            const affectedNotes = new Set();
-            const minIdx = Math.min(draggedIdx, targetIdx);
-            const maxIdx = Math.max(draggedIdx, targetIdx);
-            for (let i = minIdx; i <= maxIdx; i++) {
-              if (newNotes[i]) affectedNotes.add(newNotes[i].id);
-            }
-            setAnimatingNotes(affectedNotes);
-
-            setNotes(newNotes);
-            setDraggedNote(prev => ({ ...prev, index: targetIdx }));
-          }
+      if (e.clientY >= rect.top && e.clientY <= rect.bottom) {
+        const targetId = el.getAttribute('data-note-id');
+        if (targetId && String(targetId) !== String(draggedNote.note.id)) {
+          hoveredId = targetId;
         }
+        break;
       }
-    });
-  }, [draggedNote, notes, filteredNotes]);
+    }
+
+    dragOverNoteRef.current = hoveredId;
+    setDragOverNoteId(hoveredId);
+  }, [draggedNote]);
 
   const handleNoteDragEnd = useCallback(() => {
-    setDraggedNote(null);
-  }, []);
+    const overNoteId = dragOverNoteRef.current;
 
-  // Global mouse events for dragging
+    if (draggedNote && overNoteId) {
+      // Capture old positions for FLIP animation
+      const noteElements = document.querySelectorAll('.note-item:not(.note-drag-ghost)');
+      const oldPositions = {};
+      noteElements.forEach(item => {
+        const id = item.getAttribute('data-note-id');
+        if (id) oldPositions[id] = item.getBoundingClientRect();
+      });
+      notePositionsRef.current = oldPositions;
+
+      // Swap the two notes
+      playClickSound();
+      setNotes(prev => {
+        const dragIdx = prev.findIndex(n => String(n.id) === String(draggedNote.note.id));
+        const targetIdx = prev.findIndex(n => String(n.id) === String(overNoteId));
+        if (dragIdx === -1 || targetIdx === -1 || dragIdx === targetIdx) return prev;
+        const newNotes = [...prev];
+        [newNotes[dragIdx], newNotes[targetIdx]] = [newNotes[targetIdx], newNotes[dragIdx]];
+        return newNotes;
+      });
+    }
+
+    setDraggedNote(null);
+    setDragOverNoteId(null);
+    dragOverNoteRef.current = null;
+  }, [draggedNote]);
+
   useEffect(() => {
     if (draggedNote) {
       document.addEventListener('mousemove', handleNoteDragMove);
       document.addEventListener('mouseup', handleNoteDragEnd);
       document.body.style.cursor = 'grabbing';
       document.body.style.userSelect = 'none';
-
       return () => {
         document.removeEventListener('mousemove', handleNoteDragMove);
         document.removeEventListener('mouseup', handleNoteDragEnd);
@@ -372,42 +380,25 @@ function Notes() {
 
   // FLIP animation for smooth reordering
   useEffect(() => {
-    if (animatingNotes.size === 0) return;
+    const oldPositions = notePositionsRef.current;
+    if (Object.keys(oldPositions).length === 0) return;
 
     const noteElements = document.querySelectorAll('.note-item:not(.note-drag-ghost)');
-    const oldPositions = notePositionsRef.current;
-
     noteElements.forEach((el) => {
       const noteId = el.getAttribute('data-note-id');
-      if (!noteId || !oldPositions[noteId] || !animatingNotes.has(noteId)) return;
-
-      const oldRect = oldPositions[noteId];
+      if (!noteId || !oldPositions[noteId]) return;
       const newRect = el.getBoundingClientRect();
-
-      const deltaY = oldRect.top - newRect.top;
-
+      const deltaY = oldPositions[noteId].top - newRect.top;
       if (Math.abs(deltaY) > 1) {
-        // First: element starts at old position
         el.style.transform = `translateY(${deltaY}px)`;
         el.style.transition = 'none';
-
-        // Force reflow
         el.offsetHeight;
-
-        // Play: animate to new position
         el.style.transform = '';
         el.style.transition = 'transform 0.25s cubic-bezier(0.2, 0, 0, 1)';
       }
     });
-
-    // Clear animation state
-    const timer = setTimeout(() => {
-      setAnimatingNotes(new Set());
-      notePositionsRef.current = {};
-    }, 250);
-
-    return () => clearTimeout(timer);
-  }, [animatingNotes, notes]);
+    notePositionsRef.current = {};
+  }, [notes]);
 
   const colors = [
     '#667eea', '#f093fb', '#4ade80', '#60a5fa',
@@ -419,10 +410,9 @@ function Notes() {
       {/* Floating Drag Ghost */}
       {draggedNote && (
         <div
+          ref={noteGhostRef}
           className="note-drag-ghost"
           style={{
-            left: dragPosition.x - dragOffset.x,
-            top: dragPosition.y - dragOffset.y,
             width: draggedNote.width
           }}
         >
@@ -482,7 +472,7 @@ function Notes() {
             type="text"
             placeholder="search..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => { playTypeSoundThrottled(); setSearchQuery(e.target.value); }}
           />
         </div>
 
@@ -496,7 +486,7 @@ function Notes() {
               <div
                 key={note.id}
                 data-note-id={note.id}
-                className={`note-item ${currentNote?.id === note.id ? 'active' : ''} ${draggedNote?.note.id === note.id ? 'dragging' : ''}`}
+                className={`note-item ${currentNote?.id === note.id ? 'active' : ''} ${draggedNote?.note.id === note.id ? 'dragging' : ''} ${dragOverNoteId && String(dragOverNoteId) === String(note.id) ? 'drag-target' : ''}`}
                 onMouseDown={(e) => handleNoteDragStart(e, note, index)}
                 onClick={() => {
                   if (draggedNote) return; // Prevent click after drag
@@ -701,29 +691,87 @@ function Notes() {
 
               <div className="toolbar-divider" />
 
-              {/* Text Color */}
-              <div className="toolbar-group">
-                <input
-                  type="color"
-                  className="toolbar-color"
-                  onMouseDown={(e) => { e.stopPropagation(); saveSelection(); }}
-                  onInput={(e) => applyColor('foreColor', e.target.value)}
+              {/* Color Presets - Dropdown */}
+              <div className="toolbar-group color-preset-wrapper">
+                <button
+                  className={`toolbar-btn color-toggle-btn ${showColorPresets ? 'active' : ''}`}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    saveSelection();
+                    setShowColorPresets(!showColorPresets);
+                  }}
                   title="Text Color"
-                  defaultValue="#c9d1d9"
-                />
-                <input
-                  type="color"
-                  className="toolbar-color"
-                  onMouseDown={(e) => { e.stopPropagation(); saveSelection(); }}
-                  onInput={(e) => applyColor('hiliteColor', e.target.value)}
-                  title="Highlight Color"
-                  defaultValue="#0d1117"
-                />
+                >
+                  <span style={{ background: 'linear-gradient(90deg, #f85149, #58a6ff, #7ee787)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontWeight: 700 }}>A</span>
+                </button>
+                {showColorPresets && (
+                  <div className="color-presets-dropdown">
+                    {[
+                      { fg: '#c9d1d9', bg: null, label: 'Default' },
+                      { fg: '#f85149', bg: null, label: 'Red' },
+                      { fg: '#58a6ff', bg: null, label: 'Blue' },
+                      { fg: '#7ee787', bg: null, label: 'Green' },
+                      { fg: '#d2a8ff', bg: null, label: 'Purple' },
+                      { fg: '#f0883e', bg: null, label: 'Orange' },
+                      { fg: '#ffffff', bg: '#1f6feb', label: 'Blue BG' },
+                      { fg: '#ffffff', bg: '#238636', label: 'Green BG' },
+                      { fg: '#ffffff', bg: '#da3633', label: 'Red BG' },
+                      { fg: '#000000', bg: '#e3b341', label: 'Yellow BG' },
+                    ].map((preset, i) => (
+                      <button
+                        key={i}
+                        className="toolbar-color-preset"
+                        title={preset.label}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          restoreSelection();
+                          document.execCommand('foreColor', false, preset.fg);
+                          if (preset.bg) {
+                            document.execCommand('hiliteColor', false, preset.bg);
+                          } else {
+                            document.execCommand('hiliteColor', false, 'transparent');
+                          }
+                          updateActiveFormats();
+                          setShowColorPresets(false);
+                        }}
+                        style={{
+                          color: preset.fg,
+                          background: preset.bg || 'transparent',
+                          borderColor: preset.bg ? preset.bg : preset.fg,
+                        }}
+                      >
+                        A
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
+            {/* Spread Navigation */}
+            <div className="notes-spread-nav">
+              <button
+                className="spread-nav-btn"
+                onClick={() => setCurrentPageIndex(Math.max(0, currentSpreadIndex - 1))}
+                disabled={currentSpreadIndex === 0}
+              >
+                ‹
+              </button>
+              <span className="spread-nav-label">{currentSpreadIndex * 2 + 1}-{currentSpreadIndex * 2 + 2} / {totalSpreads * 2}</span>
+              <button
+                className="spread-nav-btn"
+                onClick={() => setCurrentPageIndex(Math.min(totalSpreads - 1, currentSpreadIndex + 1))}
+                disabled={currentSpreadIndex >= totalSpreads - 1}
+              >
+                ›
+              </button>
+              <button className="spread-nav-btn add-spread-btn" onClick={addSpread} title="Add Spread">+</button>
+            </div>
+
             {/* Notebook Style - Two Column Layout */}
-            <div className="notes-notebook">
+            <div className="notes-notebook" onClick={() => showColorPresets && setShowColorPresets(false)}>
               <div className="notebook-pages-row">
                 {/* Left Page */}
                 <div className="notes-notebook-page left">
@@ -770,19 +818,8 @@ function Notes() {
               </div>
             </div>
 
-            {/* Spread Navigation - Bottom */}
-            <div className="notes-spread-nav-bottom">
-              {Array.from({ length: totalSpreads }, (_, i) => (
-                <button
-                  key={i}
-                  className={`spread-tab ${currentSpreadIndex === i ? 'active' : ''}`}
-                  onClick={() => setCurrentPageIndex(i)}
-                >
-                  {i * 2 + 1}-{i * 2 + 2}
-                </button>
-              ))}
-              <button className="page-add-btn-toolbar" onClick={addSpread}>+ Add Spread</button>
-            </div>
+
+
           </>
         ) : (
           <div className="notes-editor-empty">

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import './App.css';
 import CategoryColumn from './components/CategoryColumn';
 import ReferencePanel from './components/ReferencePanel';
@@ -7,6 +7,9 @@ import FlashCards from './components/FlashCards';
 import DailyChecklist from './components/DailyChecklist';
 import IncomeTracker from './components/IncomeTracker';
 import Notes from './components/Notes';
+import Calendar from './components/Calendar';
+import QuickNote from './components/QuickNote';
+import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, playTypeSoundThrottled, setVolume, getVolume } from './utils/sounds';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -29,6 +32,11 @@ function App() {
   // Timer popup mode
   if (popupType === 'timer') {
     return <TimerPopupWrapper />;
+  }
+
+  // QuickNote popup mode
+  if (popupType === 'quicknote') {
+    return <QuickNotePopupWrapper />;
   }
 
   const [showUpdateWarning, setShowUpdateWarning] = useState(false);
@@ -92,7 +100,56 @@ function App() {
     localStorage.setItem('appVersion', APP_VERSION);
   }, []);
   const [showSettings, setShowSettings] = useState(false);
-  const [activeView, setActiveView] = useState('dashboard'); // 'dashboard' or individual views
+  const [showSidebarSettings, setShowSidebarSettings] = useState(false);
+  const [settingsClosing, setSettingsClosing] = useState(false);
+  const [soundVolume, setSoundVolume] = useState(() => getVolume());
+  const [activeView, setActiveView] = useState('dashboard');
+  const [sidebarItems, setSidebarItems] = useState(() => {
+    const saved = localStorage.getItem('sidebarOrder');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (!parsed.find(item => item.id === 'calendar')) {
+        parsed.splice(1, 0, { id: 'calendar', label: 'Calendar', view: 'calendar' });
+      }
+      if (!parsed.find(item => item.id === 'quicknote')) {
+        parsed.push({ id: 'quicknote', label: 'Quick Note', view: 'quicknote' });
+      }
+      localStorage.setItem('sidebarOrder', JSON.stringify(parsed));
+      return parsed;
+    }
+    return [
+      { id: 'dashboard', label: 'Dashboard', view: 'dashboard' },
+      { id: 'calendar', label: 'Calendar', view: 'calendar' },
+      { id: 'references', label: 'References', view: 'references' },
+      { id: 'flashcards', label: 'Flash Cards', view: 'flashcards' },
+      { id: 'checklists', label: 'Checklists', view: 'checklists' },
+      { id: 'income', label: 'Income Tracker', view: 'income' },
+      { id: 'notes', label: 'Notes', view: 'notes' },
+      { id: 'quicknote', label: 'Quick Note', view: 'quicknote' },
+    ];
+  });
+  const [draggedSidebarItem, setDraggedSidebarItem] = useState(null);
+  const todosHistoryRef = useRef([]);
+  const MAX_UNDO_STEPS = 30;
+
+  const pushHistory = (currentTodos) => {
+    todosHistoryRef.current.push(JSON.parse(JSON.stringify(currentTodos)));
+    if (todosHistoryRef.current.length > MAX_UNDO_STEPS) {
+      todosHistoryRef.current.shift();
+    }
+  };
+
+  const undo = () => {
+    if (todosHistoryRef.current.length === 0) return;
+    const prev = todosHistoryRef.current.pop();
+    setTodos(prev);
+  };
+
+  const sidebarDragPosRef = useRef({ x: 0, y: 0 });
+  const sidebarDragOffsetRef = useRef({ x: 0, y: 0 });
+  const sidebarGhostRef = useRef(null);
+  const sidebarPositionsRef = useRef({});
+  const sidebarReorderLockRef = useRef(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [showSearch, setShowSearch] = useState(false);
@@ -181,6 +238,118 @@ function App() {
   }, [todos]);
 
 
+  // Save sidebar order
+  useEffect(() => {
+    localStorage.setItem('sidebarOrder', JSON.stringify(sidebarItems));
+  }, [sidebarItems]);
+
+  // Sidebar drag & drop handlers - using refs for smooth performance
+  const handleSidebarDragStart = useCallback((e, item, index) => {
+    if (e.button !== 0) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    sidebarDragOffsetRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    sidebarDragPosRef.current = { x: e.clientX, y: e.clientY };
+    setDraggedSidebarItem({ item, index, width: rect.width, height: rect.height });
+
+    // Position ghost immediately
+    requestAnimationFrame(() => {
+      if (sidebarGhostRef.current) {
+        sidebarGhostRef.current.style.left = `${e.clientX - sidebarDragOffsetRef.current.x}px`;
+        sidebarGhostRef.current.style.top = `${e.clientY - sidebarDragOffsetRef.current.y}px`;
+      }
+    });
+    e.preventDefault();
+  }, []);
+
+  const handleSidebarDragMove = useCallback((e) => {
+    if (!draggedSidebarItem) return;
+
+    // Move ghost directly via ref - no state update needed
+    if (sidebarGhostRef.current) {
+      sidebarGhostRef.current.style.left = `${e.clientX - sidebarDragOffsetRef.current.x}px`;
+      sidebarGhostRef.current.style.top = `${e.clientY - sidebarDragOffsetRef.current.y}px`;
+    }
+
+    // Throttle reorder with lock
+    if (sidebarReorderLockRef.current) return;
+
+    const items = document.querySelectorAll('.sidebar-item[data-sidebar-id]');
+    for (const el of items) {
+      const rect = el.getBoundingClientRect();
+      if (e.clientY > rect.top && e.clientY < rect.bottom) {
+        const targetId = el.getAttribute('data-sidebar-id');
+        if (targetId && targetId !== draggedSidebarItem.item.id) {
+          // Lock reorder for duration of animation
+          sidebarReorderLockRef.current = true;
+
+          // Capture old positions
+          const oldPositions = {};
+          items.forEach(item => {
+            const id = item.getAttribute('data-sidebar-id');
+            if (id) oldPositions[id] = item.getBoundingClientRect();
+          });
+          sidebarPositionsRef.current = oldPositions;
+
+          playClickSound();
+          setSidebarItems(prev => {
+            const dragIdx = prev.findIndex(i => i.id === draggedSidebarItem.item.id);
+            const targetIdx = prev.findIndex(i => i.id === targetId);
+            if (dragIdx === -1 || targetIdx === -1 || dragIdx === targetIdx) return prev;
+            const newItems = [...prev];
+            const [removed] = newItems.splice(dragIdx, 1);
+            newItems.splice(targetIdx, 0, removed);
+            return newItems;
+          });
+          setDraggedSidebarItem(prev => prev ? { ...prev, index: -1 } : null);
+
+          setTimeout(() => { sidebarReorderLockRef.current = false; }, 280);
+          break;
+        }
+      }
+    }
+  }, [draggedSidebarItem]);
+
+  const handleSidebarDragEnd = useCallback(() => {
+    setDraggedSidebarItem(null);
+  }, []);
+
+  useEffect(() => {
+    if (draggedSidebarItem) {
+      document.addEventListener('mousemove', handleSidebarDragMove);
+      document.addEventListener('mouseup', handleSidebarDragEnd);
+      document.body.style.cursor = 'grabbing';
+      document.body.style.userSelect = 'none';
+      return () => {
+        document.removeEventListener('mousemove', handleSidebarDragMove);
+        document.removeEventListener('mouseup', handleSidebarDragEnd);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      };
+    }
+  }, [draggedSidebarItem, handleSidebarDragMove, handleSidebarDragEnd]);
+
+  // FLIP animation for sidebar reorder
+  useEffect(() => {
+    const oldPos = sidebarPositionsRef.current;
+    if (Object.keys(oldPos).length === 0) return;
+
+    const items = document.querySelectorAll('.sidebar-item[data-sidebar-id]');
+    items.forEach(el => {
+      const id = el.getAttribute('data-sidebar-id');
+      if (!id || !oldPos[id]) return;
+      const newRect = el.getBoundingClientRect();
+      const deltaY = oldPos[id].top - newRect.top;
+      if (Math.abs(deltaY) > 1) {
+        el.style.transform = `translateY(${deltaY}px)`;
+        el.style.transition = 'none';
+        el.offsetHeight;
+        el.style.transform = '';
+        el.style.transition = 'transform 0.25s cubic-bezier(0.2, 0, 0, 1)';
+      }
+    });
+    sidebarPositionsRef.current = {};
+  }, [sidebarItems]);
+
   // Theme değiştiğinde localStorage'a kaydet ve body'ye class ekle
   useEffect(() => {
     localStorage.setItem('theme', theme);
@@ -248,26 +417,64 @@ function App() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showSettings]);
 
+  // Animated close for sidebar settings
+  const closeSidebarSettings = () => {
+    if (!showSidebarSettings || settingsClosing) return;
+    setSettingsClosing(true);
+    setTimeout(() => {
+      setShowSidebarSettings(false);
+      setSettingsClosing(false);
+    }, 220);
+  };
+
+  // Close sidebar settings when clicking outside
+  useEffect(() => {
+    if (!showSidebarSettings) return;
+    const handleClick = (e) => {
+      if (!e.target.closest('.sidebar-settings-dropdown') && !e.target.closest('.sidebar-gear-btn')) {
+        closeSidebarSettings();
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showSidebarSettings, settingsClosing]);
+
+  // Ctrl+Z undo
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
 
   const toggleTheme = () => {
     setTheme(prev => prev === 'dark' ? 'light' : 'dark');
   };
 
 
-  const addTodo = (category, text) => {
+  const addTodo = (category, text, dueDate = null) => {
+    pushHistory(todos);
     const newTodo = {
       id: Date.now(),
       text,
       category,
       completed: false,
       createdAt: Date.now(),
+      dueDate,
       subtasks: [],
       order: todos.filter(t => t.category === category).length
     };
     setTodos([newTodo, ...todos]);
+    playAddSound();
   };
 
   const addSubtask = (todoId, subtaskText) => {
+    pushHistory(todos);
     setTodos(todos.map(todo => {
       if (todo.id === todoId) {
         const newSubtask = {
@@ -285,6 +492,7 @@ function App() {
   };
 
   const toggleSubtask = (todoId, subtaskId) => {
+    pushHistory(todos);
     setTodos(todos.map(todo => {
       if (todo.id === todoId) {
         const updatedSubtasks = (todo.subtasks || []).map(st =>
@@ -297,6 +505,7 @@ function App() {
   };
 
   const deleteSubtask = (todoId, subtaskId) => {
+    pushHistory(todos);
     setTodos(todos.map(todo => {
       if (todo.id === todoId) {
         return {
@@ -339,6 +548,12 @@ function App() {
   };
 
   const toggleTodo = (id) => {
+    pushHistory(todos);
+    const todo = todos.find(t => t.id === id);
+    if (todo) {
+      if (!todo.completed) playCompleteSound();
+      else playUncompleteSound();
+    }
     const updatedTodos = todos.map(todo => {
       if (todo.id === id) {
         const newCompleted = !todo.completed;
@@ -403,8 +618,190 @@ function App() {
   };
 
   const deleteTodo = (id) => {
+    pushHistory(todos);
+    playDeleteSound();
     setTodos(todos.filter(todo => todo.id !== id));
   };
+
+  const updateTodo = (id, updates) => {
+    pushHistory(todos);
+    setTodos(todos.map(todo =>
+      todo.id === id ? { ...todo, ...updates } : todo
+    ));
+  };
+
+  // Todo drag & drop state (swap-based)
+  const [draggingTodo, setDraggingTodo] = useState(null);
+  const [dragOverCategory, setDragOverCategory] = useState(null);
+  const [dragOverTodoId, setDragOverTodoId] = useState(null);
+  const todoDragOffsetRef = useRef({ x: 0, y: 0 });
+  const todoDragGhostRef = useRef(null);
+  const todoPositionsRef = useRef({});
+  const dragOverCategoryRef = useRef(null);
+  const dragOverTodoRef = useRef(null);
+
+  const handleTodoDragStart = useCallback((e, todo) => {
+    if (e.button !== 0) return;
+    if (e.target.closest('input, button, .cc-checkbox, .cc-checkmark, .cc-text, .cc-item-actions')) return;
+
+    const itemEl = e.target.closest('.cc-item');
+    if (!itemEl) return;
+
+    const rect = itemEl.getBoundingClientRect();
+    todoDragOffsetRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    pushHistory(todos);
+    setDraggingTodo({ todo, width: rect.width, height: rect.height });
+
+    requestAnimationFrame(() => {
+      if (todoDragGhostRef.current) {
+        todoDragGhostRef.current.style.left = `${e.clientX - todoDragOffsetRef.current.x}px`;
+        todoDragGhostRef.current.style.top = `${e.clientY - todoDragOffsetRef.current.y}px`;
+      }
+    });
+    e.preventDefault();
+  }, []);
+
+  const handleTodoDragMove = useCallback((e) => {
+    if (!draggingTodo) return;
+
+    // Move ghost via ref
+    if (todoDragGhostRef.current) {
+      todoDragGhostRef.current.style.left = `${e.clientX - todoDragOffsetRef.current.x}px`;
+      todoDragGhostRef.current.style.top = `${e.clientY - todoDragOffsetRef.current.y}px`;
+    }
+
+    // Detect which column we're over
+    const columns = document.querySelectorAll('.category-column-v2');
+    let foundCategory = null;
+    columns.forEach(col => {
+      const rect = col.getBoundingClientRect();
+      if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
+        foundCategory = col.dataset.category;
+      }
+    });
+    dragOverCategoryRef.current = foundCategory;
+    setDragOverCategory(foundCategory);
+
+    // Find which todo the cursor is hovering over
+    if (!foundCategory) {
+      dragOverTodoRef.current = null;
+      setDragOverTodoId(null);
+      return;
+    }
+
+    const hoveredColumn = document.querySelector(`.category-column-v2[data-category="${foundCategory}"]`);
+    if (!hoveredColumn) return;
+
+    const todoElements = Array.from(hoveredColumn.querySelectorAll('.cc-item[data-todo-id]'));
+    const dragId = String(draggingTodo.todo.id);
+    let hoveredTodoId = null;
+
+    for (const el of todoElements) {
+      const id = el.getAttribute('data-todo-id');
+      if (id === dragId) continue;
+      const rect = el.getBoundingClientRect();
+      if (e.clientY >= rect.top && e.clientY <= rect.bottom) {
+        hoveredTodoId = id;
+        break;
+      }
+    }
+
+    dragOverTodoRef.current = hoveredTodoId;
+    setDragOverTodoId(hoveredTodoId);
+  }, [draggingTodo]);
+
+  const handleTodoDragEnd = useCallback(() => {
+    if (!draggingTodo) {
+      setDraggingTodo(null);
+      setDragOverCategory(null);
+      setDragOverTodoId(null);
+      dragOverCategoryRef.current = null;
+      dragOverTodoRef.current = null;
+      return;
+    }
+
+    const overTodoId = dragOverTodoRef.current;
+    const overCategory = dragOverCategoryRef.current;
+    const dragId = draggingTodo.todo.id;
+
+    if (overTodoId) {
+      // Capture old positions for FLIP animation
+      const allTodoElements = document.querySelectorAll('.cc-item[data-todo-id]');
+      const oldPositions = {};
+      allTodoElements.forEach(item => {
+        const id = item.getAttribute('data-todo-id');
+        if (id) oldPositions[id] = item.getBoundingClientRect();
+      });
+      todoPositionsRef.current = oldPositions;
+
+      // Swap the two todos
+      playClickSound();
+      setTodos(prev => {
+        const dragItem = prev.find(t => String(t.id) === String(dragId));
+        const targetItem = prev.find(t => String(t.id) === String(overTodoId));
+        if (!dragItem || !targetItem) return prev;
+
+        return prev.map(t => {
+          if (String(t.id) === String(dragId)) {
+            return { ...t, order: targetItem.order, category: targetItem.category };
+          }
+          if (String(t.id) === String(overTodoId)) {
+            return { ...t, order: dragItem.order, category: dragItem.category };
+          }
+          return t;
+        });
+      });
+    } else if (overCategory && overCategory !== draggingTodo.todo.category) {
+      // Dropped on empty area of a different column - move to that column
+      setTodos(prev => prev.map(t =>
+        t.id === dragId ? { ...t, category: overCategory } : t
+      ));
+    }
+
+    setDraggingTodo(null);
+    setDragOverCategory(null);
+    setDragOverTodoId(null);
+    dragOverCategoryRef.current = null;
+    dragOverTodoRef.current = null;
+  }, [draggingTodo]);
+
+  useEffect(() => {
+    if (draggingTodo) {
+      document.addEventListener('mousemove', handleTodoDragMove);
+      document.addEventListener('mouseup', handleTodoDragEnd);
+      document.body.style.cursor = 'grabbing';
+      document.body.style.userSelect = 'none';
+      return () => {
+        document.removeEventListener('mousemove', handleTodoDragMove);
+        document.removeEventListener('mouseup', handleTodoDragEnd);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      };
+    }
+  }, [draggingTodo, handleTodoDragMove, handleTodoDragEnd]);
+
+  // FLIP animation for todo reorder
+  useEffect(() => {
+    const oldPositions = todoPositionsRef.current;
+    if (Object.keys(oldPositions).length === 0) return;
+
+    const todoElements = document.querySelectorAll('.cc-item[data-todo-id]');
+    todoElements.forEach(el => {
+      const id = el.getAttribute('data-todo-id');
+      if (!id || !oldPositions[id]) return;
+      const newRect = el.getBoundingClientRect();
+      const deltaY = oldPositions[id].top - newRect.top;
+      const deltaX = oldPositions[id].left - newRect.left;
+      if (Math.abs(deltaY) > 1 || Math.abs(deltaX) > 1) {
+        el.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+        el.style.transition = 'none';
+        el.offsetHeight; // Force reflow
+        el.style.transform = '';
+        el.style.transition = 'transform 0.18s cubic-bezier(0.25, 0.1, 0.25, 1)';
+      }
+    });
+    todoPositionsRef.current = {};
+  }, [todos]);
 
   const renameCategory = (category, newName) => {
     setCategoryNames(prev => ({
@@ -697,14 +1094,14 @@ function App() {
   const maximizeWindow = async () => {
     try {
       const window = getCurrentWindow();
-      const isFullscreen = await window.isFullscreen();
-      if (isFullscreen) {
-        await window.setFullscreen(false);
+      const isMaximized = await window.isMaximized();
+      if (isMaximized) {
+        await window.unmaximize();
       } else {
-        await window.setFullscreen(true);
+        await window.maximize();
       }
     } catch (err) {
-      console.error('Failed to toggle fullscreen:', err);
+      console.error('Failed to toggle maximize:', err);
     }
   };
 
@@ -727,7 +1124,7 @@ function App() {
           }
         }}
       >
-        <div className="titlebar-title" onClick={() => setShowSettings(true)}>BankoSpace</div>
+        <div className="titlebar-title">BankoSpace</div>
         <div className="titlebar-controls">
           <button className="titlebar-btn minimize" onClick={minimizeWindow}>─</button>
           <button className="titlebar-btn maximize" onClick={maximizeWindow}>□</button>
@@ -769,13 +1166,93 @@ function App() {
             <div className="sidebar-title">
               {!sidebarCollapsed && <span>BankoSpace</span>}
             </div>
-            <button
-              className="sidebar-toggle"
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            >
-              {sidebarCollapsed ? '»' : '«'}
-            </button>
+            <div className="sidebar-header-actions">
+              {!sidebarCollapsed && (
+                <button
+                  className="sidebar-gear-btn"
+                  onClick={(e) => { e.stopPropagation(); playClickSound(); if (showSidebarSettings) { closeSidebarSettings(); } else { setShowSidebarSettings(true); } }}
+                  title="Settings"
+                >
+                  ⚙
+                </button>
+              )}
+              <button
+                className="sidebar-toggle"
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              >
+                {sidebarCollapsed ? '»' : '«'}
+              </button>
+            </div>
           </div>
+
+          {/* Sidebar Settings Dropdown */}
+          {showSidebarSettings && !sidebarCollapsed && (
+            <div className={`sidebar-settings-dropdown ${settingsClosing ? 'closing' : ''}`} onClick={(e) => e.stopPropagation()}>
+              <div className="sidebar-settings-section">
+                <div className="sidebar-settings-row">
+                  <span className="sidebar-settings-label">Volume</span>
+                  <div className="sidebar-settings-right">
+                    <button
+                      className={`sidebar-mute-btn ${soundVolume === 0 ? 'muted' : ''}`}
+                      onClick={() => {
+                        if (soundVolume > 0) {
+                          localStorage.setItem('soundVolumePrev', String(soundVolume));
+                          setSoundVolume(0);
+                          setVolume(0);
+                        } else {
+                          const prev = parseFloat(localStorage.getItem('soundVolumePrev') || '0.7');
+                          setSoundVolume(prev);
+                          setVolume(prev);
+                          playClickSound();
+                        }
+                      }}
+                      title={soundVolume === 0 ? 'Unmute' : 'Mute'}
+                    >
+                      {soundVolume === 0 ? '🔇' : soundVolume < 0.4 ? '🔉' : '🔊'}
+                    </button>
+                    <span className="sidebar-settings-value">{Math.round(soundVolume * 100)}%</span>
+                  </div>
+                </div>
+                <input
+                  type="range"
+                  className="sidebar-volume-slider"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={soundVolume}
+                  onChange={(e) => {
+                    const v = parseFloat(e.target.value);
+                    setSoundVolume(v);
+                    setVolume(v);
+                  }}
+                  onMouseUp={() => playClickSound()}
+                />
+              </div>
+              <div className="sidebar-settings-divider" />
+              <div className="sidebar-settings-section">
+                <button
+                  className="sidebar-settings-action-btn"
+                  onClick={() => { exportData(); closeSidebarSettings(); }}
+                >
+                  Export Data
+                </button>
+                <button
+                  className="sidebar-settings-action-btn"
+                  onClick={() => { importData(); closeSidebarSettings(); }}
+                >
+                  Import Data
+                </button>
+                <button
+                  className="sidebar-settings-action-btn danger"
+                  onClick={() => { resetAllData(); closeSidebarSettings(); }}
+                >
+                  Reset All Data
+                </button>
+              </div>
+              <div className="sidebar-settings-divider" />
+              <div className="sidebar-settings-version">BankoSpace v{APP_VERSION}</div>
+            </div>
+          )}
 
           {!sidebarCollapsed && (
             <div className="sidebar-content">
@@ -788,7 +1265,7 @@ function App() {
                     className="search-input"
                     placeholder="Search..."
                     value={searchQuery}
-                    onChange={(e) => handleSearch(e.target.value)}
+                    onChange={(e) => { playTypeSoundThrottled(); handleSearch(e.target.value); }}
                     onFocus={() => setShowSearch(true)}
                   />
                   {searchQuery && (
@@ -838,63 +1315,37 @@ function App() {
                 )}
               </div>
 
-              {/* Dashboard - Main Page */}
-              <div
-                className={`sidebar-item main-item ${activeView === 'dashboard' ? 'active' : ''}`}
-                onClick={() => setActiveView('dashboard')}
-              >
-                <span className="item-name">Dashboard</span>
-              </div>
-
-              {/* References - Separate Page */}
-              <div
-                className={`sidebar-item ${activeView === 'references' ? 'active' : ''}`}
-                onClick={() => setActiveView('references')}
-              >
-                <span className="item-name">References</span>
-              </div>
-
-              {/* Flash Cards */}
-              <div
-                className={`sidebar-item ${activeView === 'flashcards' ? 'active' : ''}`}
-                onClick={() => setActiveView('flashcards')}
-              >
-                <span className="item-name">Flash Cards</span>
-              </div>
-
-              {/* Checklists */}
-              <div
-                className={`sidebar-item ${activeView === 'checklists' ? 'active' : ''}`}
-                onClick={() => setActiveView('checklists')}
-              >
-                <span className="item-name">Checklists</span>
-              </div>
-
-              {/* Income Tracker */}
-              <div
-                className={`sidebar-item ${activeView === 'income' ? 'active' : ''}`}
-                onClick={() => setActiveView('income')}
-              >
-                <span className="item-name">Income Tracker</span>
-              </div>
-
-              {/* Notes */}
-              <div
-                className={`sidebar-item ${activeView === 'notes' ? 'active' : ''}`}
-                onClick={() => setActiveView('notes')}
-              >
-                <span className="item-name">Notes</span>
-              </div>
-
-              {/* Settings at bottom */}
-              <div className="sidebar-bottom">
+              {/* Draggable Sidebar Items */}
+              {sidebarItems.map((item, index) => (
                 <div
-                  className="sidebar-item"
-                  onClick={() => setShowSettings(!showSettings)}
+                  key={item.id}
+                  data-sidebar-id={item.id}
+                  className={`sidebar-item ${item.id === 'dashboard' ? 'main-item' : ''} ${activeView === item.view ? 'active' : ''} ${draggedSidebarItem?.item.id === item.id ? 'sidebar-dragging' : ''}`}
+                  onMouseDown={(e) => handleSidebarDragStart(e, item, index)}
+                  onClick={() => {
+                    if (draggedSidebarItem) return;
+                    playNavSound();
+                    setActiveView(item.view);
+                  }}
                 >
-                  <span className="item-name">Settings</span>
+                  <span className="item-name">{item.label}</span>
                 </div>
-              </div>
+              ))}
+
+              {/* Floating sidebar drag ghost */}
+              {draggedSidebarItem && (
+                <div
+                  ref={sidebarGhostRef}
+                  className="sidebar-drag-ghost"
+                  style={{
+                    width: draggedSidebarItem.width,
+                  }}
+                >
+                  <span className="item-name">{draggedSidebarItem.item.label}</span>
+                </div>
+              )}
+
+              {/* Settings moved to gear icon in header */}
             </div>
           )}
         </div>
@@ -950,6 +1401,48 @@ function App() {
             </div>
           )}
 
+          {activeView === 'quicknote' && (
+            <div className="quicknote-fullscreen">
+              <div className="quicknote-page-header">
+                <h2 className="quicknote-page-title">Quick Note</h2>
+                <button
+                  className="quicknote-popup-btn"
+                  onClick={async () => {
+                    playClickSound();
+                    const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
+                    const webview = new WebviewWindow('quicknote-popup', {
+                      url: 'index.html?popup=quicknote',
+                      title: 'Quick Note',
+                      width: 620,
+                      height: 500,
+                      resizable: true,
+                      alwaysOnTop: true,
+                      decorations: false,
+                      center: true,
+                      focus: true,
+                    });
+                    webview.once('tauri://error', () => {});
+                  }}
+                  title="Open as popup"
+                >
+                  ↗
+                </button>
+              </div>
+              <QuickNote isPopup={true} />
+            </div>
+          )}
+
+          {/* Calendar Full Screen View */}
+          {activeView === 'calendar' && (
+            <div className="calendar-fullscreen">
+              <Calendar
+                todos={todos}
+                onToggleTodo={toggleTodo}
+                onUpdateTodo={updateTodo}
+              />
+            </div>
+          )}
+
           {/* Dashboard View */}
           {activeView === 'dashboard' && (
           <div className="dashboard-container">
@@ -959,19 +1452,19 @@ function App() {
               <div className="filters">
                 <button
                   className={`filter-btn ${currentFilter === 'all' ? 'active' : ''}`}
-                  onClick={() => setCurrentFilter('all')}
+                  onClick={() => { playClickSound(); setCurrentFilter('all'); }}
                 >
                   All
                 </button>
                 <button
                   className={`filter-btn ${currentFilter === 'active' ? 'active' : ''}`}
-                  onClick={() => setCurrentFilter('active')}
+                  onClick={() => { playClickSound(); setCurrentFilter('active'); }}
                 >
                   Active
                 </button>
                 <button
                   className={`filter-btn ${currentFilter === 'completed' ? 'active' : ''}`}
-                  onClick={() => setCurrentFilter('completed')}
+                  onClick={() => { playClickSound(); setCurrentFilter('completed'); }}
                 >
                   Completed
                 </button>
@@ -1002,12 +1495,17 @@ function App() {
                         onAddTodo={addTodo}
                         onToggleTodo={toggleTodo}
                         onDeleteTodo={deleteTodo}
+                        onUpdateTodo={updateTodo}
                         onRename={renameCategory}
                         currentFilter={currentFilter}
                         onAddSubtask={addSubtask}
                         onToggleSubtask={toggleSubtask}
                         onDeleteSubtask={deleteSubtask}
                         onReorder={reorderTodos}
+                        onTodoDragStart={handleTodoDragStart}
+                        draggingTodo={draggingTodo}
+                        dragOverCategory={dragOverCategory}
+                        dragOverTodoId={dragOverTodoId}
                       />
                       <CategoryColumn
                         title={categoryNames.weekly}
@@ -1016,12 +1514,17 @@ function App() {
                         onAddTodo={addTodo}
                         onToggleTodo={toggleTodo}
                         onDeleteTodo={deleteTodo}
+                        onUpdateTodo={updateTodo}
                         onRename={renameCategory}
                         currentFilter={currentFilter}
                         onAddSubtask={addSubtask}
                         onToggleSubtask={toggleSubtask}
                         onDeleteSubtask={deleteSubtask}
                         onReorder={reorderTodos}
+                        onTodoDragStart={handleTodoDragStart}
+                        draggingTodo={draggingTodo}
+                        dragOverCategory={dragOverCategory}
+                        dragOverTodoId={dragOverTodoId}
                       />
                       <CategoryColumn
                         title={categoryNames.longterm}
@@ -1030,12 +1533,17 @@ function App() {
                         onAddTodo={addTodo}
                         onToggleTodo={toggleTodo}
                         onDeleteTodo={deleteTodo}
+                        onUpdateTodo={updateTodo}
                         onRename={renameCategory}
                         currentFilter={currentFilter}
                         onAddSubtask={addSubtask}
                         onToggleSubtask={toggleSubtask}
                         onDeleteSubtask={deleteSubtask}
                         onReorder={reorderTodos}
+                        onTodoDragStart={handleTodoDragStart}
+                        draggingTodo={draggingTodo}
+                        dragOverCategory={dragOverCategory}
+                        dragOverTodoId={dragOverTodoId}
                       />
                     </div>
                   </div>
@@ -1066,6 +1574,26 @@ function App() {
           )}
         </div>
       </div>
+
+      {/* Drag Ghost - Notes style */}
+      {draggingTodo && (
+        <div
+          ref={todoDragGhostRef}
+          className="todo-drag-ghost"
+          style={{ width: draggingTodo.width }}
+        >
+          <div className="cc-item">
+            <div className="cc-item-main">
+              <div className="cc-drag-handle">⠿</div>
+              <label className="cc-label">
+                <span className="cc-checkmark"></span>
+                <span className="cc-text">{draggingTodo.todo.text}</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
@@ -1123,6 +1651,51 @@ function TimerPopupWrapper() {
       </div>
       <div className="timer-popup-body">
         <Timer isPopup={true} />
+      </div>
+    </div>
+  );
+}
+
+function QuickNotePopupWrapper() {
+  const closePopup = async () => {
+    try {
+      const { getCurrentWebviewWindow } = await import('@tauri-apps/api/webviewWindow');
+      await getCurrentWebviewWindow().close();
+    } catch {
+      try { await getCurrentWindow().close(); } catch {
+        try { await getCurrentWindow().destroy(); } catch {}
+      }
+    }
+  };
+
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const { getCurrentWebviewWindow } = await import('@tauri-apps/api/webviewWindow');
+        await getCurrentWebviewWindow().setAlwaysOnTop(true);
+      } catch {
+        try { await getCurrentWindow().setAlwaysOnTop(true); } catch {}
+      }
+    };
+    init();
+
+    const handleKey = (e) => {
+      if (e.key === 'Escape') closePopup();
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, []);
+
+  return (
+    <div className="qn-popup-container">
+      <div className="qn-popup-header">
+        <span className="qn-popup-header-title">Quick Note</span>
+        <div className="qn-popup-header-actions">
+          <button className="qn-popup-close-btn" onClick={closePopup} title="Close">×</button>
+        </div>
+      </div>
+      <div className="qn-popup-body">
+        <QuickNote isPopup={true} onClose={closePopup} />
       </div>
     </div>
   );

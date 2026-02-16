@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import './FlashCards.css';
+import { playTypeSoundThrottled, playClickSound, playAddSound, playDeleteSound } from '../utils/sounds';
 
 const DECK_COLORS = [
   '#58a6ff', '#7ee787', '#f85149', '#d29922', '#bc8cff',
@@ -7,8 +8,28 @@ const DECK_COLORS = [
 ];
 
 function FlashCards({ fullscreen = false }) {
-  const [cards, setCards] = useState([]);
-  const [decks, setDecks] = useState([]); // Array of {name, color}
+  const [cards, setCards] = useState(() => {
+    const saved = localStorage.getItem('flashCards');
+    if (saved) {
+      return JSON.parse(saved).map(card => ({
+        ...card,
+        group: card.group || 'General',
+        known: card.known !== undefined ? card.known : null,
+      }));
+    }
+    return [];
+  });
+  const [decks, setDecks] = useState(() => {
+    const saved = localStorage.getItem('flashCardGroups');
+    if (saved) {
+      const loaded = JSON.parse(saved);
+      if (loaded.length > 0 && typeof loaded[0] === 'string') {
+        return loaded.map((name, idx) => ({ name, color: DECK_COLORS[idx % DECK_COLORS.length] }));
+      }
+      return loaded;
+    }
+    return [];
+  });
   const [selectedDeck, setSelectedDeck] = useState(null);
   const [activeView, setActiveView] = useState('decks'); // 'decks', 'cards', 'study', 'results'
   const [editingCard, setEditingCard] = useState(null);
@@ -22,32 +43,29 @@ function FlashCards({ fullscreen = false }) {
   const [showNewDeckInput, setShowNewDeckInput] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(null);
 
-  // Load data
+  // Reload from localStorage when flashcards-updated event fires (from QuickNote)
   useEffect(() => {
-    const savedCards = localStorage.getItem('flashCards');
-    const savedDecks = localStorage.getItem('flashCardGroups');
-
-    if (savedCards) {
-      const loadedCards = JSON.parse(savedCards);
-      setCards(loadedCards.map(card => ({
-        ...card,
-        group: card.group || 'General',
-        known: card.known !== undefined ? card.known : null,
-      })));
-    }
-
-    if (savedDecks) {
-      const loaded = JSON.parse(savedDecks);
-      // Migrate old format (string array) to new format (object array)
-      if (loaded.length > 0 && typeof loaded[0] === 'string') {
-        setDecks(loaded.map((name, idx) => ({
-          name,
-          color: DECK_COLORS[idx % DECK_COLORS.length]
+    const reloadFromStorage = () => {
+      const savedCards = localStorage.getItem('flashCards');
+      const savedDecks = localStorage.getItem('flashCardGroups');
+      if (savedCards) {
+        setCards(JSON.parse(savedCards).map(card => ({
+          ...card,
+          group: card.group || 'General',
+          known: card.known !== undefined ? card.known : null,
         })));
-      } else {
-        setDecks(loaded);
       }
-    }
+      if (savedDecks) {
+        const loaded = JSON.parse(savedDecks);
+        if (loaded.length > 0 && typeof loaded[0] === 'string') {
+          setDecks(loaded.map((name, idx) => ({ name, color: DECK_COLORS[idx % DECK_COLORS.length] })));
+        } else {
+          setDecks(loaded);
+        }
+      }
+    };
+    window.addEventListener('flashcards-updated', reloadFromStorage);
+    return () => window.removeEventListener('flashcards-updated', reloadFromStorage);
   }, []);
 
   // Save data
@@ -123,12 +141,14 @@ function FlashCards({ fullscreen = false }) {
     setNewDeckName('');
     setShowNewDeckInput(false);
     setActiveView('cards');
+    playAddSound();
   };
 
   const deleteDeck = (deckName) => {
     const cardCount = getDeckCards(deckName).length;
     if (!window.confirm(`Delete "${deckName}" and its ${cardCount} cards?`)) return;
 
+    playDeleteSound();
     setCards(cards.filter(c => c.group !== deckName));
     setDecks(decks.filter(d => d.name !== deckName));
     if (selectedDeck === deckName) {
@@ -176,6 +196,7 @@ function FlashCards({ fullscreen = false }) {
     };
     setCards([...cards, card]);
     setEditingCard(null);
+    playAddSound();
   };
 
   const updateCard = (cardId, front, back) => {
@@ -261,7 +282,7 @@ function FlashCards({ fullscreen = false }) {
                   type="text"
                   placeholder="Deck name..."
                   value={newDeckName}
-                  onChange={(e) => setNewDeckName(e.target.value)}
+                  onChange={(e) => { playTypeSoundThrottled(); setNewDeckName(e.target.value); }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') createDeck();
                     if (e.key === 'Escape') {
@@ -376,7 +397,7 @@ function FlashCards({ fullscreen = false }) {
                     type="text"
                     className="fc-deck-title-input"
                     value={editingDeckTitle}
-                    onChange={(e) => setEditingDeckTitle(e.target.value)}
+                    onChange={(e) => { playTypeSoundThrottled(); setEditingDeckTitle(e.target.value); }}
                     onBlur={() => {
                       if (editingDeckTitle.trim()) {
                         renameDeck(selectedDeck, editingDeckTitle);
@@ -543,7 +564,7 @@ function FlashCards({ fullscreen = false }) {
 
             <div
               className={`fc-study-card ${isFlipped ? 'flipped' : ''}`}
-              onClick={() => setIsFlipped(!isFlipped)}
+              onClick={() => { playClickSound(); setIsFlipped(!isFlipped); }}
             >
               <div className="fc-study-card-inner">
                 <div className="fc-study-card-front">
@@ -625,7 +646,7 @@ function CardForm({ initialFront = '', initialBack = '', onSave, onCancel }) {
         type="text"
         placeholder="Front (Question)"
         value={front}
-        onChange={(e) => setFront(e.target.value)}
+        onChange={(e) => { playTypeSoundThrottled(); setFront(e.target.value); }}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && e.ctrlKey) handleSave();
           if (e.key === 'Escape') onCancel();
@@ -635,7 +656,7 @@ function CardForm({ initialFront = '', initialBack = '', onSave, onCancel }) {
         type="text"
         placeholder="Back (Answer)"
         value={back}
-        onChange={(e) => setBack(e.target.value)}
+        onChange={(e) => { playTypeSoundThrottled(); setBack(e.target.value); }}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && e.ctrlKey) handleSave();
           if (e.key === 'Escape') onCancel();
