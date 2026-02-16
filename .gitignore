@@ -28,7 +28,6 @@ yarn-error.log*
 
 # Tauri
 src-tauri/target/
-src-tauri/Cargo.lock
 
 # Temporary files
 create-icon.ps1
