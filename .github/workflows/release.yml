@@ -34,7 +34,7 @@ jobs:
           targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin' || '' }}
 
       - name: Install frontend dependencies
-        run: npm install --ignore-optional
+        run: npm install --legacy-peer-deps
 
       - name: Build the app
         uses: tauri-apps/tauri-action@v0
