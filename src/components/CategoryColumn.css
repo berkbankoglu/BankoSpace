@@ -121,10 +121,27 @@
   padding: 10px 12px;
   transition: all 0.2s ease;
   border: 1px solid transparent;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .cc-item:hover {
   border-color: #30363d;
+}
+
+.cc-item:active {
+  cursor: grabbing;
+}
+
+.cc-item.dragging {
+  opacity: 0.4;
+  border: 1px dashed #58a6ff;
+}
+
+.cc-item.drag-target {
+  border: 2px solid #58a6ff;
+  background: rgba(88, 166, 255, 0.06);
 }
 
 .cc-item.completed {
@@ -141,6 +158,27 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+
+/* Drag Handle */
+.cc-drag-handle {
+  color: #30363d;
+  font-size: 14px;
+  cursor: grab;
+  user-select: none;
+  flex-shrink: 0;
+  line-height: 1;
+  transition: color 0.15s ease;
+}
+
+.cc-item:hover .cc-drag-handle {
+  color: #484f58;
+}
+
+/* Column drag-over state */
+.category-column-v2.drag-over {
+  border-color: #58a6ff;
+  background: rgba(88, 166, 255, 0.05);
 }
 
 /* Label & Checkbox */
@@ -171,6 +209,7 @@
   width: 14px;
   height: 14px;
   border-radius: 3px;
+  border-width: 1.5px;
 }
 
 .cc-checkbox:checked + .cc-checkmark {
@@ -190,11 +229,12 @@
   transform: rotate(45deg);
 }
 
-.cc-checkmark.small.cc-checkbox:checked + .cc-checkmark::after {
+.cc-checkbox:checked + .cc-checkmark.small::after {
   left: 4px;
   top: 1px;
   width: 3px;
   height: 6px;
+  border-width: 0 1.5px 1.5px 0;
 }
 
 .cc-text {
@@ -202,6 +242,27 @@
   color: #c9d1d9;
   line-height: 1.4;
   word-break: break-word;
+}
+
+.cc-edit-input {
+  font-size: 13px;
+  color: #c9d1d9;
+  background: #0d1117;
+  border: 1px solid #58a6ff;
+  border-radius: 4px;
+  padding: 2px 6px;
+  outline: none;
+  flex: 1;
+  min-width: 0;
+}
+
+.cc-action-btn.edit-btn {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.cc-item:hover .cc-action-btn.edit-btn {
+  opacity: 1;
 }
 
 /* Item Meta */
@@ -277,9 +338,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 8px;
-  background: #161b22;
-  border-radius: 6px;
+  padding: 5px 8px;
+  background: rgba(13, 17, 23, 0.6);
+  border-radius: 5px;
 }
 
 .cc-subtask.completed .cc-text {
@@ -353,9 +414,140 @@
 
 /* Add Row - Always at bottom */
 .cc-add-row {
-  margin-top: auto;
-  padding-top: 12px;
-  border-top: 1px solid #21262d;
+  padding: 8px 0;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #21262d;
+}
+
+/* Date Picker */
+.cc-add-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cc-add-input-wrapper .cc-add-input {
+  flex: 1;
+}
+
+.cc-date-toggle-btn {
+  background: none;
+  border: 1px solid #21262d;
+  border-radius: 4px;
+  padding: 6px 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  color: #484f58;
+  line-height: 1;
+}
+
+.cc-date-toggle-btn:hover {
+  border-color: #58a6ff;
+  background: rgba(88, 166, 255, 0.1);
+}
+
+.cc-date-picker-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.cc-date-input {
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  padding: 6px 10px;
+  color: #c9d1d9;
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.cc-date-input:focus {
+  border-color: #58a6ff;
+}
+
+.cc-date-clear {
+  background: none;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  padding: 4px 8px;
+  color: #f85149;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cc-date-clear:hover {
+  background: rgba(248, 81, 73, 0.15);
+  border-color: #f85149;
+}
+
+.cc-due-date {
+  font-size: 11px;
+  color: #58a6ff;
+  margin-left: 8px;
+}
+
+.cc-due-date.overdue {
+  color: #f85149;
+}
+
+.cc-inline-date-picker {
+  margin-top: 8px;
+  padding-left: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cc-quick-dates {
+  display: flex;
+  gap: 6px;
+}
+
+.cc-quick-date-btn {
+  background: #1c2128;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  padding: 4px 10px;
+  color: #c9d1d9;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cc-quick-date-btn:hover {
+  border-color: #58a6ff;
+  background: rgba(88, 166, 255, 0.1);
+  color: #58a6ff;
+}
+
+.cc-quick-date-btn.active {
+  background: rgba(88, 166, 255, 0.2);
+  border-color: #58a6ff;
+  color: #58a6ff;
+}
+
+.cc-date-custom-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cc-date-toggle-btn.has-date {
+  border-color: #58a6ff;
+  color: #58a6ff;
+  font-size: 11px;
+  padding: 4px 8px;
+}
+
+.cc-action-btn.date-btn {
+  font-size: 13px;
 }
 
 /* ==========================================
@@ -405,6 +597,12 @@ body.light .cc-text {
   color: #37352f;
 }
 
+body.light .cc-edit-input {
+  color: #37352f;
+  background: #ffffff;
+  border-color: #0969da;
+}
+
 body.light .cc-item.completed .cc-text,
 body.light .cc-subtask.completed .cc-text {
   color: #999;
@@ -445,4 +643,88 @@ body.light .cc-add-row {
 
 body.light .cc-empty {
   color: #999;
+}
+
+body.light .cc-date-toggle-btn {
+  border-color: #e8e8e8;
+  color: #999;
+}
+
+body.light .cc-date-toggle-btn:hover {
+  border-color: #0969da;
+  background: rgba(9, 105, 218, 0.1);
+}
+
+body.light .cc-date-input {
+  background: #f7f7f7;
+  border-color: #e8e8e8;
+  color: #37352f;
+}
+
+body.light .cc-date-input:focus {
+  border-color: #0969da;
+  background: #fff;
+}
+
+body.light .cc-date-clear {
+  border-color: #e8e8e8;
+  color: #d1242f;
+}
+
+body.light .cc-date-clear:hover {
+  background: rgba(209, 36, 47, 0.1);
+  border-color: #d1242f;
+}
+
+body.light .cc-due-date {
+  color: #0969da;
+}
+
+body.light .cc-due-date.overdue {
+  color: #d1242f;
+}
+
+body.light .cc-quick-date-btn {
+  background: #f7f7f7;
+  border-color: #e8e8e8;
+  color: #37352f;
+}
+
+body.light .cc-quick-date-btn:hover {
+  border-color: #0969da;
+  background: rgba(9, 105, 218, 0.08);
+  color: #0969da;
+}
+
+body.light .cc-quick-date-btn.active {
+  background: rgba(9, 105, 218, 0.15);
+  border-color: #0969da;
+  color: #0969da;
+}
+
+body.light .cc-date-toggle-btn.has-date {
+  border-color: #0969da;
+  color: #0969da;
+}
+
+body.light .category-column-v2.drag-over {
+  border-color: #0969da;
+  background: rgba(9, 105, 218, 0.05);
+}
+
+body.light .cc-drag-handle {
+  color: #ddd;
+}
+
+body.light .cc-item:hover .cc-drag-handle {
+  color: #999;
+}
+
+body.light .cc-item.dragging {
+  border-color: #0969da;
+}
+
+body.light .cc-item.drag-target {
+  border: 2px solid #0969da;
+  background: rgba(9, 105, 218, 0.06);
 }

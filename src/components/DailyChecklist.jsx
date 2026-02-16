@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import './DailyChecklist.css';
+import { playTypeSoundThrottled, playCompleteSound, playUncompleteSound, playDeleteSound, playAddSound } from '../utils/sounds';
 
 function DailyChecklist({ storageKey = 'dailyChecklist', title, onTitleChange }) {
   const [items, setItems] = useState(() => {
@@ -60,6 +61,8 @@ function DailyChecklist({ storageKey = 'dailyChecklist', title, onTitleChange })
   }, [items, storageKey]);
 
   const toggleItem = (id) => {
+    const item = items.find(i => i.id === id);
+    if (item) { item.completed ? playUncompleteSound() : playCompleteSound(); }
     setItems(items.map(item =>
       item.id === id ? { ...item, completed: !item.completed } : item
     ));
@@ -74,12 +77,14 @@ function DailyChecklist({ storageKey = 'dailyChecklist', title, onTitleChange })
       };
       setItems([...items, newItem]);
       setNewItemText('');
+      playAddSound();
       // Input'a focus ver ki kullanıcı yazmaya devam edebilsin
       setTimeout(() => inputRef.current?.focus(), 0);
     }
   };
 
   const deleteItem = (id) => {
+    playDeleteSound();
     setItems(items.filter(item => item.id !== id));
   };
 
@@ -166,6 +171,24 @@ function DailyChecklist({ storageKey = 'dailyChecklist', title, onTitleChange })
         </div>
       )}
 
+      {/* Add New Item - At top */}
+      <div className="checklist-add-row">
+        <input
+          ref={inputRef}
+          type="text"
+          className="checklist-add-input"
+          placeholder="Add task and press Enter..."
+          value={newItemText}
+          onChange={(e) => { playTypeSoundThrottled(); setNewItemText(e.target.value); }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && newItemText.trim()) {
+              e.preventDefault();
+              addItem();
+            }
+          }}
+        />
+      </div>
+
       {/* Progress Bar */}
       {totalCount > 0 && (
         <div className="checklist-progress">
@@ -196,7 +219,7 @@ function DailyChecklist({ storageKey = 'dailyChecklist', title, onTitleChange })
                     type="text"
                     className="checklist-edit-input"
                     value={editingText}
-                    onChange={(e) => setEditingText(e.target.value)}
+                    onChange={(e) => { playTypeSoundThrottled(); setEditingText(e.target.value); }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') saveEdit(item.id);
                       if (e.key === 'Escape') {
@@ -245,23 +268,6 @@ function DailyChecklist({ storageKey = 'dailyChecklist', title, onTitleChange })
         )}
       </div>
 
-      {/* Add New Item - Always at bottom */}
-      <div className="checklist-add-row">
-        <input
-          ref={inputRef}
-          type="text"
-          className="checklist-add-input"
-          placeholder="Add task and press Enter..."
-          value={newItemText}
-          onChange={(e) => setNewItemText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && newItemText.trim()) {
-              e.preventDefault();
-              addItem();
-            }
-          }}
-        />
-      </div>
     </div>
   );
 }

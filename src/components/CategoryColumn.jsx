@@ -1,14 +1,18 @@
 import { useState, useRef } from 'react';
 import './CategoryColumn.css';
+import { playTypeSoundThrottled } from '../utils/sounds';
 
-function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDeleteTodo, currentFilter, onRename, onAddSubtask, onToggleSubtask, onDeleteSubtask, onReorder }) {
+function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDeleteTodo, onUpdateTodo, currentFilter, onRename, onAddSubtask, onToggleSubtask, onDeleteSubtask, onReorder, onTodoDragStart, draggingTodo, dragOverCategory, dragOverTodoId }) {
   const [inputValue, setInputValue] = useState('');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editTitleValue, setEditTitleValue] = useState(title);
   const [expandedTodo, setExpandedTodo] = useState(null);
   const [subtaskInput, setSubtaskInput] = useState('');
+  const [editingTodoId, setEditingTodoId] = useState(null);
+  const [editingTodoText, setEditingTodoText] = useState('');
   const inputRef = useRef(null);
   const subtaskInputRef = useRef(null);
+  const editInputRef = useRef(null);
 
   const activeCount = todos.filter(t => !t.completed).length;
   const completedCount = todos.filter(t => t.completed).length;
@@ -63,25 +67,15 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
     }
   };
 
-  const getTimeAgo = (timestamp) => {
-    const now = new Date();
-    const created = new Date(timestamp);
-    const diffMs = now - created;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return 'Şimdi';
-    if (diffMins < 60) return `${diffMins} dk önce`;
-    if (diffHours < 24) return `${diffHours} saat önce`;
-    if (diffDays < 7) return `${diffDays} gün önce`;
-    return created.toLocaleDateString('tr-TR');
-  };
+  const isDragOver = draggingTodo && dragOverCategory === category && draggingTodo.todo.category !== category;
 
   const sortedTodos = [...todos].sort((a, b) => (a.order || 0) - (b.order || 0));
 
   return (
-    <div className="category-column-v2">
+    <div
+      className={`category-column-v2 ${isDragOver ? 'drag-over' : ''}`}
+      data-category={category}
+    >
       {/* Header */}
       <div className="cc-header">
         {isEditingTitle ? (
@@ -89,7 +83,7 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
             type="text"
             className="cc-title-input"
             value={editTitleValue}
-            onChange={(e) => setEditTitleValue(e.target.value)}
+            onChange={(e) => { playTypeSoundThrottled(); setEditTitleValue(e.target.value); }}
             onKeyDown={handleTitleKeyPress}
             onBlur={handleTitleSave}
             autoFocus
@@ -103,20 +97,39 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
       </div>
 
       {/* Progress Bar */}
-      {totalCount > 0 && (
-        <div className="cc-progress">
-          <div className="cc-progress-bar">
-            <div className="cc-progress-fill" style={{ width: `${progress}%` }} />
-          </div>
-          <span className="cc-progress-text">{completedCount}/{totalCount}</span>
+      <div className="cc-progress">
+        <div className="cc-progress-bar">
+          <div className="cc-progress-fill" style={{ width: `${progress}%` }} />
         </div>
-      )}
+        <span className="cc-progress-text">{completedCount}/{totalCount}</span>
+      </div>
+
+      {/* Add New Task - Top */}
+      <div className="cc-add-row">
+        <div className="cc-add-input-wrapper">
+          <input
+            ref={inputRef}
+            type="text"
+            className="cc-add-input"
+            placeholder="Add task and press Enter..."
+            value={inputValue}
+            onChange={(e) => { playTypeSoundThrottled(); setInputValue(e.target.value); }}
+            onKeyDown={handleKeyPress}
+          />
+        </div>
+      </div>
 
       {/* Todo Items */}
       <div className="cc-items">
         {sortedTodos.map((todo) => (
-          <div key={todo.id} className={`cc-item ${todo.completed ? 'completed' : ''}`}>
+          <div
+            key={todo.id}
+            data-todo-id={todo.id}
+            className={`cc-item ${todo.completed ? 'completed' : ''} ${draggingTodo && draggingTodo.todo.id === todo.id ? 'dragging' : ''} ${dragOverTodoId && String(dragOverTodoId) === String(todo.id) ? 'drag-target' : ''}`}
+            onMouseDown={(e) => onTodoDragStart(e, todo)}
+          >
             <div className="cc-item-main">
+              <div className="cc-drag-handle" title="Surukle">⠿</div>
               <label className="cc-label">
                 <input
                   type="checkbox"
@@ -125,7 +138,32 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
                   onChange={() => onToggleTodo(todo.id)}
                 />
                 <span className="cc-checkmark"></span>
-                <span className="cc-text">{todo.text}</span>
+                {editingTodoId === todo.id ? (
+                  <input
+                    ref={editInputRef}
+                    type="text"
+                    className="cc-edit-input"
+                    value={editingTodoText}
+                    onChange={(e) => { playTypeSoundThrottled(); setEditingTodoText(e.target.value); }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && editingTodoText.trim()) {
+                        onUpdateTodo(todo.id, { text: editingTodoText.trim() });
+                        setEditingTodoId(null);
+                      } else if (e.key === 'Escape') {
+                        setEditingTodoId(null);
+                      }
+                    }}
+                    onBlur={() => {
+                      if (editingTodoText.trim() && editingTodoText.trim() !== todo.text) {
+                        onUpdateTodo(todo.id, { text: editingTodoText.trim() });
+                      }
+                      setEditingTodoId(null);
+                    }}
+                    autoFocus
+                  />
+                ) : (
+                  <span className="cc-text">{todo.text}</span>
+                )}
               </label>
               <div className="cc-item-actions">
                 {todo.subtasks && todo.subtasks.length > 0 && (
@@ -133,6 +171,16 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
                     {todo.subtasks.filter(s => s.completed).length}/{todo.subtasks.length}
                   </span>
                 )}
+                <button
+                  className="cc-action-btn edit-btn"
+                  onClick={() => {
+                    setEditingTodoId(todo.id);
+                    setEditingTodoText(todo.text);
+                  }}
+                  title="Edit"
+                >
+                  ✎
+                </button>
                 <button
                   className="cc-action-btn expand"
                   onClick={() => toggleExpand(todo.id)}
@@ -148,10 +196,6 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
                   ×
                 </button>
               </div>
-            </div>
-
-            <div className="cc-item-meta">
-              <span className="cc-time">{getTimeAgo(todo.createdAt)}</span>
             </div>
 
             {/* Subtasks */}
@@ -184,7 +228,7 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
                     className="cc-subtask-input"
                     placeholder="Add subtask..."
                     value={subtaskInput}
-                    onChange={(e) => setSubtaskInput(e.target.value)}
+                    onChange={(e) => { playTypeSoundThrottled(); setSubtaskInput(e.target.value); }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && subtaskInput.trim()) {
                         e.preventDefault();
@@ -205,19 +249,6 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
           <span>No tasks yet</span>
         </div>
       )}
-
-      {/* Add New Task - Always at Bottom */}
-      <div className="cc-add-row">
-        <input
-          ref={inputRef}
-          type="text"
-          className="cc-add-input"
-          placeholder="Add task and press Enter..."
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onKeyDown={handleKeyPress}
-        />
-      </div>
     </div>
   );
 }
