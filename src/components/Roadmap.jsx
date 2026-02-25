@@ -116,6 +116,48 @@ function Roadmap() {
       </div>
 
       <div className="roadmap-footer">
+        <button className="export-button" onClick={() => {
+          const dataStr = JSON.stringify(roadmapData, null, 2);
+          const dataBlob = new Blob([dataStr], { type: 'application/json' });
+          const url = URL.createObjectURL(dataBlob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `roadmap-${new Date().toISOString().split('T')[0]}.json`;
+          link.click();
+          URL.revokeObjectURL(url);
+        }}>
+          📤 Export Roadmap
+        </button>
+
+        <button className="import-button" onClick={() => {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = 'application/json';
+          input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+              const reader = new FileReader();
+              reader.onload = (event) => {
+                try {
+                  const imported = JSON.parse(event.target.result);
+                  if (imported.categories && Array.isArray(imported.categories)) {
+                    setRoadmapData(imported);
+                    alert('Roadmap başarıyla yüklendi!');
+                  } else {
+                    alert('Geçersiz roadmap formatı!');
+                  }
+                } catch (error) {
+                  alert('Dosya okunamadı: ' + error.message);
+                }
+              };
+              reader.readAsText(file);
+            }
+          };
+          input.click();
+        }}>
+          📥 Import Roadmap
+        </button>
+
         <button className="reset-button" onClick={() => {
           if (confirm('Tüm ilerlemeyi sıfırlamak istediğinize emin misiniz?')) {
             setRoadmapData(getInitialRoadmapData());
