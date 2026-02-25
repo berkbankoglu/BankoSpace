@@ -9,6 +9,7 @@ import IncomeTracker from './components/IncomeTracker';
 import Notes from './components/Notes';
 import Calendar from './components/Calendar';
 import QuickNote from './components/QuickNote';
+import Roadmap from './components/Roadmap';
 import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, playTypeSoundThrottled, setVolume, getVolume } from './utils/sounds';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
@@ -115,6 +116,9 @@ function App() {
       if (!parsed.find(item => item.id === 'quicknote')) {
         parsed.push({ id: 'quicknote', label: 'Quick Note', view: 'quicknote' });
       }
+      if (!parsed.find(item => item.id === 'roadmap')) {
+        parsed.push({ id: 'roadmap', label: '🎮 Roadmap', view: 'roadmap' });
+      }
       localStorage.setItem('sidebarOrder', JSON.stringify(parsed));
       return parsed;
     }
@@ -127,6 +131,7 @@ function App() {
       { id: 'income', label: 'Income Tracker', view: 'income' },
       { id: 'notes', label: 'Notes', view: 'notes' },
       { id: 'quicknote', label: 'Quick Note', view: 'quicknote' },
+      { id: 'roadmap', label: '🎮 Roadmap', view: 'roadmap' },
     ];
   });
   const [draggedSidebarItem, setDraggedSidebarItem] = useState(null);
@@ -1451,6 +1456,13 @@ function App() {
                 </button>
               </div>
               <QuickNote isPopup={true} />
+            </div>
+          )}
+
+          {/* Roadmap Full Screen View */}
+          {activeView === 'roadmap' && (
+            <div className="roadmap-fullscreen">
+              <Roadmap />
             </div>
           )}
 

@@ -8375,6 +8375,13 @@ body.light .references-header {
   overflow: hidden;
 }
 
+/* Roadmap Full Screen */
+.roadmap-fullscreen {
+  height: 100%;
+  overflow-y: auto;
+  background: var(--bg-primary);
+}
+
 /* Todo Drag Ghost - Notes style */
 .todo-drag-ghost {
   position: fixed;
