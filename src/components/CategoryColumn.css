@@ -158,6 +158,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  min-width: 0;
 }
 
 /* Drag Handle */
@@ -169,6 +170,9 @@
   flex-shrink: 0;
   line-height: 1;
   transition: color 0.15s ease;
+  padding: 6px 8px;
+  margin: -6px -4px;
+  border-radius: 4px;
 }
 
 .cc-item:hover .cc-drag-handle {
@@ -241,7 +245,10 @@
   font-size: 13px;
   color: #c9d1d9;
   line-height: 1.4;
-  word-break: break-word;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .cc-edit-input {
@@ -343,6 +350,19 @@
   border-radius: 5px;
 }
 
+.cc-subtask-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+
+.cc-subtask:hover .cc-subtask-actions {
+  opacity: 1;
+}
+
 .cc-subtask.completed .cc-text {
   text-decoration: line-through;
   color: #484f58;
@@ -354,6 +374,10 @@
 
 .cc-subtask .cc-text {
   font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .cc-subtask-add {

@@ -1,18 +1,41 @@
-import { useState, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import './CategoryColumn.css';
 import { playTypeSoundThrottled } from '../utils/sounds';
 
-function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDeleteTodo, onUpdateTodo, currentFilter, onRename, onAddSubtask, onToggleSubtask, onDeleteSubtask, onReorder, onTodoDragStart, draggingTodo, dragOverCategory, dragOverTodoId }) {
+function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDeleteTodo, onUpdateTodo, currentFilter, onRename, onAddSubtask, onToggleSubtask, onDeleteSubtask, onUpdateSubtask, onReorder, onTodoDragStart, draggingTodo, dragOverCategory, dragOverTodoId }) {
   const [inputValue, setInputValue] = useState('');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editTitleValue, setEditTitleValue] = useState(title);
-  const [expandedTodo, setExpandedTodo] = useState(null);
+  const [expandedTodos, setExpandedTodos] = useState(() => {
+    // Start with all todos that have subtasks expanded
+    const s = new Set();
+    todos.forEach(t => { if (t.subtasks && t.subtasks.length > 0) s.add(t.id); });
+    return s;
+  });
   const [subtaskInput, setSubtaskInput] = useState('');
   const [editingTodoId, setEditingTodoId] = useState(null);
   const [editingTodoText, setEditingTodoText] = useState('');
+  const [editingSubtaskId, setEditingSubtaskId] = useState(null);
+  const [editingSubtaskText, setEditingSubtaskText] = useState('');
   const inputRef = useRef(null);
   const subtaskInputRef = useRef(null);
   const editInputRef = useRef(null);
+  const editSubtaskInputRef = useRef(null);
+
+  // Auto-expand todos that have subtasks
+  useEffect(() => {
+    setExpandedTodos(prev => {
+      let changed = false;
+      const next = new Set(prev);
+      todos.forEach(t => {
+        if (t.subtasks && t.subtasks.length > 0 && !next.has(t.id)) {
+          next.add(t.id);
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [todos]);
 
   const activeCount = todos.filter(t => !t.completed).length;
   const completedCount = todos.filter(t => t.completed).length;
@@ -55,7 +78,12 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
   };
 
   const toggleExpand = (todoId) => {
-    setExpandedTodo(expandedTodo === todoId ? null : todoId);
+    setExpandedTodos(prev => {
+      const next = new Set(prev);
+      if (next.has(todoId)) next.delete(todoId);
+      else next.add(todoId);
+      return next;
+    });
     setSubtaskInput('');
   };
 
@@ -186,7 +214,7 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
                   onClick={() => toggleExpand(todo.id)}
                   title="Subtasks"
                 >
-                  {expandedTodo === todo.id ? '−' : '+'}
+                  {expandedTodos.has(todo.id) ? '−' : '+'}
                 </button>
                 <button
                   className="cc-action-btn delete"
@@ -199,11 +227,11 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
             </div>
 
             {/* Subtasks */}
-            {expandedTodo === todo.id && (
+            {expandedTodos.has(todo.id) && (
               <div className="cc-subtasks">
                 {todo.subtasks && todo.subtasks.map((subtask) => (
                   <div key={subtask.id} className={`cc-subtask ${subtask.completed ? 'completed' : ''}`}>
-                    <label className="cc-label">
+                    <label className="cc-label" onClick={(e) => { if (editingSubtaskId === subtask.id) e.preventDefault(); }}>
                       <input
                         type="checkbox"
                         className="cc-checkbox small"
@@ -211,14 +239,45 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
                         onChange={() => onToggleSubtask(todo.id, subtask.id)}
                       />
                       <span className="cc-checkmark small"></span>
-                      <span className="cc-text">{subtask.text}</span>
+                      {editingSubtaskId === subtask.id ? (
+                        <input
+                          ref={editSubtaskInputRef}
+                          type="text"
+                          className="cc-edit-input"
+                          value={editingSubtaskText}
+                          onChange={(e) => { playTypeSoundThrottled(); setEditingSubtaskText(e.target.value); }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && editingSubtaskText.trim()) {
+                              onUpdateSubtask && onUpdateSubtask(todo.id, subtask.id, editingSubtaskText.trim());
+                              setEditingSubtaskId(null);
+                            } else if (e.key === 'Escape') {
+                              setEditingSubtaskId(null);
+                            }
+                          }}
+                          onBlur={() => {
+                            if (editingSubtaskText.trim() && editingSubtaskText.trim() !== subtask.text) {
+                              onUpdateSubtask && onUpdateSubtask(todo.id, subtask.id, editingSubtaskText.trim());
+                            }
+                            setEditingSubtaskId(null);
+                          }}
+                          autoFocus
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      ) : (
+                        <span className="cc-text">{subtask.text}</span>
+                      )}
                     </label>
-                    <button
-                      className="cc-action-btn delete small"
-                      onClick={() => onDeleteSubtask(todo.id, subtask.id)}
-                    >
-                      ×
-                    </button>
+                    <div className="cc-subtask-actions">
+                      <button
+                        className="cc-action-btn edit-btn small"
+                        onClick={(e) => { e.stopPropagation(); setEditingSubtaskId(subtask.id); setEditingSubtaskText(subtask.text); }}
+                        title="Edit"
+                      >✎</button>
+                      <button
+                        className="cc-action-btn delete small"
+                        onClick={() => onDeleteSubtask(todo.id, subtask.id)}
+                      >×</button>
+                    </div>
                   </div>
                 ))}
                 <div className="cc-subtask-add">

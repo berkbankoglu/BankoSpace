@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 
-function Timer({ isPopup = false }) {
+function Timer({ isPopup = false, isCompact = false }) {
   const [timeLeft, setTimeLeft] = useState(0);
   const [initialTime, setInitialTime] = useState(25 * 60); // 25 dakika pomodoro varsayılan
   const [isRunning, setIsRunning] = useState(false);
@@ -162,7 +162,7 @@ function Timer({ isPopup = false }) {
   const presets = [5, 15, 25, 45, 60];
 
   // Open timer in popup window
-  const openPopup = async () => {
+  const openPopup = async (compact = false) => {
     try {
       // Save current timer state to localStorage for popup to read
       localStorage.setItem('timerPopupState', JSON.stringify({
@@ -172,12 +172,13 @@ function Timer({ isPopup = false }) {
         hasTimerRun
       }));
 
+      const url = compact ? 'index.html?popup=timer&compact=1' : 'index.html?popup=timer';
       const webview = new WebviewWindow('timer-popup', {
-        url: 'index.html?popup=timer',
+        url,
         title: 'Timer',
-        width: 320,
-        height: 420,
-        resizable: false,
+        width: compact ? 240 : 320,
+        height: compact ? 100 : 420,
+        resizable: compact ? false : false,
         alwaysOnTop: true,
         decorations: false,
         center: true,
@@ -235,6 +236,67 @@ function Timer({ isPopup = false }) {
     setHasTimerRun(false);
     stopAlarm();
   };
+
+  // Compact mode render (for mini popup)
+  if (isCompact) {
+    return (
+      <div className="timer-compact-body">
+        <div
+          className={`timer-compact-display ${isAlarming ? 'alarming' : ''}`}
+          onClick={() => !isRunning && setIsSettingTime(true)}
+        >
+          {isSettingTime ? (
+            <div className="timer-compact-set">
+              <input
+                type="number"
+                className="timer-compact-input"
+                value={inputMinutes}
+                onChange={(e) => setInputMinutes(e.target.value)}
+                placeholder="m"
+                min="0" max="180"
+                autoFocus
+              />
+              <span>:</span>
+              <input
+                type="number"
+                className="timer-compact-input"
+                value={inputSeconds}
+                onChange={(e) => setInputSeconds(e.target.value)}
+                placeholder="s"
+                min="0" max="59"
+              />
+              <button className="timer-compact-btn confirm" onClick={handleSetTime}>✓</button>
+              <button className="timer-compact-btn cancel" onClick={() => setIsSettingTime(false)}>✕</button>
+            </div>
+          ) : (
+            <span className="timer-compact-time">{formatTime(displayTime)}</span>
+          )}
+        </div>
+        {!isSettingTime && (
+          <div className="timer-compact-controls">
+            {timeLeft === 0 && hasTimerRun ? (
+              <>
+                <button className="timer-compact-btn" onClick={handleRepeat} title="Repeat">↺</button>
+                <button className="timer-compact-btn" onClick={handleStop} title="Reset">⏹</button>
+              </>
+            ) : isRunning ? (
+              <>
+                <button className="timer-compact-btn" onClick={handlePause} title="Pause">⏸</button>
+                <button className="timer-compact-btn" onClick={handleRestart} title="Restart">↺</button>
+              </>
+            ) : (
+              <>
+                <button className="timer-compact-btn play" onClick={handleStart} title="Start">▶</button>
+                {timeLeft > 0 && timeLeft < initialTime && (
+                  <button className="timer-compact-btn" onClick={handleStop} title="Reset">⏹</button>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className={`timer-large ${isPopup ? 'popup-mode' : ''}`}>
@@ -390,8 +452,11 @@ function Timer({ isPopup = false }) {
           {/* Popup button - only show in main window */}
           {!isPopup && (
             <div className="timer-popup-controls">
-              <button className="timer-popup-btn" onClick={openPopup} title="Open as popup">
+              <button className="timer-popup-btn" onClick={() => openPopup(false)} title="Open as popup">
                 ⬈ Popup
+              </button>
+              <button className="timer-popup-btn mini" onClick={() => openPopup(true)} title="Open as mini popup">
+                ⬈ Mini
               </button>
             </div>
           )}

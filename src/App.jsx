@@ -31,7 +31,8 @@ function App() {
 
   // Timer popup mode
   if (popupType === 'timer') {
-    return <TimerPopupWrapper />;
+    const isCompact = new URLSearchParams(window.location.search).get('compact') === '1';
+    return <TimerPopupWrapper isCompact={isCompact} />;
   }
 
   // QuickNote popup mode
@@ -150,10 +151,13 @@ function App() {
   const sidebarGhostRef = useRef(null);
   const sidebarPositionsRef = useRef({});
   const sidebarReorderLockRef = useRef(false);
+  const sidebarHoldTimerRef = useRef(null);
+  const sidebarDragJustEndedRef = useRef(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [showSearch, setShowSearch] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false); // Full sidebar collapsed
+
   const [todos, setTodos] = useState(() => {
     const saved = localStorage.getItem('todos');
     return saved ? JSON.parse(saved) : [];
@@ -246,6 +250,7 @@ function App() {
   // Sidebar drag & drop handlers - using refs for smooth performance
   const handleSidebarDragStart = useCallback((e, item, index) => {
     if (e.button !== 0) return;
+    if (!e.target.closest('.sidebar-drag-handle')) return; // Sadece drag handle'dan
     const rect = e.currentTarget.getBoundingClientRect();
     sidebarDragOffsetRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
     sidebarDragPosRef.current = { x: e.clientX, y: e.clientY };
@@ -517,6 +522,20 @@ function App() {
     }));
   };
 
+  const updateSubtask = (todoId, subtaskId, newText) => {
+    setTodos(todos.map(todo => {
+      if (todo.id === todoId) {
+        return {
+          ...todo,
+          subtasks: (todo.subtasks || []).map(st =>
+            st.id === subtaskId ? { ...st, text: newText } : st
+          )
+        };
+      }
+      return todo;
+    }));
+  };
+
   const reorderTodos = (category, startIndex, endIndex) => {
     console.log('Reorder called:', { category, startIndex, endIndex });
 
@@ -639,10 +658,11 @@ function App() {
   const todoPositionsRef = useRef({});
   const dragOverCategoryRef = useRef(null);
   const dragOverTodoRef = useRef(null);
+  const todoHoldTimerRef = useRef(null);
 
   const handleTodoDragStart = useCallback((e, todo) => {
     if (e.button !== 0) return;
-    if (e.target.closest('input, button, .cc-checkbox, .cc-checkmark, .cc-text, .cc-item-actions')) return;
+    if (!e.target.closest('.cc-drag-handle')) return; // Sadece drag handle'dan
 
     const itemEl = e.target.closest('.cc-item');
     if (!itemEl) return;
@@ -659,7 +679,7 @@ function App() {
       }
     });
     e.preventDefault();
-  }, []);
+  }, [todos]);
 
   const handleTodoDragMove = useCallback((e) => {
     if (!draggingTodo) return;
@@ -1329,6 +1349,7 @@ function App() {
                   }}
                 >
                   <span className="item-name">{item.label}</span>
+                  <span className="sidebar-drag-handle">⠿</span>
                 </div>
               ))}
 
@@ -1342,6 +1363,7 @@ function App() {
                   }}
                 >
                   <span className="item-name">{draggedSidebarItem.item.label}</span>
+                  <span className="sidebar-drag-handle">⠿</span>
                 </div>
               )}
 
@@ -1476,7 +1498,7 @@ function App() {
               {/* Left Side - Todo Lists */}
               <div className="dashboard-left">
                 {/* To-Do Lists Section */}
-                <div className="app-section">
+                <div className={`app-section ${todoCollapsed ? 'section-collapsed' : ''}`}>
                   <div
                     className="section-unified-header"
                     onClick={() => setTodoCollapsed(!todoCollapsed)}
@@ -1501,6 +1523,7 @@ function App() {
                         onAddSubtask={addSubtask}
                         onToggleSubtask={toggleSubtask}
                         onDeleteSubtask={deleteSubtask}
+                        onUpdateSubtask={updateSubtask}
                         onReorder={reorderTodos}
                         onTodoDragStart={handleTodoDragStart}
                         draggingTodo={draggingTodo}
@@ -1520,6 +1543,7 @@ function App() {
                         onAddSubtask={addSubtask}
                         onToggleSubtask={toggleSubtask}
                         onDeleteSubtask={deleteSubtask}
+                        onUpdateSubtask={updateSubtask}
                         onReorder={reorderTodos}
                         onTodoDragStart={handleTodoDragStart}
                         draggingTodo={draggingTodo}
@@ -1539,6 +1563,7 @@ function App() {
                         onAddSubtask={addSubtask}
                         onToggleSubtask={toggleSubtask}
                         onDeleteSubtask={deleteSubtask}
+                        onUpdateSubtask={updateSubtask}
                         onReorder={reorderTodos}
                         onTodoDragStart={handleTodoDragStart}
                         draggingTodo={draggingTodo}
@@ -1599,7 +1624,7 @@ function App() {
 }
 
 // Timer Popup Wrapper Component
-function TimerPopupWrapper() {
+function TimerPopupWrapper({ isCompact = false }) {
   const [isAlwaysOnTop, setIsAlwaysOnTop] = useState(true);
 
   useEffect(() => {
@@ -1631,6 +1656,25 @@ function TimerPopupWrapper() {
       console.error('Failed to close popup:', err);
     }
   };
+
+  if (isCompact) {
+    return (
+      <div className="timer-mini-popup-container">
+        <div className="timer-mini-popup-header">
+          <span className="timer-mini-popup-title">Timer</span>
+          <div className="timer-mini-popup-actions">
+            <button
+              className={`timer-mini-pin-btn ${isAlwaysOnTop ? 'active' : ''}`}
+              onClick={toggleAlwaysOnTop}
+              title={isAlwaysOnTop ? 'Unpin' : 'Pin'}
+            >📌</button>
+            <button className="timer-mini-close-btn" onClick={closePopup}>×</button>
+          </div>
+        </div>
+        <Timer isPopup={true} isCompact={true} />
+      </div>
+    );
+  }
 
   return (
     <div className="timer-popup-container">
