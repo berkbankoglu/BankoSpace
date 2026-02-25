@@ -235,25 +235,59 @@
 .roadmap-footer {
   margin-top: 40px;
   padding: 20px;
-  text-align: center;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
+.export-button,
+.import-button,
 .reset-button {
   padding: 12px 24px;
-  background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: 8px;
-  color: var(--text-primary);
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
   transition: all 0.2s ease;
 }
 
+.export-button {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border-color: #10b981;
+}
+
+.export-button:hover {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+  transform: translateY(-2px);
+}
+
+.import-button {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  border-color: #3b82f6;
+}
+
+.import-button:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  transform: translateY(-2px);
+}
+
+.reset-button {
+  background: var(--bg-secondary);
+  border-color: var(--border);
+  color: var(--text-primary);
+}
+
 .reset-button:hover {
   background: var(--bg-hover);
-  border-color: var(--accent-red);
-  color: var(--accent-red);
+  border-color: #ef4444;
+  color: #ef4444;
+  transform: translateY(-2px);
 }
 
 /* Dark theme specific */
