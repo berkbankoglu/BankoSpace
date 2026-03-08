@@ -30,4 +30,4 @@ yarn-error.log*
 src-tauri/target/
 
 # Temporary files
-create-icon.ps1
+create-icon.ps1.claude/
