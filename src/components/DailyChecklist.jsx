@@ -28,7 +28,7 @@ function DailyChecklist({ storageKey = 'dailyChecklist', title, onTitleChange })
 
   const colors = [
     '#667eea', '#f093fb', '#4ade80', '#60a5fa',
-    '#fb923c', '#f87171', '#58a6ff', '#9ca3af'
+    '#fb923c', '#f87171', '#5c7cfa', '#9ca3af'
   ];
 
   // Save color to localStorage

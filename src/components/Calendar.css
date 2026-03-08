@@ -58,9 +58,9 @@
 
 .calendar-today-btn {
   background: rgba(88, 166, 255, 0.15);
-  border: 1px solid #58a6ff;
+  border: 1px solid #5c7cfa;
   border-radius: 4px;
-  color: #58a6ff;
+  color: #5c7cfa;
   padding: 6px 14px;
   cursor: pointer;
   font-size: 13px;
@@ -133,16 +133,16 @@
 }
 
 .calendar-day.today {
-  border-color: #58a6ff;
+  border-color: #5c7cfa;
 }
 
 .calendar-day.today .calendar-day-number {
-  color: #58a6ff;
+  color: #5c7cfa;
   font-weight: 700;
 }
 
 .calendar-day.selected {
-  border-color: #58a6ff;
+  border-color: #5c7cfa;
   background: rgba(88, 166, 255, 0.1);
 }
 
@@ -164,7 +164,7 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #58a6ff;
+  background: #5c7cfa;
 }
 
 .calendar-dot.completed {
@@ -177,7 +177,7 @@
 
 .calendar-day-count {
   font-size: 10px;
-  color: #58a6ff;
+  color: #5c7cfa;
   font-weight: 600;
 }
 
@@ -310,7 +310,7 @@
 .calendar-todo-category {
   font-size: 10px;
   background: rgba(88, 166, 255, 0.2);
-  color: #58a6ff;
+  color: #5c7cfa;
   padding: 2px 6px;
   border-radius: 4px;
   flex-shrink: 0;

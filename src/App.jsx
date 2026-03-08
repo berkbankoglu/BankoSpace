@@ -8,13 +8,18 @@ import DailyChecklist from './components/DailyChecklist';
 import IncomeTracker from './components/IncomeTracker';
 import Notes from './components/Notes';
 import Calendar from './components/Calendar';
-import QuickNote from './components/QuickNote';
+import StockNews from './components/StockNews';
+import StockChart from './components/StockChart';
+import StockMiniChart from './components/StockMiniChart';
+import ProjectBid from './components/ProjectBid';
 import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, playTypeSoundThrottled, setVolume, getVolume } from './utils/sounds';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
 const APP_VERSION = '3.0.0';
+const MIN_COL_PX = 220;
+const DEFAULT_COL_PX = [null, null]; // [dailyPx, stockPx] — null = auto (flex:1 each side)
 
 function App() {
   // Check if this is a popup window
@@ -35,35 +40,89 @@ function App() {
     return <TimerPopupWrapper isCompact={isCompact} />;
   }
 
-  // QuickNote popup mode
-  if (popupType === 'quicknote') {
-    return <QuickNotePopupWrapper />;
-  }
+
+  // [dailyPx, stockPx] — Weekly is flex:1 in the middle, always fills remaining space
+  const [colWidths, setColWidths] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('dashColWidths'));
+      if (Array.isArray(saved) && saved.length === 2 &&
+          saved.every(w => w === null || (typeof w === 'number' && w >= MIN_COL_PX && w <= 1200))) {
+        return saved;
+      }
+    } catch {}
+    return DEFAULT_COL_PX;
+  });
+  const colResizeRef = useRef(null);
+  const columnsRef = useRef(null);
+
+  const [stockTickers, setStockTickers] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('stock_tickers')) || ['NBIS']; } catch { return ['NBIS']; }
+  });
+  const [activeStockTicker, setActiveStockTicker] = useState('all');
+  const [newsFilterTicker, setNewsFilterTicker] = useState('all');
+
+  const [priceTickers, setPriceTickers] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('price_tickers')) || []; } catch { return []; }
+  });
+  const savePriceTickers = (next) => {
+    localStorage.setItem('price_tickers', JSON.stringify(next));
+    setPriceTickers(next);
+  };
+
+  const startColResize = (handleIdx, e) => {
+    e.preventDefault();
+    const container = columnsRef.current;
+    if (!container) return;
+
+    const kids = Array.from(container.children).filter(el => !el.classList.contains('col-resize-handle'));
+    const startPx = kids.map(el => el.getBoundingClientRect().width);
+    // startPx[0]=daily, startPx[1]=weekly, startPx[2]=stock
+    const startX = e.clientX;
+    // Pin both sides from DOM so weekly always absorbs
+    const startDaily = startPx[0];
+    const startStock = startPx[2];
+
+    const onMove = (ev) => {
+      const delta = ev.clientX - startX;
+      if (handleIdx === 0) {
+        // Handle 0: Daily grows/shrinks, Weekly absorbs. Stock stays pinned.
+        const newDaily = Math.max(MIN_COL_PX, Math.min(startDaily + delta, startDaily + startPx[1] - MIN_COL_PX));
+        setColWidths([newDaily, startStock]);
+      } else {
+        // Handle 1: Stock grows/shrinks (inverted delta), Weekly absorbs. Daily stays pinned.
+        const newStock = Math.max(MIN_COL_PX, Math.min(startStock - delta, startPx[1] + startStock - MIN_COL_PX));
+        setColWidths([startDaily, newStock]);
+      }
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      setColWidths(prev => { localStorage.setItem('dashColWidths', JSON.stringify(prev)); return prev; });
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  };
 
   const [showUpdateWarning, setShowUpdateWarning] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  // Auto-update check disabled - no overlay
-  // useEffect(() => {
-  //   const checkForUpdates = async () => {
-  //     try {
-  //       console.log('Checking for updates...');
-  //       const update = await check();
-  //       if (update) {
-  //         console.log(`Update available: ${update.version} (current: ${update.currentVersion})`);
-  //         setUpdateAvailable(update);
-  //       } else {
-  //         console.log('No updates available');
-  //       }
-  //     } catch (error) {
-  //       console.error('Failed to check for updates:', error);
-  //     }
-  //   };
-  //   checkForUpdates();
-  //   const interval = setInterval(checkForUpdates, 10 * 60 * 1000);
-  //   return () => clearInterval(interval);
-  // }, []);
+  // Auto-update check
+  useEffect(() => {
+    const checkForUpdates = async () => {
+      try {
+        const update = await check();
+        if (update) {
+          setUpdateAvailable(update);
+        }
+      } catch (error) {
+        // Güncelleme kontrolü sessizce başarısız olabilir
+      }
+    };
+    checkForUpdates();
+    const interval = setInterval(checkForUpdates, 10 * 60 * 1000); // 10 dakikada bir
+    return () => clearInterval(interval);
+  }, []);
 
   // Install update function
   const installUpdate = async () => {
@@ -100,36 +159,53 @@ function App() {
     }
     localStorage.setItem('appVersion', APP_VERSION);
   }, []);
+
+
   const [showSettings, setShowSettings] = useState(false);
   const [showSidebarSettings, setShowSidebarSettings] = useState(false);
   const [settingsClosing, setSettingsClosing] = useState(false);
   const [soundVolume, setSoundVolume] = useState(() => getVolume());
   const [activeView, setActiveView] = useState('dashboard');
   const [sidebarItems, setSidebarItems] = useState(() => {
+    const defaults = [
+      { id: 'dashboard',  label: 'Dashboard',      view: 'dashboard',  hidden: false },
+      { id: 'calendar',   label: 'Calendar',        view: 'calendar',   hidden: false },
+      { id: 'references', label: 'References',      view: 'references', hidden: false },
+      { id: 'flashcards', label: 'Flash Cards',     view: 'flashcards', hidden: false },
+      { id: 'checklists', label: 'Checklists',      view: 'checklists', hidden: false },
+      { id: 'income',     label: 'Income Tracker',  view: 'income',     hidden: false },
+      { id: 'notes',      label: 'Notes',           view: 'notes',      hidden: false },
+      { id: 'projectbid', label: 'Project Bid',     view: 'projectbid', hidden: false },
+    ];
     const saved = localStorage.getItem('sidebarOrder');
     if (saved) {
-      const parsed = JSON.parse(saved);
-      if (!parsed.find(item => item.id === 'calendar')) {
-        parsed.splice(1, 0, { id: 'calendar', label: 'Calendar', view: 'calendar' });
-      }
-      if (!parsed.find(item => item.id === 'quicknote')) {
-        parsed.push({ id: 'quicknote', label: 'Quick Note', view: 'quicknote' });
-      }
-      localStorage.setItem('sidebarOrder', JSON.stringify(parsed));
-      return parsed;
+      const parsed = JSON.parse(saved).filter(item => item.id !== 'quicknote');
+      // Merge: keep saved order/hidden state, add any missing defaults
+      const merged = parsed.map(item => {
+        const def = defaults.find(d => d.id === item.id);
+        return def ? { ...def, ...item } : item;
+      });
+      defaults.forEach(def => {
+        if (!merged.find(m => m.id === def.id)) merged.push(def);
+      });
+      localStorage.setItem('sidebarOrder', JSON.stringify(merged));
+      return merged;
     }
-    return [
-      { id: 'dashboard', label: 'Dashboard', view: 'dashboard' },
-      { id: 'calendar', label: 'Calendar', view: 'calendar' },
-      { id: 'references', label: 'References', view: 'references' },
-      { id: 'flashcards', label: 'Flash Cards', view: 'flashcards' },
-      { id: 'checklists', label: 'Checklists', view: 'checklists' },
-      { id: 'income', label: 'Income Tracker', view: 'income' },
-      { id: 'notes', label: 'Notes', view: 'notes' },
-      { id: 'quicknote', label: 'Quick Note', view: 'quicknote' },
-    ];
+    return defaults;
   });
   const [draggedSidebarItem, setDraggedSidebarItem] = useState(null);
+
+  const togglePageVisibility = (id) => {
+    if (id === 'dashboard') return;
+    const updated = sidebarItems.map(item =>
+      item.id === id ? { ...item, hidden: !item.hidden } : item
+    );
+    setSidebarItems(updated);
+    localStorage.setItem('sidebarOrder', JSON.stringify(updated));
+    const toggled = updated.find(i => i.id === id);
+    if (toggled?.hidden && activeView === toggled.view) setActiveView('dashboard');
+  };
+
   const todosHistoryRef = useRef([]);
   const MAX_UNDO_STEPS = 30;
 
@@ -169,10 +245,6 @@ function App() {
   });
 
   // Collapse states for sections
-  const [todoCollapsed, setTodoCollapsed] = useState(() => {
-    const saved = localStorage.getItem('todoCollapsed');
-    return saved === 'true';
-  });
   const [referencesCollapsed, setReferencesCollapsed] = useState(() => {
     const saved = localStorage.getItem('referencesCollapsed');
     return saved === 'true';
@@ -189,6 +261,30 @@ function App() {
     const saved = localStorage.getItem('timerCollapsed');
     return saved === 'true';
   });
+  const [timerWidgetOpen, setTimerWidgetOpen] = useState(false);
+  const [timerWidgetCompact, setTimerWidgetCompact] = useState(true);
+  const [timerWidgetPos, setTimerWidgetPos] = useState({ top: 0, left: 0 });
+  const timerBtnRef = useRef(null);
+
+  const handleTimerDragStart = (e) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const origTop = timerWidgetPos.top;
+    const origLeft = timerWidgetPos.left;
+    const onMove = (ev) => {
+      setTimerWidgetPos({
+        top: origTop + ev.clientY - startY,
+        left: origLeft + ev.clientX - startX,
+      });
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
   const [dailyChecklistCollapsed, setDailyChecklistCollapsed] = useState(() => {
     const saved = localStorage.getItem('dailyChecklistCollapsed');
     return saved === 'true';
@@ -362,9 +458,6 @@ function App() {
   }, [theme]);
 
   // Save collapse states to localStorage
-  useEffect(() => {
-    localStorage.setItem('todoCollapsed', todoCollapsed);
-  }, [todoCollapsed]);
 
   useEffect(() => {
     localStorage.setItem('referencesCollapsed', referencesCollapsed);
@@ -940,33 +1033,47 @@ function App() {
   // Export: Tüm verileri JSON dosyası olarak indir
   const exportData = async () => {
     try {
-      // localStorage'daki tüm verileri topla
+      const get = (key, fallback) => localStorage.getItem(key) || fallback;
       const data = {
-        todos: todos,
-        refImages: localStorage.getItem('refImages') || '[]',
-        refTexts: localStorage.getItem('refTexts') || '[]',
-        flashCards: localStorage.getItem('flashCards') || '[]',
-        flashCardGroups: localStorage.getItem('flashCardGroups') || '[]',
-        goals: localStorage.getItem('goals') || '[]',
-        studyReminders: localStorage.getItem('studyReminders') || '[]',
-        streakData: localStorage.getItem('streakData') || '{}',
+        version: '5.0',
         exportDate: new Date().toISOString(),
-        version: '4.2'
+        // Core data
+        todos: todos,
+        notes: get('notes', '[]'),
+        flashCards: get('flashCards', '[]'),
+        flashCardGroups: get('flashCardGroups', '[]'),
+        goals: get('goals', '[]'),
+        invoices: get('invoices', '[]'),
+        quickNotes: get('quickNotes', '[]'),
+        // Checklists
+        dailyChecklistItems: get('dailyChecklistItems', '[]'),
+        dailyChecklistLastReset: get('dailyChecklistLastReset', ''),
+        dailyChecklistColor: get('dailyChecklistColor', ''),
+        longtermChecklistItems: get('longtermChecklistItems', '[]'),
+        longtermChecklistLastReset: get('longtermChecklistLastReset', ''),
+        longtermChecklistColor: get('longtermChecklistColor', ''),
+        // References
+        refImages: get('refImages', '[]'),
+        refTexts: get('refTexts', '[]'),
+        // User data
+        streakData: get('streakData', '{}'),
+        studyReminders: get('studyReminders', '[]'),
+        loginHeatmap: get('loginHeatmap', '{}'),
+        // Settings
+        categoryNames: get('categoryNames', '{}'),
+        checklistNames: get('checklistNames', '{}'),
+        sidebarOrder: get('sidebarOrder', '[]'),
+        theme: get('theme', 'dark'),
       };
 
       const dataStr = JSON.stringify(data, null, 2);
-
-      // Tauri dialog API'sini kullan
       const { save } = await import('@tauri-apps/plugin-dialog');
       const { writeTextFile } = await import('@tauri-apps/plugin-fs');
 
       const date = new Date().toISOString().split('T')[0];
       const filePath = await save({
-        defaultPath: `todo-yedek-${date}.json`,
-        filters: [{
-          name: 'JSON',
-          extensions: ['json']
-        }]
+        defaultPath: `bankospace-backup-${date}.json`,
+        filters: [{ name: 'JSON', extensions: ['json'] }]
       });
 
       if (filePath) {
@@ -987,10 +1094,7 @@ function App() {
 
       const filePath = await open({
         multiple: false,
-        filters: [{
-          name: 'JSON',
-          extensions: ['json']
-        }]
+        filters: [{ name: 'JSON', extensions: ['json'] }]
       });
 
       if (!filePath) return;
@@ -998,46 +1102,35 @@ function App() {
       const fileContent = await readTextFile(filePath);
       const data = JSON.parse(fileContent);
 
-      // Todo'ları yükle
+      // Core data
       if (data.todos) {
         setTodos(data.todos);
         localStorage.setItem('todos', JSON.stringify(data.todos));
       }
+      const setRaw = (key, val) => { if (val !== undefined && val !== null) localStorage.setItem(key, val); };
+      const setJSON = (key, val) => { if (val !== undefined && val !== null) localStorage.setItem(key, typeof val === 'string' ? val : JSON.stringify(val)); };
 
-      // Referans resimlerini yükle
-      if (data.refImages) {
-        localStorage.setItem('refImages', data.refImages);
-      }
-
-      // Referans metinlerini yükle
-      if (data.refTexts) {
-        localStorage.setItem('refTexts', data.refTexts);
-      }
-
-      // FlashCards'ları yükle
-      if (data.flashCards) {
-        localStorage.setItem('flashCards', data.flashCards);
-      }
-
-      // FlashCard gruplarını yükle
-      if (data.flashCardGroups) {
-        localStorage.setItem('flashCardGroups', data.flashCardGroups);
-      }
-
-      // Streak verisini yükle
-      if (data.streakData) {
-        localStorage.setItem('streakData', data.streakData);
-      }
-
-      // Goals'ı yükle
-      if (data.goals) {
-        localStorage.setItem('goals', data.goals);
-      }
-
-      // Study Reminders'ı yükle
-      if (data.studyReminders) {
-        localStorage.setItem('studyReminders', data.studyReminders);
-      }
+      setJSON('notes', data.notes);
+      setJSON('flashCards', data.flashCards);
+      setJSON('flashCardGroups', data.flashCardGroups);
+      setJSON('goals', data.goals);
+      setJSON('invoices', data.invoices);
+      setJSON('quickNotes', data.quickNotes);
+      setJSON('dailyChecklistItems', data.dailyChecklistItems);
+      setRaw('dailyChecklistLastReset', data.dailyChecklistLastReset);
+      setRaw('dailyChecklistColor', data.dailyChecklistColor);
+      setJSON('longtermChecklistItems', data.longtermChecklistItems);
+      setRaw('longtermChecklistLastReset', data.longtermChecklistLastReset);
+      setRaw('longtermChecklistColor', data.longtermChecklistColor);
+      setJSON('refImages', data.refImages);
+      setJSON('refTexts', data.refTexts);
+      setJSON('streakData', data.streakData);
+      setJSON('studyReminders', data.studyReminders);
+      setJSON('loginHeatmap', data.loginHeatmap);
+      setJSON('categoryNames', data.categoryNames);
+      setJSON('checklistNames', data.checklistNames);
+      setJSON('sidebarOrder', data.sidebarOrder);
+      if (data.theme) setRaw('theme', data.theme);
 
       alert('Data successfully imported! Page will reload.');
       window.location.reload();
@@ -1176,7 +1269,20 @@ function App() {
         </div>
       )}
 
-      {/* Auto-update notification modal - disabled */}
+      {/* Auto-update notification */}
+      {updateAvailable && (
+        <div className="update-banner">
+          <span>🚀 New version available: <strong>v{updateAvailable.version}</strong></span>
+          <button
+            className="update-install-btn"
+            onClick={installUpdate}
+            disabled={isUpdating}
+          >
+            {isUpdating ? 'Installing...' : 'Install & Restart'}
+          </button>
+          <button className="update-dismiss-btn" onClick={() => setUpdateAvailable(null)}>✕</button>
+        </div>
+      )}
 
       <div className="content-wrapper">
         {/* Left Sidebar - Notion Style */}
@@ -1208,6 +1314,23 @@ function App() {
           {/* Sidebar Settings Dropdown */}
           {showSidebarSettings && !sidebarCollapsed && (
             <div className={`sidebar-settings-dropdown ${settingsClosing ? 'closing' : ''}`} onClick={(e) => e.stopPropagation()}>
+              <div className="sidebar-settings-section">
+                <div className="sidebar-settings-pages-label">Anthropic API Key</div>
+                <div className="sidebar-apikey-row">
+                  <input
+                    type="password"
+                    className="sidebar-apikey-input"
+                    defaultValue={localStorage.getItem('anthropic_api_key') || ''}
+                    placeholder="sk-ant-..."
+                    onBlur={e => {
+                      const val = e.target.value.trim();
+                      if (val) localStorage.setItem('anthropic_api_key', val);
+                      else localStorage.removeItem('anthropic_api_key');
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="sidebar-settings-divider" />
               <div className="sidebar-settings-section">
                 <div className="sidebar-settings-row">
                   <span className="sidebar-settings-label">Volume</span>
@@ -1268,6 +1391,16 @@ function App() {
                 >
                   Reset All Data
                 </button>
+              </div>
+              <div className="sidebar-settings-divider" />
+              <div className="sidebar-settings-section">
+                <div className="sidebar-settings-pages-label">Pages</div>
+                {sidebarItems.filter(item => item.id !== 'dashboard').map(item => (
+                  <div key={item.id} className="sidebar-settings-page-row" onClick={() => togglePageVisibility(item.id)}>
+                    <span className={`sidebar-settings-page-toggle ${item.hidden ? '' : 'active'}`} />
+                    <span className="sidebar-settings-page-name">{item.label}</span>
+                  </div>
+                ))}
               </div>
               <div className="sidebar-settings-divider" />
               <div className="sidebar-settings-version">BankoSpace v{APP_VERSION}</div>
@@ -1336,7 +1469,7 @@ function App() {
               </div>
 
               {/* Draggable Sidebar Items */}
-              {sidebarItems.map((item, index) => (
+              {sidebarItems.filter(item => !item.hidden).map((item, index) => (
                 <div
                   key={item.id}
                   data-sidebar-id={item.id}
@@ -1423,36 +1556,6 @@ function App() {
             </div>
           )}
 
-          {activeView === 'quicknote' && (
-            <div className="quicknote-fullscreen">
-              <div className="quicknote-page-header">
-                <h2 className="quicknote-page-title">Quick Note</h2>
-                <button
-                  className="quicknote-popup-btn"
-                  onClick={async () => {
-                    playClickSound();
-                    const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
-                    const webview = new WebviewWindow('quicknote-popup', {
-                      url: 'index.html?popup=quicknote',
-                      title: 'Quick Note',
-                      width: 620,
-                      height: 500,
-                      resizable: true,
-                      alwaysOnTop: true,
-                      decorations: false,
-                      center: true,
-                      focus: true,
-                    });
-                    webview.once('tauri://error', () => {});
-                  }}
-                  title="Open as popup"
-                >
-                  ↗
-                </button>
-              </div>
-              <QuickNote isPopup={true} />
-            </div>
-          )}
 
           {/* Calendar Full Screen View */}
           {activeView === 'calendar' && (
@@ -1465,6 +1568,13 @@ function App() {
             </div>
           )}
 
+          {/* Project Bid View */}
+          {activeView === 'projectbid' && (
+            <div className="projectbid-fullscreen">
+              <ProjectBid />
+            </div>
+          )}
+
           {/* Dashboard View */}
           {activeView === 'dashboard' && (
           <div className="dashboard-container">
@@ -1472,6 +1582,18 @@ function App() {
             <div className="dashboard-header">
               <h1 className="dashboard-title">Dashboard</h1>
               <div className="filters">
+                <button
+                  ref={timerBtnRef}
+                  className="dashboard-timer-toggle-btn"
+                  onClick={async () => {
+                    playClickSound();
+                    const { invoke } = await import('@tauri-apps/api/core');
+                    await invoke('toggle_timer_window');
+                  }}
+                  title="Timer"
+                >
+                  ⏱ Timer
+                </button>
                 <button
                   className={`filter-btn ${currentFilter === 'all' ? 'active' : ''}`}
                   onClick={() => { playClickSound(); setCurrentFilter('all'); }}
@@ -1490,115 +1612,96 @@ function App() {
                 >
                   Completed
                 </button>
+                <button
+                  className={`filter-btn sound-toggle-btn ${soundVolume === 0 ? 'muted' : ''}`}
+                  onClick={() => {
+                    if (soundVolume > 0) {
+                      localStorage.setItem('soundVolumePrev', String(soundVolume));
+                      setSoundVolume(0);
+                      setVolume(0);
+                    } else {
+                      const prev = parseFloat(localStorage.getItem('soundVolumePrev') || '0.7');
+                      setSoundVolume(prev);
+                      setVolume(prev);
+                      playClickSound();
+                    }
+                  }}
+                  title={soundVolume === 0 ? 'Unmute sounds' : 'Mute sounds'}
+                >
+                  {soundVolume === 0 ? '🔇' : '🔊'}
+                </button>
               </div>
             </div>
 
-            {/* Main Layout - Left: Todos, Right: Tools */}
-            <div className="dashboard-layout">
-              {/* Left Side - Todo Lists */}
-              <div className="dashboard-left">
-                {/* To-Do Lists Section */}
-                <div className={`app-section ${todoCollapsed ? 'section-collapsed' : ''}`}>
-                  <div
-                    className="section-unified-header"
-                    onClick={() => setTodoCollapsed(!todoCollapsed)}
-                  >
-                    <div className="section-header-left">
-                      <h2>To-Do Lists</h2>
-                      <span className="collapse-indicator">{todoCollapsed ? '▼' : '▲'}</span>
-                    </div>
-                  </div>
-                  <div className={`section-content ${todoCollapsed ? 'collapsed' : ''}`}>
-                    <div className="todo-columns">
-                      <CategoryColumn
-                        title={categoryNames.daily}
-                        category="daily"
-                        todos={todosByCategory.daily}
-                        onAddTodo={addTodo}
-                        onToggleTodo={toggleTodo}
-                        onDeleteTodo={deleteTodo}
-                        onUpdateTodo={updateTodo}
-                        onRename={renameCategory}
-                        currentFilter={currentFilter}
-                        onAddSubtask={addSubtask}
-                        onToggleSubtask={toggleSubtask}
-                        onDeleteSubtask={deleteSubtask}
-                        onUpdateSubtask={updateSubtask}
-                        onReorder={reorderTodos}
-                        onTodoDragStart={handleTodoDragStart}
-                        draggingTodo={draggingTodo}
-                        dragOverCategory={dragOverCategory}
-                        dragOverTodoId={dragOverTodoId}
-                      />
-                      <CategoryColumn
-                        title={categoryNames.weekly}
-                        category="weekly"
-                        todos={todosByCategory.weekly}
-                        onAddTodo={addTodo}
-                        onToggleTodo={toggleTodo}
-                        onDeleteTodo={deleteTodo}
-                        onUpdateTodo={updateTodo}
-                        onRename={renameCategory}
-                        currentFilter={currentFilter}
-                        onAddSubtask={addSubtask}
-                        onToggleSubtask={toggleSubtask}
-                        onDeleteSubtask={deleteSubtask}
-                        onUpdateSubtask={updateSubtask}
-                        onReorder={reorderTodos}
-                        onTodoDragStart={handleTodoDragStart}
-                        draggingTodo={draggingTodo}
-                        dragOverCategory={dragOverCategory}
-                        dragOverTodoId={dragOverTodoId}
-                      />
-                      <CategoryColumn
-                        title={categoryNames.longterm}
-                        category="longterm"
-                        todos={todosByCategory.longterm}
-                        onAddTodo={addTodo}
-                        onToggleTodo={toggleTodo}
-                        onDeleteTodo={deleteTodo}
-                        onUpdateTodo={updateTodo}
-                        onRename={renameCategory}
-                        currentFilter={currentFilter}
-                        onAddSubtask={addSubtask}
-                        onToggleSubtask={toggleSubtask}
-                        onDeleteSubtask={deleteSubtask}
-                        onUpdateSubtask={updateSubtask}
-                        onReorder={reorderTodos}
-                        onTodoDragStart={handleTodoDragStart}
-                        draggingTodo={draggingTodo}
-                        dragOverCategory={dragOverCategory}
-                        dragOverTodoId={dragOverTodoId}
-                      />
-                    </div>
-                  </div>
-                </div>
+            {/* Todo Columns - resizable */}
+            <div className="todo-columns" ref={columnsRef}>
+              <div className="todo-col-wrapper" style={colWidths[0] ? { flex: `1 1 ${colWidths[0]}px`, maxWidth: `${colWidths[0]}px`, minWidth: 0 } : { flex: 1, minWidth: 0 }}>
+                <CategoryColumn
+                  title={categoryNames.daily}
+                  category="daily"
+                  todos={todosByCategory.daily}
+                  onAddTodo={addTodo}
+                  onToggleTodo={toggleTodo}
+                  onDeleteTodo={deleteTodo}
+                  onUpdateTodo={updateTodo}
+                  onRename={renameCategory}
+                  currentFilter={currentFilter}
+                  onAddSubtask={addSubtask}
+                  onToggleSubtask={toggleSubtask}
+                  onDeleteSubtask={deleteSubtask}
+                  onUpdateSubtask={updateSubtask}
+                  onReorder={reorderTodos}
+                  onTodoDragStart={handleTodoDragStart}
+                  draggingTodo={draggingTodo}
+                  dragOverCategory={dragOverCategory}
+                  dragOverTodoId={dragOverTodoId}
+                />
               </div>
-
-              {/* Right Side - Tools */}
-              <div className="dashboard-right">
-                {/* Timer */}
-                <div className="app-section sidebar-section">
-                  <div
-                    className="section-unified-header"
-                    onClick={() => setTimerCollapsed(!timerCollapsed)}
-                  >
-                    <div className="section-header-left">
-                      <h2>Timer</h2>
-                      <span className="collapse-indicator">{timerCollapsed ? '▼' : '▲'}</span>
-                    </div>
-                  </div>
-                  <div className={`section-content ${timerCollapsed ? 'collapsed' : ''}`}>
-                    <Timer />
-                  </div>
-                </div>
-
+              <div className="col-resize-handle" onMouseDown={e => startColResize(0, e)} onDoubleClick={() => { setColWidths(DEFAULT_COL_PX); localStorage.setItem('dashColWidths', JSON.stringify(DEFAULT_COL_PX)); }} />
+              <div className="todo-col-wrapper" style={{ flex: 1, minWidth: MIN_COL_PX }}>
+                <CategoryColumn
+                  title={categoryNames.weekly}
+                  category="weekly"
+                  todos={todosByCategory.weekly}
+                  onAddTodo={addTodo}
+                  onToggleTodo={toggleTodo}
+                  onDeleteTodo={deleteTodo}
+                  onUpdateTodo={updateTodo}
+                  onRename={renameCategory}
+                  currentFilter={currentFilter}
+                  onAddSubtask={addSubtask}
+                  onToggleSubtask={toggleSubtask}
+                  onDeleteSubtask={deleteSubtask}
+                  onUpdateSubtask={updateSubtask}
+                  onReorder={reorderTodos}
+                  onTodoDragStart={handleTodoDragStart}
+                  draggingTodo={draggingTodo}
+                  dragOverCategory={dragOverCategory}
+                  dragOverTodoId={dragOverTodoId}
+                />
+              </div>
+              <div className="col-resize-handle" onMouseDown={e => startColResize(1, e)} onDoubleClick={() => { setColWidths(DEFAULT_COL_PX); localStorage.setItem('dashColWidths', JSON.stringify(DEFAULT_COL_PX)); }} />
+              <div className="todo-col-wrapper stock-col" style={colWidths[1] ? { flex: `1 1 ${colWidths[1]}px`, maxWidth: `${colWidths[1]}px`, minWidth: 0 } : { flex: 1, minWidth: 0 }}>
+                <StockChart
+                  tickers={priceTickers}
+                  saveTickers={savePriceTickers}
+                  activeTicker={activeStockTicker}
+                  setActiveTicker={setActiveStockTicker}
+                />
+                <StockMiniChart ticker={activeStockTicker} />
+                <StockNews
+                  tickers={stockTickers}
+                  setTickers={setStockTickers}
+                  activeTicker={newsFilterTicker}
+                  setActiveTicker={setNewsFilterTicker}
+                />
               </div>
             </div>
           </div>
           )}
         </div>
       </div>
+
 
       {/* Drag Ghost - Notes style */}
       {draggingTodo && (
@@ -1619,50 +1722,91 @@ function App() {
         </div>
       )}
 
+      {/* Timer Widget Overlay */}
+      {timerWidgetOpen && (
+        <div className="timer-widget-overlay" style={{ top: timerWidgetPos.top, left: timerWidgetPos.left }}>
+          <div className={`timer-widget-panel ${timerWidgetCompact ? 'compact' : 'large'}`}>
+            <div className="timer-widget-header" onMouseDown={handleTimerDragStart} style={{ cursor: 'grab' }}>
+              <span className="timer-widget-title">⏱ Timer</span>
+              <div className="timer-widget-actions">
+                <button
+                  className="timer-widget-size-btn"
+                  onClick={() => setTimerWidgetCompact(p => !p)}
+                  title={timerWidgetCompact ? 'Expand' : 'Compact'}
+                >{timerWidgetCompact ? '⤢' : '⤡'}</button>
+                <button
+                  className="timer-widget-close-btn"
+                  onClick={() => { playClickSound(); setTimerWidgetOpen(false); }}
+                  title="Close"
+                >×</button>
+              </div>
+            </div>
+            <div className="timer-widget-body">
+              <Timer isPopup={true} isCompact={timerWidgetCompact} />
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
 
 // Timer Popup Wrapper Component
-function TimerPopupWrapper({ isCompact = false }) {
+function TimerPopupWrapper({ isCompact: initialCompact = false }) {
   const [isAlwaysOnTop, setIsAlwaysOnTop] = useState(true);
+  const [compact, setCompact] = useState(initialCompact);
+  const [settingMode, setSettingMode] = useState(false);
 
   useEffect(() => {
-    // Set always on top by default when popup opens
-    const initAlwaysOnTop = async () => {
+    const init = async () => {
       try {
         await getCurrentWindow().setAlwaysOnTop(true);
-      } catch (err) {
-        console.error('Failed to set always on top:', err);
-      }
+      } catch (err) {}
     };
-    initAlwaysOnTop();
+    init();
   }, []);
+
+  useEffect(() => {
+    const resize = async () => {
+      try {
+        const { LogicalSize } = await import('@tauri-apps/api/dpi');
+        if (compact) {
+          const h = settingMode ? 116 : 64;
+          await getCurrentWindow().setSize(new LogicalSize(260, h));
+        } else {
+          await getCurrentWindow().setSize(new LogicalSize(260, 310));
+        }
+      } catch (err) {}
+    };
+    resize();
+  }, [compact, settingMode]);
 
   const toggleAlwaysOnTop = async () => {
     try {
       const newValue = !isAlwaysOnTop;
       await getCurrentWindow().setAlwaysOnTop(newValue);
       setIsAlwaysOnTop(newValue);
-    } catch (err) {
-      console.error('Failed to toggle always on top:', err);
-    }
+    } catch (err) {}
   };
 
   const closePopup = async () => {
     try {
       await getCurrentWindow().close();
-    } catch (err) {
-      console.error('Failed to close popup:', err);
-    }
+    } catch (err) {}
   };
 
-  if (isCompact) {
+  if (compact) {
     return (
       <div className="timer-mini-popup-container">
         <div className="timer-mini-popup-header">
-          <span className="timer-mini-popup-title">Timer</span>
+          <span className="timer-mini-popup-title">⏱</span>
           <div className="timer-mini-popup-actions">
+            <button
+              className="timer-mini-size-btn"
+              onClick={() => setCompact(false)}
+              title="Expand"
+            >⤢</button>
             <button
               className={`timer-mini-pin-btn ${isAlwaysOnTop ? 'active' : ''}`}
               onClick={toggleAlwaysOnTop}
@@ -1671,26 +1815,27 @@ function TimerPopupWrapper({ isCompact = false }) {
             <button className="timer-mini-close-btn" onClick={closePopup}>×</button>
           </div>
         </div>
-        <Timer isPopup={true} isCompact={true} />
+        <Timer isPopup={true} isCompact={true} onSettingChange={setSettingMode} />
       </div>
     );
   }
 
   return (
     <div className="timer-popup-container">
-      <div className="timer-popup-header">
-        <span className="timer-popup-header-title">Timer</span>
+      <div className="timer-popup-header" onMouseDown={async () => { const { getCurrentWindow } = await import('@tauri-apps/api/window'); getCurrentWindow().startDragging(); }}>
+        <span className="timer-popup-header-title">⏱ Timer</span>
         <div className="timer-popup-header-actions">
+          <button
+            className="timer-popup-size-btn"
+            onClick={() => setCompact(true)}
+            title="Compact"
+          >⤡</button>
           <button
             className={`timer-popup-pin-btn ${isAlwaysOnTop ? 'active' : ''}`}
             onClick={toggleAlwaysOnTop}
-            title={isAlwaysOnTop ? 'Unpin from top' : 'Pin to top'}
-          >
-            📌 {isAlwaysOnTop ? 'Pinned' : 'Pin'}
-          </button>
-          <button className="timer-popup-close-btn" onClick={closePopup} title="Close">
-            ×
-          </button>
+            title={isAlwaysOnTop ? 'Unpin' : 'Pin'}
+          >📌</button>
+          <button className="timer-popup-close-btn" onClick={closePopup} title="Close">×</button>
         </div>
       </div>
       <div className="timer-popup-body">
@@ -1700,49 +1845,5 @@ function TimerPopupWrapper({ isCompact = false }) {
   );
 }
 
-function QuickNotePopupWrapper() {
-  const closePopup = async () => {
-    try {
-      const { getCurrentWebviewWindow } = await import('@tauri-apps/api/webviewWindow');
-      await getCurrentWebviewWindow().close();
-    } catch {
-      try { await getCurrentWindow().close(); } catch {
-        try { await getCurrentWindow().destroy(); } catch {}
-      }
-    }
-  };
-
-  useEffect(() => {
-    const init = async () => {
-      try {
-        const { getCurrentWebviewWindow } = await import('@tauri-apps/api/webviewWindow');
-        await getCurrentWebviewWindow().setAlwaysOnTop(true);
-      } catch {
-        try { await getCurrentWindow().setAlwaysOnTop(true); } catch {}
-      }
-    };
-    init();
-
-    const handleKey = (e) => {
-      if (e.key === 'Escape') closePopup();
-    };
-    document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, []);
-
-  return (
-    <div className="qn-popup-container">
-      <div className="qn-popup-header">
-        <span className="qn-popup-header-title">Quick Note</span>
-        <div className="qn-popup-header-actions">
-          <button className="qn-popup-close-btn" onClick={closePopup} title="Close">×</button>
-        </div>
-      </div>
-      <div className="qn-popup-body">
-        <QuickNote isPopup={true} onClose={closePopup} />
-      </div>
-    </div>
-  );
-}
 
 export default App;

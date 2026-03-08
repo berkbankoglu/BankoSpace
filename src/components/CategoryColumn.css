@@ -7,8 +7,11 @@
   display: flex;
   flex-direction: column;
   flex: 1;
+  min-width: 0;
   min-height: 0;
+  height: 100%;
   border: 1px solid #21262d;
+  box-sizing: border-box;
 }
 
 /* Header */
@@ -38,7 +41,7 @@
   font-size: 15px;
   font-weight: 600;
   background: #0d1117;
-  border: 1px solid #58a6ff;
+  border: 1px solid #5c7cfa;
   border-radius: 6px;
   padding: 4px 8px;
   color: #c9d1d9;
@@ -118,29 +121,28 @@
 .cc-item {
   background: #1c2128;
   border-radius: 4px;
-  padding: 10px 12px;
-  transition: all 0.2s ease;
+  padding: 8px 10px;
+  transition: border-color 0.15s ease;
   border: 1px solid transparent;
-  cursor: grab;
+  cursor: default;
   user-select: none;
   -webkit-user-select: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
 }
 
 .cc-item:hover {
   border-color: #30363d;
 }
 
-.cc-item:active {
-  cursor: grabbing;
-}
-
 .cc-item.dragging {
   opacity: 0.4;
-  border: 1px dashed #58a6ff;
+  border: 1px dashed #5c7cfa;
 }
 
 .cc-item.drag-target {
-  border: 2px solid #58a6ff;
+  border: 2px solid #5c7cfa;
   background: rgba(88, 166, 255, 0.06);
 }
 
@@ -153,11 +155,10 @@
   color: #484f58;
 }
 
-.cc-item-main {
+.cc-item-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
   min-width: 0;
 }
 
@@ -170,8 +171,7 @@
   flex-shrink: 0;
   line-height: 1;
   transition: color 0.15s ease;
-  padding: 6px 8px;
-  margin: -6px -4px;
+  padding: 2px 4px;
   border-radius: 4px;
 }
 
@@ -181,17 +181,17 @@
 
 /* Column drag-over state */
 .category-column-v2.drag-over {
-  border-color: #58a6ff;
+  border-color: #5c7cfa;
   background: rgba(88, 166, 255, 0.05);
 }
 
 /* Label & Checkbox */
 .cc-label {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  align-items: flex-start;
+  gap: 8px;
   cursor: pointer;
-  flex: 1;
+  width: 100%;
   min-width: 0;
 }
 
@@ -207,6 +207,7 @@
   flex-shrink: 0;
   position: relative;
   transition: all 0.2s ease;
+  margin-top: 1px;
 }
 
 .cc-checkmark.small {
@@ -245,9 +246,8 @@
   font-size: 13px;
   color: #c9d1d9;
   line-height: 1.4;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  word-break: break-word;
   min-width: 0;
 }
 
@@ -255,7 +255,7 @@
   font-size: 13px;
   color: #c9d1d9;
   background: #0d1117;
-  border: 1px solid #58a6ff;
+  border: 1px solid #5c7cfa;
   border-radius: 4px;
   padding: 2px 6px;
   outline: none;
@@ -263,14 +263,6 @@
   min-width: 0;
 }
 
-.cc-action-btn.edit-btn {
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-
-.cc-item:hover .cc-action-btn.edit-btn {
-  opacity: 1;
-}
 
 /* Item Meta */
 .cc-item-meta {
@@ -287,9 +279,10 @@
 .cc-item-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
+  flex-shrink: 0;
   opacity: 0;
-  transition: opacity 0.2s ease;
+  transition: opacity 0.15s ease;
 }
 
 .cc-item:hover .cc-item-actions {
@@ -299,11 +292,12 @@
 .cc-subtask-badge {
   font-size: 10px;
   background: rgba(88, 166, 255, 0.2);
-  color: #58a6ff;
+  color: #5c7cfa;
   padding: 2px 6px;
   border-radius: 4px;
   margin-right: 4px;
 }
+
 
 .cc-action-btn {
   background: none;
@@ -374,9 +368,8 @@
 
 .cc-subtask .cc-text {
   font-size: 12px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  word-break: break-word;
   min-width: 0;
 }
 
@@ -397,7 +390,7 @@
 }
 
 .cc-subtask-input:focus {
-  border-color: #58a6ff;
+  border-color: #5c7cfa;
 }
 
 .cc-subtask-input::placeholder {
@@ -418,7 +411,7 @@
 }
 
 .cc-add-input:focus {
-  border-color: #58a6ff;
+  border-color: #5c7cfa;
   background: #161b22;
 }
 
@@ -467,7 +460,7 @@
 }
 
 .cc-date-toggle-btn:hover {
-  border-color: #58a6ff;
+  border-color: #5c7cfa;
   background: rgba(88, 166, 255, 0.1);
 }
 
@@ -491,7 +484,7 @@
 }
 
 .cc-date-input:focus {
-  border-color: #58a6ff;
+  border-color: #5c7cfa;
 }
 
 .cc-date-clear {
@@ -512,7 +505,7 @@
 
 .cc-due-date {
   font-size: 11px;
-  color: #58a6ff;
+  color: #5c7cfa;
   margin-left: 8px;
 }
 
@@ -546,15 +539,15 @@
 }
 
 .cc-quick-date-btn:hover {
-  border-color: #58a6ff;
+  border-color: #5c7cfa;
   background: rgba(88, 166, 255, 0.1);
-  color: #58a6ff;
+  color: #5c7cfa;
 }
 
 .cc-quick-date-btn.active {
   background: rgba(88, 166, 255, 0.2);
-  border-color: #58a6ff;
-  color: #58a6ff;
+  border-color: #5c7cfa;
+  color: #5c7cfa;
 }
 
 .cc-date-custom-row {
@@ -564,8 +557,8 @@
 }
 
 .cc-date-toggle-btn.has-date {
-  border-color: #58a6ff;
-  color: #58a6ff;
+  border-color: #5c7cfa;
+  color: #5c7cfa;
   font-size: 11px;
   padding: 4px 8px;
 }

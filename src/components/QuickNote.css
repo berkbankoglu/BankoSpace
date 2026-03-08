@@ -74,7 +74,7 @@
 }
 
 .qn-input:focus {
-  border-color: #58a6ff;
+  border-color: #5c7cfa;
 }
 
 .qn-input.readonly {
@@ -191,7 +191,7 @@
 }
 
 .qn-fc:hover {
-  color: #58a6ff;
+  color: #5c7cfa;
   background: rgba(88, 166, 255, 0.1);
 }
 
