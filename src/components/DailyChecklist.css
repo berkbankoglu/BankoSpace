@@ -55,7 +55,7 @@
 
 .checklist-title-input {
   background: #0d1117;
-  border: 1px solid #58a6ff;
+  border: 1px solid #5c7cfa;
   border-radius: 4px;
   padding: 4px 8px;
   color: #e6edf3;
@@ -182,7 +182,7 @@
 
 .checklist-checkbox:checked + .checklist-checkmark {
   background: #7ee787;
-  border-color: #58a6ff;
+  border-color: #5c7cfa;
 }
 
 .checklist-checkbox:checked + .checklist-checkmark::after {
@@ -193,7 +193,7 @@
 }
 
 .checklist-label:hover .checklist-checkmark {
-  border-color: #58a6ff;
+  border-color: #5c7cfa;
 }
 
 .checklist-text {
@@ -233,7 +233,7 @@
 
 .checklist-action-btn.edit:hover {
   background: rgba(88, 166, 255, 0.2);
-  color: #58a6ff;
+  color: #5c7cfa;
 }
 
 .checklist-action-btn.delete:hover {
@@ -252,7 +252,7 @@
 .checklist-edit-input {
   flex: 1;
   background: #0d1117;
-  border: 1px solid #58a6ff;
+  border: 1px solid #5c7cfa;
   border-radius: 6px;
   padding: 8px 12px;
   font-size: 14px;
@@ -299,7 +299,7 @@
 }
 
 .checklist-add-input:focus {
-  border-color: #58a6ff;
+  border-color: #5c7cfa;
 }
 
 .checklist-add-input::placeholder {
@@ -356,7 +356,7 @@ body.light .checklist-edit-input {
 
 body.light .checklist-add-input:focus,
 body.light .checklist-edit-input:focus {
-  border-color: #58a6ff;
+  border-color: #5c7cfa;
 }
 
 body.light .checklist-add-input::placeholder {

@@ -47,7 +47,7 @@
 }
 
 .it-select:focus {
-  border-color: #58a6ff;
+  border-color: #5c7cfa;
 }
 
 .it-header-right {
@@ -146,7 +146,7 @@
   justify-content: center;
   font-size: 20px;
   font-weight: 700;
-  color: #58a6ff;
+  color: #5c7cfa;
 }
 
 .it-stat-card.primary .it-stat-icon {
@@ -272,7 +272,7 @@
 .it-chart-total {
   text-align: right;
   font-size: 14px;
-  color: #58a6ff;
+  color: #5c7cfa;
   font-weight: 600;
   margin-top: 12px;
   padding-top: 12px;
@@ -346,7 +346,7 @@
   height: 0;
   border-left: 8px solid transparent;
   border-right: 8px solid transparent;
-  border-bottom: 8px solid #58a6ff;
+  border-bottom: 8px solid #5c7cfa;
   margin-top: -8px;
 }
 
@@ -383,7 +383,7 @@
 
 .it-client-select:focus {
   outline: none;
-  border-color: #58a6ff;
+  border-color: #5c7cfa;
 }
 
 .it-client-ranking {
@@ -409,7 +409,7 @@
 .it-client-rank {
   font-size: 12px;
   font-weight: 700;
-  color: #58a6ff;
+  color: #5c7cfa;
   min-width: 28px;
 }
 
@@ -434,7 +434,7 @@
 
 .it-client-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, #58a6ff, #7ee787);
+  background: linear-gradient(90deg, #5c7cfa, #7ee787);
   border-radius: 4px;
   transition: width 0.4s ease;
 }
@@ -527,7 +527,7 @@
 
 .it-pie-percent {
   font-size: 11px;
-  color: #58a6ff;
+  color: #5c7cfa;
   font-weight: 600;
   min-width: 45px;
   text-align: right;
@@ -610,7 +610,7 @@
 
 .it-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, #58a6ff, #7ee787);
+  background: linear-gradient(90deg, #5c7cfa, #7ee787);
   border-radius: 4px;
   transition: width 0.3s ease;
 }
@@ -694,7 +694,7 @@
 
 .it-path {
   font-size: 12px;
-  color: #58a6ff;
+  color: #5c7cfa;
   font-family: monospace;
   word-break: break-all;
 }
@@ -765,7 +765,7 @@
 
 .it-list-section-header.warning {
   background: rgba(88, 166, 255, 0.15);
-  color: #58a6ff;
+  color: #5c7cfa;
   border: 1px solid rgba(88, 166, 255, 0.3);
   border-bottom: none;
 }
@@ -904,7 +904,7 @@
 
 .it-edit-btn:hover {
   background: rgba(88, 166, 255, 0.2);
-  color: #58a6ff;
+  color: #5c7cfa;
 }
 
 .it-delete-btn:hover {
@@ -915,7 +915,7 @@
 /* Editing row - sarı yerine mavi */
 .it-list-row.needs-edit {
   background: rgba(88, 166, 255, 0.1);
-  border-left: 3px solid #58a6ff;
+  border-left: 3px solid #5c7cfa;
 }
 
 .it-edit-input {
@@ -934,7 +934,7 @@
 }
 
 .it-edit-input:focus {
-  border-color: #58a6ff;
+  border-color: #5c7cfa;
 }
 
 .it-edit-actions {
@@ -1054,7 +1054,7 @@
 }
 
 .it-form-group input:focus {
-  border-color: #58a6ff;
+  border-color: #5c7cfa;
 }
 
 .it-form-group input::placeholder {
@@ -1147,7 +1147,7 @@
 
 .it-progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #58a6ff, #7ee787);
+  background: linear-gradient(90deg, #5c7cfa, #7ee787);
   border-radius: 4px;
   transition: width 0.3s ease;
 }
@@ -1203,7 +1203,7 @@
 }
 
 .it-result-section.failed h4 {
-  color: #58a6ff;
+  color: #5c7cfa;
 }
 
 .it-result-list {
@@ -1233,7 +1233,7 @@
 }
 
 .it-result-item.failed .it-result-icon {
-  color: #58a6ff;
+  color: #5c7cfa;
 }
 
 .it-result-details {
@@ -1269,7 +1269,7 @@
 }
 
 .it-result-reason {
-  color: #58a6ff;
+  color: #5c7cfa;
   font-size: 11px;
   flex: 1;
   text-align: right;
@@ -1307,7 +1307,7 @@
 }
 
 .it-sort-select:focus {
-  border-color: #58a6ff;
+  border-color: #5c7cfa;
 }
 
 .it-sort-select:hover {

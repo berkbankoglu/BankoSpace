@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import './FlashCards.css';
 import { playTypeSoundThrottled, playClickSound, playAddSound, playDeleteSound } from '../utils/sounds';
 
 const DECK_COLORS = [
-  '#58a6ff', '#7ee787', '#f85149', '#d29922', '#bc8cff',
+  '#5c7cfa', '#7ee787', '#f85149', '#d29922', '#bc8cff',
   '#ff7b72', '#79c0ff', '#ffa657', '#f778ba', '#3fb950'
 ];
 
@@ -42,6 +43,14 @@ function FlashCards({ fullscreen = false }) {
   const [newDeckName, setNewDeckName] = useState('');
   const [showNewDeckInput, setShowNewDeckInput] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(null);
+
+  // AI state
+  const [aiWord, setAiWord] = useState('');
+  const [aiResult, setAiResult] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState(null);
+  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
+  const [apiKeyDraft, setApiKeyDraft] = useState('');
 
   // Reload from localStorage when flashcards-updated event fires (from QuickNote)
   useEffect(() => {
@@ -145,9 +154,6 @@ function FlashCards({ fullscreen = false }) {
   };
 
   const deleteDeck = (deckName) => {
-    const cardCount = getDeckCards(deckName).length;
-    if (!window.confirm(`Delete "${deckName}" and its ${cardCount} cards?`)) return;
-
     playDeleteSound();
     setCards(cards.filter(c => c.group !== deckName));
     setDecks(decks.filter(d => d.name !== deckName));
@@ -178,7 +184,6 @@ function FlashCards({ fullscreen = false }) {
   };
 
   const resetDeckProgress = () => {
-    if (!window.confirm('Reset all progress for this deck?')) return;
     setCards(cards.map(c => c.group === selectedDeck ? { ...c, known: null } : c));
   };
 
@@ -199,6 +204,74 @@ function FlashCards({ fullscreen = false }) {
     playAddSound();
   };
 
+  const askAI = async () => {
+    if (!aiWord.trim()) return;
+    const key = localStorage.getItem('anthropic_api_key');
+    if (!key) { setShowApiKeyInput(true); return; }
+
+    setAiLoading(true);
+    setAiError(null);
+    setAiResult(null);
+
+    try {
+      const bodyStr = JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 400,
+        messages: [{
+          role: 'user',
+          content: `Kelime/kavram: "${aiWord}"\n\nŞu formatta JSON yanıt ver (başka hiçbir şey yazma, sadece JSON):\n{"word":"orijinal kelime/kavram","translation":"Türkçe kısa çeviri veya karşılık (max 5 kelime)","explanation":"Türkçe detaylı açıklama 2-3 cümle, ne anlama geldiğini ve nasıl kullanıldığını anlat"}`
+        }]
+      });
+      const text = await invoke('fetch_post', {
+        url: 'https://api.anthropic.com/v1/messages',
+        headers: {
+          'x-api-key': key,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        body: bodyStr,
+      });
+      const data = JSON.parse(text);
+      if (data.error) throw new Error(data.error.message);
+      const content = data.content[0].text.trim();
+      const jsonStart = content.indexOf('{');
+      const jsonEnd = content.lastIndexOf('}');
+      const parsed = JSON.parse(content.slice(jsonStart, jsonEnd + 1));
+      setAiResult(parsed);
+    } catch (e) {
+      setAiError('AI yanıt veremedi: ' + (e?.message || 'Bilinmeyen hata'));
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const addAiCardToFlashCards = () => {
+    if (!aiResult) return;
+    const targetDeck = selectedDeck || (decks[0]?.name ?? null);
+    if (!targetDeck) { setAiError('Önce bir deck seç.'); return; }
+    const card = {
+      id: Date.now(),
+      front: aiResult.word,
+      back: (aiResult.translation ? `${aiResult.translation}\n\n` : '') + aiResult.explanation,
+      group: targetDeck,
+      known: null,
+      createdAt: Date.now()
+    };
+    setCards(prev => [...prev, card]);
+    playAddSound();
+    setAiWord('');
+    setAiResult(null);
+    setAiError(null);
+  };
+
+  const saveApiKey = () => {
+    if (apiKeyDraft.trim()) {
+      localStorage.setItem('anthropic_api_key', apiKeyDraft.trim());
+    }
+    setShowApiKeyInput(false);
+    setApiKeyDraft('');
+  };
+
   const updateCard = (cardId, front, back) => {
     if (!front.trim() || !back.trim()) return;
 
@@ -211,7 +284,6 @@ function FlashCards({ fullscreen = false }) {
   };
 
   const deleteCard = (id) => {
-    if (!window.confirm('Delete this card?')) return;
     setCards(cards.filter(c => c.id !== id));
   };
 
@@ -336,6 +408,7 @@ function FlashCards({ fullscreen = false }) {
             )}
           </div>
         </div>
+
       </div>
 
       {/* Main Content Area */}
@@ -620,6 +693,96 @@ function FlashCards({ fullscreen = false }) {
               <button onClick={startStudy}>Study Again</button>
               <button onClick={endStudy}>Back to Cards</button>
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* AI Asistan Panel — sağ panel */}
+      <div className="fc-ai-panel">
+        <div className="fc-ai-panel-header">
+          <span className="fc-ai-panel-title">AI Asistan</span>
+          <button
+            className="fc-ai-key-btn"
+            onClick={() => { setApiKeyDraft(localStorage.getItem('anthropic_api_key') || ''); setShowApiKeyInput(true); }}
+            title="API Key ayarla"
+          >🔑</button>
+        </div>
+
+        {showApiKeyInput ? (
+          <div className="fc-ai-apikey-row">
+            <input
+              type="password"
+              className="fc-ai-key-input"
+              placeholder="Anthropic API key..."
+              value={apiKeyDraft}
+              onChange={e => setApiKeyDraft(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') saveApiKey(); if (e.key === 'Escape') setShowApiKeyInput(false); }}
+              autoFocus
+            />
+            <div className="fc-ai-apikey-btns">
+              <button className="fc-ai-save-btn" onClick={saveApiKey}>Kaydet</button>
+              <button className="fc-ai-cancel-btn" onClick={() => setShowApiKeyInput(false)}>İptal</button>
+            </div>
+          </div>
+        ) : (
+          <div className="fc-ai-input-row">
+            <input
+              type="text"
+              className="fc-ai-input"
+              placeholder="Kelime veya kavram yaz..."
+              value={aiWord}
+              onChange={e => setAiWord(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') askAI(); }}
+              disabled={aiLoading}
+            />
+            <button className="fc-ai-ask-btn" onClick={askAI} disabled={aiLoading || !aiWord.trim()} title="AI'ya sor">
+              {aiLoading ? <span className="fc-ai-spinner" /> : 'Sor'}
+            </button>
+          </div>
+        )}
+
+        {aiError && <div className="fc-ai-error">{aiError}</div>}
+
+        {aiLoading && (
+          <div className="fc-ai-loading-state">
+            <span className="fc-ai-spinner-lg" />
+            <span>Yanıt bekleniyor...</span>
+          </div>
+        )}
+
+        {aiResult && !aiLoading && (
+          <div className="fc-ai-result-panel">
+            <div className="fc-ai-result-word">{aiResult.word}</div>
+            <div className="fc-ai-result-translation">{aiResult.translation}</div>
+            <div className="fc-ai-result-divider" />
+            <div className="fc-ai-result-explanation">{aiResult.explanation}</div>
+
+            <div className="fc-ai-card-preview">
+              <div className="fc-ai-card-preview-label">Flash Card önizleme</div>
+              <div className="fc-ai-card-preview-front">
+                <span className="fc-ai-card-side-label">Ön</span>
+                <span>{aiResult.word}</span>
+              </div>
+              <div className="fc-ai-card-preview-back">
+                <span className="fc-ai-card-side-label">Arka</span>
+                {aiResult.translation && <span className="fc-ai-preview-translation">{aiResult.translation}</span>}
+                <span>{aiResult.explanation}</span>
+              </div>
+            </div>
+
+            <button className="fc-ai-add-btn" onClick={addAiCardToFlashCards}>
+              + Flash Card'a Ekle
+            </button>
+            {!selectedDeck && decks.length === 0 && (
+              <div className="fc-ai-no-deck-hint">Önce bir deck oluştur</div>
+            )}
+          </div>
+        )}
+
+        {!aiResult && !aiLoading && !aiError && (
+          <div className="fc-ai-empty-state">
+            <div className="fc-ai-empty-icon">✦</div>
+            <div className="fc-ai-empty-text">Merak ettiğin kelimeyi veya kavramı yaz, AI sana açıklasın ve flash card olarak ekleyebilirsin.</div>
           </div>
         )}
       </div>

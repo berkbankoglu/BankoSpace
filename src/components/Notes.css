@@ -38,7 +38,7 @@
 
 .notes-sidebar-resizer:hover,
 .notes-sidebar-resizer:active {
-  background: #58a6ff;
+  background: #5c7cfa;
 }
 
 .notes-sidebar-header {
@@ -94,7 +94,7 @@
 
 .notes-search input:focus {
   outline: none;
-  border-color: #58a6ff;
+  border-color: #5c7cfa;
 }
 
 .notes-search input::placeholder {
@@ -142,7 +142,7 @@
 }
 
 .note-item.active {
-  border-color: var(--note-color, #58a6ff);
+  border-color: var(--note-color, #5c7cfa);
   background: #1c2128;
 }
 
@@ -151,12 +151,12 @@
   opacity: 0.3;
   transform: scale(0.98);
   background: #21262d;
-  border-color: #58a6ff;
+  border-color: #5c7cfa;
   border-style: dashed;
 }
 
 .note-item.drag-target {
-  border: 2px solid #58a6ff;
+  border: 2px solid #5c7cfa;
   background: rgba(88, 166, 255, 0.06);
 }
 
@@ -166,7 +166,7 @@
   z-index: 10000;
   padding: 10px 12px;
   background: #1c2128;
-  border: 1px solid #58a6ff;
+  border: 1px solid #5c7cfa;
   border-radius: 6px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(88, 166, 255, 0.3);
   pointer-events: none;
@@ -182,7 +182,7 @@
 }
 
 .note-drag-ghost .note-drag-handle {
-  color: #58a6ff;
+  color: #5c7cfa;
   font-size: 10px;
   letter-spacing: -2px;
 }
@@ -241,7 +241,7 @@
 
 .note-item.dragging .note-drag-handle {
   cursor: grabbing;
-  color: #58a6ff;
+  color: #5c7cfa;
 }
 
 /* ─── Color Dot ─── */
@@ -665,7 +665,7 @@
 
 .notes-modal-input:focus {
   outline: none;
-  border-color: #58a6ff;
+  border-color: #5c7cfa;
 }
 
 .notes-modal-input::placeholder {
@@ -714,7 +714,7 @@
 .note-item-title-edit {
   flex: 1;
   background: #0d1117;
-  border: 1px solid #58a6ff;
+  border: 1px solid #5c7cfa;
   border-radius: 4px;
   padding: 4px 8px;
   color: #e6edf3;
@@ -756,7 +756,7 @@
 
 .notes-title-input:focus {
   outline: none;
-  border-color: #58a6ff;
+  border-color: #5c7cfa;
   background: #161b22;
 }
 
@@ -797,7 +797,7 @@
 
 .toolbar-select:focus {
   outline: none;
-  border-color: #58a6ff;
+  border-color: #5c7cfa;
 }
 
 .toolbar-btn {
@@ -825,9 +825,9 @@
 }
 
 .toolbar-btn.active {
-  background: #58a6ff22;
-  border-color: #58a6ff;
-  color: #58a6ff;
+  background: #5c7cfa22;
+  border-color: #5c7cfa;
+  color: #5c7cfa;
 }
 
 /* Color Preset Dropdown */
@@ -912,8 +912,8 @@
 
 .spread-tab.active {
   background: #21262d;
-  border-color: #58a6ff;
-  color: #58a6ff;
+  border-color: #5c7cfa;
+  color: #5c7cfa;
 }
 
 .page-add-btn-toolbar {
@@ -1104,7 +1104,7 @@
 }
 
 .notebook-page-editor a {
-  color: #58a6ff;
+  color: #5c7cfa;
   text-decoration: underline;
 }
 
@@ -1143,7 +1143,7 @@
 
 .notes-extra-page-textarea:focus {
   outline: none;
-  border-color: #58a6ff;
+  border-color: #5c7cfa;
 }
 
 .notes-extra-page-textarea::placeholder {

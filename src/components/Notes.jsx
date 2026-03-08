@@ -402,7 +402,7 @@ function Notes() {
 
   const colors = [
     '#667eea', '#f093fb', '#4ade80', '#60a5fa',
-    '#fb923c', '#f87171', '#58a6ff', '#9ca3af'
+    '#fb923c', '#f87171', '#5c7cfa', '#9ca3af'
   ];
 
   return (
@@ -703,14 +703,14 @@ function Notes() {
                   }}
                   title="Text Color"
                 >
-                  <span style={{ background: 'linear-gradient(90deg, #f85149, #58a6ff, #7ee787)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontWeight: 700 }}>A</span>
+                  <span style={{ background: 'linear-gradient(90deg, #f85149, #5c7cfa, #7ee787)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontWeight: 700 }}>A</span>
                 </button>
                 {showColorPresets && (
                   <div className="color-presets-dropdown">
                     {[
                       { fg: '#c9d1d9', bg: null, label: 'Default' },
                       { fg: '#f85149', bg: null, label: 'Red' },
-                      { fg: '#58a6ff', bg: null, label: 'Blue' },
+                      { fg: '#5c7cfa', bg: null, label: 'Blue' },
                       { fg: '#7ee787', bg: null, label: 'Green' },
                       { fg: '#d2a8ff', bg: null, label: 'Purple' },
                       { fg: '#f0883e', bg: null, label: 'Orange' },

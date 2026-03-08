@@ -12,13 +12,12 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
     todos.forEach(t => { if (t.subtasks && t.subtasks.length > 0) s.add(t.id); });
     return s;
   });
-  const [subtaskInput, setSubtaskInput] = useState('');
+  const [subtaskInputs, setSubtaskInputs] = useState({});
   const [editingTodoId, setEditingTodoId] = useState(null);
   const [editingTodoText, setEditingTodoText] = useState('');
   const [editingSubtaskId, setEditingSubtaskId] = useState(null);
   const [editingSubtaskText, setEditingSubtaskText] = useState('');
   const inputRef = useRef(null);
-  const subtaskInputRef = useRef(null);
   const editInputRef = useRef(null);
   const editSubtaskInputRef = useRef(null);
 
@@ -84,20 +83,20 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
       else next.add(todoId);
       return next;
     });
-    setSubtaskInput('');
+    setSubtaskInputs(prev => ({ ...prev, [todoId]: '' }));
   };
 
   const handleAddSubtask = (todoId) => {
-    if (subtaskInput.trim()) {
-      onAddSubtask(todoId, subtaskInput.trim());
-      setSubtaskInput('');
-      setTimeout(() => subtaskInputRef.current?.focus(), 0);
+    const val = subtaskInputs[todoId] || '';
+    if (val.trim()) {
+      onAddSubtask(todoId, val.trim());
+      setSubtaskInputs(prev => ({ ...prev, [todoId]: '' }));
     }
   };
 
   const isDragOver = draggingTodo && dragOverCategory === category && draggingTodo.todo.category !== category;
 
-  const sortedTodos = [...todos].sort((a, b) => (a.order || 0) - (b.order || 0));
+  const sortedTodos = [...todos].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
   return (
     <div
@@ -154,45 +153,10 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
             key={todo.id}
             data-todo-id={todo.id}
             className={`cc-item ${todo.completed ? 'completed' : ''} ${draggingTodo && draggingTodo.todo.id === todo.id ? 'dragging' : ''} ${dragOverTodoId && String(dragOverTodoId) === String(todo.id) ? 'drag-target' : ''}`}
-            onMouseDown={(e) => onTodoDragStart(e, todo)}
           >
-            <div className="cc-item-main">
-              <div className="cc-drag-handle" title="Surukle">⠿</div>
-              <label className="cc-label">
-                <input
-                  type="checkbox"
-                  className="cc-checkbox"
-                  checked={todo.completed}
-                  onChange={() => onToggleTodo(todo.id)}
-                />
-                <span className="cc-checkmark"></span>
-                {editingTodoId === todo.id ? (
-                  <input
-                    ref={editInputRef}
-                    type="text"
-                    className="cc-edit-input"
-                    value={editingTodoText}
-                    onChange={(e) => { playTypeSoundThrottled(); setEditingTodoText(e.target.value); }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && editingTodoText.trim()) {
-                        onUpdateTodo(todo.id, { text: editingTodoText.trim() });
-                        setEditingTodoId(null);
-                      } else if (e.key === 'Escape') {
-                        setEditingTodoId(null);
-                      }
-                    }}
-                    onBlur={() => {
-                      if (editingTodoText.trim() && editingTodoText.trim() !== todo.text) {
-                        onUpdateTodo(todo.id, { text: editingTodoText.trim() });
-                      }
-                      setEditingTodoId(null);
-                    }}
-                    autoFocus
-                  />
-                ) : (
-                  <span className="cc-text">{todo.text}</span>
-                )}
-              </label>
+            {/* Top row: drag handle + actions */}
+            <div className="cc-item-top">
+              <div className="cc-drag-handle" title="Surukle" onMouseDown={(e) => onTodoDragStart(e, todo)}>⠿</div>
               <div className="cc-item-actions">
                 {todo.subtasks && todo.subtasks.length > 0 && (
                   <span className="cc-subtask-badge">
@@ -201,30 +165,57 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
                 )}
                 <button
                   className="cc-action-btn edit-btn"
-                  onClick={() => {
-                    setEditingTodoId(todo.id);
-                    setEditingTodoText(todo.text);
-                  }}
+                  onClick={() => { setEditingTodoId(todo.id); setEditingTodoText(todo.text); }}
                   title="Edit"
-                >
-                  ✎
-                </button>
+                >✎</button>
                 <button
                   className="cc-action-btn expand"
                   onClick={() => toggleExpand(todo.id)}
                   title="Subtasks"
-                >
-                  {expandedTodos.has(todo.id) ? '−' : '+'}
-                </button>
+                >{expandedTodos.has(todo.id) ? '−' : '+'}</button>
                 <button
                   className="cc-action-btn delete"
                   onClick={() => onDeleteTodo(todo.id)}
                   title="Delete"
-                >
-                  ×
-                </button>
+                >×</button>
               </div>
             </div>
+            {/* Bottom row: checkbox + text */}
+            <label className="cc-label">
+              <input
+                type="checkbox"
+                className="cc-checkbox"
+                checked={todo.completed}
+                onChange={() => onToggleTodo(todo.id)}
+              />
+              <span className="cc-checkmark"></span>
+              {editingTodoId === todo.id ? (
+                <input
+                  ref={editInputRef}
+                  type="text"
+                  className="cc-edit-input"
+                  value={editingTodoText}
+                  onChange={(e) => { playTypeSoundThrottled(); setEditingTodoText(e.target.value); }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && editingTodoText.trim()) {
+                      onUpdateTodo(todo.id, { text: editingTodoText.trim() });
+                      setEditingTodoId(null);
+                    } else if (e.key === 'Escape') {
+                      setEditingTodoId(null);
+                    }
+                  }}
+                  onBlur={() => {
+                    if (editingTodoText.trim() && editingTodoText.trim() !== todo.text) {
+                      onUpdateTodo(todo.id, { text: editingTodoText.trim() });
+                    }
+                    setEditingTodoId(null);
+                  }}
+                  autoFocus
+                />
+              ) : (
+                <span className="cc-text">{todo.text}</span>
+              )}
+            </label>
 
             {/* Subtasks */}
             {expandedTodos.has(todo.id) && (
@@ -282,14 +273,13 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
                 ))}
                 <div className="cc-subtask-add">
                   <input
-                    ref={subtaskInputRef}
                     type="text"
                     className="cc-subtask-input"
                     placeholder="Add subtask..."
-                    value={subtaskInput}
-                    onChange={(e) => { playTypeSoundThrottled(); setSubtaskInput(e.target.value); }}
+                    value={subtaskInputs[todo.id] || ''}
+                    onChange={(e) => { playTypeSoundThrottled(); setSubtaskInputs(prev => ({ ...prev, [todo.id]: e.target.value })); }}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter' && subtaskInput.trim()) {
+                      if (e.key === 'Enter' && (subtaskInputs[todo.id] || '').trim()) {
                         e.preventDefault();
                         handleAddSubtask(todo.id);
                       }

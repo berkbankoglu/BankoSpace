@@ -71,7 +71,7 @@ function QuickNote({ onClose, isPopup = false }) {
     // Ensure deck exists
     const savedDecks = JSON.parse(localStorage.getItem('flashCardGroups') || '[]');
     if (!savedDecks.some(d => (typeof d === 'string' ? d : d.name) === deckName)) {
-      savedDecks.push({ name: deckName, color: '#58a6ff' });
+      savedDecks.push({ name: deckName, color: '#5c7cfa' });
       localStorage.setItem('flashCardGroups', JSON.stringify(savedDecks));
     }
 
