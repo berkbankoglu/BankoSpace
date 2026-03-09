@@ -3,7 +3,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 
 const MIN_H = 200;
 const MAX_H = 800;
-const DEFAULT_H = 380;
+const DEFAULT_H = 520;
 
 export default function StockMiniChart({ ticker }) {
   const containerRef = useRef(null);
