@@ -9717,8 +9717,8 @@ input::placeholder, textarea::placeholder { color: var(--text-muted) !important;
   gap: 3px;
 }
 .stc-ext-badge {
-  font-size: 10px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 400;
   padding: 2px 6px;
   border-radius: 4px;
   white-space: nowrap;
