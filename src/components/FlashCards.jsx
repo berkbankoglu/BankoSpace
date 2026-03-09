@@ -219,7 +219,7 @@ function FlashCards({ fullscreen = false }) {
         max_tokens: 400,
         messages: [{
           role: 'user',
-          content: `Kelime/kavram: "${aiWord}"\n\nŞu formatta JSON yanıt ver (başka hiçbir şey yazma, sadece JSON):\n{"word":"orijinal kelime/kavram","translation":"Türkçe kısa çeviri veya karşılık (max 5 kelime)","explanation":"Türkçe detaylı açıklama 2-3 cümle, ne anlama geldiğini ve nasıl kullanıldığını anlat"}`
+          content: `Word/concept: "${aiWord}"\n\nRespond in this JSON format only (nothing else, just JSON):\n{"word":"original word/concept","translation":"short English translation or equivalent (max 5 words)","explanation":"detailed English explanation in 2-3 sentences, what it means and how it is used"}`
         }]
       });
       const text = await invoke('fetch_post', {
@@ -239,7 +239,7 @@ function FlashCards({ fullscreen = false }) {
       const parsed = JSON.parse(content.slice(jsonStart, jsonEnd + 1));
       setAiResult(parsed);
     } catch (e) {
-      setAiError('AI yanıt veremedi: ' + (e?.message || 'Bilinmeyen hata'));
+      setAiError('AI failed to respond: ' + (e?.message || 'Unknown error'));
     } finally {
       setAiLoading(false);
     }
@@ -248,7 +248,7 @@ function FlashCards({ fullscreen = false }) {
   const addAiCardToFlashCards = () => {
     if (!aiResult) return;
     const targetDeck = selectedDeck || (decks[0]?.name ?? null);
-    if (!targetDeck) { setAiError('Önce bir deck seç.'); return; }
+    if (!targetDeck) { setAiError('Please select a deck first.'); return; }
     const card = {
       id: Date.now(),
       front: aiResult.word,
@@ -720,8 +720,8 @@ function FlashCards({ fullscreen = false }) {
               autoFocus
             />
             <div className="fc-ai-apikey-btns">
-              <button className="fc-ai-save-btn" onClick={saveApiKey}>Kaydet</button>
-              <button className="fc-ai-cancel-btn" onClick={() => setShowApiKeyInput(false)}>İptal</button>
+              <button className="fc-ai-save-btn" onClick={saveApiKey}>Save</button>
+              <button className="fc-ai-cancel-btn" onClick={() => setShowApiKeyInput(false)}>Cancel</button>
             </div>
           </div>
         ) : (
@@ -729,14 +729,14 @@ function FlashCards({ fullscreen = false }) {
             <input
               type="text"
               className="fc-ai-input"
-              placeholder="Kelime veya kavram yaz..."
+              placeholder="Enter a word or concept..."
               value={aiWord}
               onChange={e => setAiWord(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') askAI(); }}
               disabled={aiLoading}
             />
-            <button className="fc-ai-ask-btn" onClick={askAI} disabled={aiLoading || !aiWord.trim()} title="AI'ya sor">
-              {aiLoading ? <span className="fc-ai-spinner" /> : 'Sor'}
+            <button className="fc-ai-ask-btn" onClick={askAI} disabled={aiLoading || !aiWord.trim()} title="Ask AI">
+              {aiLoading ? <span className="fc-ai-spinner" /> : 'Ask'}
             </button>
           </div>
         )}
@@ -746,7 +746,7 @@ function FlashCards({ fullscreen = false }) {
         {aiLoading && (
           <div className="fc-ai-loading-state">
             <span className="fc-ai-spinner-lg" />
-            <span>Yanıt bekleniyor...</span>
+            <span>Waiting for response...</span>
           </div>
         )}
 
@@ -758,23 +758,23 @@ function FlashCards({ fullscreen = false }) {
             <div className="fc-ai-result-explanation">{aiResult.explanation}</div>
 
             <div className="fc-ai-card-preview">
-              <div className="fc-ai-card-preview-label">Flash Card önizleme</div>
+              <div className="fc-ai-card-preview-label">Flash Card preview</div>
               <div className="fc-ai-card-preview-front">
-                <span className="fc-ai-card-side-label">Ön</span>
+                <span className="fc-ai-card-side-label">Front</span>
                 <span>{aiResult.word}</span>
               </div>
               <div className="fc-ai-card-preview-back">
-                <span className="fc-ai-card-side-label">Arka</span>
+                <span className="fc-ai-card-side-label">Back</span>
                 {aiResult.translation && <span className="fc-ai-preview-translation">{aiResult.translation}</span>}
                 <span>{aiResult.explanation}</span>
               </div>
             </div>
 
             <button className="fc-ai-add-btn" onClick={addAiCardToFlashCards}>
-              + Flash Card'a Ekle
+              + Add to Flash Cards
             </button>
             {!selectedDeck && decks.length === 0 && (
-              <div className="fc-ai-no-deck-hint">Önce bir deck oluştur</div>
+              <div className="fc-ai-no-deck-hint">Create a deck first</div>
             )}
           </div>
         )}
@@ -782,7 +782,7 @@ function FlashCards({ fullscreen = false }) {
         {!aiResult && !aiLoading && !aiError && (
           <div className="fc-ai-empty-state">
             <div className="fc-ai-empty-icon">✦</div>
-            <div className="fc-ai-empty-text">Merak ettiğin kelimeyi veya kavramı yaz, AI sana açıklasın ve flash card olarak ekleyebilirsin.</div>
+            <div className="fc-ai-empty-text">Type a word or concept you're curious about, let AI explain it and add it as a flash card.</div>
           </div>
         )}
       </div>

@@ -161,7 +161,7 @@ function Calendar({ todos, onToggleTodo, onUpdateTodo }) {
               </h3>
               <div className="calendar-panel-todos">
                 {selectedDateTodos.length === 0 ? (
-                  <div className="calendar-panel-empty">Bu gün icin gorev yok</div>
+                  <div className="calendar-panel-empty">No tasks for this day</div>
                 ) : (
                   selectedDateTodos.map(todo => (
                     <div

@@ -8,10 +8,8 @@ import DailyChecklist from './components/DailyChecklist';
 import IncomeTracker from './components/IncomeTracker';
 import Notes from './components/Notes';
 import Calendar from './components/Calendar';
-import StockNews from './components/StockNews';
-import StockChart from './components/StockChart';
-import StockMiniChart from './components/StockMiniChart';
 import ProjectBid from './components/ProjectBid';
+import Stocks from './components/Stocks';
 import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, playTypeSoundThrottled, setVolume, getVolume } from './utils/sounds';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
@@ -19,7 +17,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 
 const APP_VERSION = '3.0.0';
 const MIN_COL_PX = 220;
-const DEFAULT_COL_PX = [null, null]; // [dailyPx, stockPx] — null = auto (flex:1 each side)
+const DEFAULT_COL_PX = [null, null, null]; // [dailyPx, weeklyPx, monthlyPx] — null = auto (flex:1)
 
 function App() {
   // Check if this is a popup window
@@ -45,7 +43,7 @@ function App() {
   const [colWidths, setColWidths] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('dashColWidths'));
-      if (Array.isArray(saved) && saved.length === 2 &&
+      if (Array.isArray(saved) && saved.length === 3 &&
           saved.every(w => w === null || (typeof w === 'number' && w >= MIN_COL_PX && w <= 1200))) {
         return saved;
       }
@@ -55,19 +53,6 @@ function App() {
   const colResizeRef = useRef(null);
   const columnsRef = useRef(null);
 
-  const [stockTickers, setStockTickers] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('stock_tickers')) || ['NBIS']; } catch { return ['NBIS']; }
-  });
-  const [activeStockTicker, setActiveStockTicker] = useState('all');
-  const [newsFilterTicker, setNewsFilterTicker] = useState('all');
-
-  const [priceTickers, setPriceTickers] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('price_tickers')) || []; } catch { return []; }
-  });
-  const savePriceTickers = (next) => {
-    localStorage.setItem('price_tickers', JSON.stringify(next));
-    setPriceTickers(next);
-  };
 
   const startColResize = (handleIdx, e) => {
     e.preventDefault();
@@ -76,23 +61,19 @@ function App() {
 
     const kids = Array.from(container.children).filter(el => !el.classList.contains('col-resize-handle'));
     const startPx = kids.map(el => el.getBoundingClientRect().width);
-    // startPx[0]=daily, startPx[1]=weekly, startPx[2]=stock
+    // startPx[0]=daily, startPx[1]=weekly, startPx[2]=monthly
     const startX = e.clientX;
-    // Pin both sides from DOM so weekly always absorbs
-    const startDaily = startPx[0];
-    const startStock = startPx[2];
+    const leftStart = startPx[handleIdx];
+    const rightStart = startPx[handleIdx + 1];
 
     const onMove = (ev) => {
       const delta = ev.clientX - startX;
-      if (handleIdx === 0) {
-        // Handle 0: Daily grows/shrinks, Weekly absorbs. Stock stays pinned.
-        const newDaily = Math.max(MIN_COL_PX, Math.min(startDaily + delta, startDaily + startPx[1] - MIN_COL_PX));
-        setColWidths([newDaily, startStock]);
-      } else {
-        // Handle 1: Stock grows/shrinks (inverted delta), Weekly absorbs. Daily stays pinned.
-        const newStock = Math.max(MIN_COL_PX, Math.min(startStock - delta, startPx[1] + startStock - MIN_COL_PX));
-        setColWidths([startDaily, newStock]);
-      }
+      const newLeft = Math.max(MIN_COL_PX, Math.min(leftStart + delta, leftStart + rightStart - MIN_COL_PX));
+      const newRight = leftStart + rightStart - newLeft;
+      const next = [...startPx];
+      next[handleIdx] = newLeft;
+      next[handleIdx + 1] = newRight;
+      setColWidths([next[0], next[1], next[2]]);
     };
     const onUp = () => {
       document.removeEventListener('mousemove', onMove);
@@ -176,15 +157,18 @@ function App() {
       { id: 'income',     label: 'Income Tracker',  view: 'income',     hidden: false },
       { id: 'notes',      label: 'Notes',           view: 'notes',      hidden: false },
       { id: 'projectbid', label: 'Project Bid',     view: 'projectbid', hidden: false },
+      { id: 'stocks',     label: 'Stocks',           view: 'stocks',     hidden: false },
     ];
     const saved = localStorage.getItem('sidebarOrder');
     if (saved) {
       const parsed = JSON.parse(saved).filter(item => item.id !== 'quicknote');
       // Merge: keep saved order/hidden state, add any missing defaults
-      const merged = parsed.map(item => {
-        const def = defaults.find(d => d.id === item.id);
-        return def ? { ...def, ...item } : item;
-      });
+      const merged = parsed
+        .filter(item => defaults.find(d => d.id === item.id))
+        .map(item => {
+          const def = defaults.find(d => d.id === item.id);
+          return { ...def, ...item };
+        });
       defaults.forEach(def => {
         if (!merged.find(m => m.id === def.id)) merged.push(def);
       });
@@ -297,12 +281,11 @@ function App() {
 
   // Custom category names
   const [categoryNames, setCategoryNames] = useState(() => {
-    const saved = localStorage.getItem('categoryNames');
-    return saved ? JSON.parse(saved) : {
-      daily: 'Daily',
-      weekly: 'Weekly',
-      longterm: 'Long Term'
-    };
+    const defaults = { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly', longterm: 'Long Term' };
+    try {
+      const saved = localStorage.getItem('categoryNames');
+      return saved ? { ...defaults, ...JSON.parse(saved) } : defaults;
+    } catch { return defaults; }
   });
 
   // Checklist names
@@ -917,10 +900,11 @@ function App() {
   }, [todos]);
 
   const renameCategory = (category, newName) => {
-    setCategoryNames(prev => ({
-      ...prev,
-      [category]: newName
-    }));
+    setCategoryNames(prev => {
+      const next = { ...prev, [category]: newName };
+      localStorage.setItem('categoryNames', JSON.stringify(next));
+      return next;
+    });
   };
 
   // Search function
@@ -1575,6 +1559,13 @@ function App() {
             </div>
           )}
 
+          {/* Stocks View */}
+          {activeView === 'stocks' && (
+            <div className="stocks-fullscreen">
+              <Stocks />
+            </div>
+          )}
+
           {/* Dashboard View */}
           {activeView === 'dashboard' && (
           <div className="dashboard-container">
@@ -1635,7 +1626,7 @@ function App() {
 
             {/* Todo Columns - resizable */}
             <div className="todo-columns" ref={columnsRef}>
-              <div className="todo-col-wrapper" style={colWidths[0] ? { flex: `1 1 ${colWidths[0]}px`, maxWidth: `${colWidths[0]}px`, minWidth: 0 } : { flex: 1, minWidth: 0 }}>
+              <div className="todo-col-wrapper" style={colWidths[0] ? { flex: `0 0 ${colWidths[0]}px`, width: `${colWidths[0]}px`, minWidth: 0 } : { flex: 1, minWidth: 0 }}>
                 <CategoryColumn
                   title={categoryNames.daily}
                   category="daily"
@@ -1658,7 +1649,7 @@ function App() {
                 />
               </div>
               <div className="col-resize-handle" onMouseDown={e => startColResize(0, e)} onDoubleClick={() => { setColWidths(DEFAULT_COL_PX); localStorage.setItem('dashColWidths', JSON.stringify(DEFAULT_COL_PX)); }} />
-              <div className="todo-col-wrapper" style={{ flex: 1, minWidth: MIN_COL_PX }}>
+              <div className="todo-col-wrapper" style={colWidths[1] ? { flex: `0 0 ${colWidths[1]}px`, width: `${colWidths[1]}px`, minWidth: 0 } : { flex: 1, minWidth: 0 }}>
                 <CategoryColumn
                   title={categoryNames.weekly}
                   category="weekly"
@@ -1681,19 +1672,26 @@ function App() {
                 />
               </div>
               <div className="col-resize-handle" onMouseDown={e => startColResize(1, e)} onDoubleClick={() => { setColWidths(DEFAULT_COL_PX); localStorage.setItem('dashColWidths', JSON.stringify(DEFAULT_COL_PX)); }} />
-              <div className="todo-col-wrapper stock-col" style={colWidths[1] ? { flex: `1 1 ${colWidths[1]}px`, maxWidth: `${colWidths[1]}px`, minWidth: 0 } : { flex: 1, minWidth: 0 }}>
-                <StockChart
-                  tickers={priceTickers}
-                  saveTickers={savePriceTickers}
-                  activeTicker={activeStockTicker}
-                  setActiveTicker={setActiveStockTicker}
-                />
-                <StockMiniChart ticker={activeStockTicker} />
-                <StockNews
-                  tickers={stockTickers}
-                  setTickers={setStockTickers}
-                  activeTicker={newsFilterTicker}
-                  setActiveTicker={setNewsFilterTicker}
+              <div className="todo-col-wrapper" style={colWidths[2] ? { flex: `0 0 ${colWidths[2]}px`, width: `${colWidths[2]}px`, minWidth: 0 } : { flex: 1, minWidth: 0 }}>
+                <CategoryColumn
+                  title={categoryNames.monthly}
+                  category="monthly"
+                  todos={todosByCategory.monthly}
+                  onAddTodo={addTodo}
+                  onToggleTodo={toggleTodo}
+                  onDeleteTodo={deleteTodo}
+                  onUpdateTodo={updateTodo}
+                  onRename={renameCategory}
+                  currentFilter={currentFilter}
+                  onAddSubtask={addSubtask}
+                  onToggleSubtask={toggleSubtask}
+                  onDeleteSubtask={deleteSubtask}
+                  onUpdateSubtask={updateSubtask}
+                  onReorder={reorderTodos}
+                  onTodoDragStart={handleTodoDragStart}
+                  draggingTodo={draggingTodo}
+                  dragOverCategory={dragOverCategory}
+                  dragOverTodoId={dragOverTodoId}
                 />
               </div>
             </div>

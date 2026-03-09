@@ -227,7 +227,7 @@ async function fetchAllNews(tickers) {
 async function fetchAiComment(title, tickers) {
   const key = localStorage.getItem('anthropic_api_key');
   if (!key) throw new Error('NO_KEY');
-  const tickerCtx = tickers && tickers.length > 0 ? `İlgili hisse: ${tickers.join(', ')}\n` : '';
+  const tickerCtx = tickers && tickers.length > 0 ? `Related tickers: ${tickers.join(', ')}\n` : '';
   const bodyStr = JSON.stringify({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 400,
@@ -292,8 +292,8 @@ export default function StockNews({ tickers, setTickers, activeTicker, setActive
       setAiComments(prev => ({ ...prev, [id]: { status: 'done', text } }));
     } catch (err) {
       const msg = err?.message === 'NO_KEY'
-        ? 'API key eksik (Flash Cards > 🔑)'
-        : `Hata: ${err?.message || 'Bilinmeyen hata'}`;
+        ? 'API key missing (Flash Cards > 🔑)'
+        : `Error: ${err?.message || 'Unknown error'}`;
       setAiComments(prev => ({ ...prev, [id]: { status: 'error', text: msg } }));
     }
   };
@@ -427,7 +427,7 @@ export default function StockNews({ tickers, setTickers, activeTicker, setActive
         <div className="stock-news-picker-wrap" ref={pickerRef}>
           <input
             className="stock-news-picker-search"
-            placeholder="+ Hisse ekle..."
+            placeholder="+ Add ticker..."
             value={pickerSearch}
             onChange={e => setPickerSearch(e.target.value)}
             onFocus={() => setShowPicker(true)}

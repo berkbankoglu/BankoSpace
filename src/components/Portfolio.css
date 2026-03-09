@@ -1,0 +1,183 @@
+.pf-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* Toolbar */
+.pf-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 10px 5px 10px;
+  border-bottom: 1px solid #30363d;
+  background: #161b22;
+  flex-shrink: 0;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pf-summary-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.pf-sum-item {
+  font-size: 11px;
+  color: #8b949e;
+}
+.pf-sum-item b { color: #c9d1d9; font-weight: 600; }
+.pf-sum-item.pos b { color: #3fb950; }
+.pf-sum-item.neg b { color: #f85149; }
+.pf-sum-pct { font-size: 10px; color: #8b949e; }
+.pf-sum-sep { color: #484f58; font-size: 11px; }
+
+.pf-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.pf-tab-bar {
+  display: flex;
+  gap: 0;
+}
+
+/* Icon buttons (↻, +, ✕) */
+.pf-icon-btn {
+  background: none;
+  border: 1px solid #30363d;
+  border-radius: 5px;
+  color: #8b949e;
+  font-size: 14px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  padding: 0;
+  line-height: 1;
+}
+.pf-icon-btn:hover { color: #c9d1d9; border-color: #8b949e; }
+.pf-icon-btn.add { border-color: #238636; color: #3fb950; }
+.pf-icon-btn.add:hover { background: rgba(35,134,54,0.15); }
+.pf-icon-btn.spin { animation: pf-spin 0.8s linear infinite; }
+@keyframes pf-spin { to { transform: rotate(360deg); } }
+
+/* Inline form */
+.pf-inline-form {
+  border-bottom: 1px solid #30363d;
+  padding: 6px 10px;
+  background: #0d1117;
+  flex-shrink: 0;
+}
+
+.pf-form-error {
+  font-size: 11px;
+  color: #f85149;
+  margin-bottom: 5px;
+}
+
+.pf-form-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.pf-input {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  color: #c9d1d9;
+  font-size: 11px;
+  padding: 4px 7px;
+  height: 26px;
+  outline: none;
+  min-width: 60px;
+  width: 80px;
+  transition: border-color 0.15s;
+}
+.pf-input:focus { border-color: #58a6ff; }
+.pf-input[placeholder="SEMBOL"] { width: 70px; text-transform: uppercase; }
+.pf-input[placeholder="Şirket adı"] { width: 110px; }
+.pf-input[type="date"] { width: 110px; }
+
+.pf-sell-label {
+  font-size: 11px;
+  color: #8b949e;
+  white-space: nowrap;
+}
+
+.pf-form-tutar {
+  font-size: 11px;
+  color: #8b949e;
+  white-space: nowrap;
+  padding: 0 2px;
+}
+
+.pf-input-loading {
+  border-color: #58a6ff !important;
+  opacity: 0.7;
+}
+
+.pf-form-preview {
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 0 2px;
+}
+.pf-form-preview.pos { color: #3fb950; }
+.pf-form-preview.neg { color: #f85149; }
+.pf-form-preview-pct { font-weight: 400; opacity: 0.85; }
+
+/* Row buttons */
+.pf-row-btn {
+  border: none;
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  height: 20px;
+  line-height: 1;
+}
+.pf-row-btn:hover { opacity: 0.75; }
+.pf-row-btn.sell { background: rgba(56,139,253,0.15); color: #58a6ff; }
+.pf-row-btn.edit { background: rgba(187,128,0,0.15); color: #d29922; }
+.pf-row-btn.del  { background: rgba(218,54,51,0.15);  color: #f85149; }
+
+/* Grid overrides */
+.pf-grid-open {
+  grid-template-columns: 85px 65px 70px 70px 80px 60px 65px 60px 88px !important;
+}
+.pf-grid-closed {
+  grid-template-columns: 70px 70px 70px 80px 60px 80px 28px !important;
+}
+
+.pf-name {
+  font-size: 9px;
+  font-weight: 400;
+  color: #8b949e;
+}
+
+.pf-actions {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+
+.stc-na { color: #484f58; }
+
+/* light theme */
+body.light .pf-toolbar { background: #f6f8fa; border-color: #d0d7de; }
+body.light .pf-sum-item { color: #656d76; }
+body.light .pf-sum-item b { color: #24292f; }
+body.light .pf-inline-form { background: #fff; border-color: #d0d7de; }
+body.light .pf-input { background: #f6f8fa; border-color: #d0d7de; color: #24292f; }

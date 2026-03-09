@@ -88,7 +88,7 @@ function IncomeTracker() {
       return { text: fullText, error: null };
     } catch (error) {
       console.error('PDF extraction error:', error);
-      return { text: '', error: error.message || 'PDF okunamadı' };
+      return { text: '', error: error.message || 'Could not read PDF' };
     } finally {
       if (pdf) {
         try {
@@ -139,7 +139,7 @@ function IncomeTracker() {
     }
 
     if (!date) {
-      errors.push('Tarih bulunamadı');
+      errors.push('Date not found');
       date = new Date().toISOString().split('T')[0];
     }
 
@@ -259,8 +259,8 @@ function IncomeTracker() {
     }
 
     if (!client) {
-      errors.push('Müşteri adı bulunamadı');
-      client = 'Bilinmiyor';
+      errors.push('Client name not found');
+      client = 'Unknown';
     }
 
     // Ülke bilgisini çıkar - sadece ALICI BİLGİLERİ bölümünden
@@ -469,7 +469,7 @@ function IncomeTracker() {
     }
 
     if (amountUSD === 0) {
-      errors.push('USD tutarı bulunamadı');
+      errors.push('USD amount not found');
     }
 
     // TRY Tutar
@@ -554,7 +554,7 @@ function IncomeTracker() {
       title: 'Delete Data',
       kind: 'warning',
       okLabel: 'Yes, Delete',
-      cancelLabel: 'İptal'
+      cancelLabel: 'Cancel'
     });
 
     if (confirmed) {
@@ -665,9 +665,9 @@ function IncomeTracker() {
         pdfData = null;
 
         if (extractResult.error) {
-          failReason = `PDF okuma hatası: ${extractResult.error}`;
+          failReason = `PDF read error: ${extractResult.error}`;
         } else if (!extractResult.text || extractResult.text.length < 10) {
-          failReason = `PDF içeriği boş (${extractResult.text?.length || 0} karakter)`;
+          failReason = `PDF content empty (${extractResult.text?.length || 0} characters)`;
         } else {
           parsedData = parseInvoiceText(extractResult.text, file.name);
 
@@ -677,19 +677,19 @@ function IncomeTracker() {
             readSuccess = parsedData.amountUSD > 0;
 
             // USD bulunamasa bile en azından parse edildi - fatura listesine ekle
-            if (!readSuccess && parsedData.client !== 'Bilinmiyor') {
+            if (!readSuccess && parsedData.client !== 'Unknown') {
               // Müşteri bulunduysa kısmi başarı - yine de listeye ekleniyor
-              failReason = `Tutar bulunamadı - Manuel düzenleme gerekli`;
+              failReason = `Amount not found - Manual edit required`;
             } else if (!readSuccess) {
-              failReason = `USD tutarı bulunamadı`;
+              failReason = `USD amount not found`;
             }
           } else {
-            failReason = 'PDF parse edilemedi';
+            failReason = 'Could not parse PDF';
           }
         }
       } catch (readErr) {
         console.error(`Error reading PDF ${file.name}:`, readErr);
-        failReason = `Hata: ${readErr.message || 'Dosya okunamadı'}`;
+        failReason = `Error: ${readErr.message || 'Could not read file'}`;
       }
 
       // Her 5 PDF'de bir kısa bekleme yap (bellek temizliği için)
@@ -701,7 +701,7 @@ function IncomeTracker() {
         id: file.invoiceNo + '_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
         invoiceNo: file.invoiceNo,
         date: parsedData?.date || defaultDate,
-        client: parsedData?.client || 'Bilinmiyor',
+        client: parsedData?.client || 'Unknown',
         country: parsedData?.country || '-',
         amountUSD: parsedData?.amountUSD || 0,
         fileName: file.name,
@@ -889,19 +889,19 @@ function IncomeTracker() {
   const years = allYears;
 
   const months = [
-    { value: 'all', label: 'Tüm Aylar' },
-    { value: '01', label: 'Ocak' },
-    { value: '02', label: 'Şubat' },
-    { value: '03', label: 'Mart' },
-    { value: '04', label: 'Nisan' },
-    { value: '05', label: 'Mayıs' },
-    { value: '06', label: 'Haziran' },
-    { value: '07', label: 'Temmuz' },
-    { value: '08', label: 'Ağustos' },
-    { value: '09', label: 'Eylül' },
-    { value: '10', label: 'Ekim' },
-    { value: '11', label: 'Kasım' },
-    { value: '12', label: 'Aralık' }
+    { value: 'all', label: 'All Months' },
+    { value: '01', label: 'January' },
+    { value: '02', label: 'February' },
+    { value: '03', label: 'March' },
+    { value: '04', label: 'April' },
+    { value: '05', label: 'May' },
+    { value: '06', label: 'June' },
+    { value: '07', label: 'July' },
+    { value: '08', label: 'August' },
+    { value: '09', label: 'September' },
+    { value: '10', label: 'October' },
+    { value: '11', label: 'November' },
+    { value: '12', label: 'December' }
   ];
 
   const formatCurrency = (amount, currency = 'USD') => {
@@ -1006,7 +1006,7 @@ function IncomeTracker() {
                 {/* Success List */}
                 {scanProgress.success.length > 0 && (
                   <div className="it-result-section success">
-                    <h4>Okunan ({scanProgress.success.length})</h4>
+                    <h4>Read ({scanProgress.success.length})</h4>
                     <div className="it-result-list">
                       {scanProgress.success.slice(-5).map((item, idx) => (
                         <div key={idx} className="it-result-item success">
@@ -1025,7 +1025,7 @@ function IncomeTracker() {
                 {/* Failed List */}
                 {scanProgress.failed.length > 0 && (
                   <div className="it-result-section failed">
-                    <h4>Okunamayan ({scanProgress.failed.length})</h4>
+                    <h4>Failed ({scanProgress.failed.length})</h4>
                     <div className="it-result-list">
                       {scanProgress.failed.slice(-5).map((item, idx) => (
                         <div key={idx} className="it-result-item failed">
@@ -1069,7 +1069,7 @@ function IncomeTracker() {
                   {selectedYear !== 'all' && selectedMonth !== 'all'
                     ? `${months.find(m => m.value === selectedMonth)?.label} ${selectedYear}`
                     : selectedYear !== 'all'
-                      ? `${selectedYear} Fatura`
+                      ? `${selectedYear} Invoices`
                       : 'Total Invoices'}
                 </span>
               </div>
@@ -1088,7 +1088,7 @@ function IncomeTracker() {
                 <div className="it-stat-icon">{trend.change >= 0 ? '↑' : '↓'}</div>
                 <div className="it-stat-content">
                   <span className="it-stat-value">{trend.change >= 0 ? '+' : ''}{trend.change.toFixed(1)}%</span>
-                  <span className="it-stat-label">Önceki Aya Göre</span>
+                  <span className="it-stat-label">vs. Previous Month</span>
                 </div>
               </div>
             )}
@@ -1112,7 +1112,7 @@ function IncomeTracker() {
                       className={`it-mode-btn ${chartMode === 'yearly' ? 'active' : ''}`}
                       onClick={() => setChartMode('yearly')}
                     >
-                      Yıllık
+                      Yearly
                     </button>
                   </div>
                   {/* Yıl Seçimi (sadece aylık modda) */}
@@ -1186,7 +1186,7 @@ function IncomeTracker() {
                       </div>
                     </>
                   ) : (
-                    <div className="it-empty">{chartMode === 'monthly' ? `${chartYear} için veri yok` : 'Henüz veri yok'}</div>
+                    <div className="it-empty">{chartMode === 'monthly' ? `No data for ${chartYear}` : 'No data yet'}</div>
                   );
                 })()}
               </div>
@@ -1204,7 +1204,7 @@ function IncomeTracker() {
                     onChange={(e) => setClientFilter(e.target.value)}
                     className="it-client-select"
                   >
-                    <option value="all">Tüm Müşteriler</option>
+                    <option value="all">All Clients</option>
                     {Object.entries(stats.byClient)
                       .sort((a, b) => b[1] - a[1])
                       .map(([client]) => (
@@ -1239,7 +1239,7 @@ function IncomeTracker() {
                     );
                   })}
                 {Object.keys(stats.byClient).length === 0 && (
-                  <div className="it-empty">Henüz müşteri verisi yok</div>
+                  <div className="it-empty">No client data yet</div>
                 )}
               </div>
             </div>
@@ -1249,7 +1249,7 @@ function IncomeTracker() {
           <div className="it-charts">
             {/* Year Comparison */}
             <div className="it-chart-card">
-              <h3>Yıllık Karşılaştırma</h3>
+              <h3>Yearly Comparison</h3>
               <div className="it-bar-chart">
                 {Object.entries(stats.byYear)
                   .sort((a, b) => b[0].localeCompare(a[0]))
@@ -1270,7 +1270,7 @@ function IncomeTracker() {
                     );
                   })}
                 {Object.keys(stats.byYear).length === 0 && (
-                  <div className="it-empty">Henüz veri yok</div>
+                  <div className="it-empty">No data yet</div>
                 )}
               </div>
             </div>
@@ -1295,7 +1295,7 @@ function IncomeTracker() {
                     </div>
                   ))}
                 {Object.keys(stats.byClient).length === 0 && (
-                  <div className="it-empty">Henüz veri yok</div>
+                  <div className="it-empty">No data yet</div>
                 )}
               </div>
             </div>
@@ -1305,7 +1305,7 @@ function IncomeTracker() {
           <div className="it-charts">
             {/* Country Distribution - Pie Chart Style */}
             <div className="it-chart-card">
-              <h3>Ülke Dağılımı</h3>
+              <h3>Country Distribution</h3>
               <div className="it-pie-chart">
                 {(() => {
                   const countryData = Object.entries(stats.byCountry)
@@ -1328,7 +1328,7 @@ function IncomeTracker() {
                       ))}
                     </div>
                   ) : (
-                    <div className="it-empty">Henüz veri yok</div>
+                    <div className="it-empty">No data yet</div>
                   );
                 })()}
               </div>
@@ -1425,18 +1425,18 @@ function IncomeTracker() {
         <div className="it-list-container">
           {/* Sıralama Seçenekleri */}
           <div className="it-sort-controls">
-            <span className="it-sort-label">Sırala:</span>
+            <span className="it-sort-label">Sort:</span>
             <select
               value={sortOrder}
               onChange={(e) => setSortOrder(e.target.value)}
               className="it-sort-select"
             >
-              <option value="date-desc">Tarih (Yeniden Eskiye)</option>
-              <option value="date-asc">Tarih (Eskiden Yeniye)</option>
-              <option value="amount-desc">Tutar (Yüksekten Düşüğe)</option>
-              <option value="amount-asc">Tutar (Düşükten Yükseğe)</option>
-              <option value="client-asc">Müşteri (A-Z)</option>
-              <option value="client-desc">Müşteri (Z-A)</option>
+              <option value="date-desc">Date (Newest First)</option>
+              <option value="date-asc">Date (Oldest First)</option>
+              <option value="amount-desc">Amount (High to Low)</option>
+              <option value="amount-asc">Amount (Low to High)</option>
+              <option value="client-asc">Client (A-Z)</option>
+              <option value="client-desc">Client (Z-A)</option>
             </select>
           </div>
 
@@ -1476,13 +1476,13 @@ function IncomeTracker() {
                       className="it-edit-input"
                       value={editForm.client}
                       onChange={(e) => setEditForm({...editForm, client: e.target.value})}
-                      placeholder="Müşteri"
+                      placeholder="Client"
                     />
                     <input
                       className="it-edit-input"
                       value={editForm.country}
                       onChange={(e) => setEditForm({...editForm, country: e.target.value})}
-                      placeholder="Ülke"
+                      placeholder="Country"
                     />
                     <input
                       className="it-edit-input small"
@@ -1506,7 +1506,7 @@ function IncomeTracker() {
                       <button
                         className="it-edit-btn"
                         onClick={() => startEdit(invoice)}
-                        title="Düzenle"
+                        title="Edit"
                       >
                         ✎
                       </button>
@@ -1540,10 +1540,10 @@ function IncomeTracker() {
                     {!collapsedSections.read && (
                       <div className="it-list">
                         <div className="it-list-header">
-                          <span>Tarih</span>
-                          <span>Müşteri</span>
-                          <span>Ülke</span>
-                          <span>Tutar (USD)</span>
+                          <span>Date</span>
+                          <span>Client</span>
+                          <span>Country</span>
+                          <span>Amount (USD)</span>
                           <span></span>
                         </div>
                         <div className="it-list-body">
@@ -1564,15 +1564,15 @@ function IncomeTracker() {
                       <span className={`it-section-arrow ${collapsedSections.unread ? 'collapsed' : ''}`}>▼</span>
                       <span className="it-section-icon">!</span>
                       <span>Unread Invoices ({unreadInvoices.length})</span>
-                      <span className="it-section-hint">Düzenlemek için kalem ikonuna tıklayın</span>
+                      <span className="it-section-hint">Click the pencil icon to edit</span>
                     </div>
                     {!collapsedSections.unread && (
                       <div className="it-list">
                         <div className="it-list-header">
-                          <span>Tarih</span>
-                          <span>Müşteri</span>
-                          <span>Ülke</span>
-                          <span>Tutar (USD)</span>
+                          <span>Date</span>
+                          <span>Client</span>
+                          <span>Country</span>
+                          <span>Amount (USD)</span>
                           <span></span>
                         </div>
                         <div className="it-list-body">
@@ -1586,7 +1586,7 @@ function IncomeTracker() {
                 {filteredInvoices.length === 0 && (
                   <div className="it-empty-list">
                     <p>No invoices yet</p>
-                    <button onClick={() => setView('add')}>Manuel Ekle</button>
+                    <button onClick={() => setView('add')}>Add Manually</button>
                     <button onClick={scanFolder}>Scan from Folder</button>
                   </div>
                 )}
@@ -1602,7 +1602,7 @@ function IncomeTracker() {
           <h3>Add Manual Invoice</h3>
           <div className="it-form-grid">
             <div className="it-form-group">
-              <label>Tarih</label>
+              <label>Date</label>
               <input
                 type="date"
                 value={manualEntry.date}
@@ -1619,25 +1619,25 @@ function IncomeTracker() {
               />
             </div>
             <div className="it-form-group">
-              <label>Müşteri *</label>
+              <label>Client *</label>
               <input
                 type="text"
-                placeholder="Müşteri adı"
+                placeholder="Client name"
                 value={manualEntry.client}
                 onChange={(e) => setManualEntry({...manualEntry, client: e.target.value})}
               />
             </div>
             <div className="it-form-group">
-              <label>Açıklama</label>
+              <label>Description</label>
               <input
                 type="text"
-                placeholder="Hizmet açıklaması"
+                placeholder="Service description"
                 value={manualEntry.description}
                 onChange={(e) => setManualEntry({...manualEntry, description: e.target.value})}
               />
             </div>
             <div className="it-form-group">
-              <label>Tutar (USD) *</label>
+              <label>Amount (USD) *</label>
               <input
                 type="number"
                 step="0.01"
@@ -1647,7 +1647,7 @@ function IncomeTracker() {
               />
             </div>
             <div className="it-form-group">
-              <label>Tutar (TRY)</label>
+              <label>Amount (TRY)</label>
               <input
                 type="number"
                 step="0.01"
@@ -1659,10 +1659,10 @@ function IncomeTracker() {
           </div>
           <div className="it-form-actions">
             <button className="it-save-btn" onClick={addManualEntry}>
-              Kaydet
+              Save
             </button>
             <button className="it-cancel-btn" onClick={() => setView('list')}>
-              İptal
+              Cancel
             </button>
           </div>
         </div>
