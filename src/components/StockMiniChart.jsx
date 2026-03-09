@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 
 const MIN_H = 200;
 const MAX_H = 800;
@@ -11,7 +12,8 @@ export default function StockMiniChart({ ticker }) {
   const [height, setHeight] = useState(DEFAULT_H);
 
   useEffect(() => {
-    if (!ticker || ticker === 'all' || !containerRef.current) return;
+    const symbol = (!ticker || ticker === 'all') ? 'AAPL' : ticker;
+    if (!containerRef.current) return;
 
     containerRef.current.innerHTML = '';
 
@@ -21,12 +23,12 @@ export default function StockMiniChart({ ticker }) {
     script.async = true;
     script.innerHTML = JSON.stringify({
       autosize: true,
-      symbol: ticker,
+      symbol: symbol,
       interval: 'D',
       timezone: 'Europe/Istanbul',
       theme: 'dark',
       style: '1',
-      locale: 'tr',
+      locale: 'en',
       backgroundColor: '#1c2128',
       toolbarBg: '#1c2128',
       gridColor: 'rgba(48,54,61,0.8)',
@@ -81,6 +83,11 @@ export default function StockMiniChart({ ticker }) {
     const startY = e.clientY;
     const startH = wrapperRef.current ? wrapperRef.current.offsetHeight : height;
 
+    document.body.style.userSelect = 'none';
+    getCurrentWindow().setCursorVisible(false).catch(() => {
+      document.body.style.cursor = 'none';
+    });
+
     const onMove = (ev) => {
       const delta = ev.clientY - startY;
       const newH = Math.min(MAX_H, Math.max(MIN_H, startH + delta));
@@ -89,6 +96,9 @@ export default function StockMiniChart({ ticker }) {
 
     const onUp = (ev) => {
       ev.target.releasePointerCapture(ev.pointerId);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+      getCurrentWindow().setCursorVisible(true).catch(() => {});
       const finalH = wrapperRef.current ? wrapperRef.current.offsetHeight : height;
       setHeight(finalH);
       e.target.removeEventListener('pointermove', onMove);
@@ -99,28 +109,22 @@ export default function StockMiniChart({ ticker }) {
     e.target.addEventListener('pointerup', onUp);
   }, [height]);
 
-  const hidden = !ticker || ticker === 'all';
-
   return (
     <div
       className="smc-wrapper"
       ref={wrapperRef}
-      style={{ height: hidden ? 0 : height, overflow: 'hidden', minHeight: 0, border: hidden ? 'none' : undefined }}
+      style={{ height, overflow: 'hidden', minHeight: MIN_H }}
     >
-      {!hidden && (
-        <>
-          <div className="smc-tv-clip">
-            <div
-              className="tradingview-widget-container"
-              ref={containerRef}
-              style={{ width: '100%', height: '100%' }}
-            />
-          </div>
-          <div className="smc-resize-handle" onPointerDown={onDragHandleDown}>
-            <span /><span /><span />
-          </div>
-        </>
-      )}
+      <div className="smc-tv-clip">
+        <div
+          className="tradingview-widget-container"
+          ref={containerRef}
+          style={{ width: '100%', height: '100%' }}
+        />
+      </div>
+      <div className="smc-resize-handle" onPointerDown={onDragHandleDown}>
+        <span /><span /><span />
+      </div>
     </div>
   );
 }

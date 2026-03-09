@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import './ProjectBid.css';
 
-const DEFAULT_RULES = `Teklif yazarken şu kurallara uy:
-- Kısa ve öz ol (max 150 kelime)
-- Müşterinin sorununu anladığını göster
-- Deneyimini somut örnekle belirt
-- Fiyat/süre tahminini sona ekle
-- Samimi ve profesyonel ton kullan
-- Türkçe yaz`;
+const DEFAULT_RULES = `Follow these rules when writing a bid:
+- Be concise (max 150 words)
+- Show that you understood the client's problem
+- Mention your experience with a concrete example
+- Add price/timeline estimate at the end
+- Use a sincere and professional tone
+- Write in English`;
 
 export default function ProjectBid() {
   const [projectDetails, setProjectDetails] = useState('');
@@ -26,7 +26,7 @@ export default function ProjectBid() {
     if (!projectDetails.trim()) return;
     const key = localStorage.getItem('anthropic_api_key');
     if (!key) {
-      setError('API key bulunamadı. Lütfen Settings > API key alanına Anthropic API key\'ini gir.');
+      setError('API key not found. Please enter your Anthropic API key in Settings > API key.');
       return;
     }
     setLoading(true);
@@ -38,7 +38,7 @@ export default function ProjectBid() {
         max_tokens: 600,
         messages: [{
           role: 'user',
-          content: `Sen deneyimli bir Upwork freelancer'ısın. Aşağıdaki proje için teklif yazısı hazırla.\n\n[Teklif Kuralları]\n${bidRules}\n\n[Müşteri Adı]\n${clientName.trim() || 'Belirtilmedi'}\n\n[Proje Detayları]\n${projectDetails}\n\nSadece teklif yazısını yaz, başka hiçbir şey ekleme.`,
+          content: `You are an experienced Upwork freelancer. Write a bid proposal for the following project.\n\n[Bid Rules]\n${bidRules}\n\n[Client Name]\n${clientName.trim() || 'Not specified'}\n\n[Project Details]\n${projectDetails}\n\nWrite only the bid text, nothing else.`,
         }],
       });
       const text = await window.__TAURI__.core.invoke('fetch_post', {
@@ -54,7 +54,7 @@ export default function ProjectBid() {
       if (data.error) throw new Error(data.error.message || 'API error');
       setGeneratedBid(data.content[0].text);
     } catch (e) {
-      setError(e.message || 'Teklif oluşturulamadı.');
+      setError(e.message || 'Failed to generate bid.');
     } finally {
       setLoading(false);
     }
@@ -78,16 +78,16 @@ export default function ProjectBid() {
       <div className="pb-header">
         <h2 className="pb-title">Project Bid</h2>
         <button className="pb-rules-btn" onClick={() => { setRulesEdit(bidRules); setShowRules(true); }}>
-          ⚙ Kurallar
+          ⚙ Rules
         </button>
       </div>
 
       {showRules && (
         <div className="pb-rules-panel">
           <div className="pb-rules-header">
-            <span className="pb-rules-title">Teklif Kuralları</span>
+            <span className="pb-rules-title">Bid Rules</span>
             <div className="pb-rules-actions">
-              <button className="pb-save-btn" onClick={saveRules}>Kaydet</button>
+              <button className="pb-save-btn" onClick={saveRules}>Save</button>
               <button className="pb-close-btn" onClick={() => setShowRules(false)}>✕</button>
             </div>
           </div>
@@ -95,30 +95,30 @@ export default function ProjectBid() {
             className="pb-rules-textarea"
             value={rulesEdit}
             onChange={e => setRulesEdit(e.target.value)}
-            placeholder="Teklif yazma kurallarını buraya gir..."
+            placeholder="Enter bid writing rules here..."
           />
         </div>
       )}
 
       <div className="pb-form">
         <div className="pb-field">
-          <label className="pb-label">Müşteri Adı <span className="pb-optional">(opsiyonel)</span></label>
+          <label className="pb-label">Client Name <span className="pb-optional">(optional)</span></label>
           <input
             className="pb-input"
             type="text"
             value={clientName}
             onChange={e => setClientName(e.target.value)}
-            placeholder="Müşteri adı..."
+            placeholder="Client name..."
           />
         </div>
 
         <div className="pb-field">
-          <label className="pb-label">Proje Detayları</label>
+          <label className="pb-label">Project Details</label>
           <textarea
             className="pb-textarea pb-details"
             value={projectDetails}
             onChange={e => setProjectDetails(e.target.value)}
-            placeholder="Upwork ilanını veya proje açıklamasını buraya yapıştır..."
+            placeholder="Paste the Upwork listing or project description here..."
           />
         </div>
 
@@ -127,7 +127,7 @@ export default function ProjectBid() {
           onClick={generateBid}
           disabled={loading || !projectDetails.trim()}
         >
-          {loading ? <><span className="pb-spinner" /> Oluşturuluyor...</> : 'Teklif Oluştur →'}
+          {loading ? <><span className="pb-spinner" /> Generating...</> : 'Generate Bid →'}
         </button>
 
         {error && <div className="pb-error">{error}</div>}
@@ -136,9 +136,9 @@ export default function ProjectBid() {
       {generatedBid && (
         <div className="pb-result">
           <div className="pb-result-header">
-            <span className="pb-result-title">Oluşturulan Teklif</span>
+            <span className="pb-result-title">Generated Bid</span>
             <button className="pb-copy-btn" onClick={handleCopy}>
-              {copied ? '✓ Kopyalandı' : 'Kopyala'}
+              {copied ? '✓ Copied' : 'Copy'}
             </button>
           </div>
           <textarea

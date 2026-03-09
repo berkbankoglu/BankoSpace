@@ -226,11 +226,11 @@ function WorldMap({ invoices = [] }) {
     <div className="world-map-container">
       <div className="map-header">
         <div className="map-title">
-          <h2>🌍 Çalıştığım Ülkeler</h2>
+          <h2>🌍 Countries I've Worked With</h2>
           {currentCountry && (
             <div className="current-location">
               <span className="location-dot">📍</span>
-              Şu anki konumunuz: {currentCountry}
+              Your current location: {currentCountry}
             </div>
           )}
         </div>
@@ -240,7 +240,7 @@ function WorldMap({ invoices = [] }) {
             className="btn-toggle-stats"
             onClick={() => setShowStats(!showStats)}
           >
-            {showStats ? 'İstatistikleri Gizle' : 'İstatistikleri Göster'}
+            {showStats ? 'Hide Stats' : 'Show Stats'}
           </button>
         </div>
       </div>
@@ -249,11 +249,11 @@ function WorldMap({ invoices = [] }) {
         <div className="map-stats">
           <div className="stat-card">
             <div className="stat-value">{workedCount}</div>
-            <div className="stat-label">Ülke Sayısı</div>
+            <div className="stat-label">Countries</div>
           </div>
           <div className="stat-card">
             <div className="stat-value">{percentage}%</div>
-            <div className="stat-label">Dünya Kapsamı</div>
+            <div className="stat-label">World Coverage</div>
           </div>
           <div className="stat-card">
             <div className="stat-value">
@@ -261,7 +261,7 @@ function WorldMap({ invoices = [] }) {
                 ? new Date(workedCountriesList[workedCountriesList.length - 1].addedAt).getFullYear()
                 : '-'}
             </div>
-            <div className="stat-label">Son Yıl</div>
+            <div className="stat-label">Latest Year</div>
           </div>
         </div>
       )}
@@ -270,14 +270,14 @@ function WorldMap({ invoices = [] }) {
         {isLoading && (
           <div className="map-loading">
             <div className="loading-spinner"></div>
-            <p>Harita yükleniyor...</p>
+            <p>Loading map...</p>
           </div>
         )}
 
         {error && (
           <div className="map-error">
-            <p>⚠️ Harita yükleme hatası: {error}</p>
-            <button onClick={() => window.location.reload()}>Yeniden Dene</button>
+            <p>⚠️ Map loading error: {error}</p>
+            <button onClick={() => window.location.reload()}>Retry</button>
           </div>
         )}
 
@@ -354,7 +354,7 @@ function WorldMap({ invoices = [] }) {
 
       {workedCountriesList.length > 0 && (
         <div className="countries-list">
-          <h3>Çalıştığım Ülkeler ve Müşteriler ({workedCount})</h3>
+          <h3>Countries & Clients ({workedCount})</h3>
           <div className="countries-grid">
             {workedCountriesList
               .sort((a, b) => {
@@ -382,14 +382,14 @@ function WorldMap({ invoices = [] }) {
                     </div>
                     <div className="country-card-body">
                       <div className="country-clients">
-                        <strong>Müşteriler ({Object.keys(clientsByName).length}):</strong>
+                        <strong>Clients ({Object.keys(clientsByName).length}):</strong>
                         {Object.entries(clientsByName)
                           .sort((a, b) => b[1].total - a[1].total)
                           .map(([clientName, data]) => (
                             <div key={clientName} className="client-item">
                               <span className="client-name">{clientName}</span>
                               <span className="client-stats">
-                                {data.count} fatura • ${data.total.toFixed(2)}
+                                {data.count} invoice{data.count !== 1 ? 's' : ''} • ${data.total.toFixed(2)}
                               </span>
                             </div>
                           ))}
@@ -405,8 +405,8 @@ function WorldMap({ invoices = [] }) {
       {workedCountriesList.length === 0 && !isLoading && (
         <div className="countries-list">
           <div className="empty-state">
-            <p>Henüz ülke verisi yok</p>
-            <p>Gelir Takibi bölümünden PDF faturalarınızı tarayın</p>
+            <p>No country data yet</p>
+            <p>Scan your PDF invoices from the Income Tracker section</p>
           </div>
         </div>
       )}
