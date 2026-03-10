@@ -142,10 +142,28 @@
   pointer-events: none;
 }
 
-.kana-cell:not(.kana-cell--empty):hover {
+.kana-cell--clickable {
+  cursor: pointer;
+  position: relative;
+}
+
+.kana-cell--clickable:hover {
   background: #21262d;
   border-color: #58a6ff;
   transform: scale(1.08);
+}
+
+.kana-cell--clickable:hover .kana-speak-icon {
+  opacity: 1;
+}
+
+.kana-speak-icon {
+  font-size: 0.7rem;
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
 }
 
 .kana-char {
@@ -279,6 +297,35 @@
   line-height: 1.2;
   color: #e6edf3;
   font-style: italic;
+}
+
+.speak-btn {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  opacity: 0.4;
+  transition: opacity 0.15s, transform 0.1s;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.speak-btn:hover {
+  opacity: 1;
+  transform: scale(1.15);
+}
+
+.guide-section-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8b949e;
+  padding: 0.5rem 0 0.25rem;
+  border-bottom: 1px solid #30363d;
+  margin-bottom: 0.5rem;
 }
 
 .feedback-icon {
