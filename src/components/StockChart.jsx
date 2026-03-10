@@ -282,9 +282,6 @@ function GroupRows({ group, quotes, activeTicker, setActiveTicker, dragState, dr
             </>
           )}
         </span>
-        <span className="stc-prev">
-          {!isLoading && !isError && `$${q.prevClose.toFixed(2)}`}
-        </span>
         <span className="stc-ext-col">
           {!isLoading && !isError && q.preMarket && (
             <span className={`stc-ext-badge ${q.preMarket.change >= 0 ? 'pos' : 'neg'}`}>
@@ -556,7 +553,6 @@ export default function StockChart({ groups, saveGroups, activeTicker, setActive
                 <span style={{ userSelect: 'none', WebkitUserSelect: 'none', pointerEvents: 'none' }}>Symbol</span>
                 <span style={{ userSelect: 'none', WebkitUserSelect: 'none', pointerEvents: 'none' }}>Price</span>
                 <span style={{ userSelect: 'none', WebkitUserSelect: 'none', pointerEvents: 'none' }}>Change</span>
-                <span style={{ userSelect: 'none', WebkitUserSelect: 'none', pointerEvents: 'none' }}>Prev Close</span>
                 <span style={{ userSelect: 'none', WebkitUserSelect: 'none', pointerEvents: 'none' }}>Pre / After</span>
                 <span></span>
               </div>

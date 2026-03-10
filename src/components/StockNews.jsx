@@ -255,7 +255,7 @@ async function fetchAiComment(title, tickers) {
 
 const SN_SIZES = ['S', 'M', 'L'];
 
-export default function StockNews({ tickers, setTickers, activeTicker, setActiveTicker }) {
+export default function StockNews({ tickers, setTickers, activeTicker, setActiveTicker, onSizeChange }) {
   const [showPicker, setShowPicker] = useState(false);
   const [pickerSearch, setPickerSearch] = useState('');
   const pickerRef = useRef(null);
@@ -477,7 +477,7 @@ export default function StockNews({ tickers, setTickers, activeTicker, setActive
                   <button
                     key={s}
                     className={`sn-size-menu-item ${snSize === s ? 'active' : ''}`}
-                    onClick={() => { setSnSize(s); localStorage.setItem('sn_size', s); setShowSizeMenu(false); }}
+                    onClick={() => { setSnSize(s); localStorage.setItem('sn_size', s); setShowSizeMenu(false); if (onSizeChange) onSizeChange(s); }}
                   >{s}</button>
                 ))}
               </div>,

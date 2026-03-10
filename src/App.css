@@ -9344,6 +9344,22 @@ input::placeholder, textarea::placeholder { color: var(--text-muted) !important;
 .sn-size-l .sn-ai-etki,
 .sn-size-l .sn-ai-detay            { font-size: 15px; }
 
+/* Prices list S/M/L size variants */
+.sn-size-s .stc-symbol, .sn-size-s .stc-price, .sn-size-s .stc-change { font-size: 12px; }
+.sn-size-s .stc-change-abs { font-size: 11px; }
+.sn-size-s .stc-ext-badge { font-size: 11px; }
+.sn-size-s .stc-row { padding: 5px 10px; }
+
+.sn-size-m .stc-symbol, .sn-size-m .stc-price, .sn-size-m .stc-change { font-size: 14px; }
+.sn-size-m .stc-change-abs { font-size: 12px; }
+.sn-size-m .stc-ext-badge { font-size: 13px; }
+.sn-size-m .stc-row { padding: 7px 10px; }
+
+.sn-size-l .stc-symbol, .sn-size-l .stc-price, .sn-size-l .stc-change { font-size: 16px; }
+.sn-size-l .stc-change-abs { font-size: 13px; }
+.sn-size-l .stc-ext-badge { font-size: 14px; }
+.sn-size-l .stc-row { padding: 9px 10px; }
+
 /* ============================================================
    STOCK MINI CHART
    ============================================================ */
@@ -9636,7 +9652,7 @@ input::placeholder, textarea::placeholder { color: var(--text-muted) !important;
 /* Başlık satırı */
 .stc-list-header {
   display: grid;
-  grid-template-columns: 70px 1fr 1fr 1fr 1fr 28px;
+  grid-template-columns: 70px 1fr 1fr 1fr 28px;
   align-items: center;
   padding: 4px 10px;
   border-bottom: 1px solid var(--border);
@@ -9652,7 +9668,7 @@ input::placeholder, textarea::placeholder { color: var(--text-muted) !important;
 /* Her hisse satırı */
 .stc-row {
   display: grid;
-  grid-template-columns: 70px 1fr 1fr 1fr 1fr 28px;
+  grid-template-columns: 70px 1fr 1fr 1fr 28px;
   align-items: center;
   padding: 6px 10px;
   border-bottom: 1px solid var(--border);
@@ -9683,28 +9699,28 @@ input::placeholder, textarea::placeholder { color: var(--text-muted) !important;
 }
 
 .stc-symbol {
-  font-size: 11px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 500;
   color: var(--text-primary, #e6edf3);
 }
 
 .stc-price {
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 400;
   color: var(--text-primary, #e6edf3);
 }
 
 .stc-change {
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 400;
   display: flex;
   align-items: center;
   gap: 4px;
 }
 .stc-change.pos { color: #3fb950; }
 .stc-change.neg { color: #f85149; }
-.stc-change-arrow { font-size: 9px; }
-.stc-change-abs { font-size: 10px; opacity: 0.75; }
+.stc-change-arrow { font-size: 11px; }
+.stc-change-abs { font-size: 12px; opacity: 0.75; }
 
 .stc-prev {
   font-size: 11px;
@@ -9723,8 +9739,8 @@ input::placeholder, textarea::placeholder { color: var(--text-muted) !important;
   border-radius: 4px;
   white-space: nowrap;
 }
-.stc-ext-badge.pos { color: #3fb950; background: rgba(63,185,80,0.1); }
-.stc-ext-badge.neg { color: #f85149; background: rgba(248,81,73,0.1); }
+.stc-ext-badge.pos { color: #3fb950; }
+.stc-ext-badge.neg { color: #f85149; }
 .stc-ext-pct { font-weight: 400; opacity: 0.85; }
 
 .stc-loading-dot {
