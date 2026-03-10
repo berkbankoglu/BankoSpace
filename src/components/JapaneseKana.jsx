@@ -1,6 +1,17 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import "./JapaneseKana.css";
 
+function speakKana(char) {
+  try {
+    const utterance = new SpeechSynthesisUtterance(char);
+    utterance.lang = 'ja-JP';
+    utterance.rate = 0.85;
+    utterance.pitch = 1.1;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+  } catch {}
+}
+
 function playCorrectSound() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -44,6 +55,14 @@ const HIRAGANA_ROWS = [
   ["わwa", "をwo", "んn"],
 ];
 
+const HIRAGANA_VOICED_ROWS = [
+  ["がga", "ぎgi", "ぐgu", "げge", "ごgo"],
+  ["ざza", "じji", "ずzu", "ぜze", "ぞzo"],
+  ["だda", "ぢji", "づzu", "でde", "どdo"],
+  ["ばba", "びbi", "ぶbu", "べbe", "ぼbo"],
+  ["ぱpa", "ぴpi", "ぷpu", "ぺpe", "ぽpo"],
+];
+
 const KATAKANA_ROWS = [
   ["アa", "イi", "ウu", "エe", "オo"],
   ["カka", "キki", "クku", "ケke", "コko"],
@@ -57,6 +76,14 @@ const KATAKANA_ROWS = [
   ["ワwa", "ヲwo", "ンn"],
 ];
 
+const KATAKANA_VOICED_ROWS = [
+  ["ガga", "ギgi", "グgu", "ゲge", "ゴgo"],
+  ["ザza", "ジji", "ズzu", "ゼze", "ゾzo"],
+  ["ダda", "ヂji", "ヅzu", "デde", "ドdo"],
+  ["バba", "ビbi", "ブbu", "ベbe", "ボbo"],
+  ["パpa", "ピpi", "プpu", "ペpe", "ポpo"],
+];
+
 // Parse "あa" → { char: "あ", romaji: "a" }
 function parseEntry(entry) {
   // The character is everything up to the first ASCII letter
@@ -66,11 +93,16 @@ function parseEntry(entry) {
 }
 
 const HIRAGANA = HIRAGANA_ROWS.flat().map(parseEntry).filter(Boolean);
+const HIRAGANA_VOICED = HIRAGANA_VOICED_ROWS.flat().map(parseEntry).filter(Boolean);
 const KATAKANA = KATAKANA_ROWS.flat().map(parseEntry).filter(Boolean);
+const KATAKANA_VOICED = KATAKANA_VOICED_ROWS.flat().map(parseEntry).filter(Boolean);
 const ALL_KANA = [...HIRAGANA, ...KATAKANA];
+const ALL_KANA_WITH_VOICED = [...HIRAGANA, ...HIRAGANA_VOICED, ...KATAKANA, ...KATAKANA_VOICED];
 
 const ROW_LABELS = ["a", "ka", "sa", "ta", "na", "ha", "ma", "ya", "ra", "wa"];
+const VOICED_ROW_LABELS = ["ga", "za", "da", "ba", "pa"];
 const COL_LABELS = ["·", "K", "S", "T", "N", "H", "M", "Y", "R", "W"];
+const VOICED_COL_LABELS = ["G", "Z", "D", "B", "P"];
 const VOWEL_LABELS = ["A", "I", "U", "E", "O"];
 
 // ── localStorage helpers ──────────────────────────────────────────────────────
@@ -152,28 +184,29 @@ function buildTransposedGrid(rows) {
   return grid;
 }
 
-function KanaTable({ rows, title }) {
+function KanaTable({ rows, title, colLabels = COL_LABELS }) {
   const grid = buildTransposedGrid(rows);
   return (
     <div className="kana-table-wrapper">
       <h3 className="kana-table-title">{title}</h3>
-      <div className="kana-grid">
-        {/* Header row: consonant labels */}
+      <div className="kana-grid" style={{ gridTemplateColumns: `28px repeat(${colLabels.length}, 1fr)` }}>
+        {/* Header row */}
         <div className="kana-grid-row">
           <span className="kana-vowel-label" />
-          {COL_LABELS.map((c) => (
+          {colLabels.map((c) => (
             <span key={c} className="kana-col-label">{c}</span>
           ))}
         </div>
-        {/* 5 vowel rows */}
+        {/* Vowel rows */}
         {grid.map((row, vi) => (
           <div key={vi} className="kana-grid-row">
             <span className="kana-vowel-label">{VOWEL_LABELS[vi]}</span>
             {row.map((p, ci) =>
               p ? (
-                <div key={ci} className="kana-cell">
+                <div key={ci} className="kana-cell kana-cell--clickable" onClick={() => speakKana(p.char)} title="Click to hear">
                   <span className="kana-char">{p.char}</span>
                   <span className="kana-romaji">{p.romaji}</span>
+                  <span className="kana-speak-icon">🔊</span>
                 </div>
               ) : (
                 <div key={ci} className="kana-cell kana-cell--empty" />
@@ -189,8 +222,12 @@ function KanaTable({ rows, title }) {
 function GuideTab() {
   return (
     <div className="guide-tab">
+      <div className="guide-section-label">Basic (清音)</div>
       <KanaTable rows={HIRAGANA_ROWS} title="Hiragana" />
       <KanaTable rows={KATAKANA_ROWS} title="Katakana" />
+      <div className="guide-section-label">Voiced &amp; Semi-voiced (濁音・半濁音)</div>
+      <KanaTable rows={HIRAGANA_VOICED_ROWS} title="Hiragana voiced" colLabels={VOICED_COL_LABELS} />
+      <KanaTable rows={KATAKANA_VOICED_ROWS} title="Katakana voiced" colLabels={VOICED_COL_LABELS} />
     </div>
   );
 }
@@ -246,6 +283,7 @@ function PracticeTab() {
 
   const [mode, setMode] = useState(prefs.mode || "Hiragana");
   const [direction, setDirection] = useState(prefs.direction || "Kana → Romaji");
+  const [includeVoiced, setIncludeVoiced] = useState(() => prefs.includeVoiced ?? false);
   const [stats, setStats] = useState(loadStats);
   const [current, setCurrent] = useState(null);
   const [input, setInput] = useState("");
@@ -262,12 +300,12 @@ function PracticeTab() {
   const advanceTimerRef = useRef(null);
   const lastCharRef = useRef(null);
 
-  // Derive base pool from mode
-  const basePool =
-    mode === "Hiragana" ? HIRAGANA : mode === "Katakana" ? KATAKANA : ALL_KANA;
+  // Derive base pool from mode + voiced toggle
+  const baseBasic = mode === "Hiragana" ? HIRAGANA : mode === "Katakana" ? KATAKANA : ALL_KANA;
+  const baseVoiced = mode === "Hiragana" ? HIRAGANA_VOICED : mode === "Katakana" ? KATAKANA_VOICED : [...HIRAGANA_VOICED, ...KATAKANA_VOICED];
+  const basePool = includeVoiced ? [...baseBasic, ...baseVoiced] : baseBasic;
 
   // Filter by selected rows if any
-  // null = all selected, [] = none selected (explicit empty), array = specific selection
   const pool = selectedRows === null
     ? basePool
     : basePool.filter(item => selectedRows.includes(item.char));
@@ -276,7 +314,11 @@ function PracticeTab() {
   // Row groups for selection UI
   const hiraganaRows = HIRAGANA_ROWS.map((row, i) => ({ label: ROW_LABELS[i], items: row.map(parseEntry).filter(Boolean) }));
   const katakanaRows = KATAKANA_ROWS.map((row, i) => ({ label: ROW_LABELS[i], items: row.map(parseEntry).filter(Boolean) }));
-  const visibleRowGroups = mode === "Hiragana" ? hiraganaRows : mode === "Katakana" ? katakanaRows : [...hiraganaRows, ...katakanaRows];
+  const hiraganaVoicedRows = HIRAGANA_VOICED_ROWS.map((row, i) => ({ label: VOICED_ROW_LABELS[i], items: row.map(parseEntry).filter(Boolean), voiced: true }));
+  const katakanaVoicedRows = KATAKANA_VOICED_ROWS.map((row, i) => ({ label: VOICED_ROW_LABELS[i], items: row.map(parseEntry).filter(Boolean), voiced: true }));
+  const basicGroups = mode === "Hiragana" ? hiraganaRows : mode === "Katakana" ? katakanaRows : [...hiraganaRows, ...katakanaRows];
+  const voicedGroups = mode === "Hiragana" ? hiraganaVoicedRows : mode === "Katakana" ? katakanaVoicedRows : [...hiraganaVoicedRows, ...katakanaVoicedRows];
+  const visibleRowGroups = includeVoiced ? [...basicGroups, ...voicedGroups] : basicGroups;
 
   function toggleRow(chars) {
     setSelectedRows(prev => {
@@ -309,8 +351,8 @@ function PracticeTab() {
 
   // Persist prefs
   useEffect(() => {
-    savePrefs({ mode, direction });
-  }, [mode, direction]);
+    savePrefs({ mode, direction, includeVoiced });
+  }, [mode, direction, includeVoiced]);
 
   // Persist stats
   useEffect(() => {
@@ -327,7 +369,8 @@ function PracticeTab() {
       setInput("");
       setFeedback(null);
       setCorrectAnswer("");
-      setTimeout(() => inputRef.current?.focus(), 50);
+      // Auto-speak the kana character
+      setTimeout(() => { speakKana(next.char); inputRef.current?.focus(); }, 80);
     },
     [pool, stats]
   );
@@ -460,6 +503,13 @@ function PracticeTab() {
             </button>
           ))}
         </div>
+        <button
+          className={`toggle-btn${includeVoiced ? " toggle-btn--active" : ""}`}
+          onClick={() => { setIncludeVoiced(v => !v); setFeedback(null); setInput(""); setSelectedRows(null); localStorage.removeItem('kana_selected_rows'); }}
+          title="Include voiced (が/ざ/だ/ば/ぱ) kana"
+        >
+          + Voiced
+        </button>
         <button className="reset-btn" onClick={resetStats}>
           Reset Stats
         </button>
@@ -501,6 +551,7 @@ function PracticeTab() {
           >
             {question}
           </span>
+          <button className="speak-btn" onClick={() => speakKana(current?.char)} title="Hear pronunciation">🔊</button>
           {feedback === "correct" && (
             <span className="feedback-icon feedback-icon--correct">✓</span>
           )}
