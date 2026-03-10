@@ -39,6 +39,7 @@ export default function Stocks() {
     const saved = parseInt(localStorage.getItem('news_panel_width'));
     return isNaN(saved) ? NEWS_DEFAULT_W : Math.min(NEWS_MAX_W, Math.max(NEWS_MIN_W, saved));
   });
+  const [snSize, setSnSize] = useState(() => localStorage.getItem('sn_size') || 'M');
   const newsResizeRef = useRef(null);
   const leftRef = useRef(null);
   const listWrapRef = useRef(null);
@@ -93,7 +94,7 @@ export default function Stocks() {
   return (
     <div className="stocks-root">
       <div className="stocks-market">
-        <div className="stocks-market-left" ref={leftRef}>
+        <div className={`stocks-market-left sn-size-${snSize.toLowerCase()}`} ref={leftRef}>
           <StockMiniChart ticker={activeStockTicker} />
           <div className="stc-list-wrap" ref={listWrapRef}>
             <div className="stc-bottom-tabs">
@@ -118,6 +119,7 @@ export default function Stocks() {
             setTickers={setStockTickers}
             activeTicker={newsFilterTicker}
             setActiveTicker={setNewsFilterTicker}
+            onSizeChange={setSnSize}
           />
         </div>
       </div>

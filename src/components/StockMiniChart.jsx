@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
-const MIN_H = 200;
-const MAX_H = 800;
-const DEFAULT_H = 520;
+const MIN_H = 700;
+const MAX_H = 2500;
+const DEFAULT_H = 1000;
 
 export default function StockMiniChart({ ticker }) {
   const containerRef = useRef(null);
