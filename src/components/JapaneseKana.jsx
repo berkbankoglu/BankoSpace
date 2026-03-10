@@ -3,18 +3,28 @@ import "./JapaneseKana.css";
 
 function speakKana(char) {
   try {
+    window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(char);
     utterance.lang = 'ja-JP';
-    utterance.rate = 0.85;
-    utterance.pitch = 1.1;
-    window.speechSynthesis.cancel();
+    utterance.rate = 0.5;
+    utterance.pitch = 1.0;
+    utterance.volume = 1;
     window.speechSynthesis.speak(utterance);
   } catch {}
 }
 
+let _audioCtx = null;
+function getAudioCtx() {
+  if (!_audioCtx || _audioCtx.state === 'closed') {
+    _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (_audioCtx.state === 'suspended') _audioCtx.resume();
+  return _audioCtx;
+}
+
 function playCorrectSound() {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = getAudioCtx();
     const o = ctx.createOscillator();
     const g = ctx.createGain();
     o.connect(g); g.connect(ctx.destination);
@@ -28,7 +38,7 @@ function playCorrectSound() {
 
 function playWrongSound() {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = getAudioCtx();
     const o = ctx.createOscillator();
     const g = ctx.createGain();
     o.connect(g); g.connect(ctx.destination);
@@ -37,6 +47,19 @@ function playWrongSound() {
     g.gain.setValueAtTime(0.15, ctx.currentTime);
     g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
     o.start(); o.stop(ctx.currentTime + 0.3);
+  } catch {}
+}
+
+function playTypeSound() {
+  try {
+    const ctx = getAudioCtx();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.type = 'sine'; o.frequency.setValueAtTime(800, ctx.currentTime);
+    g.gain.setValueAtTime(0.04, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.06);
+    o.start(); o.stop(ctx.currentTime + 0.06);
   } catch {}
 }
 
@@ -369,8 +392,7 @@ function PracticeTab() {
       setInput("");
       setFeedback(null);
       setCorrectAnswer("");
-      // Auto-speak the kana character
-      setTimeout(() => { speakKana(next.char); inputRef.current?.focus(); }, 80);
+      setTimeout(() => { inputRef.current?.focus(); }, 80);
     },
     [pool, stats]
   );
@@ -579,7 +601,7 @@ function PracticeTab() {
             className="kana-input"
             type="text"
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => { setInput(e.target.value); if (e.target.value.length > input.length) playTypeSound(); }}
             onKeyDown={handleKeyDown}
             placeholder={
               direction === "Kana → Romaji" ? "Type romaji..." : "Type kana..."
