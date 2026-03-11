@@ -4,10 +4,11 @@ import { invoke } from '@tauri-apps/api/core';
 import { sendNotification, isPermissionGranted, requestPermission } from '@tauri-apps/plugin-notification';
 import { open } from '@tauri-apps/plugin-shell';
 
-const REFRESH_INTERVAL = 60 * 1000;
+const REFRESH_INTERVAL = 15 * 1000;
 const STORAGE_KEY = 'stock_seen_news';
 const FAVS_KEY = 'stock_favs';
 const TICKERS_KEY = 'stock_tickers';
+const FINNHUB_KEY = 'd6omik1r01qi5kh3h3v0d6omik1r01qi5kh3h3vg';
 
 const DEFAULT_TICKERS = ['NBIS'];
 
@@ -111,26 +112,15 @@ const POPULAR_STOCKS = [
   { ticker: 'RKLB',   name: 'Rocket Lab' },
 ];
 
-const POSITIVE_WORDS = ['win','approval','growth','gain','surge','beat','record','launch','expand','profit','rise','up','strong','buy','upgrade','positive','success','milestone','partnership','invest','breakthrough'];
-const NEGATIVE_WORDS = ['down','drop','fall','loss','miss','fail','decline','cut','risk','warn','sell','downgrade','crash','plunge','concern','trouble','layoff','investigation','fine','penalty','negative'];
-
-function getYahooUrl(ticker) {
-  return `https://feeds.finance.yahoo.com/rss/2.0/headline?s=${encodeURIComponent(ticker)}&region=US&lang=en-US`;
-}
-
-function getGoogleUrl(ticker) {
-  // Exact ticker match with quotes to avoid unrelated results
-  const q = encodeURIComponent(`"${ticker}" stock`);
-  return `https://news.google.com/rss/search?q=${q}&hl=en-US&gl=US&ceid=US:en`;
-}
-
-function getSentiment(title) {
-  const t = title.toLowerCase();
-  const pos = POSITIVE_WORDS.filter(w => t.includes(w)).length;
-  const neg = NEGATIVE_WORDS.filter(w => t.includes(w)).length;
-  if (pos > neg) return 'positive';
-  if (neg > pos) return 'negative';
-  return 'neutral';
+function getFinnhubUrl(ticker) {
+  const now = new Date();
+  const toDate = new Date(now);
+  toDate.setDate(toDate.getDate() + 1);
+  const to = toDate.toISOString().slice(0, 10);
+  const fromDate = new Date(now);
+  fromDate.setDate(fromDate.getDate() - 30);
+  const from = fromDate.toISOString().slice(0, 10);
+  return `https://finnhub.io/api/v1/company-news?symbol=${encodeURIComponent(ticker)}&from=${from}&to=${to}&token=${FINNHUB_KEY}`;
 }
 
 function timeAgo(dateStr) {
@@ -168,51 +158,19 @@ function playNewsSound(sentiment) {
   } catch {}
 }
 
-function parseItems(xml, ticker, sourceLabel) {
-  return Array.from(xml.querySelectorAll('item')).slice(0, 20).map(item => {
-    const title = item.querySelector('title')?.textContent || '';
-    const rawLink = item.querySelector('link')?.textContent || '';
-    const guid = item.querySelector('guid')?.textContent || rawLink;
-    // Google News source is inside <source> tag
-    const source = item.querySelector('source')?.textContent || sourceLabel;
-    return {
-      id: guid + `_${ticker}`,
-      title,
-      link: rawLink,
-      date: item.querySelector('pubDate')?.textContent || '',
-      source,
-      sentiment: getSentiment(title),
-      ticker,
-      provider: sourceLabel,
-    };
-  });
-}
-
-async function fetchYahooNews(ticker) {
-  const text = await invoke('fetch_rss', { url: getYahooUrl(ticker) });
-  const xml = new DOMParser().parseFromString(text, 'text/xml');
-  return parseItems(xml, ticker, 'Yahoo Finance');
-}
-
-async function fetchGoogleNews(ticker) {
-  const text = await invoke('fetch_rss', { url: getGoogleUrl(ticker) });
-  const xml = new DOMParser().parseFromString(text, 'text/xml');
-  return parseItems(xml, ticker, 'Google News');
-}
-
 async function fetchTickerNews(ticker) {
-  const [yahoo, google] = await Promise.allSettled([
-    fetchYahooNews(ticker),
-    fetchGoogleNews(ticker),
-  ]);
-  const yahooItems = yahoo.status === 'fulfilled' ? yahoo.value : [];
-  const googleItems = google.status === 'fulfilled' ? google.value : [];
-
-  // Deduplicate by title similarity (Google & Yahoo often carry same article)
-  const seen = new Set(yahooItems.map(i => i.title.toLowerCase().slice(0, 60)));
-  const uniqueGoogle = googleItems.filter(i => !seen.has(i.title.toLowerCase().slice(0, 60)));
-
-  return [...yahooItems, ...uniqueGoogle];
+  const text = await invoke('fetch_rss', { url: getFinnhubUrl(ticker) });
+  const data = JSON.parse(text);
+  if (!Array.isArray(data)) return [];
+  return data.slice(0, 100).map(item => ({
+    id: String(item.id) + `_${ticker}`,
+    title: item.headline || '',
+    link: item.url || '',
+    date: new Date(item.datetime * 1000).toISOString(),
+    source: item.source || 'Finnhub',
+    ticker,
+    provider: 'Finnhub',
+  }));
 }
 
 async function fetchAllNews(tickers) {
@@ -220,8 +178,16 @@ async function fetchAllNews(tickers) {
   const all = results
     .filter(r => r.status === 'fulfilled')
     .flatMap(r => r.value);
-  all.sort((a, b) => new Date(b.date) - new Date(a.date));
-  return all;
+  // Deduplicate by title similarity across tickers
+  const seen = new Set();
+  const unique = all.filter(item => {
+    const key = item.title.toLowerCase().slice(0, 60);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  unique.sort((a, b) => new Date(b.date) - new Date(a.date));
+  return unique;
 }
 
 async function fetchAiComment(title, tickers) {
@@ -233,7 +199,7 @@ async function fetchAiComment(title, tickers) {
     max_tokens: 400,
     messages: [{
       role: 'user',
-      content: `${tickerCtx}Hisse senedi haberi başlığı: "${title}"\n\nBu haberi ${tickers && tickers.length > 0 ? tickers.join(', ') + ' hissesi' : 'ilgili hisse'} üzerindeki etkisi açısından yatırımcı bakış açısıyla analiz et. Şu formatta JSON yanıt ver (başka hiçbir şey yazma, sadece JSON):\n{"yorum":"2 cümle Türkçe yorum, haberin ne anlama geldiğini açıkla","etki":"Fiyata kısa vadeli olası etkisi: örn. +%2-4 beklenir / Nötr / -%1-3 baskı olabilir","detay":"Varsa ekstra önemli bağlam veya dikkat edilmesi gereken nokta (max 1 cümle), yoksa boş string"}`
+      content: `${tickerCtx}Hisse senedi haberi başlığı: "${title}"\n\nBu haberi ${tickers && tickers.length > 0 ? tickers.join(', ') + ' hissesi' : 'ilgili hisse'} açısından yatırımcı bakış açısıyla analiz et. Şu formatta JSON yanıt ver (başka hiçbir şey yazma, sadece JSON):\n{"yorum":"2 cümle Türkçe yorum, haberin ne anlama geldiğini açıkla","detay":"Varsa ekstra önemli bağlam veya dikkat edilmesi gereken nokta (max 1 cümle), yoksa boş string"}`
     }]
   });
   const text = await invoke('fetch_post', {
@@ -353,23 +319,15 @@ export default function StockNews({ tickers, setTickers, activeTicker, setActive
 
   const notifyNew = async (newItems) => {
     if (newItems.length === 0) return;
-    // Only notify for items published within the last 2 minutes
-    const cutoff = Date.now() - 2 * 60 * 1000;
-    const recentItems = newItems.filter(n => n.date && new Date(n.date).getTime() >= cutoff);
-    // Still mark all as seen, but only notify/sound for recent ones
     newItems.forEach(n => seenRef.current.add(n.id));
     localStorage.setItem(STORAGE_KEY, JSON.stringify([...seenRef.current].slice(-500)));
-    if (recentItems.length === 0) return;
-    const hasPositive = recentItems.some(n => n.sentiment === 'positive');
-    const hasNegative = recentItems.some(n => n.sentiment === 'negative');
-    const sentiment = hasPositive && !hasNegative ? 'positive' : hasNegative && !hasPositive ? 'negative' : 'neutral';
-    playNewsSound(sentiment);
+    playNewsSound('neutral');
     let granted = await isPermissionGranted();
     if (!granted) { const perm = await requestPermission(); granted = perm === 'granted'; }
     if (granted) {
-      for (const item of recentItems.slice(0, 2)) {
+      for (const item of newItems.slice(0, 2)) {
         sendNotification({
-          title: `${item.ticker} ${item.sentiment === 'positive' ? '▲' : item.sentiment === 'negative' ? '▼' : '—'}`,
+          title: item.ticker,
           body: item.title,
         });
       }
@@ -408,8 +366,6 @@ export default function StockNews({ tickers, setTickers, activeTicker, setActive
     let items = news;
     if (activeTicker !== 'all') items = items.filter(n => n.ticker === activeTicker);
     if (filter === 'favorites') items = items.filter(n => favs.has(n.id));
-    else if (filter === 'positive') items = items.filter(n => n.sentiment === 'positive');
-    else if (filter === 'negative') items = items.filter(n => n.sentiment === 'negative');
     if (search.trim()) {
       const q = search.toLowerCase();
       items = items.filter(n => n.title.toLowerCase().includes(q) || n.ticker.toLowerCase().includes(q));
@@ -524,8 +480,6 @@ export default function StockNews({ tickers, setTickers, activeTicker, setActive
       <div className="stock-news-filters">
         {[
           { key: 'all', label: 'All' },
-          { key: 'positive', label: '▲ Positive' },
-          { key: 'negative', label: '▼ Negative' },
           { key: 'favorites', label: `★ Saved${favCount > 0 ? ` (${favCount})` : ''}` },
         ].map(f => (
           <button
@@ -551,12 +505,9 @@ export default function StockNews({ tickers, setTickers, activeTicker, setActive
         {!loading && !error && filtered.map((item, i) => (
           <div
             key={item.id || i}
-            className={`stock-news-item stock-news-item--${item.sentiment} ${!seenRef.current.has(item.id) ? 'stock-news-item--unread' : ''}`}
+            className={`stock-news-item ${!seenRef.current.has(item.id) ? 'stock-news-item--unread' : ''}`}
           >
             <div className="stock-news-item-top">
-              <span className={`stock-news-sentiment stock-news-sentiment--${item.sentiment}`}>
-                {item.sentiment === 'positive' ? '▲' : item.sentiment === 'negative' ? '▼' : '—'}
-              </span>
               <span
                 className="stock-news-item-title"
                 onClick={() => {
@@ -594,16 +545,6 @@ export default function StockNews({ tickers, setTickers, activeTicker, setActive
                 ) : (
                   <>
                     <div className="sn-ai-yorum">{aiComments[item.id].text.yorum}</div>
-                    <div className="sn-ai-etki">
-                      <span className="sn-ai-etki-label">Etki:</span>
-                      <span className="sn-ai-etki-value neutral">
-                        {aiComments[item.id].text.etki.split(/([+\-]%?\d[\d\-–%,. ]*)/g).map((part, i) => {
-                          if (/^[+]/.test(part)) return <span key={i} className="pos">{part}</span>;
-                          if (/^[-]/.test(part)) return <span key={i} className="neg">{part}</span>;
-                          return part;
-                        })}
-                      </span>
-                    </div>
                     {aiComments[item.id].text.detay && (
                       <div className="sn-ai-detay">{aiComments[item.id].text.detay}</div>
                     )}

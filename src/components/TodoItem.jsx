@@ -110,16 +110,18 @@ function TodoItem({ todo, index, onToggle, onDelete, onAddSubtask, onToggleSubta
         </div>
         <div className="todo-content">
           <div className="todo-text-row">
+            <div className="todo-text-row-top">
+              <div
+                className={`checkbox ${todo.completed ? 'checked' : ''}`}
+                onClick={handleToggle}
+              />
+              {hasSubtasks && (
+                <div className="subtask-progress">
+                  ({completedSubtasks}/{subtasks.length})
+                </div>
+              )}
+            </div>
             <div className="todo-text">{todo.text}</div>
-            <div
-              className={`checkbox ${todo.completed ? 'checked' : ''}`}
-              onClick={handleToggle}
-            />
-            {hasSubtasks && (
-              <div className="subtask-progress">
-                ({completedSubtasks}/{subtasks.length})
-              </div>
-            )}
           </div>
           <div className="todo-meta">
             <span className="created-date">{formatDate(todo.createdAt)}</span>
