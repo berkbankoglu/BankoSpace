@@ -14,8 +14,8 @@
 .jk-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 1rem 1.5rem;
+  justify-content: flex-start;
+  padding: 0.6rem 1rem;
   border-bottom: 1px solid #30363d;
   background: #161b22;
   flex-wrap: wrap;
@@ -691,4 +691,307 @@
     padding: 0.35rem 0.65rem;
     font-size: 0.8rem;
   }
+}
+
+/* ── Wrong Analysis ─────────────────────────────────────────────────────────── */
+
+.wrong-analysis {
+  margin: 0.5rem 1rem 1rem;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #161b22;
+}
+
+.wrong-analysis-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.9rem;
+  background: none;
+  border: none;
+  color: #c9d1d9;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.wrong-analysis-toggle:hover {
+  background: #1f2937;
+}
+
+.wrong-analysis-badge {
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 10px;
+  min-width: 20px;
+  text-align: center;
+}
+
+.wrong-analysis-body {
+  border-top: 1px solid #30363d;
+  padding: 0.75rem;
+}
+
+.wrong-analysis-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.wrong-analysis-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+}
+
+.wa-char {
+  font-size: 1.1rem;
+  width: 28px;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+}
+.wa-char:hover { opacity: 0.7; }
+
+.wa-romaji {
+  width: 52px;
+  color: #8b949e;
+  font-size: 0.78rem;
+}
+
+.wa-bar-wrap {
+  flex: 1;
+  height: 6px;
+  background: #30363d;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.wa-bar {
+  height: 100%;
+  background: #ef4444;
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+
+.wa-pct {
+  width: 32px;
+  text-align: right;
+  color: #ef4444;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.wa-counts {
+  width: 70px;
+  text-align: right;
+  color: #6e7681;
+  font-size: 0.75rem;
+}
+
+.practice-wrong-btn {
+  width: 100%;
+  padding: 0.55rem;
+  background: #ef4444;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.practice-wrong-btn:hover {
+  background: #dc2626;
+}
+
+/* ── Words Tab ──────────────────────────────────────────────────────────────── */
+
+.words-tab {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.words-toolbar {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.words-search {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  background: #1f2937;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  color: #c9d1d9;
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.words-search:focus {
+  border-color: #58a6ff;
+}
+
+.words-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 0.5rem;
+}
+
+.word-card {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.word-card:hover {
+  border-color: #58a6ff;
+  background: #1f2937;
+}
+
+.word-kana {
+  font-size: 1.2rem;
+  line-height: 1.2;
+  color: #e6edf3;
+}
+
+.word-romaji {
+  font-size: 0.72rem;
+  color: #58a6ff;
+}
+
+.word-meaning {
+  font-size: 0.68rem;
+  color: #8b949e;
+}
+
+.words-quiz {
+  padding: 0.5rem 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.words-quiz-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.words-quiz-progress {
+  color: #8b949e;
+  font-size: 0.85rem;
+}
+
+/* ── Study Words Section ────────────────────────────────────────────────────── */
+
+.study-words-section {
+  margin-top: 0.5rem;
+  border-top: 1px solid #30363d;
+  width: 100%;
+}
+
+.study-words-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  padding: 0.6rem 1rem;
+  background: none;
+  border: none;
+  color: #c9d1d9;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.study-words-toggle:hover {
+  background: #1f2937;
+}
+
+.study-words-body {
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.study-words-body .flashcard {
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 160px;
+}
+
+.study-words-body .words-search {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Word card states ───────────────────────────────────────────────────────── */
+
+.word-card--learned {
+  border-color: #4ade80;
+  background: #0d2818;
+}
+
+.word-card--selected {
+  border-color: #2563eb;
+  background: #1e3a5f;
+  box-shadow: 0 0 0 2px #2563eb;
+}
+
+/* ikisi aynı anda: yeşil zemin + mavi çerçeve/glow */
+.word-card--selected.word-card--learned {
+  background: #0d2818;
+  border-color: #4ade80;
+  box-shadow: 0 0 0 2px #2563eb;
+}
+
+.word-learned-btn {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #374151;
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 4px;
+  padding: 1px 4px;
+  cursor: pointer;
+  line-height: 1.4;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.word-learned-btn:hover {
+  border-color: #4ade80;
+  color: #4ade80;
+}
+
+.word-learned-btn--active {
+  background: #14532d;
+  border-color: #4ade80;
+  color: #4ade80;
 }

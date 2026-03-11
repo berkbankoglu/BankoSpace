@@ -7,7 +7,7 @@ let masterGain = null;
 // Volume: 0 to 1, stored in localStorage
 let volume = parseFloat(localStorage.getItem('soundVolume') ?? '0.7');
 
-function getAudioContext() {
+export function getAudioContext() {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     masterGain = audioCtx.createGain();
@@ -20,7 +20,7 @@ function getAudioContext() {
   return audioCtx;
 }
 
-function getMasterGain() {
+export function getMasterGain() {
   getAudioContext();
   return masterGain;
 }
