@@ -159,7 +159,7 @@ function App() {
       { id: 'notes',      label: 'Notes',           view: 'notes',      hidden: false },
       { id: 'projectbid',   label: 'Project Bid',     view: 'projectbid',   hidden: false },
       { id: 'stocks',       label: 'Stocks',           view: 'stocks',       hidden: false },
-      { id: 'tradingview',  label: 'TradingView',      view: 'tradingview',  hidden: false },
+
       { id: 'japanesekana', label: 'Japanese Kana',    view: 'japanesekana', hidden: false },
     ];
     const saved = localStorage.getItem('sidebarOrder');
@@ -1569,8 +1569,6 @@ function App() {
             </div>
           )}
 
-          {/* TradingView Full Screen */}
-          {activeView === 'tradingview' && <TradingViewFull />}
 
           {/* Japanese Kana */}
           {activeView === 'japanesekana' && <JapaneseKana />}
@@ -1853,80 +1851,5 @@ function TimerPopupWrapper({ isCompact: initialCompact = false }) {
 }
 
 
-function TradingViewFull() {
-  const containerRef = useRef(null);
-  const [symbol, setSymbol] = useState(() => localStorage.getItem('tv_full_symbol') || 'AAPL');
-  const [inputVal, setInputVal] = useState(symbol);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-    containerRef.current.innerHTML = '';
-    const script = document.createElement('script');
-    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
-    script.type = 'text/javascript';
-    script.async = true;
-    script.innerHTML = JSON.stringify({
-      autosize: true,
-      symbol,
-      interval: 'D',
-      timezone: 'Europe/Istanbul',
-      theme: 'dark',
-      style: '1',
-      locale: 'en',
-      backgroundColor: '#1c2128',
-      toolbarBg: '#1c2128',
-      hide_top_toolbar: false,
-      hide_side_toolbar: false,
-      allow_symbol_change: true,
-      save_image: false,
-      withdateranges: true,
-      support_host: 'https://www.tradingview.com',
-      overrides: {
-        'paneProperties.background': '#1c2128',
-        'paneProperties.backgroundType': 'solid',
-        'paneProperties.gridLinesMode': 'both',
-        'paneProperties.horzGridProperties.color': '#30363d',
-        'paneProperties.vertGridProperties.color': '#30363d',
-        'scalesProperties.textColor': '#8b949e',
-        'scalesProperties.backgroundColor': '#1c2128',
-        'mainSeriesProperties.candleStyle.upColor': '#3fb950',
-        'mainSeriesProperties.candleStyle.downColor': '#f85149',
-        'mainSeriesProperties.candleStyle.borderUpColor': '#3fb950',
-        'mainSeriesProperties.candleStyle.borderDownColor': '#f85149',
-        'mainSeriesProperties.candleStyle.wickUpColor': '#3fb950',
-        'mainSeriesProperties.candleStyle.wickDownColor': '#f85149',
-      },
-    });
-    containerRef.current.appendChild(script);
-    return () => { if (containerRef.current) containerRef.current.innerHTML = ''; };
-  }, [symbol]);
-
-  const applySymbol = () => {
-    const s = inputVal.trim().toUpperCase();
-    if (s) { setSymbol(s); localStorage.setItem('tv_full_symbol', s); }
-  };
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#1c2128' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: '1px solid #30363d', flexShrink: 0 }}>
-        <input
-          value={inputVal}
-          onChange={e => setInputVal(e.target.value.toUpperCase())}
-          onKeyDown={e => e.key === 'Enter' && applySymbol()}
-          placeholder="AAPL, BTCUSDT..."
-          style={{ background: '#161b22', border: '1px solid #30363d', color: '#e6edf3', borderRadius: 6, padding: '4px 10px', fontSize: 14, width: 160, outline: 'none' }}
-        />
-        <button
-          onClick={applySymbol}
-          style={{ background: '#238636', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 14px', fontSize: 13, cursor: 'pointer' }}
-        >
-          Yükle
-        </button>
-        <span style={{ color: '#8b949e', fontSize: 12 }}>Enter veya Yükle butonuna bas</span>
-      </div>
-      <div ref={containerRef} style={{ flex: 1, minHeight: 0 }} />
-    </div>
-  );
-}
 
 export default App;

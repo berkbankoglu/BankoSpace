@@ -33,6 +33,30 @@ async fn fetch_rss(url: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+async fn fetch_tts(text: String, slow: bool) -> Result<Vec<u8>, String> {
+    let url = format!(
+        "https://translate.googleapis.com/translate_tts?ie=UTF-8&tl=ja&client=tw-ob&slow={}&q={}",
+        slow,
+        urlencoding::encode(&text)
+    );
+    let client = reqwest::Client::builder()
+        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+        .build()
+        .map_err(|e| e.to_string())?;
+    let response = client
+        .get(&url)
+        .header("Referer", "https://translate.google.com/")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !response.status().is_success() {
+        return Err(format!("HTTP {}", response.status()));
+    }
+    let bytes = response.bytes().await.map_err(|e| e.to_string())?;
+    Ok(bytes.to_vec())
+}
+
+#[tauri::command]
 async fn fetch_post(url: String, headers: std::collections::HashMap<String, String>, body: String) -> Result<String, String> {
     let client = reqwest::Client::builder()
         .build()
@@ -55,7 +79,7 @@ fn main() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![toggle_timer_window, fetch_rss, fetch_post])
+        .invoke_handler(tauri::generate_handler![toggle_timer_window, fetch_rss, fetch_post, fetch_tts])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
                 if window.label() == "main" {
