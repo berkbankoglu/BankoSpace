@@ -2209,22 +2209,21 @@ body.light .reset-btn:hover {
 
 .filters {
     display: flex;
-    gap: 8px;
-    margin-top: 15px;
-    margin-bottom: 20px;
+    align-items: center;
+    gap: 6px;
     flex-wrap: wrap;
-    padding-left: 20px;
 }
 
 .filter-btn {
-    padding: 8px 16px;
+    padding: 7px 14px;
     background: #161b22;
-    color: #484f58;
+    color: #8b949e;
     border: 1px solid #30363d;
-    border-radius: 4px;
+    border-radius: 6px;
     cursor: pointer;
     font-size: 13px;
-    transition: all 0.2s;
+    line-height: 1;
+    transition: all 0.15s;
 }
 
 .filter-btn:hover {
@@ -2569,7 +2568,7 @@ body.light .reset-btn:hover {
     word-break: break-word;
     overflow-wrap: break-word;
     font-weight: 400;
-    flex: 1;
+    width: 100%;
     letter-spacing: 0.01em;
 }
 
@@ -2668,6 +2667,13 @@ body.light .reset-btn:hover {
 
 /* Subtask Styles */
 .todo-text-row {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+}
+
+.todo-text-row-top {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -8339,17 +8345,66 @@ body.light .dashboard-header {
 }
 
 /* Timer button in filter bar */
+.font-size-control {
+  position: relative;
+}
+
+.font-size-trigger {
+  font-weight: 700;
+  padding: 7px 14px !important;
+  font-size: 13px !important;
+  min-width: unset;
+}
+
+.font-size-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  z-index: 1000;
+  min-width: 44px;
+}
+
+.font-size-option {
+  background: transparent;
+  border: none;
+  color: #8b949e;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  transition: background 0.1s, color 0.1s;
+}
+
+.font-size-option:hover {
+  background: #1c2128;
+  color: #c9d1d9;
+}
+
+.font-size-option.active {
+  background: rgba(126, 231, 135, 0.15);
+  color: #7ee787;
+}
+
 .dashboard-timer-toggle-btn {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 14px;
+  padding: 7px 14px;
   background: #161b22;
   color: #8b949e;
   border: 1px solid #30363d;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
+  line-height: 1;
   transition: all 0.15s;
   white-space: nowrap;
 }
@@ -8361,8 +8416,8 @@ body.light .dashboard-header {
 }
 
 .sound-toggle-btn {
-  font-size: 16px;
-  padding: 6px 10px;
+  font-size: 14px;
+  padding: 7px 10px;
 }
 .sound-toggle-btn.muted {
   opacity: 0.5;

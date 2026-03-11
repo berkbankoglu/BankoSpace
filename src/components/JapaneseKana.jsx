@@ -555,12 +555,16 @@ function KanaTable({ rows, title, colLabels = COL_LABELS }) {
 function GuideTab() {
   return (
     <div className="guide-tab">
-      <div className="guide-section-label">Basic (清音)</div>
-      <KanaTable rows={HIRAGANA_ROWS} title="Hiragana" />
-      <KanaTable rows={KATAKANA_ROWS} title="Katakana" />
-      <div className="guide-section-label">Voiced &amp; Semi-voiced (濁音・半濁音)</div>
-      <KanaTable rows={HIRAGANA_VOICED_ROWS} title="Hiragana voiced" colLabels={VOICED_COL_LABELS} />
-      <KanaTable rows={KATAKANA_VOICED_ROWS} title="Katakana voiced" colLabels={VOICED_COL_LABELS} />
+      <div className="guide-section-label">Basic — 清音</div>
+      <div className="guide-tables-row">
+        <KanaTable rows={HIRAGANA_ROWS} title="Hiragana" />
+        <KanaTable rows={KATAKANA_ROWS} title="Katakana" />
+      </div>
+      <div className="guide-section-label">Voiced &amp; Semi-voiced — 濁音・半濁音</div>
+      <div className="guide-tables-row">
+        <KanaTable rows={HIRAGANA_VOICED_ROWS} title="Hiragana voiced" colLabels={VOICED_COL_LABELS} />
+        <KanaTable rows={KATAKANA_VOICED_ROWS} title="Katakana voiced" colLabels={VOICED_COL_LABELS} />
+      </div>
     </div>
   );
 }
@@ -681,6 +685,7 @@ function PracticeTab({ selectedRows, setSelectedRows }) {
   const [mode, setMode] = useState(prefs.mode || "Hiragana");
   const [direction, setDirection] = useState(prefs.direction || "Kana → Romaji");
   const [includeVoiced, setIncludeVoiced] = useState(() => prefs.includeVoiced ?? false);
+
   const [stats, setStats] = useState(loadStats);
   const [current, setCurrent] = useState(null);
   const [input, setInput] = useState("");
@@ -720,16 +725,15 @@ function PracticeTab({ selectedRows, setSelectedRows }) {
 
   function toggleRow(chars) {
     setSelectedRows(prev => {
-      const allSelected = chars.every(c => prev ? prev.includes(c) : true);
+      const allChars = prev === null ? basePool.map(i => i.char) : prev;
+      const allSelected = chars.every(c => allChars.includes(c));
       let next;
-      if (prev === null) {
-        // Start from all selected, remove this row
-        const allChars = basePool.map(i => i.char);
-        next = allSelected ? allChars.filter(c => !chars.includes(c)) : [...allChars, ...chars.filter(c => !allChars.includes(c))];
+      if (allSelected) {
+        next = allChars.filter(c => !chars.includes(c));
       } else {
-        next = allSelected ? prev.filter(c => !chars.includes(c)) : [...new Set([...prev, ...chars])];
+        next = [...new Set([...allChars, ...chars])];
       }
-      if (next.length === basePool.length) next = null; // all = no filter
+      if (next.length === basePool.length) next = null;
       localStorage.setItem('kana_selected_rows', JSON.stringify(next));
       return next;
     });

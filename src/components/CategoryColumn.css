@@ -158,8 +158,12 @@
 .cc-item-top {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
   min-width: 0;
+}
+
+.cc-item-top .cc-item-actions {
+  margin-left: auto;
 }
 
 /* Drag Handle */
@@ -185,14 +189,19 @@
   background: rgba(88, 166, 255, 0.05);
 }
 
-/* Label & Checkbox */
-.cc-label {
+.cc-inline-check {
   display: flex;
-  align-items: flex-start;
-  gap: 8px;
+  align-items: center;
   cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* Label & text only */
+.cc-label {
+  display: block;
   width: 100%;
   min-width: 0;
+  cursor: default;
 }
 
 .cc-checkbox {
@@ -207,7 +216,6 @@
   flex-shrink: 0;
   position: relative;
   transition: all 0.2s ease;
-  margin-top: 1px;
 }
 
 .cc-checkmark.small {
@@ -243,8 +251,9 @@
 }
 
 .cc-text {
-  font-size: 13px;
+  font-size: var(--todo-font-size, 13px);
   color: #c9d1d9;
+  font-weight: 600;
   line-height: 1.4;
   white-space: normal;
   word-break: break-word;
@@ -328,20 +337,52 @@
 
 /* Subtasks */
 .cc-subtasks {
-  margin-top: 10px;
-  padding-left: 28px;
+  margin-top: 8px;
+  padding-left: 8px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .cc-subtask {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 5px 8px;
-  background: rgba(13, 17, 23, 0.6);
+  padding: 4px 6px;
+  background: #161b22;
   border-radius: 5px;
+  gap: 6px;
+  transition: background 0.15s, border-color 0.15s, transform 0.2s, opacity 0.2s;
+}
+
+.cc-subtask.dragging {
+  opacity: 0.35;
+  transform: scale(0.97);
+}
+
+.cc-subtask.pressed {
+  border-color: #58a6ff;
+  background: rgba(88, 166, 255, 0.12);
+  box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.25);
+}
+
+.cc-subtask.drag-target {
+  border-color: #58a6ff;
+  background: rgba(88, 166, 255, 0.08);
+  transform: translateY(-1px);
+}
+
+.cc-subtask-drag {
+  font-size: 12px;
+  padding: 1px 3px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  cursor: grab;
+  flex-shrink: 0;
+}
+
+.cc-subtask:hover .cc-subtask-drag {
+  opacity: 1;
 }
 
 .cc-subtask-actions {
@@ -363,11 +404,17 @@
 }
 
 .cc-subtask .cc-label {
-  gap: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
 }
 
 .cc-subtask .cc-text {
   font-size: 12px;
+  color: #c9d1d9;
   white-space: normal;
   word-break: break-word;
   min-width: 0;

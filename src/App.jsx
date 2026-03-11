@@ -46,6 +46,9 @@ function App() {
       const saved = JSON.parse(localStorage.getItem('dashColWidths'));
       if (Array.isArray(saved) && saved.length === 3 &&
           saved.every(w => w === null || (typeof w === 'number' && w >= MIN_COL_PX && w <= 1200))) {
+        // If saved px values exceed available width, reset to auto
+        const total = saved.reduce((s, w) => s + (w || 0), 0);
+        if (total > 0 && total > window.innerWidth - 260) return DEFAULT_COL_PX;
         return saved;
       }
     } catch {}
@@ -248,6 +251,9 @@ function App() {
     const saved = localStorage.getItem('timerCollapsed');
     return saved === 'true';
   });
+  const [todoFontSize, setTodoFontSize] = useState(() => localStorage.getItem('todoFontSize') || 'M');
+  const [fontSizeOpen, setFontSizeOpen] = useState(false);
+  const fontSizeMap = { S: '11px', M: '13px', L: '16px' };
   const [timerWidgetOpen, setTimerWidgetOpen] = useState(false);
   const [timerWidgetCompact, setTimerWidgetCompact] = useState(true);
   const [timerWidgetPos, setTimerWidgetPos] = useState({ top: 0, left: 0 });
@@ -1575,11 +1581,29 @@ function App() {
 
           {/* Dashboard View */}
           {activeView === 'dashboard' && (
-          <div className="dashboard-container">
+          <div className="dashboard-container" style={{ '--todo-font-size': fontSizeMap[todoFontSize] }}>
             {/* Dashboard Header */}
             <div className="dashboard-header">
               <h1 className="dashboard-title">Dashboard</h1>
               <div className="filters">
+                <div className="font-size-control" style={{ position: 'relative' }}>
+                  <button
+                    className="filter-btn font-size-trigger"
+                    onClick={() => setFontSizeOpen(o => !o)}
+                    title="Font size"
+                  >{todoFontSize}</button>
+                  {fontSizeOpen && (
+                    <div className="font-size-dropdown">
+                      {['S', 'M', 'L'].map(s => (
+                        <button
+                          key={s}
+                          className={`font-size-option ${todoFontSize === s ? 'active' : ''}`}
+                          onClick={() => { setTodoFontSize(s); localStorage.setItem('todoFontSize', s); setFontSizeOpen(false); }}
+                        >{s}</button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <button
                   ref={timerBtnRef}
                   className="dashboard-timer-toggle-btn"

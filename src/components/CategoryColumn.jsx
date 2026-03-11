@@ -17,6 +17,9 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
   const [editingTodoText, setEditingTodoText] = useState('');
   const [editingSubtaskId, setEditingSubtaskId] = useState(null);
   const [editingSubtaskText, setEditingSubtaskText] = useState('');
+  const [draggingSubtask, setDraggingSubtask] = useState(null); // { todoId, subtaskId, index }
+  const [dragOverSubtask, setDragOverSubtask] = useState(null); // { todoId, index }
+  const [pressedSubtaskId, setPressedSubtaskId] = useState(null);
   const inputRef = useRef(null);
   const editInputRef = useRef(null);
   const editSubtaskInputRef = useRef(null);
@@ -94,6 +97,58 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
     }
   };
 
+  const subtaskDragRef = useRef(null);
+  const subtaskDragOverRef = useRef(null);
+
+  const handleSubtaskMouseDown = (e, todoId, subtaskId, index) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setPressedSubtaskId(subtaskId);
+    subtaskDragRef.current = { todoId, subtaskId, index, started: false };
+
+    const onMouseMove = (me) => {
+      if (!subtaskDragRef.current) return;
+      if (!subtaskDragRef.current.started) {
+        subtaskDragRef.current.started = true;
+        setDraggingSubtask({ todoId, subtaskId, index });
+      }
+      const els = document.querySelectorAll(`.cc-subtask[data-subtask-todoid="${todoId}"]`);
+      let overIdx = null;
+      els.forEach((el, i) => {
+        const rect = el.getBoundingClientRect();
+        if (me.clientY >= rect.top && me.clientY <= rect.bottom) overIdx = i;
+      });
+      if (overIdx !== null) {
+        subtaskDragOverRef.current = overIdx;
+        setDragOverSubtask({ todoId, index: overIdx });
+      }
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      if (!subtaskDragRef.current?.started) { subtaskDragRef.current = null; return; }
+      const { todoId: tid, index: fromIdx } = subtaskDragRef.current;
+      const toIdx = subtaskDragOverRef.current;
+      subtaskDragRef.current = null;
+      subtaskDragOverRef.current = null;
+      setDraggingSubtask(null);
+      setDragOverSubtask(null);
+      setPressedSubtaskId(null);
+      if (toIdx !== null && toIdx !== undefined && toIdx !== fromIdx) {
+        const todo = todos.find(t => t.id === tid);
+        if (!todo) return;
+        const subtasks = [...(todo.subtasks || [])];
+        const [moved] = subtasks.splice(fromIdx, 1);
+        subtasks.splice(toIdx, 0, moved);
+        onUpdateTodo(tid, { subtasks });
+      }
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  };
+
   const isDragOver = draggingTodo && dragOverCategory === category && draggingTodo.todo.category !== category;
 
   const sortedTodos = [...todos].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
@@ -154,9 +209,13 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
             data-todo-id={todo.id}
             className={`cc-item ${todo.completed ? 'completed' : ''} ${draggingTodo && draggingTodo.todo.id === todo.id ? 'dragging' : ''} ${dragOverTodoId && String(dragOverTodoId) === String(todo.id) ? 'drag-target' : ''}`}
           >
-            {/* Top row: drag handle + actions */}
+            {/* Top row: drag handle + checkbox + actions */}
             <div className="cc-item-top">
               <div className="cc-drag-handle" title="Surukle" onMouseDown={(e) => onTodoDragStart(e, todo)}>⠿</div>
+              <label className="cc-inline-check" onClick={e => e.stopPropagation()}>
+                <input type="checkbox" className="cc-checkbox" checked={todo.completed} onChange={() => onToggleTodo(todo.id)} />
+                <span className="cc-checkmark"></span>
+              </label>
               <div className="cc-item-actions">
                 {todo.subtasks && todo.subtasks.length > 0 && (
                   <span className="cc-subtask-badge">
@@ -180,15 +239,8 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
                 >×</button>
               </div>
             </div>
-            {/* Bottom row: checkbox + text */}
+            {/* Bottom row: text */}
             <label className="cc-label">
-              <input
-                type="checkbox"
-                className="cc-checkbox"
-                checked={todo.completed}
-                onChange={() => onToggleTodo(todo.id)}
-              />
-              <span className="cc-checkmark"></span>
               {editingTodoId === todo.id ? (
                 <input
                   ref={editInputRef}
@@ -220,8 +272,16 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
             {/* Subtasks */}
             {expandedTodos.has(todo.id) && (
               <div className="cc-subtasks">
-                {todo.subtasks && todo.subtasks.map((subtask) => (
-                  <div key={subtask.id} className={`cc-subtask ${subtask.completed ? 'completed' : ''}`}>
+                {todo.subtasks && todo.subtasks.map((subtask, sIdx) => (
+                  <div
+                    key={subtask.id}
+                    data-subtask-todoid={todo.id}
+                    className={`cc-subtask ${subtask.completed ? 'completed' : ''} ${draggingSubtask?.subtaskId === subtask.id ? 'dragging' : ''} ${pressedSubtaskId === subtask.id && !draggingSubtask ? 'pressed' : ''} ${dragOverSubtask && dragOverSubtask.todoId === todo.id && dragOverSubtask.index === sIdx && draggingSubtask?.subtaskId !== subtask.id ? 'drag-target' : ''}`}
+                  >
+                    <span
+                      className="cc-drag-handle cc-subtask-drag"
+                      onMouseDown={(e) => handleSubtaskMouseDown(e, todo.id, subtask.id, sIdx)}
+                    >⠿</span>
                     <label className="cc-label" onClick={(e) => { if (editingSubtaskId === subtask.id) e.preventDefault(); }}>
                       <input
                         type="checkbox"
