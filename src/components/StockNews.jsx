@@ -133,28 +133,26 @@ function timeAgo(dateStr) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-function playNewsSound(sentiment) {
+function playNewsSound() {
   try {
     const AudioCtx = /** @type {typeof AudioContext} */ (window.AudioContext || window['webkitAudioContext']);
     const ctx = new AudioCtx();
-    const gain = ctx.createGain();
-    gain.connect(ctx.destination);
-    gain.gain.setValueAtTime(0.18, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
-    const osc = ctx.createOscillator();
-    osc.connect(gain);
-    if (sentiment === 'positive') {
-      osc.frequency.setValueAtTime(660, ctx.currentTime);
-      osc.frequency.setValueAtTime(880, ctx.currentTime + 0.15);
-    } else if (sentiment === 'negative') {
-      osc.frequency.setValueAtTime(440, ctx.currentTime);
-      osc.frequency.setValueAtTime(330, ctx.currentTime + 0.15);
-    } else {
-      osc.frequency.setValueAtTime(520, ctx.currentTime);
-    }
-    osc.type = 'sine';
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.8);
+    // İki kısa bip — dikkat çekici ama rahatsız etmez
+    const beep = (freq, startTime, duration) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = freq;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0, startTime);
+      gain.gain.linearRampToValueAtTime(0.25, startTime + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+      osc.start(startTime);
+      osc.stop(startTime + duration);
+    };
+    beep(880, ctx.currentTime, 0.12);
+    beep(1100, ctx.currentTime + 0.16, 0.10);
   } catch {}
 }
 
@@ -321,7 +319,7 @@ export default function StockNews({ tickers, setTickers, activeTicker, setActive
     if (newItems.length === 0) return;
     newItems.forEach(n => seenRef.current.add(n.id));
     localStorage.setItem(STORAGE_KEY, JSON.stringify([...seenRef.current].slice(-500)));
-    playNewsSound('neutral');
+    playNewsSound();
     let granted = await isPermissionGranted();
     if (!granted) { const perm = await requestPermission(); granted = perm === 'granted'; }
     if (granted) {
