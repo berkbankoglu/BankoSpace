@@ -15,7 +15,7 @@ export default function TimerApp() {
   useEffect(() => {
     const win = getCurrentWindow();
     if (compact) {
-      win.setSize(new LogicalSize(260, 80)).catch(() => {});
+      win.setSize(new LogicalSize(280, 95)).catch(() => {});
     } else {
       win.setSize(new LogicalSize(260, 310)).catch(() => {});
     }

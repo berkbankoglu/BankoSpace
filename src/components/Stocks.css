@@ -1,14 +1,15 @@
+/* ====================================================
+   STOCKS ROOT
+   ==================================================== */
 .stocks-root {
   display: flex;
   flex-direction: column;
   height: 100%;
+  background: #080b10;
   user-select: none;
 }
-
 .stocks-root input,
-.stocks-root textarea {
-  user-select: text;
-}
+.stocks-root textarea { user-select: text; }
 
 .stocks-market {
   display: flex;
@@ -18,92 +19,459 @@
   overflow: hidden;
 }
 
+/* ====================================================
+   LEFT PANEL — Watchlist
+   ==================================================== */
 .stocks-market-left {
-  flex: 1;
-  min-width: 0;
-  position: relative;
-  border-right: 1px solid #30363d;
+  width: 272px;
+  min-width: 220px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: #0d1117;
+  border-right: 1px solid #1e2631;
   overflow: hidden;
 }
 
-.stocks-market-left .smc-wrapper {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 1;
+.stc-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid #1e2631;
+  flex-shrink: 0;
+}
+.stc-panel-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: #4a5568;
+}
+.stc-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
-.stocks-market-left .stc-list-wrap {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
+.stc-list-wrap {
+  flex: 1;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  background: var(--bg-card, #161b22);
 }
+.stc-list-wrap::-webkit-scrollbar { width: 3px; }
+.stc-list-wrap::-webkit-scrollbar-thumb { background: #1e2631; border-radius: 2px; }
 
 .stc-bottom-tabs {
   display: flex;
-  gap: 0;
-  border-bottom: 1px solid #30363d;
+  border-bottom: 1px solid #1e2631;
   flex-shrink: 0;
-  background: #161b22;
+  background: #0d1117;
+  padding: 0 10px;
+  gap: 2px;
 }
-
 .stc-bottom-tab {
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
-  color: #8b949e;
-  font-size: 12px;
-  font-weight: 500;
-  padding: 7px 16px;
+  color: #4a5568;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  padding: 8px 10px;
   cursor: pointer;
   margin-bottom: -1px;
   transition: color 0.15s;
   user-select: none;
-  -webkit-user-select: none;
+  text-transform: uppercase;
 }
-.stc-bottom-tab:hover { color: #c9d1d9; }
+.stc-bottom-tab:hover { color: #8b949e; }
 .stc-bottom-tab.active {
   color: #58a6ff;
   border-bottom-color: #58a6ff;
-  font-weight: 600;
 }
 
-.stocks-market-right {
-  flex-shrink: 0;
+/* Ticker rows — kompakt card stili */
+.stc-row {
   display: flex;
-  flex-direction: row;
-  overflow: hidden;
+  align-items: center;
+  padding: 9px 14px;
+  border-bottom: 1px solid #111820;
+  cursor: pointer;
+  transition: background 0.1s;
+  gap: 6px;
   position: relative;
 }
+.stc-row:hover { background: #111820; }
+.stc-row.active { background: #0f1823; border-left: 2px solid #58a6ff; padding-left: 12px; }
+.stc-row.stc-dragging { opacity: 0.35; }
+.stc-row.stc-drag-over { border-top: 1px solid #58a6ff44; }
 
-.stocks-news-resize-handle {
-  width: 4px;
-  flex-shrink: 0;
-  cursor: col-resize;
-  background: transparent;
-  border-left: 1px solid #30363d;
-  transition: background 0.15s;
-  z-index: 2;
+.stc-row-left {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
 }
-.stocks-news-resize-handle:hover,
-.stocks-news-resize-handle:active {
-  background: #58a6ff44;
-  border-color: #58a6ff;
+.stc-symbol {
+  font-size: 12px;
+  font-weight: 700;
+  color: #c9d1d9;
+  letter-spacing: 0.3px;
+  line-height: 1;
+}
+.stc-name-label {
+  font-size: 10px;
+  color: #4a5568;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stc-row-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.stc-price {
+  font-size: 12px;
+  font-weight: 600;
+  color: #e6edf3;
+  font-variant-numeric: tabular-nums;
+}
+.stc-change {
+  font-size: 10px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
+}
+.stc-change.pos { color: #3fb950; }
+.stc-change.neg { color: #f85149; }
+.stc-change-abs { color: inherit; opacity: 0.7; font-size: 9px; }
+
+.stc-ext-badge {
+  font-size: 9px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+.stc-ext-badge.pos { background: rgba(63,185,80,0.12); color: #3fb950; }
+.stc-ext-badge.neg { background: rgba(248,81,73,0.12); color: #f85149; }
+
+.stc-remove {
+  background: none;
+  border: none;
+  color: #2a3441;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+.stc-row:hover .stc-remove { opacity: 1; }
+.stc-remove:hover { color: #f85149; }
+
+.stc-loading-dot {
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #2a3441;
+  animation: stc-pulse 1.2s ease-in-out infinite;
+}
+@keyframes stc-pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+.stc-error { color: #4a5568; font-size: 11px; }
+
+/* Group */
+.stc-group { }
+.stc-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 14px 4px;
+}
+.stc-group-name {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: #2a3441;
+  cursor: default;
+}
+.stc-group-name:hover { color: #4a5568; }
+.stc-group-name-input {
+  flex: 1;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  color: #c9d1d9;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  outline: none;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+.stc-group-actions { display: flex; gap: 3px; }
+.stc-group-add-btn {
+  background: none; border: 1px solid #238636;
+  border-radius: 3px; color: #3fb950;
+  font-size: 13px; line-height: 1; padding: 1px 5px;
+  cursor: pointer; transition: background 0.12s;
+}
+.stc-group-add-btn:hover { background: rgba(35,134,54,0.2); }
+.stc-group-del-btn {
+  background: none; border: 1px solid transparent;
+  border-radius: 3px; color: #2a3441;
+  font-size: 13px; line-height: 1; padding: 1px 5px;
+  cursor: pointer; transition: color 0.12s;
+}
+.stc-group-del-btn:hover { color: #f85149; }
+
+.stc-group-empty { font-size: 11px; color: #2a3441; padding: 6px 14px 10px; display: block; }
+.stc-toolbar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 10px; border-bottom: 1px solid #1e2631; flex-shrink: 0;
+}
+.stc-add-group-btn {
+  background: none; border: 1px solid #1e2631;
+  border-radius: 4px; color: #4a5568;
+  font-size: 11px; padding: 3px 8px;
+  cursor: pointer; transition: all 0.12s; font-family: inherit;
+}
+.stc-add-group-btn:hover { border-color: #30363d; color: #8b949e; }
+.stock-ticker-refresh {
+  background: none; border: none; color: #4a5568;
+  font-size: 15px; cursor: pointer; padding: 2px 6px;
+  border-radius: 4px; transition: color 0.12s, background 0.12s;
+}
+.stock-ticker-refresh:hover { color: #58a6ff; background: rgba(88,166,255,0.08); }
+
+.stc-list-header {
+  display: grid;
+  grid-template-columns: 70px 1fr 1fr 1fr 28px;
+  font-size: 10px; color: #2a3441;
+  padding: 4px 14px;
+  font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase;
+}
+
+/* Picker */
+.stc-picker-dropdown {
+  background: #0d1117; border: 1px solid #1e2631;
+  border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+  width: 280px; overflow: hidden; display: flex; flex-direction: column;
+}
+.stc-picker-search {
+  width: 100%; box-sizing: border-box;
+  background: #161b22; border: none; border-bottom: 1px solid #1e2631;
+  color: #c9d1d9; font-size: 12px; padding: 10px 12px;
+  outline: none; font-family: inherit;
+}
+.stc-picker-cats {
+  display: flex; gap: 2px; padding: 6px 8px;
+  border-bottom: 1px solid #1e2631; flex-wrap: wrap;
+}
+.stc-picker-cat {
+  background: none; border: 1px solid transparent;
+  border-radius: 4px; color: #4a5568; font-size: 10px;
+  font-weight: 600; padding: 2px 7px; cursor: pointer;
+  font-family: inherit; text-transform: uppercase; letter-spacing: 0.5px;
+  transition: all 0.1s;
+}
+.stc-picker-cat:hover { color: #8b949e; background: #161b22; }
+.stc-picker-cat.active { color: #58a6ff; border-color: #1e3a5f; background: #0f1e33; }
+.stc-picker-list { max-height: 280px; overflow-y: auto; }
+.stc-picker-list::-webkit-scrollbar { width: 3px; }
+.stc-picker-list::-webkit-scrollbar-thumb { background: #1e2631; }
+.stc-picker-group-label {
+  font-size: 9px; font-weight: 700; color: #2a3441;
+  padding: 8px 12px 3px; letter-spacing: 1px; text-transform: uppercase;
+}
+.stc-picker-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 12px; background: none; border: none;
+  cursor: pointer; width: 100%; text-align: left; font-family: inherit;
+  transition: background 0.1s;
+}
+.stc-picker-item:hover, .stc-picker-item.highlighted { background: #161b22; }
+.stc-picker-item.selected { background: rgba(88,166,255,0.06); }
+.stc-picker-ticker { font-size: 11px; font-weight: 700; color: #58a6ff; min-width: 60px; }
+.stc-picker-name { font-size: 11px; color: #4a5568; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stc-picker-check { font-size: 10px; color: #3fb950; font-weight: 700; }
+.stc-picker-add-icon { font-size: 13px; color: #3fb950; }
+.stc-picker-custom { border-bottom: 1px solid #1e2631; }
+
+/* ====================================================
+   RIGHT PANEL — News Feed
+   ==================================================== */
+.stocks-market-right {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #080b10;
 }
 
 .stocks-market-right .stock-news-column {
   border: none;
   border-radius: 0;
-  min-height: 0;
   flex: 1;
-  min-width: 0;
+  min-height: 0;
   overflow: hidden;
+  background: #080b10;
+}
+
+/* ====================================================
+   STOCK NEWS — full redesign overrides
+   ==================================================== */
+
+/* Header */
+.stocks-market-right .stock-news-header {
+  padding: 12px 20px;
+  background: #0d1117;
+  border-bottom: 1px solid #1e2631;
+}
+.stocks-market-right .stock-news-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: #4a5568;
+}
+
+/* Ticker tabs */
+.stocks-market-right .stock-news-ticker-tabs {
+  padding: 8px 16px;
+  background: #0d1117;
+  border-bottom: 1px solid #111820;
+  gap: 4px;
+}
+.stocks-market-right .stock-news-ticker-tab {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  padding: 4px 10px 4px 12px;
+  border-radius: 20px;
+  border: 1px solid #1e2631;
+  color: #4a5568;
+  background: none;
+  transition: all 0.12s;
+}
+.stocks-market-right .stock-news-ticker-tab:hover {
+  color: #8b949e;
+  border-color: #2a3441;
+  background: #111820;
+}
+.stocks-market-right .stock-news-ticker-tab.active {
+  color: #58a6ff;
+  background: rgba(88,166,255,0.08);
+  border-color: rgba(88,166,255,0.25);
+}
+
+/* Search */
+.stocks-market-right .stock-news-search-row {
+  padding: 8px 16px;
+  background: #0d1117;
+  border-bottom: 1px solid #111820;
+}
+.stocks-market-right .stock-news-search {
+  background: #111820;
+  border-color: #1e2631;
+  font-size: 12px;
+  color: #8b949e;
+  padding: 7px 12px;
+}
+.stocks-market-right .stock-news-search:focus { border-color: #58a6ff; }
+
+/* Filters */
+.stocks-market-right .stock-news-filters {
+  padding: 6px 16px;
+  background: #0d1117;
+  border-bottom: 1px solid #111820;
+}
+
+/* News List */
+.stocks-market-right .stock-news-list {
+  background: #080b10;
+}
+
+/* News Items — büyük, öncelikli */
+.stocks-market-right .stock-news-item {
+  padding: 16px 20px;
+  border-bottom: 1px solid #0f1520;
+  border-left: 3px solid transparent;
+  background: transparent;
+  transition: background 0.12s;
+  gap: 8px;
+}
+.stocks-market-right .stock-news-item:hover {
+  background: #0d1117;
+}
+.stocks-market-right .stock-news-item--unread {
+  border-left-color: #58a6ff;
+  background: #090d13;
+}
+.stocks-market-right .stock-news-item--unread .stock-news-item-title {
+  color: #e6edf3;
+  font-weight: 600;
+}
+.stocks-market-right .stock-news-item-title {
+  font-size: 14px;
+  line-height: 1.55;
+  color: #8b949e;
+  font-weight: 400;
+}
+.stocks-market-right .stock-news-item:hover .stock-news-item-title {
+  color: #c9d1d9;
+}
+.stocks-market-right .stock-news-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.stocks-market-right .stock-news-item-time {
+  font-size: 11px;
+  color: #2a3441;
+}
+.stocks-market-right .stock-news-item-ticker-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: #58a6ff;
+  background: rgba(88,166,255,0.08);
+  border: 1px solid rgba(88,166,255,0.18);
+  border-radius: 4px;
+  padding: 1px 6px;
+  letter-spacing: 0.5px;
+}
+
+/* AI comment box */
+.stocks-market-right .stock-news-ai-comment {
+  background: #0d1117;
+  border-left: 2px solid #58a6ff;
+  border-radius: 0 6px 6px 0;
+  padding: 10px 14px;
+  margin-top: 8px;
+}
+
+/* Scrollbar */
+.stocks-market-right .stock-news-list::-webkit-scrollbar { width: 4px; }
+.stocks-market-right .stock-news-list::-webkit-scrollbar-thumb { background: #1e2631; border-radius: 2px; }
+
+/* Picker addon */
+.stocks-market-right .stock-news-picker-dropdown {
+  background: #0d1117;
+  border-color: #1e2631;
 }
 
 body.light .stc-bottom-tabs { border-color: #d0d7de; background: #fff; }

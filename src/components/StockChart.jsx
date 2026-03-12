@@ -258,6 +258,8 @@ function GroupRows({ group, quotes, activeTicker, setActiveTicker, dragState, dr
       }
     };
 
+    const stockInfo = POPULAR_STOCKS.find(s => s.ticker === t);
+
     return (
       <div
         key={t}
@@ -267,33 +269,34 @@ function GroupRows({ group, quotes, activeTicker, setActiveTicker, dragState, dr
         onPointerEnter={handlePointerEnter}
         onPointerUp={handlePointerUp}
       >
-        <span className="stc-symbol">{t}</span>
-        <span className="stc-price">
-          {isLoading && <span className="stc-loading-dot" />}
-          {isError && <span className="stc-error">—</span>}
-          {!isLoading && !isError && `$${q.price.toFixed(2)}`}
-        </span>
-        <span className={`stc-change ${!isLoading && !isError ? (pos ? 'pos' : 'neg') : ''}`}>
-          {!isLoading && !isError && (
-            <>
-              <span className="stc-change-arrow">{pos ? '▲' : '▼'}</span>
-              {pos ? '+' : ''}{q.pct.toFixed(2)}%
-              <span className="stc-change-abs"> ({pos ? '+' : ''}${q.change.toFixed(2)})</span>
-            </>
-          )}
-        </span>
-        <span className="stc-ext-col">
+        <div className="stc-row-left">
+          <span className="stc-symbol">{t}</span>
+          {stockInfo && <span className="stc-name-label">{stockInfo.name}</span>}
+        </div>
+        <div className="stc-row-right">
+          <span className="stc-price">
+            {isLoading && <span className="stc-loading-dot" />}
+            {isError && <span className="stc-error">—</span>}
+            {!isLoading && !isError && `$${q.price.toFixed(2)}`}
+          </span>
+          <span className={`stc-change ${!isLoading && !isError ? (pos ? 'pos' : 'neg') : ''}`}>
+            {!isLoading && !isError && (
+              <>
+                {pos ? '▲' : '▼'} {pos ? '+' : ''}{q.pct.toFixed(2)}%
+              </>
+            )}
+          </span>
           {!isLoading && !isError && q.preMarket && (
             <span className={`stc-ext-badge ${q.preMarket.change >= 0 ? 'pos' : 'neg'}`}>
-              Pre ${q.preMarket.price.toFixed(2)} <span className="stc-ext-pct">({q.preMarket.change >= 0 ? '+' : ''}{q.preMarket.pct.toFixed(2)}%)</span>
+              Pre {q.preMarket.change >= 0 ? '+' : ''}{q.preMarket.pct.toFixed(2)}%
             </span>
           )}
           {!isLoading && !isError && q.postMarket && (
             <span className={`stc-ext-badge ${q.postMarket.change >= 0 ? 'pos' : 'neg'}`}>
-              After ${q.postMarket.price.toFixed(2)} <span className="stc-ext-pct">({q.postMarket.change >= 0 ? '+' : ''}{q.postMarket.pct.toFixed(2)}%)</span>
+              After {q.postMarket.change >= 0 ? '+' : ''}{q.postMarket.pct.toFixed(2)}%
             </span>
           )}
-        </span>
+        </div>
         <button className="stc-remove" onClick={e => { e.stopPropagation(); onRemove(group.id, t); }} title={`Remove ${t}`}>×</button>
       </div>
     );
@@ -484,8 +487,8 @@ export default function StockChart({ groups, saveGroups, activeTicker, setActive
     <div className="stock-ticker-bar">
       {/* Global toolbar */}
       <div className="stc-toolbar">
-        <button className="stc-add-group-btn" onClick={addGroup} title="Yeni grup ekle">+ Grup</button>
-        <button className="stock-ticker-refresh" onClick={loadAll} title="Yenile">↻</button>
+        <button className="stc-add-group-btn" onClick={addGroup} title="Add group">+ Group</button>
+        <button className="stock-ticker-refresh" onClick={loadAll} title="Refresh">↻</button>
       </div>
 
       {/* Groups */}
@@ -548,15 +551,6 @@ export default function StockChart({ groups, saveGroups, activeTicker, setActive
             </div>
 
             {/* Rows */}
-            {group.tickers.length > 0 && (
-              <div className="stc-list-header" style={{ userSelect: 'none', WebkitUserSelect: 'none' }}>
-                <span style={{ userSelect: 'none', WebkitUserSelect: 'none', pointerEvents: 'none' }}>Symbol</span>
-                <span style={{ userSelect: 'none', WebkitUserSelect: 'none', pointerEvents: 'none' }}>Price</span>
-                <span style={{ userSelect: 'none', WebkitUserSelect: 'none', pointerEvents: 'none' }}>Change</span>
-                <span style={{ userSelect: 'none', WebkitUserSelect: 'none', pointerEvents: 'none' }}>Pre / After</span>
-                <span></span>
-              </div>
-            )}
             {group.tickers.length === 0 && (
               <span className="stc-empty stc-group-empty">Click + to add symbols</span>
             )}

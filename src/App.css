@@ -1849,8 +1849,8 @@ body.light .reset-btn:hover {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 8px 0 12px;
-    height: 40px;
+    padding: 0 6px 0 10px;
+    height: 32px;
     background: #161b22;
     border-bottom: 1px solid #21262d;
     flex-shrink: 0;
@@ -1976,20 +1976,22 @@ body.light .reset-btn:hover {
 .timer-compact-body {
     flex: 1;
     display: flex;
+    flex-direction: row;
     align-items: center;
     justify-content: center;
-    gap: 12px;
-    padding: 4px 10px;
+    gap: 8px;
+    padding: 2px 8px;
 }
 
 .timer-compact-display {
-    font-size: 26px;
+    font-size: 30px;
     font-weight: 700;
     color: #c9d1d9;
     cursor: pointer;
     font-family: 'JetBrains Mono', monospace;
     letter-spacing: 2px;
     transition: color 0.2s;
+    line-height: 1;
 }
 .timer-compact-display:hover { color: #58a6ff; }
 .timer-compact-display.alarming { color: #f85149; animation: timerPulse 0.5s infinite alternate; }
@@ -1997,8 +1999,38 @@ body.light .reset-btn:hover {
 .timer-compact-set {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 5px;
     font-size: 14px;
+    flex-wrap: nowrap;
+}
+
+.timer-compact-colon {
+    font-size: 18px;
+    font-weight: 700;
+    color: #8b949e;
+    line-height: 1;
+}
+
+.timer-compact-spinner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+.timer-spin-btn {
+    background: none;
+    border: none;
+    color: #6e7681;
+    font-size: 9px;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+    transition: color 0.1s;
+}
+
+.timer-spin-btn:hover {
+    color: #58a6ff;
 }
 
 .timer-compact-time { display: block; }
@@ -2010,9 +2042,9 @@ body.light .reset-btn:hover {
     border: 1px solid #30363d;
     border-radius: 4px;
     color: #8b949e;
-    font-size: 14px;
+    font-size: 18px;
     cursor: pointer;
-    padding: 3px 8px;
+    padding: 4px 10px;
     transition: all 0.15s;
     line-height: 1;
 }
@@ -2023,16 +2055,23 @@ body.light .reset-btn:hover {
 .timer-compact-btn.cancel { color: #f85149; }
 
 .timer-compact-input {
-    width: 36px;
+    width: 38px;
     background: #1c2128;
     border: 1px solid #30363d;
     border-radius: 4px;
-    padding: 2px 4px;
-    color: #c9d1d9;
-    font-size: 14px;
-    font-family: inherit;
+    padding: 3px 4px;
+    color: #e6edf3;
+    font-size: 15px;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
     outline: none;
     text-align: center;
+    -moz-appearance: textfield;
+}
+.timer-compact-input::-webkit-outer-spin-button,
+.timer-compact-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
 }
 .timer-compact-input:focus { border-color: #58a6ff; }
 
@@ -9053,8 +9092,8 @@ input::placeholder, textarea::placeholder { color: var(--text-muted) !important;
 .stock-news-header {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
+    gap: 10px;
+    padding: 10px 16px;
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
     background: var(--bg-card);
@@ -9096,7 +9135,7 @@ input::placeholder, textarea::placeholder { color: var(--text-muted) !important;
     padding: 2px 8px;
     letter-spacing: 0.5px;
 }
-.stock-news-label { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+.stock-news-label { font-size: 14px; font-weight: 700; color: var(--text-primary); letter-spacing: 0.2px; }
 .stock-news-meta { display: flex; align-items: center; gap: 8px; }
 .stock-news-updated { font-size: 11px; color: var(--text-muted); }
 .stock-news-refresh-btn {
@@ -9118,18 +9157,29 @@ input::placeholder, textarea::placeholder { color: var(--text-muted) !important;
 @keyframes spin { to { transform: rotate(360deg); } }
 .stock-news-error { padding: 16px; color: var(--danger); font-size: 13px; }
 .stock-news-item {
-    display: flex; flex-direction: column; gap: 4px;
-    padding: 10px 16px; border-bottom: 1px solid var(--border);
+    display: flex; flex-direction: column; gap: 6px;
+    padding: 14px 20px; border-bottom: 1px solid var(--border);
     text-decoration: none; transition: background 0.12s; cursor: pointer;
+    border-left: 3px solid transparent;
 }
 .stock-news-item:last-child { border-bottom: none; }
 .stock-news-item:hover { background: var(--bg-hover); }
 .stock-news-item-title {
-    font-size: 12.5px; color: var(--text-primary);
-    line-height: 1.45; font-weight: 500;
+    font-size: 13.5px; color: var(--text-primary);
+    line-height: 1.5; font-weight: 500;
     flex: 1; min-width: 0; word-break: break-word; overflow-wrap: break-word;
 }
 .stock-news-item:hover .stock-news-item-title { color: var(--accent); }
+
+/* Unread — sol kenarda mavi çizgi + başlık parlak beyaz */
+.stock-news-item--unread {
+    border-left-color: var(--accent);
+    background: #0d1117;
+}
+.stock-news-item--unread .stock-news-item-title {
+    font-weight: 650; color: #e6edf3;
+}
+
 .stock-news-item--new .stock-news-item-title {
     display: flex; align-items: flex-start; gap: 6px;
 }
@@ -9143,8 +9193,8 @@ input::placeholder, textarea::placeholder { color: var(--text-muted) !important;
     justify-content: space-between; gap: 8px;
 }
 .stock-news-item-source { font-size: 11px; color: var(--text-muted); }
-.stock-news-item-time { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
-.stock-news-empty { padding: 24px 16px; color: var(--text-muted); font-size: 13px; text-align: center; }
+.stock-news-item-time { font-size: 11.5px; color: var(--text-muted); white-space: nowrap; }
+.stock-news-empty { padding: 32px 20px; color: var(--text-muted); font-size: 13px; text-align: center; }
 
 /* Provider badge (Y = Yahoo, G = Google) */
 .stock-news-provider-badge {

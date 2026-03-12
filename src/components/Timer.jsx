@@ -153,58 +153,59 @@ function Timer({ isPopup = false, isCompact = false }) {
   if (isCompact) {
     return (
       <div className="timer-compact-body">
-        <div
-          className={`timer-compact-display ${isAlarming ? 'alarming' : ''}`}
-          onClick={() => !isRunning && setIsSettingTime(true)}
-        >
-          {isSettingTime ? (
-            <div className="timer-compact-set">
-              <input
-                type="number"
-                className="timer-compact-input"
-                value={inputMinutes}
-                onChange={(e) => setInputMinutes(e.target.value)}
-                placeholder="m"
-                min="0" max="180"
-                autoFocus
-              />
-              <span>:</span>
-              <input
-                type="number"
-                className="timer-compact-input"
-                value={inputSeconds}
-                onChange={(e) => setInputSeconds(e.target.value)}
-                placeholder="s"
-                min="0" max="59"
-              />
-              <button className="timer-compact-btn confirm" onClick={handleSetTime}>✓</button>
-              <button className="timer-compact-btn cancel" onClick={() => setIsSettingTime(false)}>✕</button>
-            </div>
-          ) : (
-            <span className="timer-compact-time">{formatTime(displayTime)}</span>
-          )}
-        </div>
-        {!isSettingTime && (
-          <div className="timer-compact-controls">
-            {timeLeft === 0 && hasTimerRun ? (
-              <>
-                <button className="timer-compact-btn" onClick={handleRepeat} title="Repeat">↺</button>
-                <button className="timer-compact-btn" onClick={handleStop} title="Reset">⏹</button>
-              </>
-            ) : isRunning ? (
-              <>
-                <button className="timer-compact-btn" onClick={handlePause} title="Pause">⏸</button>
-                <button className="timer-compact-btn" onClick={handleRestart} title="Restart">↺</button>
-              </>
-            ) : (
-              <>
-                <button className="timer-compact-btn play" onClick={handleStart} title="Start">▶</button>
-                {timeLeft > 0 && timeLeft < initialTime && (
-                  <button className="timer-compact-btn" onClick={handleStop} title="Reset">⏹</button>
-                )}
-              </>
-            )}
+        {isSettingTime ? (
+          <div className="timer-compact-set">
+            <input
+              type="number"
+              className="timer-compact-input"
+              value={inputMinutes}
+              onChange={(e) => setInputMinutes(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSetTime()}
+              min="0" max="180"
+              autoFocus
+            />
+            <span className="timer-compact-colon">:</span>
+            <input
+              type="number"
+              className="timer-compact-input"
+              value={inputSeconds}
+              onChange={(e) => setInputSeconds(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSetTime()}
+              min="0" max="59"
+            />
+            <button className="timer-compact-btn confirm" onClick={handleSetTime} title="Onayla">✓</button>
+            <button className="timer-compact-btn cancel" onClick={() => setIsSettingTime(false)} title="İptal">✕</button>
           </div>
+        ) : (
+          <>
+            <div
+              className={`timer-compact-display ${isAlarming ? 'alarming' : ''}`}
+              onClick={() => !isRunning && setIsSettingTime(true)}
+              title={!isRunning ? 'Süreyi ayarla' : ''}
+            >
+              <span className="timer-compact-time">{formatTime(displayTime)}</span>
+            </div>
+            <div className="timer-compact-controls">
+              {timeLeft === 0 && hasTimerRun ? (
+                <>
+                  <button className="timer-compact-btn" onClick={handleRepeat} title="Repeat">↺</button>
+                  <button className="timer-compact-btn" onClick={handleStop} title="Reset">⏹</button>
+                </>
+              ) : isRunning ? (
+                <>
+                  <button className="timer-compact-btn" onClick={handlePause} title="Pause">⏸</button>
+                  <button className="timer-compact-btn" onClick={handleRestart} title="Restart">↺</button>
+                </>
+              ) : (
+                <>
+                  <button className="timer-compact-btn play" onClick={handleStart} title="Start">▶</button>
+                  {timeLeft > 0 && timeLeft < initialTime && (
+                    <button className="timer-compact-btn" onClick={handleStop} title="Reset">⏹</button>
+                  )}
+                </>
+              )}
+            </div>
+          </>
         )}
       </div>
     );
@@ -263,7 +264,7 @@ function Timer({ isPopup = false, isCompact = false }) {
                 }}
               />
             </svg>
-            <div className="timer-display-large" onClick={() => !isPopup && !isRunning && setIsSettingTime(true)}>
+            <div className="timer-display-large" onClick={() => !isRunning && setIsSettingTime(true)}>
               {formatTime(displayTime)}
             </div>
           </div>
