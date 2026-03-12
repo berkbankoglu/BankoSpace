@@ -1,15 +1,23 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
-const MIN_H = 700;
+const MIN_H = 150;
 const MAX_H = 2500;
 const DEFAULT_H = 1000;
+
+function getSavedHeight() {
+  const maxAllowed = Math.floor(window.innerHeight * 0.6);
+  const saved = parseInt(localStorage.getItem('smcHeight'));
+  if (!isNaN(saved) && saved >= MIN_H && saved <= MAX_H) return Math.min(saved, maxAllowed);
+  // Cap default to 60% of viewport height so price list is always visible
+  return Math.min(DEFAULT_H, maxAllowed);
+}
 
 export default function StockMiniChart({ ticker }) {
   const containerRef = useRef(null);
   const wrapperRef = useRef(null);
   const dragRef = useRef(null);
-  const [height, setHeight] = useState(DEFAULT_H);
+  const [height, setHeight] = useState(getSavedHeight);
 
   useEffect(() => {
     const symbol = (!ticker || ticker === 'all') ? 'AAPL' : ticker;
@@ -101,6 +109,7 @@ export default function StockMiniChart({ ticker }) {
       getCurrentWindow().setCursorVisible(true).catch(() => {});
       const finalH = wrapperRef.current ? wrapperRef.current.offsetHeight : height;
       setHeight(finalH);
+      localStorage.setItem('smcHeight', String(finalH));
       e.target.removeEventListener('pointermove', onMove);
       e.target.removeEventListener('pointerup', onUp);
     };
@@ -113,7 +122,7 @@ export default function StockMiniChart({ ticker }) {
     <div
       className="smc-wrapper"
       ref={wrapperRef}
-      style={{ height, overflow: 'hidden', minHeight: MIN_H }}
+      style={{ height, overflow: 'hidden', minHeight: 0, maxHeight: 'calc(100vh - 180px)' }}
     >
       <div className="smc-tv-clip">
         <div
