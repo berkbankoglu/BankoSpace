@@ -53,7 +53,9 @@ function Notes() {
     const saved = localStorage.getItem('notesSidebarWidth');
     return saved ? parseInt(saved) : 300;
   });
-  const [isResizing, setIsResizing] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    return localStorage.getItem('notesSidebarCollapsed') === 'true';
+  });
   const [deleteConfirm, setDeleteConfirm] = useState({ show: false, type: null, id: null });
   const [activeFormats, setActiveFormats] = useState({});
   const [showColorPresets, setShowColorPresets] = useState(false);
@@ -123,35 +125,45 @@ function Notes() {
     return () => document.removeEventListener('selectionchange', handleSelectionChange);
   }, [handleSelectionChange]);
 
-  // Sidebar resize handlers
+  // Sidebar resize handlers — ref-based for smooth, jank-free dragging
+  const resizeStartXRef = useRef(0);
+  const resizeStartWidthRef = useRef(0);
+  const isResizingRef = useRef(false);
+
   const handleResizeMouseDown = useCallback((e) => {
     e.preventDefault();
-    setIsResizing(true);
-  }, []);
+    resizeStartXRef.current = e.clientX;
+    resizeStartWidthRef.current = sidebarRef.current
+      ? sidebarRef.current.getBoundingClientRect().width
+      : sidebarWidth;
+    isResizingRef.current = true;
+    document.body.style.cursor = 'ew-resize';
+    document.body.style.userSelect = 'none';
 
-  const handleResizeMouseMove = useCallback((e) => {
-    if (!isResizing) return;
-    const newWidth = Math.min(Math.max(200, e.clientX), 500);
-    setSidebarWidth(newWidth);
-  }, [isResizing]);
-
-  const handleResizeMouseUp = useCallback(() => {
-    if (isResizing) {
-      setIsResizing(false);
-      localStorage.setItem('notesSidebarWidth', sidebarWidth.toString());
+    function onMove(ev) {
+      if (!isResizingRef.current) return;
+      const delta = ev.clientX - resizeStartXRef.current;
+      const newWidth = Math.min(Math.max(200, resizeStartWidthRef.current + delta), 500);
+      if (sidebarRef.current) {
+        sidebarRef.current.style.width = `${newWidth}px`;
+      }
     }
-  }, [isResizing, sidebarWidth]);
 
-  useEffect(() => {
-    if (isResizing) {
-      document.addEventListener('mousemove', handleResizeMouseMove);
-      document.addEventListener('mouseup', handleResizeMouseUp);
-      return () => {
-        document.removeEventListener('mousemove', handleResizeMouseMove);
-        document.removeEventListener('mouseup', handleResizeMouseUp);
-      };
+    function onUp(ev) {
+      isResizingRef.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      const delta = ev.clientX - resizeStartXRef.current;
+      const newWidth = Math.min(Math.max(200, resizeStartWidthRef.current + delta), 500);
+      setSidebarWidth(newWidth);
+      localStorage.setItem('notesSidebarWidth', newWidth.toString());
     }
-  }, [isResizing, handleResizeMouseMove, handleResizeMouseUp]);
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, [sidebarWidth]);
 
   useEffect(() => {
     localStorage.setItem('notes', JSON.stringify(notes));
@@ -454,19 +466,34 @@ function Notes() {
 
       {/* Sidebar */}
       <div
-        className="notes-sidebar"
+        className={`notes-sidebar${sidebarCollapsed ? ' notes-sidebar--collapsed' : ''}`}
         ref={sidebarRef}
-        style={{ width: `${sidebarWidth}px` }}
+        style={sidebarCollapsed ? {} : { width: `${sidebarWidth}px` }}
       >
-        <div
-          className="notes-sidebar-resizer"
-          onMouseDown={handleResizeMouseDown}
-        />
         <div className="notes-sidebar-header">
-          <span className="notes-header-label">NOTES</span>
-          <button className="notes-new-btn" onClick={createNewNote}>+ ADD</button>
+          {!sidebarCollapsed && <span className="notes-header-label">NOTES</span>}
+          {!sidebarCollapsed && <button className="notes-new-btn" onClick={createNewNote}>+ ADD</button>}
+          {!sidebarCollapsed && (
+            <div
+              className="notes-sidebar-resizer-handle"
+              onMouseDown={handleResizeMouseDown}
+              title="Drag to resize"
+            >⋮⋮</div>
+          )}
+          <button
+            className="notes-collapse-btn"
+            onClick={() => {
+              const next = !sidebarCollapsed;
+              setSidebarCollapsed(next);
+              localStorage.setItem('notesSidebarCollapsed', String(next));
+            }}
+            title={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
+          >
+            {sidebarCollapsed ? '»' : '«'}
+          </button>
         </div>
 
+        {!sidebarCollapsed && <div className="notes-sidebar-inner">
         <div className="notes-search">
           <input
             type="text"
@@ -571,6 +598,7 @@ function Notes() {
             ))
           )}
         </div>
+        </div>}
       </div>
 
       {/* Editor */}

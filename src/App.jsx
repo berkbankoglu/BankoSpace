@@ -57,6 +57,22 @@ function App() {
   const colResizeRef = useRef(null);
   const columnsRef = useRef(null);
 
+  // Reset column widths when window shrinks and saved px values no longer fit
+  useEffect(() => {
+    const container = columnsRef.current;
+    if (!container) return;
+    const ro = new ResizeObserver(() => {
+      setColWidths(prev => {
+        const hasFixed = prev.some(w => w !== null);
+        if (!hasFixed) return prev;
+        const total = prev.reduce((s, w) => s + (w || 0), 0);
+        if (total > container.clientWidth) return DEFAULT_COL_PX;
+        return prev;
+      });
+    });
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, []);
 
   const startColResize = (handleIdx, e) => {
     e.preventDefault();
