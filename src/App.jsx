@@ -111,10 +111,16 @@ function App() {
 
   // Supabase sync — uygulama açılınca çek, localStorage değişince yaz
   useEffect(() => {
-    // Aç: Supabase'den çek, sonra sayfayı yenile
-    pullFromSupabase().then(pulled => {
-      if (pulled) window.location.reload();
-    });
+    // Sadece ilk açılışta çek (reload yapma, sonsuz döngü olur)
+    const alreadySynced = sessionStorage.getItem('supabase_synced');
+    if (!alreadySynced) {
+      pullFromSupabase().then(pulled => {
+        if (pulled) {
+          sessionStorage.setItem('supabase_synced', '1');
+          window.location.reload();
+        }
+      });
+    }
 
     // localStorage.setItem'i intercept et, değişiklikleri Supabase'e yaz
     const origSetItem = localStorage.setItem.bind(localStorage);
