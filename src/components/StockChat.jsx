@@ -90,9 +90,12 @@ export default function StockChat({ session }) {
       return;
     }
 
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
     const { error } = await supabase.from('chat_messages').insert({
       channel,
-      user_id: session.user.id,
+      user_id: user.id,
       username,
       content: text.trim(),
     });
