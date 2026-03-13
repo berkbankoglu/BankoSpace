@@ -37,7 +37,10 @@ export default function Stocks({ session }) {
   return (
     <div className="stocks-root">
       <div className="stocks-market">
-        {/* Sol panel: fiyat listesi + portfolio */}
+        {/* Chat panel - en solda */}
+        <StockChat session={session} />
+
+        {/* Watchlist */}
         <div className="stocks-market-left">
           <div className="stc-bottom-tabs">
             <button className={`stc-bottom-tab ${bottomTab === 'prices' ? 'active' : ''}`} onClick={() => setBottomTab('prices')}>Prices</button>
@@ -66,9 +69,6 @@ export default function Stocks({ session }) {
             onSizeChange={() => {}}
           />
         </div>
-
-        {/* Chat panel */}
-        <StockChat session={session} />
       </div>
     </div>
   );
