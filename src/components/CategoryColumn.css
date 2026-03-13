@@ -117,6 +117,12 @@
   background: #30363d;
 }
 
+@keyframes cc-complete {
+  0%   { opacity: 1; transform: translateX(0) scaleY(1); max-height: 200px; }
+  30%  { opacity: 0.6; transform: translateX(8px) scaleY(0.98); }
+  100% { opacity: 0; transform: translateX(24px) scaleY(0.3); max-height: 0; margin-bottom: 0; padding-top: 0; padding-bottom: 0; }
+}
+
 /* Item */
 .cc-item {
   background: #1c2128;
@@ -130,6 +136,12 @@
   display: flex;
   flex-direction: column;
   gap: 5px;
+}
+
+.cc-item.completing {
+  animation: cc-complete 0.4s ease-in forwards;
+  pointer-events: none;
+  overflow: hidden;
 }
 
 .cc-item:hover {
