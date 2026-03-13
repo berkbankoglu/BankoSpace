@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
+import { flushSync } from 'react-dom';
 
 function TodoItem({ todo, index, onToggle, onDelete, onAddSubtask, onToggleSubtask, onDeleteSubtask, draggable, onDragStart, onDragOver, onDrop, onDragEnd, isDragging, onMoveUp, onMoveDown, isFirst, isLast }) {
   const [isDeleting, setIsDeleting] = useState(false);
@@ -6,12 +7,6 @@ function TodoItem({ todo, index, onToggle, onDelete, onAddSubtask, onToggleSubta
   const [subtaskText, setSubtaskText] = useState('');
   const [showSubtasks, setShowSubtasks] = useState(true);
   const subtaskInputRef = useRef(null);
-
-  useEffect(() => {
-    if (showSubtaskInput && subtaskInputRef.current) {
-      subtaskInputRef.current.focus();
-    }
-  }, [showSubtaskInput]);
 
   const handleToggle = () => {
     if (!todo.completed) {
@@ -134,7 +129,11 @@ function TodoItem({ todo, index, onToggle, onDelete, onAddSubtask, onToggleSubta
             <span className="created-date">{formatDate(todo.createdAt)}</span>
             <button
               className="subtask-toggle-btn"
-              onClick={() => setShowSubtaskInput(!showSubtaskInput)}
+              onClick={() => {
+                const next = !showSubtaskInput;
+                flushSync(() => setShowSubtaskInput(next));
+                if (next) subtaskInputRef.current?.focus();
+              }}
               title="Add subtask"
             >
               +
@@ -153,16 +152,15 @@ function TodoItem({ todo, index, onToggle, onDelete, onAddSubtask, onToggleSubta
         </div>
       </div>
 
-      {showSubtaskInput && (
-        <div className="subtask-input-container">
+      <div className="subtask-input-container" style={{ display: showSubtaskInput ? undefined : 'none' }}>
           <input
             type="text"
             className="subtask-input"
             placeholder="New subtask..."
             value={subtaskText}
+            ref={subtaskInputRef}
             onChange={(e) => setSubtaskText(e.target.value)}
             onKeyDown={handleSubtaskKeyPress}
-            ref={subtaskInputRef}
           />
           <button className="subtask-add-btn" onClick={handleAddSubtask}>Add</button>
           <button
@@ -174,8 +172,7 @@ function TodoItem({ todo, index, onToggle, onDelete, onAddSubtask, onToggleSubta
           >
             Cancel
           </button>
-        </div>
-      )}
+      </div>
 
       {hasSubtasks && showSubtasks && (
         <ul className="subtask-list">
