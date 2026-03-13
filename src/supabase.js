@@ -36,12 +36,22 @@ export const SYNC_KEYS = [
   'soundVolume',
 ];
 
+// Mevcut kullanıcı ID'sini al
+async function getUserId() {
+  const { data: { user } } = await supabase.auth.getUser();
+  return user?.id || null;
+}
+
 // Supabase'den tüm veriyi çek ve localStorage'a yaz
 export async function pullFromSupabase() {
   try {
+    const userId = await getUserId();
+    if (!userId) return false;
+
     const { data, error } = await supabase
       .from('user_data')
-      .select('key, value');
+      .select('key, value')
+      .eq('user_id', userId);
 
     if (error) throw error;
 
@@ -64,13 +74,16 @@ export async function pullFromSupabase() {
 export async function pushKeyToSupabase(key, value) {
   if (!SYNC_KEYS.includes(key)) return;
   try {
+    const userId = await getUserId();
+    if (!userId) return;
+
     let parsed;
     try { parsed = typeof value === 'string' ? JSON.parse(value) : value; }
     catch { parsed = value; }
 
     await supabase
       .from('user_data')
-      .upsert({ key, value: parsed, updated_at: new Date().toISOString() });
+      .upsert({ user_id: userId, key, value: parsed, updated_at: new Date().toISOString() });
   } catch (e) {
     console.error('Supabase push error:', e);
   }
@@ -78,13 +91,16 @@ export async function pushKeyToSupabase(key, value) {
 
 // Tüm localStorage'ı Supabase'e yükle (ilk kurulum)
 export async function pushAllToSupabase() {
+  const userId = await getUserId();
+  if (!userId) return;
+
   const rows = SYNC_KEYS
     .filter(key => localStorage.getItem(key) !== null)
     .map(key => {
       let value;
       try { value = JSON.parse(localStorage.getItem(key)); }
       catch { value = localStorage.getItem(key); }
-      return { key, value, updated_at: new Date().toISOString() };
+      return { user_id: userId, key, value, updated_at: new Date().toISOString() };
     });
 
   if (rows.length === 0) return;

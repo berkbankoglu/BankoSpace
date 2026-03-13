@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import './App.css';
-import { pullFromSupabase, pushKeyToSupabase, pushAllToSupabase, SYNC_KEYS } from './supabase';
+import { supabase, pullFromSupabase, pushKeyToSupabase, pushAllToSupabase, SYNC_KEYS } from './supabase';
+import Login from './components/Login';
 import CategoryColumn from './components/CategoryColumn';
 import ReferencePanel from './components/ReferencePanel';
 import Timer from './components/Timer';
@@ -21,7 +22,7 @@ const APP_VERSION = '3.0.0';
 const MIN_COL_PX = 220;
 const DEFAULT_COL_PX = [null, null, null]; // [dailyPx, weeklyPx, monthlyPx] — null = auto (flex:1)
 
-function App() {
+function App({ session, onLogout }) {
   // Check if this is a popup window
   const popupType = new URLSearchParams(window.location.search).get('popup');
 
@@ -109,8 +110,9 @@ function App() {
   const [updateAvailable, setUpdateAvailable] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  // Supabase sync — sadece sync aktifse çalışır
+  // Supabase sync — oturum açıksa ve sync aktifse çalışır
   useEffect(() => {
+    if (!session) return;
     const syncEnabled = localStorage.getItem('supabase_sync_enabled') === '1';
     if (!syncEnabled) return;
 
@@ -135,7 +137,7 @@ function App() {
     return () => {
       localStorage.setItem = origSetItem;
     };
-  }, []);
+  }, [session]);
 
   // Auto-update check
   useEffect(() => {
@@ -1370,7 +1372,21 @@ function App() {
               </div>
               <div className="sidebar-settings-divider" />
               <div className="sidebar-settings-section">
-                <div className="sidebar-settings-pages-label">Cloud Sync</div>
+                <div className="sidebar-settings-pages-label">Hesap</div>
+                {session && (
+                  <div className="sidebar-settings-row" style={{marginBottom:'8px'}}>
+                    <span className="sidebar-settings-label" style={{fontSize:'11px',color:'#7d8590',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:'160px'}}>{session.user?.email}</span>
+                    <button
+                      className="sidebar-settings-action-btn"
+                      style={{fontSize:'12px',color:'#f85149'}}
+                      onClick={async () => {
+                        await supabase.auth.signOut();
+                        if (onLogout) onLogout();
+                      }}
+                    >Çıkış</button>
+                  </div>
+                )}
+                <div className="sidebar-settings-pages-label" style={{marginTop:'4px'}}>Cloud Sync</div>
                 <div className="sidebar-settings-row">
                   <span className="sidebar-settings-label" style={{fontSize:'12px',color: localStorage.getItem('supabase_sync_enabled')==='1' ? '#4f86f7' : '#484f58'}}>
                     {localStorage.getItem('supabase_sync_enabled')==='1' ? 'Sync aktif' : 'Sync kapalı'}
@@ -1955,4 +1971,36 @@ function TimerPopupWrapper({ isCompact: initialCompact = false }) {
 
 
 
-export default App;
+function AppWrapper() {
+  const [session, setSession] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setAuthLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (authLoading) {
+    return (
+      <div style={{ width: '100vw', height: '100vh', background: '#0d1117', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ color: '#7d8590', fontSize: '14px' }}>Yükleniyor...</div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <Login onLogin={(s) => setSession(s)} />;
+  }
+
+  return <App session={session} onLogout={() => setSession(null)} />;
+}
+
+export default AppWrapper;
