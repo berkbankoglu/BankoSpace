@@ -20,6 +20,7 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
   const [draggingSubtask, setDraggingSubtask] = useState(null); // { todoId, subtaskId, index }
   const [dragOverSubtask, setDragOverSubtask] = useState(null); // { todoId, index }
   const [pressedSubtaskId, setPressedSubtaskId] = useState(null);
+  const [completingIds, setCompletingIds] = useState(new Set());
   const inputRef = useRef(null);
   const editInputRef = useRef(null);
   const editSubtaskInputRef = useRef(null);
@@ -217,13 +218,23 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
           <div
             key={todo.id}
             data-todo-id={todo.id}
-            className={`cc-item ${todo.completed ? 'completed' : ''} ${draggingTodo && draggingTodo.todo.id === todo.id ? 'dragging' : ''} ${dragOverTodoId && String(dragOverTodoId) === String(todo.id) ? 'drag-target' : ''}`}
+            className={`cc-item ${todo.completed ? 'completed' : ''} ${completingIds.has(todo.id) ? 'completing' : ''} ${draggingTodo && draggingTodo.todo.id === todo.id ? 'dragging' : ''} ${dragOverTodoId && String(dragOverTodoId) === String(todo.id) ? 'drag-target' : ''}`}
           >
             {/* Top row: drag handle + checkbox + actions */}
             <div className="cc-item-top">
               <div className="cc-drag-handle" title="Surukle" onMouseDown={(e) => onTodoDragStart(e, todo)}>⠿</div>
               <label className="cc-inline-check" onClick={e => e.stopPropagation()}>
-                <input type="checkbox" className="cc-checkbox" checked={todo.completed} onChange={() => onToggleTodo(todo.id)} />
+                <input type="checkbox" className="cc-checkbox" checked={todo.completed} onChange={() => {
+                  if (!todo.completed) {
+                    setCompletingIds(prev => new Set(prev).add(todo.id));
+                    setTimeout(() => {
+                      onToggleTodo(todo.id);
+                      setCompletingIds(prev => { const n = new Set(prev); n.delete(todo.id); return n; });
+                    }, 400);
+                  } else {
+                    onToggleTodo(todo.id);
+                  }
+                }} />
                 <span className="cc-checkmark"></span>
               </label>
               <div className="cc-item-actions">
