@@ -1747,7 +1747,7 @@ function App({ session, onLogout }) {
           {/* Stocks View */}
           {activeView === 'stocks' && (
             <div className="stocks-fullscreen">
-              <Stocks />
+              <Stocks session={session} />
             </div>
           )}
 
