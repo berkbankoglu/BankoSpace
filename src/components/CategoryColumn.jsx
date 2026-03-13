@@ -80,6 +80,7 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
   };
 
   const toggleExpand = (todoId) => {
+    const isOpening = !expandedTodos.has(todoId);
     setExpandedTodos(prev => {
       const next = new Set(prev);
       if (next.has(todoId)) next.delete(todoId);
@@ -87,6 +88,12 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
       return next;
     });
     setSubtaskInputs(prev => ({ ...prev, [todoId]: '' }));
+    if (isOpening) {
+      setTimeout(() => {
+        const el = document.querySelector(`[data-todo-id="${todoId}"] .cc-subtask-input`);
+        if (el) el.focus();
+      }, 0);
+    }
   };
 
   const handleAddSubtask = (todoId) => {
@@ -151,7 +158,10 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
 
   const isDragOver = draggingTodo && dragOverCategory === category && draggingTodo.todo.category !== category;
 
-  const sortedTodos = [...todos].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  const sortedTodos = [...todos].sort((a, b) => {
+    if (a.order !== undefined && b.order !== undefined) return a.order - b.order;
+    return (b.createdAt || 0) - (a.createdAt || 0);
+  });
 
   return (
     <div
@@ -265,7 +275,7 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
                   autoFocus
                 />
               ) : (
-                <span className="cc-text">{todo.text}</span>
+                <span className="cc-text" onDoubleClick={() => { setEditingTodoId(todo.id); setEditingTodoText(todo.text); }}>{todo.text}</span>
               )}
             </label>
 

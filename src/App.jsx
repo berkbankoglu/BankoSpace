@@ -295,6 +295,7 @@ function App({ session, onLogout }) {
     return saved === 'true';
   });
   const [todoFontSize, setTodoFontSize] = useState(() => localStorage.getItem('todoFontSize') || 'M');
+  const [subtaskFontSize, setSubtaskFontSize] = useState(() => localStorage.getItem('subtaskFontSize') || 'M');
   const [fontSizeOpen, setFontSizeOpen] = useState(false);
   const fontSizeMap = { S: '11px', M: '13px', L: '16px' };
   const [timerWidgetOpen, setTimerWidgetOpen] = useState(false);
@@ -882,22 +883,30 @@ function App({ session, onLogout }) {
       });
       todoPositionsRef.current = oldPositions;
 
-      // Swap the two todos
+      // Reorder: insert dragged item at target position
       playClickSound();
       setTodos(prev => {
         const dragItem = prev.find(t => String(t.id) === String(dragId));
         const targetItem = prev.find(t => String(t.id) === String(overTodoId));
         if (!dragItem || !targetItem) return prev;
 
-        return prev.map(t => {
-          if (String(t.id) === String(dragId)) {
-            return { ...t, order: targetItem.order, category: targetItem.category };
-          }
-          if (String(t.id) === String(overTodoId)) {
-            return { ...t, order: dragItem.order, category: dragItem.category };
-          }
-          return t;
-        });
+        const category = targetItem.category;
+        const categoryTodos = prev
+          .filter(t => t.category === category)
+          .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+        const fromIdx = categoryTodos.findIndex(t => String(t.id) === String(dragId));
+        const toIdx = categoryTodos.findIndex(t => String(t.id) === String(overTodoId));
+
+        const reordered = [...categoryTodos];
+        const [moved] = reordered.splice(fromIdx !== -1 ? fromIdx : reordered.length, 1);
+        const insertItem = moved || { ...dragItem };
+        reordered.splice(toIdx, 0, insertItem);
+
+        const updatedCategory = reordered.map((t, i) => ({ ...t, order: i, category }));
+        const others = prev.filter(t => t.category !== category && String(t.id) !== String(dragId));
+
+        return [...updatedCategory, ...others];
       });
     } else if (overCategory && overCategory !== draggingTodo.todo.category) {
       // Dropped on empty area of a different column - move to that column
@@ -1672,7 +1681,7 @@ function App({ session, onLogout }) {
 
           {/* Dashboard View */}
           {activeView === 'dashboard' && (
-          <div className="dashboard-container" style={{ '--todo-font-size': fontSizeMap[todoFontSize] }}>
+          <div className="dashboard-container" style={{ '--todo-font-size': fontSizeMap[todoFontSize], '--subtask-font-size': fontSizeMap[subtaskFontSize] }}>
             {/* Dashboard Header */}
             <div className="dashboard-header">
               <h1 className="dashboard-title">Dashboard</h1>
@@ -1685,11 +1694,20 @@ function App({ session, onLogout }) {
                   >{todoFontSize}</button>
                   {fontSizeOpen && (
                     <div className="font-size-dropdown">
+                      <div style={{fontSize:'10px',color:'#7d8590',padding:'4px 8px 2px',borderBottom:'1px solid #30363d',marginBottom:'2px'}}>Başlık</div>
                       {['S', 'M', 'L'].map(s => (
                         <button
                           key={s}
                           className={`font-size-option ${todoFontSize === s ? 'active' : ''}`}
                           onClick={() => { setTodoFontSize(s); localStorage.setItem('todoFontSize', s); setFontSizeOpen(false); }}
+                        >{s}</button>
+                      ))}
+                      <div style={{fontSize:'10px',color:'#7d8590',padding:'6px 8px 2px',borderTop:'1px solid #30363d',borderBottom:'1px solid #30363d',margin:'2px 0'}}>Subtask</div>
+                      {['S', 'M', 'L'].map(s => (
+                        <button
+                          key={'sub-'+s}
+                          className={`font-size-option ${subtaskFontSize === s ? 'active' : ''}`}
+                          onClick={() => { setSubtaskFontSize(s); localStorage.setItem('subtaskFontSize', s); setFontSizeOpen(false); }}
                         >{s}</button>
                       ))}
                     </div>
