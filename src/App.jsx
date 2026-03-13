@@ -110,19 +110,15 @@ function App({ session, onLogout }) {
   const [updateAvailable, setUpdateAvailable] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  // Supabase sync — oturum açıksa ve sync aktifse çalışır
+  // Supabase sync — oturum açıksa otomatik aktif
   useEffect(() => {
     if (!session) return;
-    const syncEnabled = localStorage.getItem('supabase_sync_enabled') === '1';
-    if (!syncEnabled) return;
 
     const alreadySynced = sessionStorage.getItem('supabase_synced');
     if (!alreadySynced) {
       pullFromSupabase().then(pulled => {
-        if (pulled) {
-          sessionStorage.setItem('supabase_synced', '1');
-          window.location.reload();
-        }
+        sessionStorage.setItem('supabase_synced', '1');
+        if (pulled) window.location.reload();
       });
     }
 
