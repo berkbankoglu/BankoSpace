@@ -2,6 +2,7 @@ import { useState } from 'react';
 import StockChart from './StockChart';
 import StockNews from './StockNews';
 import Portfolio from './Portfolio';
+import StockChat from './StockChat';
 import './Stocks.css';
 
 function makeGroup(name, tickers = []) {
@@ -20,7 +21,7 @@ function loadGroups() {
   return [makeGroup('Watchlist', [])];
 }
 
-export default function Stocks() {
+export default function Stocks({ session }) {
   const [bottomTab, setBottomTab] = useState('prices');
   const [stockTickers, setStockTickers] = useState(() => {
     try { return JSON.parse(localStorage.getItem('stock_tickers')) || ['NBIS']; } catch { return ['NBIS']; }
@@ -65,6 +66,9 @@ export default function Stocks() {
             onSizeChange={() => {}}
           />
         </div>
+
+        {/* Chat panel */}
+        <StockChat session={session} />
       </div>
     </div>
   );
