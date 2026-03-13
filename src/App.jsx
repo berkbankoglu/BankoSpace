@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import './App.css';
+import { pullFromSupabase, pushKeyToSupabase, pushAllToSupabase, SYNC_KEYS } from './supabase';
 import CategoryColumn from './components/CategoryColumn';
 import ReferencePanel from './components/ReferencePanel';
 import Timer from './components/Timer';
@@ -107,6 +108,27 @@ function App() {
   const [showUpdateWarning, setShowUpdateWarning] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
+
+  // Supabase sync — uygulama açılınca çek, localStorage değişince yaz
+  useEffect(() => {
+    // Aç: Supabase'den çek, sonra sayfayı yenile
+    pullFromSupabase().then(pulled => {
+      if (pulled) window.location.reload();
+    });
+
+    // localStorage.setItem'i intercept et, değişiklikleri Supabase'e yaz
+    const origSetItem = localStorage.setItem.bind(localStorage);
+    localStorage.setItem = function(key, value) {
+      origSetItem(key, value);
+      if (SYNC_KEYS.includes(key)) {
+        pushKeyToSupabase(key, value);
+      }
+    };
+
+    return () => {
+      localStorage.setItem = origSetItem;
+    };
+  }, []);
 
   // Auto-update check
   useEffect(() => {
@@ -1337,6 +1359,21 @@ function App() {
                       else localStorage.removeItem('anthropic_api_key');
                     }}
                   />
+                </div>
+              </div>
+              <div className="sidebar-settings-divider" />
+              <div className="sidebar-settings-section">
+                <div className="sidebar-settings-pages-label">Cloud Sync</div>
+                <div className="sidebar-settings-row">
+                  <span className="sidebar-settings-label" style={{fontSize:'12px',color:'#484f58'}}>Supabase aktif</span>
+                  <button
+                    className="sidebar-settings-action-btn"
+                    style={{fontSize:'12px'}}
+                    onClick={async () => {
+                      await pushAllToSupabase();
+                      alert('Tüm veriler Supabase\'e yüklendi!');
+                    }}
+                  >Şimdi Sync Et</button>
                 </div>
               </div>
               <div className="sidebar-settings-divider" />

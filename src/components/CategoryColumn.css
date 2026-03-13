@@ -19,8 +19,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
-  padding-bottom: 12px;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
   border-bottom: 1px solid #21262d;
 }
 
@@ -64,7 +64,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 12px;
+  margin-bottom: 6px;
 }
 
 .cc-progress-bar {
@@ -226,7 +226,7 @@
 }
 
 .cc-checkbox:checked + .cc-checkmark {
-  background: #7ee787;
+  background: #4f86f7;
   border-color: transparent;
 }
 
