@@ -1,10 +1,17 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 function TodoItem({ todo, index, onToggle, onDelete, onAddSubtask, onToggleSubtask, onDeleteSubtask, draggable, onDragStart, onDragOver, onDrop, onDragEnd, isDragging, onMoveUp, onMoveDown, isFirst, isLast }) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showSubtaskInput, setShowSubtaskInput] = useState(false);
   const [subtaskText, setSubtaskText] = useState('');
   const [showSubtasks, setShowSubtasks] = useState(true);
+  const subtaskInputRef = useRef(null);
+
+  useEffect(() => {
+    if (showSubtaskInput && subtaskInputRef.current) {
+      subtaskInputRef.current.focus();
+    }
+  }, [showSubtaskInput]);
 
   const handleToggle = () => {
     if (!todo.completed) {
@@ -155,7 +162,7 @@ function TodoItem({ todo, index, onToggle, onDelete, onAddSubtask, onToggleSubta
             value={subtaskText}
             onChange={(e) => setSubtaskText(e.target.value)}
             onKeyDown={handleSubtaskKeyPress}
-            autoFocus
+            ref={subtaskInputRef}
           />
           <button className="subtask-add-btn" onClick={handleAddSubtask}>Add</button>
           <button
