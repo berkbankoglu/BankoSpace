@@ -1,9 +1,12 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../supabase';
 import './StockChat.css';
 
 const MAX_MSG = 200;
 const CHANNEL_REGEX = /^[a-z0-9_-]{1,20}$/;
+const MIN_WIDTH = 180;
+const MAX_WIDTH = 480;
+const DEFAULT_WIDTH = 240;
 
 function timeAgo(dateStr) {
   const d = new Date(dateStr);
@@ -31,9 +34,14 @@ export default function StockChat({ session }) {
   const [usernameSet, setUsernameSet] = useState(false);
   const [usernameInput, setUsernameInput] = useState('');
   const [collapsed, setCollapsed] = useState(false);
+  const [width, setWidth] = useState(() => {
+    const saved = parseInt(localStorage.getItem('chat_width'));
+    return (saved >= MIN_WIDTH && saved <= MAX_WIDTH) ? saved : DEFAULT_WIDTH;
+  });
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
   const channelRef = useRef(channel);
+  const myUserIdRef = useRef(null);
   channelRef.current = channel;
 
   // Load saved username
@@ -41,6 +49,11 @@ export default function StockChat({ session }) {
     const saved = localStorage.getItem('chat_username');
     if (saved) { setUsername(saved); setUsernameSet(true); }
   }, []);
+
+  // Store own user id
+  useEffect(() => {
+    if (session?.user?.id) myUserIdRef.current = session.user.id;
+  }, [session]);
 
   // Fetch messages + realtime subscription
   useEffect(() => {
@@ -57,11 +70,11 @@ export default function StockChat({ session }) {
       .then(({ data }) => {
         if (data) setMessages(data);
         setLoading(false);
-        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'instant' }), 50);
       });
 
     const sub = supabase
-      .channel(`chat:${channel}`)
+      .channel(`chat-${channel}-${Date.now()}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
@@ -69,7 +82,9 @@ export default function StockChat({ session }) {
         filter: `channel=eq.${channel}`,
       }, (payload) => {
         if (channelRef.current !== channel) return;
-        setMessages(prev => [...prev.slice(-MAX_MSG + 1), payload.new]);
+        // Skip own messages — already added optimistically
+        if (payload.new.user_id === myUserIdRef.current) return;
+        setMessages(prev => [...prev.slice(-(MAX_MSG - 1)), payload.new]);
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
       })
       .subscribe();
@@ -80,26 +95,43 @@ export default function StockChat({ session }) {
   const sendMessage = async (text) => {
     if (!text.trim() || !session) return;
 
-    // /join <channel> command
+    // /join command
     if (text.startsWith('/join ')) {
       const ch = text.slice(6).trim().toLowerCase();
-      if (CHANNEL_REGEX.test(ch)) {
-        setChannel(ch);
-        setInput('');
-      }
+      if (CHANNEL_REGEX.test(ch)) { setChannel(ch); setInput(''); }
       return;
     }
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { error } = await supabase.from('chat_messages').insert({
+    // Optimistic: add message immediately
+    const optimistic = {
+      id: `opt-${Date.now()}`,
       channel,
       user_id: user.id,
       username,
       content: text.trim(),
-    });
-    if (!error) setInput('');
+      created_at: new Date().toISOString(),
+    };
+    setMessages(prev => [...prev.slice(-(MAX_MSG - 1)), optimistic]);
+    setInput('');
+    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+
+    const { data, error } = await supabase.from('chat_messages').insert({
+      channel,
+      user_id: user.id,
+      username,
+      content: text.trim(),
+    }).select().single();
+
+    if (!error && data) {
+      // Replace optimistic with real
+      setMessages(prev => prev.map(m => m.id === optimistic.id ? data : m));
+    } else if (error) {
+      // Remove optimistic on error
+      setMessages(prev => prev.filter(m => m.id !== optimistic.id));
+    }
   };
 
   const handleKeyDown = (e) => {
@@ -117,6 +149,25 @@ export default function StockChat({ session }) {
     setUsernameSet(true);
   };
 
+  // Resize drag
+  const startResize = useCallback((e) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = width;
+    const onMove = (ev) => {
+      const delta = ev.clientX - startX;
+      const newW = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, startW + delta));
+      setWidth(newW);
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      setWidth(w => { localStorage.setItem('chat_width', String(w)); return w; });
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, [width]);
+
   if (collapsed) {
     return (
       <div className="schat-collapsed" onClick={() => setCollapsed(false)}>
@@ -128,10 +179,9 @@ export default function StockChat({ session }) {
 
   if (!session) {
     return (
-      <div className="schat-root">
-        <div className="schat-header">
-          <span className="schat-title">💬 Chat</span>
-        </div>
+      <div className="schat-root" style={{ width }}>
+        <div className="schat-resize-handle" onMouseDown={startResize} />
+        <div className="schat-header"><span className="schat-title">💬 Chat</span></div>
         <div className="schat-no-session">Sohbet için giriş yapman gerekiyor</div>
       </div>
     );
@@ -139,10 +189,9 @@ export default function StockChat({ session }) {
 
   if (!usernameSet) {
     return (
-      <div className="schat-root">
-        <div className="schat-header">
-          <span className="schat-title">💬 Chat</span>
-        </div>
+      <div className="schat-root" style={{ width }}>
+        <div className="schat-resize-handle" onMouseDown={startResize} />
+        <div className="schat-header"><span className="schat-title">💬 Chat</span></div>
         <div className="schat-username-setup">
           <div className="schat-username-title">Kullanıcı adını seç</div>
           <div className="schat-username-sub">Diğer kullanıcılar bu ismi görecek</div>
@@ -162,7 +211,10 @@ export default function StockChat({ session }) {
   }
 
   return (
-    <div className="schat-root">
+    <div className="schat-root" style={{ width }}>
+      {/* Resize handle - sağ kenar */}
+      <div className="schat-resize-handle" onMouseDown={startResize} />
+
       {/* Header */}
       <div className="schat-header">
         <div className="schat-header-left">
@@ -193,10 +245,7 @@ export default function StockChat({ session }) {
             <div key={msg.id} className={`schat-msg ${!showHeader ? 'schat-msg-cont' : ''}`}>
               {showHeader && (
                 <div className="schat-msg-header">
-                  <div
-                    className="schat-avatar"
-                    style={{ background: getAvatarColor(msg.username) }}
-                  >
+                  <div className="schat-avatar" style={{ background: getAvatarColor(msg.username) }}>
                     {msg.username[0].toUpperCase()}
                   </div>
                   <span className="schat-msg-user">{msg.username}</span>
@@ -217,7 +266,7 @@ export default function StockChat({ session }) {
         <input
           ref={inputRef}
           className="schat-input"
-          placeholder={`#${channel} — /join <kanal> ile geç`}
+          placeholder={`#${channel} — /join <kanal>`}
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
