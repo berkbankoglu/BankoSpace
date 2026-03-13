@@ -191,7 +191,7 @@ function App({ session, onLogout }) {
 
   const [showSettings, setShowSettings] = useState(false);
   const [showSidebarSettings, setShowSidebarSettings] = useState(false);
-  const [settingsClosing, setSettingsClosing] = useState(false);
+  const [settingsTab, setSettingsTab] = useState('account');
   const [soundVolume, setSoundVolume] = useState(() => getVolume());
   const [activeView, setActiveView] = useState('dashboard');
   const [sidebarItems, setSidebarItems] = useState(() => {
@@ -271,7 +271,7 @@ function App({ session, onLogout }) {
     const saved = localStorage.getItem('todos');
     return saved ? JSON.parse(saved) : [];
   });
-  const [currentFilter, setCurrentFilter] = useState('active');
+  const currentFilter = 'active';
   const [theme, setTheme] = useState(() => {
     const saved = localStorage.getItem('theme');
     return saved || 'dark';
@@ -551,27 +551,9 @@ function App({ session, onLogout }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showSettings]);
 
-  // Animated close for sidebar settings
   const closeSidebarSettings = () => {
-    if (!showSidebarSettings || settingsClosing) return;
-    setSettingsClosing(true);
-    setTimeout(() => {
-      setShowSidebarSettings(false);
-      setSettingsClosing(false);
-    }, 220);
+    setShowSidebarSettings(false);
   };
-
-  // Close sidebar settings when clicking outside
-  useEffect(() => {
-    if (!showSidebarSettings) return;
-    const handleClick = (e) => {
-      if (!e.target.closest('.sidebar-settings-dropdown') && !e.target.closest('.sidebar-gear-btn')) {
-        closeSidebarSettings();
-      }
-    };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [showSidebarSettings, settingsClosing]);
 
   // Ctrl+Z undo
   useEffect(() => {
@@ -1276,13 +1258,61 @@ function App({ session, onLogout }) {
       {/* Custom Title Bar */}
       <div
         className="custom-titlebar"
-        onDoubleClick={(e) => {
-          if (e.target.closest('.titlebar-controls') === null) {
-            maximizeWindow();
-          }
-        }}
       >
-        <div className="titlebar-title">BankoSpace</div>
+        <div className="titlebar-left">
+          <button className="titlebar-nav-btn" onClick={() => toggleTheme()} title={theme === 'dark' ? 'Beyaz mod' : 'Siyah mod'}>
+            {theme === 'dark' ? '☀' : '🌙'}
+          </button>
+          <button className="titlebar-nav-btn" onClick={() => { playClickSound(); setShowSidebarSettings(s => !s); setSettingsTab('account'); }} title="Settings">
+            ⚙
+          </button>
+        </div>
+        {activeView === 'dashboard' && (
+          <div className="titlebar-filters">
+            <div className="titlebar-filters-left">
+              <div className="font-size-control" style={{ position: 'relative' }}>
+                <button
+                  className="dashboard-timer-toggle-btn font-size-trigger"
+                  onClick={() => setFontSizeOpen(o => !o)}
+                  title="Font size"
+                ><span className="font-size-icon">T</span></button>
+                {fontSizeOpen && (
+                  <div className="font-size-dropdown">
+                    <div style={{fontSize:'10px',color:'#7d8590',padding:'4px 8px 2px',borderBottom:'1px solid #30363d',marginBottom:'2px'}}>Başlık</div>
+                    {['S', 'M', 'L'].map(s => (
+                      <button
+                        key={s}
+                        className={`font-size-option ${todoFontSize === s ? 'active' : ''}`}
+                        onClick={() => { setTodoFontSize(s); localStorage.setItem('todoFontSize', s); setFontSizeOpen(false); }}
+                      >{s}</button>
+                    ))}
+                    <div style={{fontSize:'10px',color:'#7d8590',padding:'6px 8px 2px',borderTop:'1px solid #30363d',borderBottom:'1px solid #30363d',margin:'2px 0'}}>Subtask</div>
+                    {['S', 'M', 'L'].map(s => (
+                      <button
+                        key={'sub-'+s}
+                        className={`font-size-option ${subtaskFontSize === s ? 'active' : ''}`}
+                        onClick={() => { setSubtaskFontSize(s); localStorage.setItem('subtaskFontSize', s); setFontSizeOpen(false); }}
+                      >{s}</button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <button
+                ref={timerBtnRef}
+                className="dashboard-timer-toggle-btn"
+                onClick={async () => {
+                  playClickSound();
+                  const { invoke } = await import('@tauri-apps/api/core');
+                  await invoke('toggle_timer_window');
+                }}
+                title="Timer"
+              >
+                ⏱
+              </button>
+            </div>
+          </div>
+        )}
+        <div className="titlebar-drag-region" data-tauri-drag-region onDoubleClick={maximizeWindow} />
         <div className="titlebar-controls">
           <button className="titlebar-btn minimize" onClick={minimizeWindow}>─</button>
           <button className="titlebar-btn maximize" onClick={maximizeWindow}>□</button>
@@ -1338,165 +1368,211 @@ function App({ session, onLogout }) {
               {!sidebarCollapsed && <span>BankoSpace</span>}
             </div>
             <div className="sidebar-header-actions">
-              {!sidebarCollapsed && (
-                <button
-                  className="sidebar-gear-btn"
-                  onClick={(e) => { e.stopPropagation(); playClickSound(); if (showSidebarSettings) { closeSidebarSettings(); } else { setShowSidebarSettings(true); } }}
-                  title="Settings"
-                >
-                  ⚙
-                </button>
-              )}
               <button
                 className="sidebar-toggle"
-                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                onClick={() => { setSidebarCollapsed(c => !c); setColWidths([null, null, null]); }}
               >
                 {sidebarCollapsed ? '»' : '«'}
               </button>
             </div>
           </div>
 
-          {/* Sidebar Settings Dropdown */}
-          {showSidebarSettings && !sidebarCollapsed && (
-            <div className={`sidebar-settings-dropdown ${settingsClosing ? 'closing' : ''}`} onClick={(e) => e.stopPropagation()}>
-              <div className="sidebar-settings-section">
-                <div className="sidebar-settings-pages-label">Anthropic API Key</div>
-                <div className="sidebar-apikey-row">
-                  <input
-                    type="password"
-                    className="sidebar-apikey-input"
-                    defaultValue={localStorage.getItem('anthropic_api_key') || ''}
-                    placeholder="sk-ant-..."
-                    onBlur={e => {
-                      const val = e.target.value.trim();
-                      if (val) localStorage.setItem('anthropic_api_key', val);
-                      else localStorage.removeItem('anthropic_api_key');
-                    }}
-                  />
-                </div>
-              </div>
-              <div className="sidebar-settings-divider" />
-              <div className="sidebar-settings-section">
-                <div className="sidebar-settings-pages-label">Hesap</div>
-                {session && (
-                  <div className="sidebar-settings-row" style={{marginBottom:'8px'}}>
-                    <span className="sidebar-settings-label" style={{fontSize:'11px',color:'#7d8590',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:'160px'}}>{session.user?.email}</span>
-                    <button
-                      className="sidebar-settings-action-btn"
-                      style={{fontSize:'12px',color:'#f85149'}}
-                      onClick={async () => {
-                        await supabase.auth.signOut();
-                        if (onLogout) onLogout();
-                      }}
-                    >Çıkış</button>
-                  </div>
-                )}
-                <div className="sidebar-settings-pages-label" style={{marginTop:'4px'}}>Cloud Sync</div>
-                <div className="sidebar-settings-row">
-                  <span className="sidebar-settings-label" style={{fontSize:'12px',color: localStorage.getItem('supabase_sync_enabled')==='1' ? '#4f86f7' : '#484f58'}}>
-                    {localStorage.getItem('supabase_sync_enabled')==='1' ? 'Sync aktif' : 'Sync kapalı'}
-                  </span>
-                  <div style={{display:'flex',gap:'6px'}}>
-                    <button
-                      className="sidebar-settings-action-btn"
-                      style={{fontSize:'12px'}}
-                      onClick={() => {
-                        const isOn = localStorage.getItem('supabase_sync_enabled') === '1';
-                        if (isOn) {
-                          localStorage.removeItem('supabase_sync_enabled');
-                        } else {
-                          localStorage.setItem('supabase_sync_enabled', '1');
-                        }
-                        window.location.reload();
-                      }}
-                    >{localStorage.getItem('supabase_sync_enabled')==='1' ? 'Kapat' : 'Aç'}</button>
-                    {localStorage.getItem('supabase_sync_enabled')==='1' && (
-                      <button
-                        className="sidebar-settings-action-btn"
-                        style={{fontSize:'12px'}}
-                        onClick={async () => {
-                          await pushAllToSupabase();
-                          alert('Tüm veriler Supabase\'e yüklendi!');
-                        }}
-                      >Sync Et</button>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className="sidebar-settings-divider" />
-              <div className="sidebar-settings-section">
-                <div className="sidebar-settings-row">
-                  <span className="sidebar-settings-label">Volume</span>
-                  <div className="sidebar-settings-right">
-                    <button
-                      className={`sidebar-mute-btn ${soundVolume === 0 ? 'muted' : ''}`}
-                      onClick={() => {
-                        if (soundVolume > 0) {
-                          localStorage.setItem('soundVolumePrev', String(soundVolume));
-                          setSoundVolume(0);
-                          setVolume(0);
-                        } else {
-                          const prev = parseFloat(localStorage.getItem('soundVolumePrev') || '0.7');
-                          setSoundVolume(prev);
-                          setVolume(prev);
-                          playClickSound();
-                        }
-                      }}
-                      title={soundVolume === 0 ? 'Unmute' : 'Mute'}
-                    >
-                      {soundVolume === 0 ? '🔇' : soundVolume < 0.4 ? '🔉' : '🔊'}
+          {/* Settings Modal - Notion Style */}
+          {showSidebarSettings && (
+            <div className="settings-modal-overlay" onClick={closeSidebarSettings}>
+              <div className="settings-modal" onClick={e => e.stopPropagation()}>
+                {/* Left nav */}
+                <div className="settings-modal-nav">
+                  <div className="settings-modal-nav-section">
+                    <div className="settings-modal-nav-label">Hesap</div>
+                    <button className={`settings-modal-nav-item ${settingsTab === 'account' ? 'active' : ''}`} onClick={() => setSettingsTab('account')}>
+                      <span className="settings-nav-icon">👤</span> Profil
                     </button>
-                    <span className="sidebar-settings-value">{Math.round(soundVolume * 100)}%</span>
+                    <button className={`settings-modal-nav-item ${settingsTab === 'ai' ? 'active' : ''}`} onClick={() => setSettingsTab('ai')}>
+                      <span className="settings-nav-icon">🤖</span> Yapay Zeka
+                    </button>
+                    <button className={`settings-modal-nav-item ${settingsTab === 'sync' ? 'active' : ''}`} onClick={() => setSettingsTab('sync')}>
+                      <span className="settings-nav-icon">☁</span> Cloud Sync
+                    </button>
                   </div>
+                  <div className="settings-modal-nav-section">
+                    <div className="settings-modal-nav-label">Uygulama</div>
+                    <button className={`settings-modal-nav-item ${settingsTab === 'sound' ? 'active' : ''}`} onClick={() => setSettingsTab('sound')}>
+                      <span className="settings-nav-icon">🔊</span> Ses
+                    </button>
+                    <button className={`settings-modal-nav-item ${settingsTab === 'pages' ? 'active' : ''}`} onClick={() => setSettingsTab('pages')}>
+                      <span className="settings-nav-icon">📄</span> Sayfalar
+                    </button>
+                    <button className={`settings-modal-nav-item ${settingsTab === 'data' ? 'active' : ''}`} onClick={() => setSettingsTab('data')}>
+                      <span className="settings-nav-icon">💾</span> Veri
+                    </button>
+                  </div>
+                  <div className="settings-modal-nav-version">BankoSpace v{APP_VERSION}</div>
                 </div>
-                <input
-                  type="range"
-                  className="sidebar-volume-slider"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={soundVolume}
-                  onChange={(e) => {
-                    const v = parseFloat(e.target.value);
-                    setSoundVolume(v);
-                    setVolume(v);
-                  }}
-                  onMouseUp={() => playClickSound()}
-                />
+
+                {/* Right content */}
+                <div className="settings-modal-content">
+                  <button className="settings-modal-close" onClick={closeSidebarSettings}>✕</button>
+
+                  {settingsTab === 'account' && (
+                    <div className="settings-modal-section">
+                      <h2 className="settings-modal-title">Profil</h2>
+                      {session ? (
+                        <>
+                          <div className="settings-row-card">
+                            <div className="settings-row-info">
+                              <div className="settings-row-avatar">{session.user?.email?.[0]?.toUpperCase()}</div>
+                              <div>
+                                <div className="settings-row-name">{session.user?.email}</div>
+                                <div className="settings-row-sub">Aktif oturum</div>
+                              </div>
+                            </div>
+                            <button
+                              className="settings-action-btn danger"
+                              onClick={async () => { await supabase.auth.signOut(); if (onLogout) onLogout(); }}
+                            >Çıkış Yap</button>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="settings-empty-state">Giriş yapılmamış</div>
+                      )}
+                    </div>
+                  )}
+
+                  {settingsTab === 'ai' && (
+                    <div className="settings-modal-section">
+                      <h2 className="settings-modal-title">Yapay Zeka</h2>
+                      <div className="settings-field">
+                        <label className="settings-field-label">Anthropic API Key</label>
+                        <div className="settings-field-desc">Claude AI özelliklerini kullanmak için API anahtarınızı girin</div>
+                        <input
+                          type="password"
+                          className="settings-field-input"
+                          defaultValue={localStorage.getItem('anthropic_api_key') || ''}
+                          placeholder="sk-ant-..."
+                          onBlur={e => {
+                            const val = e.target.value.trim();
+                            if (val) localStorage.setItem('anthropic_api_key', val);
+                            else localStorage.removeItem('anthropic_api_key');
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {settingsTab === 'sync' && (
+                    <div className="settings-modal-section">
+                      <h2 className="settings-modal-title">Cloud Sync</h2>
+                      <div className="settings-row-inline">
+                        <div>
+                          <div className="settings-row-name">Supabase Senkronizasyon</div>
+                          <div className="settings-row-sub">Verilerinizi bulutta saklayın ve cihazlar arası senkronize edin</div>
+                        </div>
+                        <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
+                          <span className={`settings-sync-badge ${localStorage.getItem('supabase_sync_enabled')==='1' ? 'on' : 'off'}`}>
+                            {localStorage.getItem('supabase_sync_enabled')==='1' ? 'Aktif' : 'Kapalı'}
+                          </span>
+                          <button
+                            className="settings-action-btn"
+                            onClick={() => {
+                              const isOn = localStorage.getItem('supabase_sync_enabled') === '1';
+                              if (isOn) localStorage.removeItem('supabase_sync_enabled');
+                              else localStorage.setItem('supabase_sync_enabled', '1');
+                              window.location.reload();
+                            }}
+                          >{localStorage.getItem('supabase_sync_enabled')==='1' ? 'Kapat' : 'Aç'}</button>
+                          {localStorage.getItem('supabase_sync_enabled')==='1' && (
+                            <button
+                              className="settings-action-btn"
+                              onClick={async () => { await pushAllToSupabase(); alert('Tüm veriler yüklendi!'); }}
+                            >Sync Et</button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {settingsTab === 'sound' && (
+                    <div className="settings-modal-section">
+                      <h2 className="settings-modal-title">Ses</h2>
+                      <div className="settings-row-inline">
+                        <div>
+                          <div className="settings-row-name">Ses Seviyesi</div>
+                          <div className="settings-row-sub">Uygulama ses efektlerinin seviyesi</div>
+                        </div>
+                        <div className="settings-volume-right">
+                          <button
+                            className={`sidebar-mute-btn ${soundVolume === 0 ? 'muted' : ''}`}
+                            onClick={() => {
+                              if (soundVolume > 0) {
+                                localStorage.setItem('soundVolumePrev', String(soundVolume));
+                                setSoundVolume(0); setVolume(0);
+                              } else {
+                                const prev = parseFloat(localStorage.getItem('soundVolumePrev') || '0.7');
+                                setSoundVolume(prev); setVolume(prev); playClickSound();
+                              }
+                            }}
+                          >{soundVolume === 0 ? '🔇' : soundVolume < 0.4 ? '🔉' : '🔊'}</button>
+                          <span className="sidebar-settings-value">{Math.round(soundVolume * 100)}%</span>
+                        </div>
+                      </div>
+                      <input
+                        type="range"
+                        className="sidebar-volume-slider"
+                        style={{width:'100%',marginTop:'12px'}}
+                        min="0" max="1" step="0.05"
+                        value={soundVolume}
+                        onChange={e => { const v = parseFloat(e.target.value); setSoundVolume(v); setVolume(v); }}
+                        onMouseUp={() => playClickSound()}
+                      />
+                    </div>
+                  )}
+
+                  {settingsTab === 'pages' && (
+                    <div className="settings-modal-section">
+                      <h2 className="settings-modal-title">Sayfalar</h2>
+                      <div className="settings-field-desc" style={{marginBottom:'16px'}}>Kenar çubuğunda görünecek sayfaları seçin</div>
+                      {sidebarItems.filter(item => item.id !== 'dashboard').map(item => (
+                        <div key={item.id} className="settings-page-row" onClick={() => togglePageVisibility(item.id)}>
+                          <div>
+                            <div className="settings-row-name">{item.label}</div>
+                          </div>
+                          <div className={`settings-toggle ${item.hidden ? '' : 'on'}`}>
+                            <div className="settings-toggle-knob" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {settingsTab === 'data' && (
+                    <div className="settings-modal-section">
+                      <h2 className="settings-modal-title">Veri</h2>
+                      <div className="settings-data-row">
+                        <div>
+                          <div className="settings-row-name">Verileri Dışa Aktar</div>
+                          <div className="settings-row-sub">Tüm verilerinizi JSON dosyası olarak indirin</div>
+                        </div>
+                        <button className="settings-action-btn" onClick={() => { exportData(); closeSidebarSettings(); }}>Export</button>
+                      </div>
+                      <div className="settings-data-row">
+                        <div>
+                          <div className="settings-row-name">Verileri İçe Aktar</div>
+                          <div className="settings-row-sub">JSON dosyasından verilerinizi yükleyin</div>
+                        </div>
+                        <button className="settings-action-btn" onClick={() => { importData(); closeSidebarSettings(); }}>Import</button>
+                      </div>
+                      <div className="settings-data-row danger-row">
+                        <div>
+                          <div className="settings-row-name" style={{color:'#f85149'}}>Tüm Verileri Sıfırla</div>
+                          <div className="settings-row-sub">Bu işlem geri alınamaz</div>
+                        </div>
+                        <button className="settings-action-btn danger" onClick={() => { resetAllData(); closeSidebarSettings(); }}>Sıfırla</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="sidebar-settings-divider" />
-              <div className="sidebar-settings-section">
-                <button
-                  className="sidebar-settings-action-btn"
-                  onClick={() => { exportData(); closeSidebarSettings(); }}
-                >
-                  Export Data
-                </button>
-                <button
-                  className="sidebar-settings-action-btn"
-                  onClick={() => { importData(); closeSidebarSettings(); }}
-                >
-                  Import Data
-                </button>
-                <button
-                  className="sidebar-settings-action-btn danger"
-                  onClick={() => { resetAllData(); closeSidebarSettings(); }}
-                >
-                  Reset All Data
-                </button>
-              </div>
-              <div className="sidebar-settings-divider" />
-              <div className="sidebar-settings-section">
-                <div className="sidebar-settings-pages-label">Pages</div>
-                {sidebarItems.filter(item => item.id !== 'dashboard').map(item => (
-                  <div key={item.id} className="sidebar-settings-page-row" onClick={() => togglePageVisibility(item.id)}>
-                    <span className={`sidebar-settings-page-toggle ${item.hidden ? '' : 'active'}`} />
-                    <span className="sidebar-settings-page-name">{item.label}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="sidebar-settings-divider" />
-              <div className="sidebar-settings-version">BankoSpace v{APP_VERSION}</div>
             </div>
           )}
 
@@ -1682,91 +1758,9 @@ function App({ session, onLogout }) {
           {/* Dashboard View */}
           {activeView === 'dashboard' && (
           <div className="dashboard-container" style={{ '--todo-font-size': fontSizeMap[todoFontSize], '--subtask-font-size': fontSizeMap[subtaskFontSize] }}>
-            {/* Dashboard Header */}
-            <div className="dashboard-header">
-              <h1 className="dashboard-title">Dashboard</h1>
-              <div className="filters">
-                <div className="font-size-control" style={{ position: 'relative' }}>
-                  <button
-                    className="filter-btn font-size-trigger"
-                    onClick={() => setFontSizeOpen(o => !o)}
-                    title="Font size"
-                  >{todoFontSize}</button>
-                  {fontSizeOpen && (
-                    <div className="font-size-dropdown">
-                      <div style={{fontSize:'10px',color:'#7d8590',padding:'4px 8px 2px',borderBottom:'1px solid #30363d',marginBottom:'2px'}}>Başlık</div>
-                      {['S', 'M', 'L'].map(s => (
-                        <button
-                          key={s}
-                          className={`font-size-option ${todoFontSize === s ? 'active' : ''}`}
-                          onClick={() => { setTodoFontSize(s); localStorage.setItem('todoFontSize', s); setFontSizeOpen(false); }}
-                        >{s}</button>
-                      ))}
-                      <div style={{fontSize:'10px',color:'#7d8590',padding:'6px 8px 2px',borderTop:'1px solid #30363d',borderBottom:'1px solid #30363d',margin:'2px 0'}}>Subtask</div>
-                      {['S', 'M', 'L'].map(s => (
-                        <button
-                          key={'sub-'+s}
-                          className={`font-size-option ${subtaskFontSize === s ? 'active' : ''}`}
-                          onClick={() => { setSubtaskFontSize(s); localStorage.setItem('subtaskFontSize', s); setFontSizeOpen(false); }}
-                        >{s}</button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <button
-                  ref={timerBtnRef}
-                  className="dashboard-timer-toggle-btn"
-                  onClick={async () => {
-                    playClickSound();
-                    const { invoke } = await import('@tauri-apps/api/core');
-                    await invoke('toggle_timer_window');
-                  }}
-                  title="Timer"
-                >
-                  ⏱ Timer
-                </button>
-                <button
-                  className={`filter-btn ${currentFilter === 'all' ? 'active' : ''}`}
-                  onClick={() => { playClickSound(); setCurrentFilter('all'); }}
-                >
-                  All
-                </button>
-                <button
-                  className={`filter-btn ${currentFilter === 'active' ? 'active' : ''}`}
-                  onClick={() => { playClickSound(); setCurrentFilter('active'); }}
-                >
-                  Active
-                </button>
-                <button
-                  className={`filter-btn ${currentFilter === 'completed' ? 'active' : ''}`}
-                  onClick={() => { playClickSound(); setCurrentFilter('completed'); }}
-                >
-                  Completed
-                </button>
-                <button
-                  className={`filter-btn sound-toggle-btn ${soundVolume === 0 ? 'muted' : ''}`}
-                  onClick={() => {
-                    if (soundVolume > 0) {
-                      localStorage.setItem('soundVolumePrev', String(soundVolume));
-                      setSoundVolume(0);
-                      setVolume(0);
-                    } else {
-                      const prev = parseFloat(localStorage.getItem('soundVolumePrev') || '0.7');
-                      setSoundVolume(prev);
-                      setVolume(prev);
-                      playClickSound();
-                    }
-                  }}
-                  title={soundVolume === 0 ? 'Unmute sounds' : 'Mute sounds'}
-                >
-                  {soundVolume === 0 ? '🔇' : '🔊'}
-                </button>
-              </div>
-            </div>
-
             {/* Todo Columns - resizable */}
             <div className="todo-columns" ref={columnsRef}>
-              <div className="todo-col-wrapper" style={colWidths[0] ? { flex: `0 0 ${colWidths[0]}px`, width: `${colWidths[0]}px`, minWidth: 0 } : { flex: 1, minWidth: 0 }}>
+              <div className="todo-col-wrapper" style={colWidths[0] ? { flex: `1 1 ${colWidths[0]}px`, minWidth: 0 } : { flex: 1, minWidth: 0 }}>
                 <CategoryColumn
                   title={categoryNames.daily}
                   category="daily"
@@ -1789,7 +1783,7 @@ function App({ session, onLogout }) {
                 />
               </div>
               <div className="col-resize-handle" onMouseDown={e => startColResize(0, e)} onDoubleClick={() => { setColWidths(DEFAULT_COL_PX); localStorage.setItem('dashColWidths', JSON.stringify(DEFAULT_COL_PX)); }} />
-              <div className="todo-col-wrapper" style={colWidths[1] ? { flex: `0 0 ${colWidths[1]}px`, width: `${colWidths[1]}px`, minWidth: 0 } : { flex: 1, minWidth: 0 }}>
+              <div className="todo-col-wrapper" style={colWidths[1] ? { flex: `1 1 ${colWidths[1]}px`, minWidth: 0 } : { flex: 1, minWidth: 0 }}>
                 <CategoryColumn
                   title={categoryNames.weekly}
                   category="weekly"
@@ -1812,7 +1806,7 @@ function App({ session, onLogout }) {
                 />
               </div>
               <div className="col-resize-handle" onMouseDown={e => startColResize(1, e)} onDoubleClick={() => { setColWidths(DEFAULT_COL_PX); localStorage.setItem('dashColWidths', JSON.stringify(DEFAULT_COL_PX)); }} />
-              <div className="todo-col-wrapper" style={colWidths[2] ? { flex: `0 0 ${colWidths[2]}px`, width: `${colWidths[2]}px`, minWidth: 0 } : { flex: 1, minWidth: 0 }}>
+              <div className="todo-col-wrapper" style={colWidths[2] ? { flex: `1 1 ${colWidths[2]}px`, minWidth: 0 } : { flex: 1, minWidth: 0 }}>
                 <CategoryColumn
                   title={categoryNames.monthly}
                   category="monthly"
