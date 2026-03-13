@@ -109,9 +109,11 @@ function App() {
   const [updateAvailable, setUpdateAvailable] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  // Supabase sync — uygulama açılınca çek, localStorage değişince yaz
+  // Supabase sync — sadece sync aktifse çalışır
   useEffect(() => {
-    // Sadece ilk açılışta çek (reload yapma, sonsuz döngü olur)
+    const syncEnabled = localStorage.getItem('supabase_sync_enabled') === '1';
+    if (!syncEnabled) return;
+
     const alreadySynced = sessionStorage.getItem('supabase_synced');
     if (!alreadySynced) {
       pullFromSupabase().then(pulled => {
@@ -122,7 +124,6 @@ function App() {
       });
     }
 
-    // localStorage.setItem'i intercept et, değişiklikleri Supabase'e yaz
     const origSetItem = localStorage.setItem.bind(localStorage);
     localStorage.setItem = function(key, value) {
       origSetItem(key, value);
@@ -1371,15 +1372,34 @@ function App() {
               <div className="sidebar-settings-section">
                 <div className="sidebar-settings-pages-label">Cloud Sync</div>
                 <div className="sidebar-settings-row">
-                  <span className="sidebar-settings-label" style={{fontSize:'12px',color:'#484f58'}}>Supabase aktif</span>
-                  <button
-                    className="sidebar-settings-action-btn"
-                    style={{fontSize:'12px'}}
-                    onClick={async () => {
-                      await pushAllToSupabase();
-                      alert('Tüm veriler Supabase\'e yüklendi!');
-                    }}
-                  >Şimdi Sync Et</button>
+                  <span className="sidebar-settings-label" style={{fontSize:'12px',color: localStorage.getItem('supabase_sync_enabled')==='1' ? '#4f86f7' : '#484f58'}}>
+                    {localStorage.getItem('supabase_sync_enabled')==='1' ? 'Sync aktif' : 'Sync kapalı'}
+                  </span>
+                  <div style={{display:'flex',gap:'6px'}}>
+                    <button
+                      className="sidebar-settings-action-btn"
+                      style={{fontSize:'12px'}}
+                      onClick={() => {
+                        const isOn = localStorage.getItem('supabase_sync_enabled') === '1';
+                        if (isOn) {
+                          localStorage.removeItem('supabase_sync_enabled');
+                        } else {
+                          localStorage.setItem('supabase_sync_enabled', '1');
+                        }
+                        window.location.reload();
+                      }}
+                    >{localStorage.getItem('supabase_sync_enabled')==='1' ? 'Kapat' : 'Aç'}</button>
+                    {localStorage.getItem('supabase_sync_enabled')==='1' && (
+                      <button
+                        className="sidebar-settings-action-btn"
+                        style={{fontSize:'12px'}}
+                        onClick={async () => {
+                          await pushAllToSupabase();
+                          alert('Tüm veriler Supabase\'e yüklendi!');
+                        }}
+                      >Sync Et</button>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="sidebar-settings-divider" />
