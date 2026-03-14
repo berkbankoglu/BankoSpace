@@ -125,3 +125,61 @@
 .login-toggle span:hover {
   text-decoration: underline;
 }
+
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+  color: #484f58;
+  font-size: 12px;
+}
+.login-divider::before,
+.login-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #30363d;
+}
+
+.login-google-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #fff;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  color: #24292f;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 9px;
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s;
+  font-family: inherit;
+  width: 100%;
+}
+.login-google-btn:hover:not(:disabled) {
+  background: #f6f8fa;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+}
+.login-google-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.login-guest-btn {
+  background: transparent;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  color: #7d8590;
+  font-size: 13px;
+  padding: 9px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+  font-family: inherit;
+}
+.login-guest-btn:hover {
+  border-color: #484f58;
+  color: #c9d1d9;
+}

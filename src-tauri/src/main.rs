@@ -2,6 +2,98 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use tauri::Manager;
+use tauri::{LogicalPosition, LogicalSize, WebviewUrl};
+use tauri::webview::WebviewBuilder;
+
+#[tauri::command]
+async fn create_child_webview(
+    app: tauri::AppHandle,
+    url: String,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+) -> Result<(), String> {
+    let window = app
+        .get_window("main")
+        .ok_or_else(|| "Main window not found".to_string())?;
+
+    // If already exists, just navigate and show
+    if let Some(existing) = app.get_webview("tradingview-child") {
+        let parsed = url.parse().map_err(|e: url::ParseError| e.to_string())?;
+        existing.navigate(parsed).map_err(|e| e.to_string())?;
+        existing.show().map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+
+    let parsed: url::Url = url.parse().map_err(|e: url::ParseError| e.to_string())?;
+
+    window
+        .add_child(
+            WebviewBuilder::new("tradingview-child", WebviewUrl::External(parsed)),
+            LogicalPosition::new(x, y),
+            LogicalSize::new(width, height),
+        )
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn navigate_child_webview(app: tauri::AppHandle, url: String) -> Result<(), String> {
+    let webview = app
+        .get_webview("tradingview-child")
+        .ok_or_else(|| "tradingview-child not found".to_string())?;
+    let parsed: url::Url = url.parse().map_err(|e: url::ParseError| e.to_string())?;
+    webview.navigate(parsed).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn show_child_webview(app: tauri::AppHandle) -> Result<(), String> {
+    let webview = app
+        .get_webview("tradingview-child")
+        .ok_or_else(|| "tradingview-child not found".to_string())?;
+    webview.show().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn hide_child_webview(app: tauri::AppHandle) -> Result<(), String> {
+    let webview = app
+        .get_webview("tradingview-child")
+        .ok_or_else(|| "tradingview-child not found".to_string())?;
+    webview.hide().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn close_child_webview(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(webview) = app.get_webview("tradingview-child") {
+        webview.close().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn set_child_webview_bounds(
+    app: tauri::AppHandle,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+) -> Result<(), String> {
+    let webview = app
+        .get_webview("tradingview-child")
+        .ok_or_else(|| "tradingview-child not found".to_string())?;
+    webview
+        .set_position(tauri::Position::Logical(LogicalPosition::new(x, y)))
+        .map_err(|e| e.to_string())?;
+    webview
+        .set_size(tauri::Size::Logical(LogicalSize::new(width, height)))
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
 
 #[tauri::command]
 fn toggle_timer_window(app: tauri::AppHandle) {
@@ -79,7 +171,19 @@ fn main() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![toggle_timer_window, fetch_rss, fetch_post, fetch_tts])
+        .plugin(tauri_plugin_deep_link::init())
+        .invoke_handler(tauri::generate_handler![
+            toggle_timer_window,
+            fetch_rss,
+            fetch_post,
+            fetch_tts,
+            create_child_webview,
+            navigate_child_webview,
+            show_child_webview,
+            hide_child_webview,
+            close_child_webview,
+            set_child_webview_bounds,
+        ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
                 if window.label() == "main" {

@@ -1998,6 +1998,9 @@ function AppWrapper() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
         setLoggedIn(false);
+      } else if (event === 'SIGNED_IN' && session) {
+        setInitialSession(session);
+        setLoggedIn(true);
       }
       // TOKEN_REFRESHED, USER_UPDATED, INITIAL_SESSION etc. are intentionally ignored
       // to prevent re-renders that break the layout
@@ -2015,7 +2018,10 @@ function AppWrapper() {
   }
 
   if (!loggedIn) {
-    return <Login onLogin={(s) => { setInitialSession(s); setLoggedIn(true); }} />;
+    return <Login
+      onLogin={(s) => { setInitialSession(s); setLoggedIn(true); }}
+      onGuest={() => { setInitialSession(null); setLoggedIn(true); }}
+    />;
   }
 
   return <App key="main-app" session={initialSession} onLogout={() => setLoggedIn(false)} />;
