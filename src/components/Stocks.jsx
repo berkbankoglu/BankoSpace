@@ -37,9 +37,6 @@ export default function Stocks({ session }) {
   return (
     <div className="stocks-root">
       <div className="stocks-market">
-        {/* Chat panel - en solda */}
-        <StockChat session={session} />
-
         {/* Watchlist */}
         <div className="stocks-market-left">
           <div className="stc-bottom-tabs">
@@ -68,6 +65,11 @@ export default function Stocks({ session }) {
             setActiveTicker={setNewsFilterTicker}
             onSizeChange={() => {}}
           />
+        </div>
+
+        {/* Chat panel - en sağda sabit panel */}
+        <div className="stocks-chat-panel">
+          <StockChat />
         </div>
       </div>
     </div>
