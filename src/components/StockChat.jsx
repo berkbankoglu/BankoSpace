@@ -1,12 +1,9 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabase';
 import './StockChat.css';
 
 const MAX_MSG = 200;
 const CHANNEL_REGEX = /^[a-z0-9_-]{1,20}$/;
-const MIN_WIDTH = 180;
-const MAX_WIDTH = 480;
-const DEFAULT_WIDTH = 240;
 
 function timeAgo(dateStr) {
   const d = new Date(dateStr);
@@ -25,37 +22,33 @@ function getAvatarColor(username) {
   return colors[Math.abs(hash) % colors.length];
 }
 
-export default function StockChat({ session }) {
+export default function StockChat() {
   const [channel, setChannel] = useState('general');
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [username, setUsername] = useState('');
   const [usernameSet, setUsernameSet] = useState(false);
   const [usernameInput, setUsernameInput] = useState('');
-  const [collapsed, setCollapsed] = useState(false);
-  const [width, setWidth] = useState(() => {
-    const saved = parseInt(localStorage.getItem('chat_width'));
-    return (saved >= MIN_WIDTH && saved <= MAX_WIDTH) ? saved : DEFAULT_WIDTH;
-  });
+  const [loggedIn, setLoggedIn] = useState(false);
   const bottomRef = useRef(null);
-  const inputRef = useRef(null);
   const channelRef = useRef(channel);
   const myUserIdRef = useRef(null);
   channelRef.current = channel;
 
-  // Load saved username
+  // Load saved username + resolve user id once (no session prop dependency)
   useEffect(() => {
     const saved = localStorage.getItem('chat_username');
     if (saved) { setUsername(saved); setUsernameSet(true); }
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user?.id) {
+        myUserIdRef.current = session.user.id;
+        setLoggedIn(true);
+      }
+    });
   }, []);
 
-  // Store own user id
-  useEffect(() => {
-    if (session?.user?.id) myUserIdRef.current = session.user.id;
-  }, [session]);
-
-  // Fetch messages + realtime subscription
+  // Fetch + subscribe
   useEffect(() => {
     if (!usernameSet) return;
     setLoading(true);
@@ -82,7 +75,6 @@ export default function StockChat({ session }) {
         filter: `channel=eq.${channel}`,
       }, (payload) => {
         if (channelRef.current !== channel) return;
-        // Skip own messages — already added optimistically
         if (payload.new.user_id === myUserIdRef.current) return;
         setMessages(prev => [...prev.slice(-(MAX_MSG - 1)), payload.new]);
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
@@ -93,23 +85,19 @@ export default function StockChat({ session }) {
   }, [channel, usernameSet]);
 
   const sendMessage = async (text) => {
-    if (!text.trim() || !session) return;
+    if (!text.trim() || !myUserIdRef.current) return;
 
-    // /join command
     if (text.startsWith('/join ')) {
       const ch = text.slice(6).trim().toLowerCase();
       if (CHANNEL_REGEX.test(ch)) { setChannel(ch); setInput(''); }
       return;
     }
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    // Optimistic: add message immediately
+    const userId = myUserIdRef.current;
     const optimistic = {
       id: `opt-${Date.now()}`,
       channel,
-      user_id: user.id,
+      user_id: userId,
       username,
       content: text.trim(),
       created_at: new Date().toISOString(),
@@ -120,24 +108,15 @@ export default function StockChat({ session }) {
 
     const { data, error } = await supabase.from('chat_messages').insert({
       channel,
-      user_id: user.id,
+      user_id: userId,
       username,
       content: text.trim(),
     }).select().single();
 
     if (!error && data) {
-      // Replace optimistic with real
       setMessages(prev => prev.map(m => m.id === optimistic.id ? data : m));
     } else if (error) {
-      // Remove optimistic on error
       setMessages(prev => prev.filter(m => m.id !== optimistic.id));
-    }
-  };
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage(input);
     }
   };
 
@@ -149,134 +128,90 @@ export default function StockChat({ session }) {
     setUsernameSet(true);
   };
 
-  // Resize drag
-  const startResize = useCallback((e) => {
-    e.preventDefault();
-    const startX = e.clientX;
-    const startW = width;
-    const onMove = (ev) => {
-      const delta = ev.clientX - startX;
-      const newW = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, startW + delta));
-      setWidth(newW);
-    };
-    const onUp = () => {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-      setWidth(w => { localStorage.setItem('chat_width', String(w)); return w; });
-    };
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-  }, [width]);
-
-  if (collapsed) {
-    return (
-      <div className="schat-collapsed" onClick={() => setCollapsed(false)}>
-        <span className="schat-collapsed-icon">💬</span>
-        <span className="schat-collapsed-label">#{channel}</span>
-      </div>
-    );
-  }
-
-  if (!session) {
-    return (
-      <div className="schat-root" style={{ width }}>
-        <div className="schat-resize-handle" onMouseDown={startResize} />
-        <div className="schat-header"><span className="schat-title">💬 Chat</span></div>
-        <div className="schat-no-session">Sohbet için giriş yapman gerekiyor</div>
-      </div>
-    );
-  }
-
-  if (!usernameSet) {
-    return (
-      <div className="schat-root" style={{ width }}>
-        <div className="schat-resize-handle" onMouseDown={startResize} />
-        <div className="schat-header"><span className="schat-title">💬 Chat</span></div>
-        <div className="schat-username-setup">
-          <div className="schat-username-title">Kullanıcı adını seç</div>
-          <div className="schat-username-sub">Diğer kullanıcılar bu ismi görecek</div>
-          <input
-            className="schat-username-input"
-            placeholder="kullaniciadi"
-            value={usernameInput}
-            maxLength={20}
-            onChange={e => setUsernameInput(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))}
-            onKeyDown={e => e.key === 'Enter' && saveUsername()}
-            autoFocus
-          />
-          <button className="schat-username-btn" onClick={saveUsername}>Devam</button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="schat-root" style={{ width }}>
-      {/* Resize handle - sağ kenar */}
-      <div className="schat-resize-handle" onMouseDown={startResize} />
+    <div className="schat-wrapper">
+      <div className="schat-root">
 
-      {/* Header */}
-      <div className="schat-header">
-        <div className="schat-header-left">
-          <span className="schat-channel-hash">#</span>
-          <span className="schat-title">{channel}</span>
-        </div>
-        <div className="schat-header-right">
-          <span className="schat-me">@{username}</span>
-          <button className="schat-collapse-btn" onClick={() => setCollapsed(true)} title="Küçült">‹</button>
-        </div>
-      </div>
-
-      {/* Messages */}
-      <div className="schat-messages">
-        {loading && <div className="schat-loading">Yükleniyor...</div>}
-        {!loading && messages.length === 0 && (
-          <div className="schat-empty">
-            <div className="schat-empty-icon">💬</div>
-            <div>#{channel} kanalında henüz mesaj yok</div>
-            <div className="schat-empty-sub">İlk mesajı sen gönder!</div>
+        {/* Header */}
+        <div className="schat-header">
+          <div className="schat-header-left">
+            <span className="schat-channel-hash">#</span>
+            <span className="schat-title">{channel}</span>
           </div>
-        )}
-        {messages.map((msg, i) => {
-          const prevMsg = messages[i - 1];
-          const showHeader = !prevMsg || prevMsg.username !== msg.username ||
-            (new Date(msg.created_at) - new Date(prevMsg.created_at)) > 60000;
-          return (
-            <div key={msg.id} className={`schat-msg ${!showHeader ? 'schat-msg-cont' : ''}`}>
-              {showHeader && (
-                <div className="schat-msg-header">
-                  <div className="schat-avatar" style={{ background: getAvatarColor(msg.username) }}>
-                    {msg.username[0].toUpperCase()}
-                  </div>
-                  <span className="schat-msg-user">{msg.username}</span>
-                  <span className="schat-msg-time">{timeAgo(msg.created_at)}</span>
+          <div className="schat-header-right">
+            {usernameSet && <span className="schat-me">@{username}</span>}
+          </div>
+        </div>
+
+        {!loggedIn ? (
+          <div className="schat-no-session">Sohbet için giriş yapman gerekiyor</div>
+        ) : !usernameSet ? (
+          <div className="schat-username-setup">
+            <div className="schat-username-title">Kullanıcı adını seç</div>
+            <div className="schat-username-sub">Diğer kullanıcılar bu ismi görecek</div>
+            <input
+              className="schat-username-input"
+              placeholder="kullaniciadi"
+              value={usernameInput}
+              maxLength={20}
+              onChange={e => setUsernameInput(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))}
+              onKeyDown={e => e.key === 'Enter' && saveUsername()}
+              autoFocus
+            />
+            <button className="schat-username-btn" onClick={saveUsername}>Devam</button>
+          </div>
+        ) : (
+          <>
+            <div className="schat-messages">
+              {loading && <div className="schat-loading">Yükleniyor...</div>}
+              {!loading && messages.length === 0 && (
+                <div className="schat-empty">
+                  <div className="schat-empty-icon">💬</div>
+                  <div>#{channel} kanalında henüz mesaj yok</div>
+                  <div className="schat-empty-sub">İlk mesajı sen gönder!</div>
                 </div>
               )}
-              <div className={`schat-msg-body ${!showHeader ? 'schat-msg-body-cont' : ''}`}>
-                {msg.content}
-              </div>
+              {messages.map((msg, i) => {
+                const prevMsg = messages[i - 1];
+                const showHeader = !prevMsg || prevMsg.username !== msg.username ||
+                  (new Date(msg.created_at) - new Date(prevMsg.created_at)) > 60000;
+                return (
+                  <div key={msg.id} className={`schat-msg ${!showHeader ? 'schat-msg-cont' : ''}`}>
+                    {showHeader && (
+                      <div className="schat-msg-header">
+                        <div className="schat-avatar" style={{ background: getAvatarColor(msg.username) }}>
+                          {msg.username[0].toUpperCase()}
+                        </div>
+                        <span className="schat-msg-user">{msg.username}</span>
+                        <span className="schat-msg-time">{timeAgo(msg.created_at)}</span>
+                      </div>
+                    )}
+                    <div className={`schat-msg-body ${!showHeader ? 'schat-msg-body-cont' : ''}`}>
+                      {msg.content}
+                    </div>
+                  </div>
+                );
+              })}
+              <div ref={bottomRef} />
             </div>
-          );
-        })}
-        <div ref={bottomRef} />
-      </div>
 
-      {/* Input */}
-      <div className="schat-input-area">
-        <input
-          ref={inputRef}
-          className="schat-input"
-          placeholder={`#${channel} — /join <kanal>`}
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          maxLength={500}
-        />
-        <button
-          className="schat-send-btn"
-          onClick={() => sendMessage(input)}
-          disabled={!input.trim()}
-        >↑</button>
+            <div className="schat-input-area">
+              <input
+                className="schat-input"
+                placeholder={`#${channel} — /join <kanal>`}
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(input); } }}
+                maxLength={500}
+              />
+              <button
+                className="schat-send-btn"
+                onClick={() => sendMessage(input)}
+                disabled={!input.trim()}
+              >↑</button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

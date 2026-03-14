@@ -110,30 +110,35 @@ function App({ session, onLogout }) {
   const [updateAvailable, setUpdateAvailable] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  // Supabase sync — oturum açıksa otomatik aktif
+  // Supabase sync — oturum açıksa otomatik aktif (runs once, not reactive to session prop)
   useEffect(() => {
-    if (!session) return;
-
-    const alreadySynced = sessionStorage.getItem('supabase_synced');
-    if (!alreadySynced) {
-      pullFromSupabase().then(pulled => {
-        sessionStorage.setItem('supabase_synced', '1');
-        if (pulled) window.location.reload();
-      });
-    }
-
+    let mounted = true;
     const origSetItem = localStorage.setItem.bind(localStorage);
-    localStorage.setItem = function(key, value) {
-      origSetItem(key, value);
-      if (SYNC_KEYS.includes(key)) {
-        pushKeyToSupabase(key, value);
+
+    supabase.auth.getSession().then(({ data: { session: s } }) => {
+      if (!s || !mounted) return;
+
+      const alreadySynced = sessionStorage.getItem('supabase_synced');
+      if (!alreadySynced) {
+        pullFromSupabase().then(pulled => {
+          sessionStorage.setItem('supabase_synced', '1');
+          if (pulled) window.location.reload();
+        });
       }
-    };
+
+      localStorage.setItem = function(key, value) {
+        origSetItem(key, value);
+        if (SYNC_KEYS.includes(key)) {
+          pushKeyToSupabase(key, value);
+        }
+      };
+    });
 
     return () => {
+      mounted = false;
       localStorage.setItem = origSetItem;
     };
-  }, [session]);
+  }, []);
 
   // Auto-update check
   useEffect(() => {
@@ -1980,23 +1985,28 @@ function TimerPopupWrapper({ isCompact: initialCompact = false }) {
 
 
 function AppWrapper() {
-  const [session, setSession] = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
+  // loggedIn: null=loading, false=logged out, true=logged in
+  const [loggedIn, setLoggedIn] = useState(null);
+  const [initialSession, setInitialSession] = useState(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setAuthLoading(false);
+      setInitialSession(session);
+      setLoggedIn(!!session);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        setLoggedIn(false);
+      }
+      // TOKEN_REFRESHED, USER_UPDATED, INITIAL_SESSION etc. are intentionally ignored
+      // to prevent re-renders that break the layout
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  if (authLoading) {
+  if (loggedIn === null) {
     return (
       <div style={{ width: '100vw', height: '100vh', background: '#0d1117', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ color: '#7d8590', fontSize: '14px' }}>Yükleniyor...</div>
@@ -2004,11 +2014,11 @@ function AppWrapper() {
     );
   }
 
-  if (!session) {
-    return <Login onLogin={(s) => setSession(s)} />;
+  if (!loggedIn) {
+    return <Login onLogin={(s) => { setInitialSession(s); setLoggedIn(true); }} />;
   }
 
-  return <App session={session} onLogout={() => setSession(null)} />;
+  return <App key="main-app" session={initialSession} onLogout={() => setLoggedIn(false)} />;
 }
 
 export default AppWrapper;

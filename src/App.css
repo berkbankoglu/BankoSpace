@@ -105,11 +105,9 @@ body {
 .update-dismiss-btn:hover { color: var(--text-primary); }
 
 .custom-titlebar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
+    position: relative;
     height: 32px;
+    flex-shrink: 0;
     background: var(--bg-surface);
     border-bottom: 1px solid var(--border);
     display: flex;
@@ -253,7 +251,6 @@ html, body, #root {
 }
 
 .container {
-    padding-top: 32px;
     height: 100%;
     display: flex;
     flex-direction: column;
@@ -1664,9 +1661,10 @@ body.light .timer-input-small {
     margin: 0 auto;
     position: relative;
     overflow-x: hidden;
-    padding-top: 32px;
     height: 100%;
     box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
 }
 
 .header-row {
@@ -5909,7 +5907,7 @@ body.light .reset-btn:hover {
 
 
 /* Main content and sidebar layout */
-.content-wrapper {
+.content-wrapper-old {
     display: grid;
     grid-template-columns: 3fr 1fr;
     gap: 15px;
@@ -8250,7 +8248,8 @@ body.light .sidebar-bottom {
 /* Main content area adjustments */
 .content-wrapper {
   display: flex;
-  height: calc(100vh - 32px);
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
