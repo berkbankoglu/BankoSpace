@@ -297,6 +297,11 @@ function GroupRows({ group, quotes, activeTicker, setActiveTicker, dragState, dr
             </span>
           )}
         </div>
+        <button
+          className="stc-tv-btn"
+          onClick={e => { e.stopPropagation(); open(`https://www.tradingview.com/chart/?symbol=${t}`); }}
+          title="TradingView'de Aç"
+        >↗</button>
         <button className="stc-remove" onClick={e => { e.stopPropagation(); onRemove(group.id, t); }} title={`Remove ${t}`}>×</button>
       </div>
     );
