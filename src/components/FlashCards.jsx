@@ -603,9 +603,35 @@ function FlashCards({ fullscreen = false }) {
                         setSelectedDeck(deck.name);
                         setActiveView('cards');
                       }}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedDeck(deck.name);
+                        setActiveView('cards');
+                        setEditingDeckName(deck.name);
+                        setEditingDeckTitle(deck.name);
+                      }}
                     >
                       <div className="fc-deck-item-color" style={{ backgroundColor: deck.color }} />
-                      <div className="fc-deck-item-name">{deck.name}</div>
+                      {editingDeckName === deck.name ? (
+                        <input
+                          className="fc-deck-item-rename-input"
+                          value={editingDeckTitle}
+                          onChange={(e) => setEditingDeckTitle(e.target.value)}
+                          onBlur={() => {
+                            if (editingDeckTitle.trim()) renameDeck(deck.name, editingDeckTitle);
+                            else { setEditingDeckName(null); setEditingDeckTitle(''); }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && editingDeckTitle.trim()) renameDeck(deck.name, editingDeckTitle);
+                            if (e.key === 'Escape') { setEditingDeckName(null); setEditingDeckTitle(''); }
+                            e.stopPropagation();
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          autoFocus
+                        />
+                      ) : (
+                        <div className="fc-deck-item-name">{deck.name}</div>
+                      )}
                       <div className="fc-deck-item-count">{deckStats.total}</div>
                     </div>
                   );

@@ -13,7 +13,7 @@ import Calendar from './components/Calendar';
 import ProjectBid from './components/ProjectBid';
 import Stocks from './components/Stocks';
 import JapaneseKana from './components/JapaneseKana';
-import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, playTypeSoundThrottled, setVolume, getVolume } from './utils/sounds';
+import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, setVolume, getVolume } from './utils/sounds';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -267,9 +267,6 @@ function App({ session, onLogout }) {
   const sidebarReorderLockRef = useRef(false);
   const sidebarHoldTimerRef = useRef(null);
   const sidebarDragJustEndedRef = useRef(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
-  const [showSearch, setShowSearch] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false); // Full sidebar collapsed
 
   const [todos, setTodos] = useState(() => {
@@ -303,6 +300,7 @@ function App({ session, onLogout }) {
   const [subtaskFontSize, setSubtaskFontSize] = useState(() => localStorage.getItem('subtaskFontSize') || 'M');
   const [fontSizeOpen, setFontSizeOpen] = useState(false);
   const fontSizeMap = { S: '11px', M: '13px', L: '16px' };
+  const [useEmoji, setUseEmoji] = useState(() => localStorage.getItem('useEmoji') !== 'false');
   const [timerWidgetOpen, setTimerWidgetOpen] = useState(false);
   const [timerWidgetCompact, setTimerWidgetCompact] = useState(true);
   const [timerWidgetPos, setTimerWidgetPos] = useState({ top: 0, left: 0 });
@@ -955,112 +953,6 @@ function App({ session, onLogout }) {
     });
   };
 
-  // Search function
-  const handleSearch = (query) => {
-    setSearchQuery(query);
-    if (!query.trim()) {
-      setSearchResults([]);
-      return;
-    }
-
-    const results = [];
-    const lowerQuery = query.toLowerCase();
-
-    // Search in todos
-    todos.forEach(todo => {
-      if (todo.text.toLowerCase().includes(lowerQuery)) {
-        results.push({
-          type: 'todo',
-          id: todo.id,
-          title: todo.text,
-          category: todo.category,
-          icon: '📝'
-        });
-      }
-      // Search in subtasks
-      if (todo.subtasks) {
-        todo.subtasks.forEach(subtask => {
-          if (subtask.text.toLowerCase().includes(lowerQuery)) {
-            results.push({
-              type: 'subtask',
-              id: subtask.id,
-              parentId: todo.id,
-              title: subtask.text,
-              parent: todo.text,
-              icon: '📋'
-            });
-          }
-        });
-      }
-    });
-
-    // Search in flash cards
-    const flashCards = JSON.parse(localStorage.getItem('flashCards') || '[]');
-    flashCards.forEach(card => {
-      if (card.front.toLowerCase().includes(lowerQuery) || card.back.toLowerCase().includes(lowerQuery)) {
-        results.push({
-          type: 'flashcard',
-          id: card.id,
-          title: card.front,
-          subtitle: card.back,
-          group: card.group,
-          icon: '🎴'
-        });
-      }
-    });
-
-    // Search in checklists
-    const dailyItems = JSON.parse(localStorage.getItem('dailyChecklistItems') || '[]');
-    dailyItems.forEach(item => {
-      if (item.text.toLowerCase().includes(lowerQuery)) {
-        results.push({
-          type: 'checklist',
-          id: item.id,
-          title: item.text,
-          listType: 'daily',
-          icon: '✅'
-        });
-      }
-    });
-
-    const longtermItems = JSON.parse(localStorage.getItem('longtermChecklistItems') || '[]');
-    longtermItems.forEach(item => {
-      if (item.text.toLowerCase().includes(lowerQuery)) {
-        results.push({
-          type: 'checklist',
-          id: item.id,
-          title: item.text,
-          listType: 'longterm',
-          icon: '📌'
-        });
-      }
-    });
-
-    setSearchResults(results.slice(0, 10)); // Limit to 10 results
-  };
-
-  const handleSearchResultClick = (result) => {
-    setShowSearch(false);
-    setSearchQuery('');
-    setSearchResults([]);
-
-    if (result.type === 'todo' || result.type === 'subtask') {
-      setActiveView('dashboard');
-      // Highlight the todo item briefly
-      setTimeout(() => {
-        const element = document.querySelector(`[data-todo-id="${result.type === 'subtask' ? result.parentId : result.id}"]`);
-        if (element) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          element.classList.add('highlight-search');
-          setTimeout(() => element.classList.remove('highlight-search'), 2000);
-        }
-      }, 100);
-    } else if (result.type === 'flashcard') {
-      setActiveView('flashcards');
-    } else if (result.type === 'checklist') {
-      setActiveView('checklists');
-    }
-  };
 
   // Export: Tüm verileri JSON dosyası olarak indir
   const exportData = async () => {
@@ -1265,10 +1157,7 @@ function App({ session, onLogout }) {
         className="custom-titlebar"
       >
         <div className="titlebar-left">
-          <button className="titlebar-nav-btn" onClick={() => toggleTheme()} title={theme === 'dark' ? 'Beyaz mod' : 'Siyah mod'}>
-            {theme === 'dark' ? '☀' : '🌙'}
-          </button>
-          <button className="titlebar-nav-btn" onClick={() => { playClickSound(); setShowSidebarSettings(s => !s); setSettingsTab('account'); }} title="Settings">
+          <button className="titlebar-nav-btn" onClick={() => { playClickSound(); setShowSidebarSettings(s => !s); setSettingsTab('appearance'); }} title="Settings">
             ⚙
           </button>
         </div>
@@ -1402,6 +1291,9 @@ function App({ session, onLogout }) {
                   </div>
                   <div className="settings-modal-nav-section">
                     <div className="settings-modal-nav-label">Uygulama</div>
+                    <button className={`settings-modal-nav-item ${settingsTab === 'appearance' ? 'active' : ''}`} onClick={() => setSettingsTab('appearance')}>
+                      <span className="settings-nav-icon">◑</span> Görünüm
+                    </button>
                     <button className={`settings-modal-nav-item ${settingsTab === 'sound' ? 'active' : ''}`} onClick={() => setSettingsTab('sound')}>
                       <span className="settings-nav-icon">🔊</span> Ses
                     </button>
@@ -1497,6 +1389,74 @@ function App({ session, onLogout }) {
                     </div>
                   )}
 
+                  {settingsTab === 'appearance' && (
+                    <div className="settings-modal-section">
+                      <h2 className="settings-modal-title">Görünüm</h2>
+
+                      <div className="settings-row-inline">
+                        <div>
+                          <div className="settings-row-name">Tema</div>
+                          <div className="settings-row-sub">Açık veya koyu mod</div>
+                        </div>
+                        <div className="settings-theme-toggle">
+                          <button
+                            className={`settings-theme-btn ${theme === 'light' ? 'active' : ''}`}
+                            onClick={() => { if (theme !== 'light') toggleTheme(); }}
+                          >Açık</button>
+                          <button
+                            className={`settings-theme-btn ${theme === 'dark' ? 'active' : ''}`}
+                            onClick={() => { if (theme !== 'dark') toggleTheme(); }}
+                          >Koyu</button>
+                        </div>
+                      </div>
+
+                      <div className="settings-row-inline" style={{marginTop:'16px'}}>
+                        <div>
+                          <div className="settings-row-name">Todo Yazı Boyutu</div>
+                          <div className="settings-row-sub">Görev listesi metin boyutu</div>
+                        </div>
+                        <div className="settings-size-group">
+                          {['S','M','L'].map(s => (
+                            <button
+                              key={s}
+                              className={`settings-size-btn ${todoFontSize === s ? 'active' : ''}`}
+                              onClick={() => { setTodoFontSize(s); localStorage.setItem('todoFontSize', s); }}
+                            >{s}</button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="settings-row-inline" style={{marginTop:'16px'}}>
+                        <div>
+                          <div className="settings-row-name">Subtask Yazı Boyutu</div>
+                          <div className="settings-row-sub">Alt görev metin boyutu</div>
+                        </div>
+                        <div className="settings-size-group">
+                          {['S','M','L'].map(s => (
+                            <button
+                              key={s}
+                              className={`settings-size-btn ${subtaskFontSize === s ? 'active' : ''}`}
+                              onClick={() => { setSubtaskFontSize(s); localStorage.setItem('subtaskFontSize', s); }}
+                            >{s}</button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="settings-row-inline" style={{marginTop:'16px'}}>
+                        <div>
+                          <div className="settings-row-name">Emoji Kullan</div>
+                          <div className="settings-row-sub">Görev listesinde emoji göster</div>
+                        </div>
+                        <div
+                          className={`settings-toggle ${useEmoji ? 'on' : ''}`}
+                          onClick={() => { const v = !useEmoji; setUseEmoji(v); localStorage.setItem('useEmoji', String(v)); }}
+                        >
+                          <div className="settings-toggle-knob" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {settingsTab === 'sound' && (
                     <div className="settings-modal-section">
                       <h2 className="settings-modal-title">Ses</h2>
@@ -1581,67 +1541,13 @@ function App({ session, onLogout }) {
             </div>
           )}
 
+          {/* Timer — always mounted so it doesn't reset on collapse */}
+          <div className="sidebar-timer-widget" style={{ display: sidebarCollapsed ? 'none' : undefined }}>
+            <Timer isCompact={true} />
+          </div>
+
           {!sidebarCollapsed && (
             <div className="sidebar-content">
-              {/* Search */}
-              <div className="sidebar-search">
-                <div className="search-input-wrapper">
-                  <span className="search-icon">🔍</span>
-                  <input
-                    type="text"
-                    className="search-input"
-                    placeholder="Search..."
-                    value={searchQuery}
-                    onChange={(e) => { playTypeSoundThrottled(); handleSearch(e.target.value); }}
-                    onFocus={() => setShowSearch(true)}
-                  />
-                  {searchQuery && (
-                    <button
-                      className="search-clear"
-                      onClick={() => {
-                        setSearchQuery('');
-                        setSearchResults([]);
-                      }}
-                    >
-                      ×
-                    </button>
-                  )}
-                </div>
-                {showSearch && searchResults.length > 0 && (
-                  <div className="search-results">
-                    {searchResults.map((result, index) => (
-                      <div
-                        key={`${result.type}-${result.id}-${index}`}
-                        className="search-result-item"
-                        onClick={() => handleSearchResultClick(result)}
-                      >
-                        <span className="result-icon">{result.icon}</span>
-                        <div className="result-content">
-                          <span className="result-title">{result.title}</span>
-                          {result.subtitle && (
-                            <span className="result-subtitle">{result.subtitle}</span>
-                          )}
-                          {result.category && (
-                            <span className="result-badge">{result.category}</span>
-                          )}
-                          {result.group && (
-                            <span className="result-badge">{result.group}</span>
-                          )}
-                          {result.listType && (
-                            <span className="result-badge">{result.listType}</span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {showSearch && searchQuery && searchResults.length === 0 && (
-                  <div className="search-results">
-                    <div className="search-no-results">No results found</div>
-                  </div>
-                )}
-              </div>
-
               {/* Draggable Sidebar Items */}
               {sidebarItems.filter(item => !item.hidden).map((item, index) => (
                 <div
