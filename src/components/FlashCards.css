@@ -33,6 +33,13 @@
   border-bottom: 1px solid #21262d;
 }
 
+.fc-sidebar-timer {
+  border-bottom: 1px solid #21262d;
+  display: flex;
+  justify-content: center;
+  padding: 8px 0;
+}
+
 .fc-sidebar-header h2 {
   margin: 0;
   font-size: 14px;
@@ -186,6 +193,19 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.fc-deck-item-rename-input {
+  flex: 1;
+  background: #0d1117;
+  border: 1px solid #4f86f7;
+  border-radius: 4px;
+  color: #e6edf3;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 1px 6px;
+  outline: none;
+  min-width: 0;
 }
 
 .fc-deck-item-count {
@@ -1047,6 +1067,7 @@
 
 .fc-ai-input-row {
   display: flex;
+  flex-direction: column;
   gap: 6px;
   padding: 10px 10px 8px;
   border-bottom: 1px solid #21262d;
@@ -1054,8 +1075,9 @@
 }
 
 .fc-ai-input {
-  flex: 1;
-  padding: 9px 12px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
   background: #161b22;
   border: 1px solid #30363d;
   border-radius: 6px;
@@ -1075,7 +1097,8 @@
 }
 
 .fc-ai-ask-btn {
-  padding: 9px 12px;
+  width: 100%;
+  padding: 8px 12px;
   background: #1f6feb;
   border: none;
   border-radius: 6px;
@@ -1089,6 +1112,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
 }
 
 .fc-ai-ask-btn:hover:not(:disabled) {

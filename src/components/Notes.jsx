@@ -3,7 +3,7 @@ import './Notes.css';
 import { playTypeSoundThrottled, playClickSound, playAddSound, playDeleteSound } from '../utils/sounds';
 
 // Rich Text Editor Component
-const RichTextEditor = forwardRef(({ content, placeholder, onChange }, ref) => {
+const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, ref) => {
   const editorRef = useRef(null);
   const [isEmpty, setIsEmpty] = useState(!content);
 
@@ -35,6 +35,7 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange }, ref) => {
       suppressContentEditableWarning
       onInput={handleInput}
       data-placeholder={placeholder}
+      style={style}
     />
   );
 });
@@ -59,6 +60,11 @@ function Notes() {
   const [deleteConfirm, setDeleteConfirm] = useState({ show: false, type: null, id: null });
   const [activeFormats, setActiveFormats] = useState({});
   const [showColorPresets, setShowColorPresets] = useState(false);
+  const [lineSpacing, setLineSpacing] = useState(() => {
+    const saved = localStorage.getItem('notesLineSpacing');
+    const v = saved ? parseFloat(saved) : 1.7;
+    return Math.round(v * 10) / 10;
+  });
   const [draggedNote, setDraggedNote] = useState(null);
   const [dragOverNoteId, setDragOverNoteId] = useState(null);
   const noteDragPosRef = useRef({ x: 0, y: 0 });
@@ -95,11 +101,34 @@ function Notes() {
     updateActiveFormats();
   };
 
+  // Apply exact px font size using execCommand fontSize workaround
+  const applyFontSize = (px) => {
+    playClickSound();
+    document.execCommand('fontSize', false, '7');
+    const editor = editorLeftRef.current || editorRightRef.current;
+    if (editor) {
+      editor.querySelectorAll('font[size="7"]').forEach(el => {
+        el.removeAttribute('size');
+        el.style.fontSize = px + 'px';
+      });
+    }
+    updateActiveFormats();
+  };
+
   // Apply color with selection restore
   const applyColor = (command, value) => {
     restoreSelection();
     document.execCommand(command, false, value);
     updateActiveFormats();
+  };
+
+  const getSelectionFontSize = () => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return null;
+    const node = sel.anchorNode?.nodeType === 3 ? sel.anchorNode.parentElement : sel.anchorNode;
+    if (!node) return null;
+    const size = window.getComputedStyle(node).fontSize;
+    return size ? Math.round(parseFloat(size)) : null;
   };
 
   const updateActiveFormats = () => {
@@ -113,6 +142,7 @@ function Notes() {
       justifyRight: document.queryCommandState('justifyRight'),
       insertUnorderedList: document.queryCommandState('insertUnorderedList'),
       insertOrderedList: document.queryCommandState('insertOrderedList'),
+      fontSize: getSelectionFontSize(),
     });
   };
 
@@ -657,16 +687,33 @@ function Notes() {
                 <select
                   className="toolbar-select"
                   onMouseDown={(e) => e.stopPropagation()}
-                  onChange={(e) => { execFormat('fontSize', e.target.value); }}
-                  defaultValue="3"
+                  onChange={(e) => { applyFontSize(parseInt(e.target.value)); }}
+                  value={activeFormats.fontSize || 14}
                 >
-                  <option value="1">10</option>
-                  <option value="2">12</option>
-                  <option value="3">14</option>
-                  <option value="4">18</option>
-                  <option value="5">24</option>
-                  <option value="6">32</option>
-                  <option value="7">48</option>
+                  {[8,9,10,11,12,13,14,15,16,18,20,22,24,26,28,32,36,42,48,56,64,72].map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="toolbar-divider" />
+
+              {/* Line Spacing */}
+              <div className="toolbar-group">
+                <select
+                  className="toolbar-select"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  value={String(lineSpacing)}
+                  onChange={(e) => {
+                    const v = parseFloat(e.target.value);
+                    setLineSpacing(v);
+                    localStorage.setItem('notesLineSpacing', String(v));
+                  }}
+                  title="Satır aralığı"
+                >
+                  {[1, 1.2, 1.4, 1.5, 1.7, 2, 2.5, 3].map(v => (
+                    <option key={v} value={String(v)}>{v.toFixed(1)}</option>
+                  ))}
                 </select>
               </div>
 
@@ -809,6 +856,7 @@ function Notes() {
                       ref={editorLeftRef}
                       content={leftPage.content || ''}
                       placeholder={`Page ${currentSpreadIndex * 2 + 1}...`}
+                      style={{ lineHeight: lineSpacing }}
                       onChange={(content) => {
                         const pageIndex = currentSpreadIndex * 2;
                         const updatedPages = [...currentNote.pages];
@@ -832,6 +880,7 @@ function Notes() {
                       ref={editorRightRef}
                       content={rightPage.content || ''}
                       placeholder={`Page ${currentSpreadIndex * 2 + 2}...`}
+                      style={{ lineHeight: lineSpacing }}
                       onChange={(content) => {
                         const pageIndex = currentSpreadIndex * 2 + 1;
                         const updatedPages = [...currentNote.pages];
