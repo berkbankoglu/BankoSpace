@@ -2,11 +2,12 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: 32px 40px;
-  max-width: 800px;
+  padding: 24px 32px;
+  max-width: 1200px;
   margin: 0 auto;
-  gap: 20px;
-  overflow-y: auto;
+  gap: 16px;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .pb-header {
@@ -14,13 +15,35 @@
   align-items: center;
   justify-content: space-between;
   flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
 }
 
-.pb-title {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0;
+.pb-tabs {
+  display: flex;
+  gap: 2px;
+}
+
+.pb-tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  margin-bottom: -5px;
+}
+.pb-tab:hover { color: var(--text-primary); }
+.pb-tab.active { color: #4f86f7; border-bottom-color: #4f86f7; }
+
+.pb-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .pb-rules-btn {
@@ -113,6 +136,78 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.pb-main-row {
+  display: flex;
+  gap: 20px;
+  flex: 1;
+  min-height: 0;
+}
+
+.pb-left {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+}
+
+.pb-field-grow {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.pb-field-grow .pb-textarea {
+  flex: 1;
+}
+
+.pb-action-row {
+  display: flex;
+  gap: 10px;
+}
+
+.pb-action-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.15s, color 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.pb-action-btn:disabled { opacity: 0.45; cursor: default; }
+
+.pb-analyze-btn {
+  background: #1a2f1a;
+  border-color: #3fb950;
+  color: #7ee787;
+}
+.pb-analyze-btn:hover:not(:disabled) { background: #238636; color: #fff; }
+
+.pb-bid-btn {
+  background: #1f3a5f;
+  border-color: #4f86f7;
+  color: #79c0ff;
+}
+.pb-bid-btn:hover:not(:disabled) { background: #1f6feb; color: #fff; }
+
+.pb-right {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: #0a0e14;
+  border: 1px solid #21262d;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .pb-field {
@@ -245,4 +340,91 @@
   height: 100%;
   overflow-y: auto;
   background: var(--bg-base);
+}
+
+.pb-field-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.pb-field-header .pb-label {
+  margin-bottom: 0;
+}
+
+.pb-summarize-btn {
+  background: #1f3a5f;
+  border: 1px solid #4f86f7;
+  border-radius: 6px;
+  color: #79c0ff;
+  font-size: 12px;
+  font-family: inherit;
+  padding: 4px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: background 0.15s, color 0.15s;
+}
+.pb-summarize-btn:hover:not(:disabled) {
+  background: #1f6feb;
+  color: #fff;
+}
+.pb-summarize-btn:disabled { opacity: 0.5; cursor: default; }
+
+.pb-spinner-sm {
+  width: 10px;
+  height: 10px;
+  border-width: 1.5px;
+}
+
+.pb-summary {
+  background: #0d1f38;
+  border: 1px solid #1f3a5f;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.pb-summary-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: #0a1628;
+  border-bottom: 1px solid #1f3a5f;
+}
+
+.pb-summary-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #79c0ff;
+}
+
+.pb-summary-body {
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pb-summary-row {
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.pb-summary-label {
+  font-weight: 600;
+  color: #79c0ff;
+  white-space: nowrap;
+  min-width: 150px;
+  flex-shrink: 0;
+}
+
+.pb-summary-value {
+  color: #c9d1d9;
+  white-space: pre-wrap;
 }

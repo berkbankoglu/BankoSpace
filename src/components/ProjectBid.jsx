@@ -12,72 +12,84 @@ const DEFAULT_RULES = `Follow these rules when writing a bid:
 export default function ProjectBid() {
   const [projectDetails, setProjectDetails] = useState('');
   const [clientName, setClientName] = useState('');
-  const [bidRules, setBidRules] = useState(() =>
-    localStorage.getItem('bid_rules') || DEFAULT_RULES
-  );
+  const [bidRules, setBidRules] = useState(() => localStorage.getItem('bid_rules') || DEFAULT_RULES);
   const [rulesEdit, setRulesEdit] = useState(bidRules);
   const [showRules, setShowRules] = useState(false);
-  const [generatedBid, setGeneratedBid] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+
+  const [result, setResult] = useState('');
+  const [resultType, setResultType] = useState(null); // 'analyze' | 'bid'
+  const [loading, setLoading] = useState(null); // 'analyze' | 'bid' | null
   const [copied, setCopied] = useState(false);
+  const [error, setError] = useState(null);
 
-  const generateBid = async () => {
-    if (!projectDetails.trim()) return;
+  const callApi = async (prompt, maxTokens) => {
     const key = localStorage.getItem('anthropic_api_key');
-    if (!key) {
-      setError('API key not found. Please enter your Anthropic API key in Settings > API key.');
-      return;
-    }
-    setLoading(true);
+    if (!key) { setError('API key bulunamadı → Ayarlar → Yapay Zeka'); return null; }
     setError(null);
-    setGeneratedBid('');
+    const text = await window.__TAURI__.core.invoke('fetch_post', {
+      url: 'https://api.anthropic.com/v1/messages',
+      headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] }),
+    });
+    const data = JSON.parse(text);
+    if (data.error) throw new Error(data.error.message || 'API error');
+    return data.content[0].text.trim();
+  };
+
+  const handleAnalyze = async () => {
+    if (!projectDetails.trim()) return;
+    setLoading('analyze');
+    setResult('');
+    setResultType(null);
     try {
-      const bodyStr = JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 600,
-        messages: [{
-          role: 'user',
-          content: `You are an experienced Upwork freelancer. Write a bid proposal for the following project.\n\n[Bid Rules]\n${bidRules}\n\n[Client Name]\n${clientName.trim() || 'Not specified'}\n\n[Project Details]\n${projectDetails}\n\nWrite only the bid text, nothing else.`,
-        }],
-      });
-      const text = await window.__TAURI__.core.invoke('fetch_post', {
-        url: 'https://api.anthropic.com/v1/messages',
-        headers: {
-          'x-api-key': key,
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json',
-        },
-        body: bodyStr,
-      });
-      const data = JSON.parse(text);
-      if (data.error) throw new Error(data.error.message || 'API error');
-      setGeneratedBid(data.content[0].text);
-    } catch (e) {
-      setError(e.message || 'Failed to generate bid.');
-    } finally {
-      setLoading(false);
-    }
+      const res = await callApi(
+        `Aşağıdaki proje ilanını Türkçe olarak analiz et. Şu formatta yanıt ver (başka bir şey yazma):
+
+**Ne istiyor:** <2-3 cümle, müşteri tam olarak ne yaptırmak istiyor, hangi sorunu çözüyor>
+**Görevler:** <madde madde tam olarak yapılması gereken işler, hiçbirini atlama>
+**Teknoloji/Alan:** <kullanılacak teknolojiler, araçlar, platformlar>
+**Süre:** <belirtilmişse süre ve deadline, yoksa "Belirtilmemiş">
+**Bütçe:** <belirtilmişse bütçe aralığı, yoksa "Belirtilmemiş">
+**Dikkat:** <mutlaka yapılması/yapılmaması gereken özel şartlar, tercihler, beklentiler>
+**Zorluk:** <Kolay / Orta / Zor — neden>
+
+Proje ilanı:
+${projectDetails}`, 1000);
+      if (res) { setResult(res); setResultType('analyze'); }
+    } catch (e) { setError(e.message || 'Analiz başarısız.'); }
+    finally { setLoading(null); }
   };
 
-  const handleCopy = () => {
-    if (!generatedBid) return;
-    navigator.clipboard.writeText(generatedBid);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleBid = async () => {
+    if (!projectDetails.trim()) return;
+    setLoading('bid');
+    setResult('');
+    setResultType(null);
+    try {
+      const res = await callApi(
+        `You are an experienced Upwork freelancer. Write a bid proposal for the following project.\n\n[Bid Rules]\n${bidRules}\n\n[Client Name]\n${clientName.trim() || 'Not specified'}\n\n[Project Details]\n${projectDetails}\n\nWrite only the bid text, nothing else.`, 600);
+      if (res) { setResult(res); setResultType('bid'); }
+    } catch (e) { setError(e.message || 'Bid oluşturulamadı.'); }
+    finally { setLoading(null); }
   };
 
-  const saveRules = () => {
-    setBidRules(rulesEdit);
-    localStorage.setItem('bid_rules', rulesEdit);
-    setShowRules(false);
-  };
+  const renderAnalysis = (text) =>
+    text.split('\n').map((line, i) => {
+      const match = line.match(/^\*\*(.+?)\*\*:(.*)$/);
+      if (match) return (
+        <div key={i} className="pb-summary-row">
+          <span className="pb-summary-label">{match[1]}:</span>
+          <span className="pb-summary-value">{match[2].trim()}</span>
+        </div>
+      );
+      return line.trim() ? <div key={i} className="pb-summary-row pb-summary-plain">{line}</div> : null;
+    });
 
   return (
     <div className="pb-container">
       <div className="pb-header">
         <h2 className="pb-title">Project Bid</h2>
-        <button className="pb-rules-btn" onClick={() => { setRulesEdit(bidRules); setShowRules(true); }}>
+        <button className="pb-rules-btn" onClick={() => { setRulesEdit(bidRules); setShowRules(s => !s); }}>
           ⚙ Rules
         </button>
       </div>
@@ -87,68 +99,56 @@ export default function ProjectBid() {
           <div className="pb-rules-header">
             <span className="pb-rules-title">Bid Rules</span>
             <div className="pb-rules-actions">
-              <button className="pb-save-btn" onClick={saveRules}>Save</button>
+              <button className="pb-save-btn" onClick={() => { setBidRules(rulesEdit); localStorage.setItem('bid_rules', rulesEdit); setShowRules(false); }}>Save</button>
               <button className="pb-close-btn" onClick={() => setShowRules(false)}>✕</button>
             </div>
           </div>
-          <textarea
-            className="pb-rules-textarea"
-            value={rulesEdit}
-            onChange={e => setRulesEdit(e.target.value)}
-            placeholder="Enter bid writing rules here..."
-          />
+          <textarea className="pb-rules-textarea" value={rulesEdit} onChange={e => setRulesEdit(e.target.value)} />
         </div>
       )}
 
-      <div className="pb-form">
-        <div className="pb-field">
-          <label className="pb-label">Client Name <span className="pb-optional">(optional)</span></label>
-          <input
-            className="pb-input"
-            type="text"
-            value={clientName}
-            onChange={e => setClientName(e.target.value)}
-            placeholder="Client name..."
-          />
-        </div>
-
-        <div className="pb-field">
-          <label className="pb-label">Project Details</label>
-          <textarea
-            className="pb-textarea pb-details"
-            value={projectDetails}
-            onChange={e => setProjectDetails(e.target.value)}
-            placeholder="Paste the Upwork listing or project description here..."
-          />
-        </div>
-
-        <button
-          className="pb-generate-btn"
-          onClick={generateBid}
-          disabled={loading || !projectDetails.trim()}
-        >
-          {loading ? <><span className="pb-spinner" /> Generating...</> : 'Generate Bid →'}
-        </button>
-
-        {error && <div className="pb-error">{error}</div>}
-      </div>
-
-      {generatedBid && (
-        <div className="pb-result">
-          <div className="pb-result-header">
-            <span className="pb-result-title">Generated Bid</span>
-            <button className="pb-copy-btn" onClick={handleCopy}>
-              {copied ? '✓ Copied' : 'Copy'}
+      <div className="pb-main-row">
+        <div className="pb-left">
+          <div className="pb-field">
+            <label className="pb-label">Client Name <span className="pb-optional">(optional)</span></label>
+            <input className="pb-input" type="text" value={clientName} onChange={e => setClientName(e.target.value)} placeholder="Client name..." />
+          </div>
+          <div className="pb-field pb-field-grow">
+            <label className="pb-label">Proje İlanı</label>
+            <textarea
+              className="pb-textarea pb-details"
+              value={projectDetails}
+              onChange={e => { setProjectDetails(e.target.value); setResult(''); setResultType(null); }}
+              placeholder="Upwork ilanını veya proje açıklamasını buraya yapıştırın..."
+            />
+          </div>
+          <div className="pb-action-row">
+            <button className="pb-action-btn pb-analyze-btn" onClick={handleAnalyze} disabled={!!loading || !projectDetails.trim()}>
+              {loading === 'analyze' ? <><span className="pb-spinner" /> Analiz...</> : 'Analiz Et'}
+            </button>
+            <button className="pb-action-btn pb-bid-btn" onClick={handleBid} disabled={!!loading || !projectDetails.trim()}>
+              {loading === 'bid' ? <><span className="pb-spinner" /> Generating...</> : 'Teklif Yaz'}
             </button>
           </div>
-          <textarea
-            className="pb-textarea pb-output"
-            value={generatedBid}
-            onChange={e => setGeneratedBid(e.target.value)}
-            readOnly={false}
-          />
+          {error && <div className="pb-error">{error}</div>}
         </div>
-      )}
+
+        {result && (
+          <div className="pb-right">
+            <div className="pb-result-header">
+              <span className="pb-result-title">{resultType === 'analyze' ? 'Proje Analizi' : 'Generated Bid'}</span>
+              <button className="pb-copy-btn" onClick={() => { navigator.clipboard.writeText(result); setCopied(true); setTimeout(() => setCopied(false), 1500); }}>
+                {copied ? '✓ Kopyalandı' : 'Kopyala'}
+              </button>
+            </div>
+            {resultType === 'analyze' ? (
+              <div className="pb-summary-body">{renderAnalysis(result)}</div>
+            ) : (
+              <textarea className="pb-textarea pb-output" value={result} onChange={e => setResult(e.target.value)} />
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

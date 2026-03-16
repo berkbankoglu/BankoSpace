@@ -120,25 +120,6 @@ function ReferencePanel() {
           const loadedTabs = JSON.parse(saved);
           console.log('Loaded tabs:', loadedTabs);
 
-          // Check if tabs have content
-          const hasContent = loadedTabs.some(tab => tab.items && tab.items.length > 0);
-
-          if (!hasContent && backup) {
-            // Try to restore from backup
-            console.log('No content in current tabs, trying backup...');
-            try {
-              const backupTabs = JSON.parse(backup);
-              console.log('Restored from backup:', backupTabs);
-              setTabs(backupTabs);
-              if (backupTabs.length > 0) {
-                setActiveTabId(backupTabs[0].id);
-              }
-              return;
-            } catch (e) {
-              console.error('Failed to load backup:', e);
-            }
-          }
-
           setTabs(loadedTabs);
           if (loadedTabs.length > 0) {
             setActiveTabId(loadedTabs[0].id);
@@ -146,24 +127,12 @@ function ReferencePanel() {
         } catch (e) {
           console.error('Failed to load tabs:', e);
         }
-      } else {
-        console.log('No saved tabs found in localStorage');
-
-        // Try backup
-        if (backup) {
-          try {
-            const backupTabs = JSON.parse(backup);
-            console.log('Loaded from backup:', backupTabs);
-            setTabs(backupTabs);
-            if (backupTabs.length > 0) {
-              setActiveTabId(backupTabs[0].id);
-            }
-          } catch (e) {
-            console.error('Failed to load backup:', e);
-          }
-        }
       }
     };
+
+    // Clear old backup keys so they don't interfere
+    localStorage.removeItem('freeformTabs_backup');
+    localStorage.removeItem('freeformTabs_backup_old');
 
     // Initial load
     loadTabs();
@@ -189,22 +158,9 @@ function ReferencePanel() {
     setStorageService(new StorageService('local-user'));
   }, []);
 
-  // Save to localStorage with backup
+  // Save to localStorage
   useEffect(() => {
-    const tabsJson = JSON.stringify(tabs);
-
-    // Create backup before saving if tabs have content
-    const hasContent = tabs.some(tab => tab.items && tab.items.length > 0);
-    if (hasContent) {
-      const existingBackup = localStorage.getItem('freeformTabs_backup');
-      if (existingBackup) {
-        // Keep old backup as second backup
-        localStorage.setItem('freeformTabs_backup_old', existingBackup);
-      }
-      localStorage.setItem('freeformTabs_backup', tabsJson);
-    }
-
-    localStorage.setItem('freeformTabs', tabsJson);
+    localStorage.setItem('freeformTabs', JSON.stringify(tabs));
   }, [tabs]);
 
 

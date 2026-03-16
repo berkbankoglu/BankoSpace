@@ -34,6 +34,7 @@ export const SYNC_KEYS = [
   'todoFontSize',
   'theme',
   'soundVolume',
+  'anthropic_api_key',
 ];
 
 // Mevcut kullanıcı ID'sini al
@@ -70,12 +71,21 @@ export async function pullFromSupabase() {
   }
 }
 
-// Tek bir key'i Supabase'e yaz
+// Tek bir key'i Supabase'e yaz (value === null ise Supabase'den sil)
 export async function pushKeyToSupabase(key, value) {
   if (!SYNC_KEYS.includes(key)) return;
   try {
     const userId = await getUserId();
     if (!userId) return;
+
+    if (value === null || value === undefined) {
+      await supabase
+        .from('user_data')
+        .delete()
+        .eq('user_id', userId)
+        .eq('key', key);
+      return;
+    }
 
     let parsed;
     try { parsed = typeof value === 'string' ? JSON.parse(value) : value; }
