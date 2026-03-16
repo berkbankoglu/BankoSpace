@@ -392,175 +392,140 @@ export default function StockNews({ tickers, setTickers, activeTicker, setActive
 
   return (
     <div className={`stock-news-column sn-size-${snSize.toLowerCase()}`}>
-      {/* Header */}
-      <div className="stock-news-header">
-        <span className="stock-news-label">Stock News</span>
-        <div className="stock-news-picker-wrap" ref={pickerRef}>
-          <input
-            className="stock-news-picker-search"
-            placeholder="+ Add ticker..."
-            value={pickerSearch}
-            onChange={e => setPickerSearch(e.target.value)}
-            onFocus={() => setShowPicker(true)}
-          />
-          {showPicker && (
-            <div className="stock-news-picker-dropdown">
-              {POPULAR_STOCKS
-                .filter((s, idx, arr) => arr.findIndex(x => x.ticker === s.ticker) === idx)
-                .filter(s => {
-                  const q = pickerSearch.toLowerCase();
-                  return !q || s.ticker.toLowerCase().includes(q) || s.name.toLowerCase().includes(q);
-                })
-                .map(s => (
-                  <button
-                    key={s.ticker}
-                    className={`stock-news-picker-item ${tickers.includes(s.ticker) ? 'selected' : ''}`}
-                    onMouseDown={e => { e.preventDefault(); toggleTicker(s.ticker); }}
-                    title={s.name}
-                  >
-                    <span className="stock-news-picker-ticker">{s.ticker}</span>
-                    <span className="stock-news-picker-name">{s.name}</span>
-                    {tickers.includes(s.ticker) && <span className="stock-news-picker-check">✓</span>}
-                  </button>
-                ))
-              }
-            </div>
-          )}
+
+      {/* ── Toolbar ── */}
+      <div className="sn-toolbar">
+        <div className="sn-toolbar-left">
+          <span className="sn-brand">📰 Stock News</span>
+          {lastUpdated && <span className="sn-updated">{timeAgo(lastUpdated)}</span>}
         </div>
-        <div className="stock-news-meta">
-          {lastUpdated && <span className="stock-news-updated">{timeAgo(lastUpdated)}</span>}
-          <div className="sn-size-wrap">
-            <button
-              className={`sn-size-toggle ${showSizeMenu ? 'active' : ''}`}
-              ref={sizeBtnRef}
-              onClick={() => {
-                if (!showSizeMenu && sizeBtnRef.current) {
-                  const r = sizeBtnRef.current.getBoundingClientRect();
-                  setSizeMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
-                }
-                setShowSizeMenu(p => !p);
-              }}
-              title="Text size"
-            >{snSize}</button>
-            {showSizeMenu && createPortal(
-              <div ref={sizeMenuRef} className="sn-size-menu" style={{ position: 'fixed', top: sizeMenuPos.top, right: sizeMenuPos.right, left: 'auto', zIndex: 99999 }}>
-                {SN_SIZES.map(s => (
-                  <button
-                    key={s}
-                    className={`sn-size-menu-item ${snSize === s ? 'active' : ''}`}
-                    onClick={() => { setSnSize(s); localStorage.setItem('sn_size', s); setShowSizeMenu(false); if (onSizeChange) onSizeChange(s); }}
-                  >{s}</button>
-                ))}
-              </div>,
-              document.body
-            )}
-          </div>
+        <div className="sn-toolbar-right">
+          <input
+            className="sn-search"
+            placeholder="Search…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
           <button
-            className="stock-news-refresh-btn"
+            className={`sn-filter-fav ${filter === 'favorites' ? 'active' : ''}`}
+            onClick={() => setFilter(f => f === 'favorites' ? 'all' : 'favorites')}
+            title="Saved"
+          >★{favCount > 0 ? ` ${favCount}` : ''}</button>
+          <button
+            className="sn-refresh"
             onClick={() => { setLoading(true); load(true); }}
             title="Refresh"
           >↻</button>
         </div>
       </div>
 
-      {/* Ticker tabs */}
-      <div className="stock-news-ticker-tabs">
+      {/* ── Ticker bar ── */}
+      <div className="sn-ticker-bar">
         <button
-          className={`stock-news-ticker-tab ${activeTicker === 'all' ? 'active' : ''}`}
+          className={`sn-tab ${activeTicker === 'all' ? 'active' : ''}`}
           onClick={() => setActiveTicker('all')}
         >All</button>
         {tickers.map(t => (
-          <span key={t} className={`stock-news-ticker-tab ${activeTicker === t ? 'active' : ''}`}>
-            <span onClick={() => setActiveTicker(t)}>{t}</span>
-            <button
-              className="stock-news-tab-remove"
-              onClick={e => removeTicker(t, e)}
-              title={`Remove ${t}`}
-            >×</button>
+          <span key={t} className={`sn-tab ${activeTicker === t ? 'active' : ''}`}>
+            <span className="sn-tab-label" onClick={() => setActiveTicker(t)}>{t}</span>
+            <button className="sn-tab-x" onClick={e => removeTicker(t, e)}>×</button>
           </span>
         ))}
+        {/* Add ticker */}
+        <div className="sn-add-wrap" ref={pickerRef}>
+          <button className="sn-add-btn" onClick={() => setShowPicker(p => !p)}>＋</button>
+          {showPicker && (
+            <div className="sn-picker-dropdown">
+              <input
+                className="sn-picker-search"
+                placeholder="Search ticker…"
+                value={pickerSearch}
+                onChange={e => setPickerSearch(e.target.value)}
+                autoFocus
+              />
+              <div className="sn-picker-list">
+                {POPULAR_STOCKS
+                  .filter((s, idx, arr) => arr.findIndex(x => x.ticker === s.ticker) === idx)
+                  .filter(s => {
+                    const q = pickerSearch.toLowerCase();
+                    return !q || s.ticker.toLowerCase().includes(q) || s.name.toLowerCase().includes(q);
+                  })
+                  .map(s => (
+                    <button
+                      key={s.ticker}
+                      className={`sn-picker-item ${tickers.includes(s.ticker) ? 'selected' : ''}`}
+                      onMouseDown={e => { e.preventDefault(); toggleTicker(s.ticker); }}
+                    >
+                      <span className="sn-picker-ticker">{s.ticker}</span>
+                      <span className="sn-picker-name">{s.name}</span>
+                      {tickers.includes(s.ticker) && <span className="sn-picker-check">✓</span>}
+                    </button>
+                  ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Search */}
-      <div className="stock-news-search-row">
-        <input
-          className="stock-news-search"
-          placeholder="Search news..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
-      </div>
-
-      {/* Filters */}
-      <div className="stock-news-filters">
-        {[
-          { key: 'all', label: 'All' },
-          { key: 'favorites', label: `★ Saved${favCount > 0 ? ` (${favCount})` : ''}` },
-        ].map(f => (
-          <button
-            key={f.key}
-            className={`stock-news-filter-btn ${filter === f.key ? 'active' : ''}`}
-            onClick={() => setFilter(f.key)}
-          >{f.label}</button>
-        ))}
-      </div>
-
-      {/* List */}
-      <div className="stock-news-list">
+      {/* ── News list ── */}
+      <div className="sn-list">
         {loading && (
-          <div className="stock-news-loading">
-            <span className="stock-news-spinner" />
-            Loading...
+          <div className="sn-state">
+            <span className="sn-spinner" />
+            Loading news…
           </div>
         )}
-        {error && <div className="stock-news-error">{error}</div>}
+        {error && <div className="sn-state sn-error">{error}</div>}
         {!loading && !error && filtered.length === 0 && (
-          <div className="stock-news-empty">No news found</div>
+          <div className="sn-state">No news found</div>
         )}
         {!loading && !error && filtered.map((item, i) => (
           <div
             key={item.id || i}
-            className={`stock-news-item ${!seenRef.current.has(item.id) ? 'stock-news-item--unread' : ''}`}
+            className={`sn-card ${!seenRef.current.has(item.id) ? 'sn-card--unread' : ''}`}
           >
-            <div className="stock-news-item-top">
-              <span
-                className="stock-news-item-title"
-                onClick={() => {
-                  seenRef.current.add(item.id);
-                  localStorage.setItem(STORAGE_KEY, JSON.stringify([...seenRef.current].slice(-500)));
-                  open(item.link).catch(() => {});
-                }}
-                style={{ cursor: 'pointer' }}
-              >{item.title}</span>
-              <div className="stock-news-item-actions">
+            {/* top meta: ticker + source + time */}
+            <div className="sn-card-meta">
+              <span className="sn-card-ticker">{item.ticker}</span>
+              {item.source && <span className="sn-card-source">{item.source}</span>}
+              <span className="sn-card-dot">·</span>
+              <span className="sn-card-time">{timeAgo(item.date)}</span>
+              <div className="sn-card-actions">
                 <button
-                  className={`stock-news-ai-btn ${aiComments[item.id]?.status === 'done' ? 'active' : ''}`}
+                  className={`sn-ai-btn ${aiComments[item.id]?.status === 'done' ? 'active' : ''}`}
                   onClick={e => requestAiComment(item, e)}
-                  title="AI yorumu"
+                  title="AI analiz"
                 >
                   {aiComments[item.id]?.status === 'loading'
-                    ? <span className="stock-news-ai-spinner" />
-                    : 'AI'}
+                    ? <span className="sn-spin-sm" />
+                    : '✦ AI'}
                 </button>
                 <button
-                  className={`stock-news-fav-btn ${favs.has(item.id) ? 'active' : ''}`}
+                  className={`sn-fav-btn ${favs.has(item.id) ? 'active' : ''}`}
                   onClick={e => toggleFav(item.id, e)}
-                  title={favs.has(item.id) ? 'Remove from saved' : 'Save'}
                 >★</button>
               </div>
             </div>
+
+            {/* headline */}
+            <div
+              className="sn-card-title"
+              onClick={() => {
+                seenRef.current.add(item.id);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify([...seenRef.current].slice(-500)));
+                open(item.link).catch(() => {});
+              }}
+            >{item.title}</div>
+
+            {/* description */}
             {item.description && (
-              <div className="stock-news-item-desc">{item.description}</div>
+              <div className="sn-card-desc">{item.description}</div>
             )}
-            <div className="stock-news-item-meta">
-              <span className="stock-news-item-ticker-badge">{item.ticker}</span>
-              <span className="stock-news-item-source">{item.source}</span>
-              <span className="stock-news-item-time">{timeAgo(item.date)}</span>
-            </div>
+            {/* AI panel */}
             {aiComments[item.id] && aiComments[item.id].status !== 'loading' && (
-              <div className={`stock-news-ai-comment ${aiComments[item.id].status}`}>
+              <div className={`sn-ai-panel ${aiComments[item.id].status}`}>
                 {aiComments[item.id].status === 'error' ? (
-                  <span>{aiComments[item.id].text}</span>
+                  <span className="sn-ai-err">{aiComments[item.id].text}</span>
                 ) : (
                   <>
                     <div className="sn-ai-yorum">{aiComments[item.id].text.yorum}</div>
