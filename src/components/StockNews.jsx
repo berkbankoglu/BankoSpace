@@ -111,8 +111,8 @@ const POPULAR_STOCKS = [
   { ticker: 'RKLB',   name: 'Rocket Lab' },
 ];
 
-function getGoogleNewsUrl(ticker) {
-  return `https://news.google.com/rss/search?q=${encodeURIComponent(ticker)}+stock&hl=en-US&gl=US&ceid=US:en`;
+function getYahooFinanceUrl(ticker) {
+  return `https://feeds.finance.yahoo.com/rss/2.0/headline?s=${encodeURIComponent(ticker)}&region=US&lang=en-US`;
 }
 
 function parseRssXml(xml, ticker) {
@@ -124,22 +124,19 @@ function parseRssXml(xml, ticker) {
       const title = item.querySelector('title')?.textContent || '';
       const link = item.querySelector('link')?.textContent || '';
       const pubDate = item.querySelector('pubDate')?.textContent || '';
-      const source = item.querySelector('source')?.textContent || 'Google News';
+      const source = item.querySelector('source')?.textContent || 'Yahoo Finance';
       const guid = item.querySelector('guid')?.textContent || `${ticker}_${i}`;
-      // description may contain HTML — strip tags
       const rawDesc = item.querySelector('description')?.textContent || '';
       const description = rawDesc.replace(/<[^>]*>/g, '').trim();
-      // title usually ends with " - Source Name", remove it
-      const cleanTitle = title.replace(/ - [^-]+$/, '');
       return {
         id: `${ticker}_${guid}`,
-        title: cleanTitle,
+        title,
         description,
         link,
         date: pubDate ? new Date(pubDate).toISOString() : new Date().toISOString(),
         source,
         ticker,
-        provider: 'Google News',
+        provider: 'Yahoo Finance',
       };
     });
   } catch {
@@ -181,7 +178,7 @@ function playNewsSound() {
 }
 
 async function fetchTickerNews(ticker) {
-  const text = await invoke('fetch_rss', { url: getGoogleNewsUrl(ticker) });
+  const text = await invoke('fetch_rss', { url: getYahooFinanceUrl(ticker) });
   return parseRssXml(text, ticker);
 }
 
