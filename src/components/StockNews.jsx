@@ -4,11 +4,10 @@ import { invoke } from '@tauri-apps/api/core';
 import { sendNotification, isPermissionGranted, requestPermission } from '@tauri-apps/plugin-notification';
 import { open } from '@tauri-apps/plugin-shell';
 
-const REFRESH_INTERVAL = 15 * 1000;
+const REFRESH_INTERVAL = 15 * 60 * 1000;
 const STORAGE_KEY = 'stock_seen_news';
 const FAVS_KEY = 'stock_favs';
 const TICKERS_KEY = 'stock_tickers';
-const FINNHUB_KEY = 'd6omik1r01qi5kh3h3v0d6omik1r01qi5kh3h3vg';
 
 const DEFAULT_TICKERS = ['NBIS'];
 
@@ -112,15 +111,34 @@ const POPULAR_STOCKS = [
   { ticker: 'RKLB',   name: 'Rocket Lab' },
 ];
 
-function getFinnhubUrl(ticker) {
-  const now = new Date();
-  const toDate = new Date(now);
-  toDate.setDate(toDate.getDate() + 1);
-  const to = toDate.toISOString().slice(0, 10);
-  const fromDate = new Date(now);
-  fromDate.setDate(fromDate.getDate() - 30);
-  const from = fromDate.toISOString().slice(0, 10);
-  return `https://finnhub.io/api/v1/company-news?symbol=${encodeURIComponent(ticker)}&from=${from}&to=${to}&token=${FINNHUB_KEY}`;
+function getGoogleNewsUrl(ticker) {
+  return `https://news.google.com/rss/search?q=${encodeURIComponent(ticker)}+stock&hl=en-US&gl=US&ceid=US:en`;
+}
+
+function parseRssXml(xml, ticker) {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xml, 'text/xml');
+    const items = Array.from(doc.querySelectorAll('item'));
+    return items.slice(0, 30).map((item, i) => {
+      const title = item.querySelector('title')?.textContent || '';
+      const link = item.querySelector('link')?.textContent || '';
+      const pubDate = item.querySelector('pubDate')?.textContent || '';
+      const source = item.querySelector('source')?.textContent || 'Google News';
+      const guid = item.querySelector('guid')?.textContent || `${ticker}_${i}`;
+      return {
+        id: `${ticker}_${guid}`,
+        title: title.replace(/ - [^-]+$/, ''), // remove source suffix
+        link,
+        date: pubDate ? new Date(pubDate).toISOString() : new Date().toISOString(),
+        source,
+        ticker,
+        provider: 'Google News',
+      };
+    });
+  } catch {
+    return [];
+  }
 }
 
 function timeAgo(dateStr) {
@@ -157,22 +175,14 @@ function playNewsSound() {
 }
 
 async function fetchTickerNews(ticker) {
-  const text = await invoke('fetch_rss', { url: getFinnhubUrl(ticker) });
-  const data = JSON.parse(text);
-  if (!Array.isArray(data)) return [];
-  return data.slice(0, 100).map(item => ({
-    id: String(item.id) + `_${ticker}`,
-    title: item.headline || '',
-    link: item.url || '',
-    date: new Date(item.datetime * 1000).toISOString(),
-    source: item.source || 'Finnhub',
-    ticker,
-    provider: 'Finnhub',
-  }));
+  const text = await invoke('fetch_rss', { url: getGoogleNewsUrl(ticker) });
+  return parseRssXml(text, ticker);
 }
 
 async function fetchAllNews(tickers) {
+  if (!tickers || tickers.length === 0) return [];
   const results = await Promise.allSettled(tickers.map(fetchTickerNews));
+  results.forEach((r, i) => { if (r.status === 'rejected') console.error('News fetch failed for', tickers[i], r.reason); });
   const all = results
     .filter(r => r.status === 'fulfilled')
     .flatMap(r => r.value);
@@ -271,7 +281,7 @@ export default function StockNews({ tickers, setTickers, activeTicker, setActive
   const toggleTicker = (t) => {
     if (tickers.includes(t)) {
       const next = tickers.filter(x => x !== t);
-      saveTickers(next.length > 0 ? next : DEFAULT_TICKERS);
+      saveTickers(next);
       if (activeTicker === t) setActiveTicker('all');
     } else {
       saveTickers([...tickers, t]);
@@ -301,7 +311,7 @@ export default function StockNews({ tickers, setTickers, activeTicker, setActive
   const removeTicker = (t, e) => {
     e.stopPropagation();
     const next = tickers.filter(x => x !== t);
-    saveTickers(next.length > 0 ? next : DEFAULT_TICKERS);
+    saveTickers(next);
     if (activeTicker === t) setActiveTicker('all');
   };
 
@@ -335,7 +345,8 @@ export default function StockNews({ tickers, setTickers, activeTicker, setActive
   const load = useCallback(async (notify = false) => {
     try {
       setError(null);
-      const items = await fetchAllNews(tickers);
+      const activeTickers = tickers && tickers.length > 0 ? tickers : DEFAULT_TICKERS;
+      const items = await fetchAllNews(activeTickers);
       const newItems = items.filter(n => !seenRef.current.has(n.id));
       setNews(items);
       setLastUpdated(new Date());
@@ -345,8 +356,8 @@ export default function StockNews({ tickers, setTickers, activeTicker, setActive
         localStorage.setItem(STORAGE_KEY, JSON.stringify([...seenRef.current].slice(-500)));
         isFirstLoad.current = false;
       }
-    } catch {
-      setError('Could not load news');
+    } catch (e) {
+      setError('Could not load news: ' + (e?.message || String(e)));
     } finally {
       setLoading(false);
     }

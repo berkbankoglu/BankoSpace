@@ -4,7 +4,10 @@ import './Stocks.css';
 
 export default function Stocks() {
   const [stockTickers, setStockTickers] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('stock_tickers')) || []; } catch { return []; }
+    try {
+      const saved = JSON.parse(localStorage.getItem('stock_tickers'));
+      return Array.isArray(saved) && saved.length > 0 ? saved : ['AAPL', 'NVDA', 'TSLA'];
+    } catch { return ['AAPL', 'NVDA', 'TSLA']; }
   });
   const [activeTicker, setActiveTicker] = useState('all');
 
