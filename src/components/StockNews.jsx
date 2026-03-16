@@ -111,34 +111,98 @@ const POPULAR_STOCKS = [
   { ticker: 'RKLB',   name: 'Rocket Lab' },
 ];
 
-function getYahooFinanceUrl(ticker) {
-  return `https://feeds.finance.yahoo.com/rss/2.0/headline?s=${encodeURIComponent(ticker)}&region=US&lang=en-US`;
+// Seeking Alpha RSS — ticker-specific, good quality
+function getSeekingAlphaUrl(ticker) {
+  return `https://seekingalpha.com/api/sa/combined/${encodeURIComponent(ticker)}.xml`;
 }
 
-function parseRssXml(xml, ticker) {
+// TradingView real-time feed — Reuters/DJ, general market
+const TV_FEED_URL = 'https://news-headlines.tradingview.com/v2/headlines?client=web&lang=en';
+
+// Company name keywords for TradingView title matching
+const TICKER_KEYWORDS = {
+  AAPL: ['Apple'], MSFT: ['Microsoft'], GOOGL: ['Alphabet', 'Google'], AMZN: ['Amazon'],
+  NVDA: ['Nvidia', 'NVIDIA'], META: ['Meta'], TSLA: ['Tesla'], AMD: ['AMD'],
+  INTC: ['Intel'], NFLX: ['Netflix'], PLTR: ['Palantir'], CRWD: ['CrowdStrike'],
+  SNOW: ['Snowflake'], MSTR: ['MicroStrategy', 'Strategy'], COIN: ['Coinbase'],
+  HOOD: ['Robinhood'], RKLB: ['Rocket Lab'], IONQ: ['IonQ'], SOUN: ['SoundHound'],
+  MARA: ['Marathon Digital', 'Marathon'], RIOT: ['Riot Platforms', 'Riot'],
+  SHOP: ['Shopify'], PYPL: ['PayPal'], UBER: ['Uber'], SPOT: ['Spotify'],
+  NET: ['Cloudflare'], DDOG: ['Datadog'], CRM: ['Salesforce'], ORCL: ['Oracle'],
+  JPM: ['JPMorgan'], GS: ['Goldman Sachs'], BAC: ['Bank of America'],
+  RIVN: ['Rivian'], LCID: ['Lucid'], NIO: ['NIO'], BABA: ['Alibaba'],
+  NBIS: ['Nebius'], IREN: ['IREN'],
+};
+
+function parseSeekingAlphaXml(xml, ticker) {
   try {
     const parser = new DOMParser();
     const doc = parser.parseFromString(xml, 'text/xml');
     const items = Array.from(doc.querySelectorAll('item'));
-    return items.slice(0, 30).map((item, i) => {
+    return items.slice(0, 20).map((item, i) => {
       const title = item.querySelector('title')?.textContent || '';
-      const link = item.querySelector('link')?.textContent || '';
       const pubDate = item.querySelector('pubDate')?.textContent || '';
-      const source = item.querySelector('source')?.textContent || 'Yahoo Finance';
-      const guid = item.querySelector('guid')?.textContent || `${ticker}_${i}`;
+      const guid = item.querySelector('guid')?.textContent || `sa_${ticker}_${i}`;
+      // link is a redirect page; use guid or construct direct URL
+      const link = `https://seekingalpha.com/symbol/${ticker}/news`;
       const rawDesc = item.querySelector('description')?.textContent || '';
       const description = rawDesc.replace(/<[^>]*>/g, '').trim();
       return {
-        id: `${ticker}_${guid}`,
+        id: `sa_${ticker}_${guid}`,
         title,
         description,
         link,
         date: pubDate ? new Date(pubDate).toISOString() : new Date().toISOString(),
-        source,
+        source: 'Seeking Alpha',
         ticker,
-        provider: 'Yahoo Finance',
+        provider: 'SeekingAlpha',
       };
     });
+  } catch {
+    return [];
+  }
+}
+
+function parseTvFeed(data, tickers) {
+  try {
+    const items = data.items || [];
+    const results = [];
+    const tickerSet = new Set(tickers.map(t => t.toUpperCase()));
+    const keywordMap = {};
+    tickers.forEach(t => {
+      const kws = TICKER_KEYWORDS[t.toUpperCase()] || [];
+      kws.forEach(kw => { keywordMap[kw] = t; });
+    });
+
+    for (const item of items) {
+      const relSymbols = (item.relatedSymbols || []).map(r => r.symbol || '');
+      // find matching ticker via relatedSymbols
+      let matchedTicker = null;
+      for (const sym of relSymbols) {
+        const parts = sym.split(':');
+        const bare = parts[parts.length - 1].toUpperCase();
+        if (tickerSet.has(bare)) { matchedTicker = bare; break; }
+      }
+      // fallback: title keyword match
+      if (!matchedTicker) {
+        for (const [kw, t] of Object.entries(keywordMap)) {
+          if (item.title.includes(kw)) { matchedTicker = t; break; }
+        }
+      }
+      if (!matchedTicker) continue;
+
+      results.push({
+        id: `tv_${item.id}`,
+        title: item.title || '',
+        description: '',
+        link: item.storyPath ? `https://www.tradingview.com${item.storyPath}` : '',
+        date: item.published ? new Date(item.published * 1000).toISOString() : new Date().toISOString(),
+        source: item.source || 'TradingView',
+        ticker: matchedTicker,
+        provider: 'TradingView',
+      });
+    }
+    return results;
   } catch {
     return [];
   }
@@ -177,26 +241,42 @@ function playNewsSound() {
   } catch {}
 }
 
-async function fetchTickerNews(ticker) {
-  const text = await invoke('fetch_rss', { url: getYahooFinanceUrl(ticker) });
-  return parseRssXml(text, ticker);
-}
-
 async function fetchAllNews(tickers) {
   if (!tickers || tickers.length === 0) return [];
-  const results = await Promise.allSettled(tickers.map(fetchTickerNews));
-  results.forEach((r, i) => { if (r.status === 'rejected') console.error('News fetch failed for', tickers[i], r.reason); });
-  const all = results
+
+  // 1. Seeking Alpha per-ticker RSS
+  const saResults = await Promise.allSettled(
+    tickers.map(async t => {
+      const text = await invoke('fetch_rss', { url: getSeekingAlphaUrl(t) });
+      return parseSeekingAlphaXml(text, t);
+    })
+  );
+  const saItems = saResults
     .filter(r => r.status === 'fulfilled')
     .flatMap(r => r.value);
-  // Deduplicate by title similarity across tickers
+
+  // 2. TradingView real-time feed (Reuters/DJ)
+  let tvItems = [];
+  try {
+    const tvText = await invoke('fetch_rss', { url: TV_FEED_URL });
+    const tvData = JSON.parse(tvText);
+    tvItems = parseTvFeed(tvData, tickers);
+  } catch (e) {
+    console.warn('TradingView feed failed:', e);
+  }
+
+  const all = [...tvItems, ...saItems];
+
+  // Deduplicate by title
   const seen = new Set();
   const unique = all.filter(item => {
+    if (!item.title) return false;
     const key = item.title.toLowerCase().slice(0, 60);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
+
   unique.sort((a, b) => new Date(b.date) - new Date(a.date));
   return unique;
 }
@@ -484,6 +564,7 @@ export default function StockNews({ tickers, setTickers, activeTicker, setActive
             {/* top meta: ticker + source + time */}
             <div className="sn-card-meta">
               <span className="sn-card-ticker">{item.ticker}</span>
+              {item.provider === 'TradingView' && <span className="sn-live-badge">LIVE</span>}
               {item.source && <span className="sn-card-source">{item.source}</span>}
               <span className="sn-card-dot">·</span>
               <span className="sn-card-time">{timeAgo(item.date)}</span>

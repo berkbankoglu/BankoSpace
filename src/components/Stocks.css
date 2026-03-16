@@ -236,6 +236,13 @@
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   max-width: 140px;
 }
+.sn-live-badge {
+  font-size: 9px; font-weight: 800;
+  color: #3fb950; background: rgba(63,185,80,0.12);
+  border: 1px solid rgba(63,185,80,0.3);
+  border-radius: 3px; padding: 1px 5px;
+  letter-spacing: 0.6px; flex-shrink: 0;
+}
 .sn-card-dot { color: #3d444d; font-size: 10px; }
 .sn-card-time { font-size: 11px; color: #3d444d; flex-shrink: 0; }
 
