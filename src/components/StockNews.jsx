@@ -126,9 +126,15 @@ function parseRssXml(xml, ticker) {
       const pubDate = item.querySelector('pubDate')?.textContent || '';
       const source = item.querySelector('source')?.textContent || 'Google News';
       const guid = item.querySelector('guid')?.textContent || `${ticker}_${i}`;
+      // description may contain HTML — strip tags
+      const rawDesc = item.querySelector('description')?.textContent || '';
+      const description = rawDesc.replace(/<[^>]*>/g, '').trim();
+      // title usually ends with " - Source Name", remove it
+      const cleanTitle = title.replace(/ - [^-]+$/, '');
       return {
         id: `${ticker}_${guid}`,
-        title: title.replace(/ - [^-]+$/, ''), // remove source suffix
+        title: cleanTitle,
+        description,
         link,
         date: pubDate ? new Date(pubDate).toISOString() : new Date().toISOString(),
         source,
@@ -543,8 +549,12 @@ export default function StockNews({ tickers, setTickers, activeTicker, setActive
                 >★</button>
               </div>
             </div>
+            {item.description && (
+              <div className="stock-news-item-desc">{item.description}</div>
+            )}
             <div className="stock-news-item-meta">
               <span className="stock-news-item-ticker-badge">{item.ticker}</span>
+              <span className="stock-news-item-source">{item.source}</span>
               <span className="stock-news-item-time">{timeAgo(item.date)}</span>
             </div>
             {aiComments[item.id] && aiComments[item.id].status !== 'loading' && (
