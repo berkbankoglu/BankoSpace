@@ -13,6 +13,7 @@ import Calendar from './components/Calendar';
 import ProjectBid from './components/ProjectBid';
 import Stocks from './components/Stocks';
 import JapaneseKana from './components/JapaneseKana';
+import Translate from './components/Translate';
 import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, setVolume, getVolume } from './utils/sounds';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
@@ -132,6 +133,14 @@ function App({ session, onLogout }) {
           pushKeyToSupabase(key, value);
         }
       };
+
+      const origRemoveItem = localStorage.removeItem.bind(localStorage);
+      localStorage.removeItem = function(key) {
+        origRemoveItem(key);
+        if (SYNC_KEYS.includes(key)) {
+          pushKeyToSupabase(key, null);
+        }
+      };
     });
 
     return () => {
@@ -212,6 +221,7 @@ function App({ session, onLogout }) {
       { id: 'stocks',       label: 'Stocks',           view: 'stocks',       hidden: false },
 
       { id: 'japanesekana', label: 'Japanese Kana',    view: 'japanesekana', hidden: false },
+      { id: 'translate',    label: 'Translate',        view: 'translate',    hidden: false },
     ];
     const saved = localStorage.getItem('sidebarOrder');
     if (saved) {
@@ -1665,6 +1675,13 @@ function App({ session, onLogout }) {
 
           {/* Japanese Kana */}
           {activeView === 'japanesekana' && <JapaneseKana />}
+
+          {/* Translate */}
+          {activeView === 'translate' && (
+            <div style={{ height: '100%', overflow: 'hidden' }}>
+              <Translate />
+            </div>
+          )}
 
           {/* Dashboard View */}
           {activeView === 'dashboard' && (

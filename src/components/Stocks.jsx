@@ -4,7 +4,7 @@ import './Stocks.css';
 
 export default function Stocks() {
   const [stockTickers, setStockTickers] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('stock_tickers')) || ['NBIS']; } catch { return ['NBIS']; }
+    try { return JSON.parse(localStorage.getItem('stock_tickers')) || []; } catch { return []; }
   });
   const [activeTicker, setActiveTicker] = useState('all');
 
