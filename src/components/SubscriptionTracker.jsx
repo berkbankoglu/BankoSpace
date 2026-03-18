@@ -112,8 +112,8 @@ function SubModal({ initial, onSave, onClose }) {
 }
 
 // ─── Payment Modal ────────────────────────────────────────────
-const PAY_DEFAULT = { name: '', date: '', price: '', currency: '₺', type: 'manual', note: '' };
-// type: 'manual' = manuel/nakit, 'card' = kredi kartı
+const PAY_DEFAULT = { name: '', date: '', price: '', currency: '₺', type: 'manual', cancelBy: '', note: '' };
+// type: 'manual' = elle yapılan, 'auto' = otomatik
 
 function PayModal({ initial, onSave, onClose }) {
   const [form, setForm] = useState(initial || PAY_DEFAULT);
@@ -156,10 +156,15 @@ function PayModal({ initial, onSave, onClose }) {
               <button className={`sub-type-btn ${form.type === 'manual' ? 'active' : ''}`} onClick={() => set('type', 'manual')}>
                 <span>✋</span> Manuel
               </button>
-              <button className={`sub-type-btn ${form.type === 'card' ? 'active' : ''}`} onClick={() => set('type', 'card')}>
-                <span>💳</span> Kredi Kartı
+              <button className={`sub-type-btn sub-type-btn--auto ${form.type === 'auto' ? 'active' : ''}`} onClick={() => set('type', 'auto')}>
+                <span>⚡</span> Otomatik
               </button>
             </div>
+          </div>
+          <div className="sub-field">
+            <label className="sub-label">İptal Son Tarihi <span className="sub-label-hint">(opsiyonel)</span></label>
+            <input className="sub-input" type="date" value={form.cancelBy} onChange={e => set('cancelBy', e.target.value)} />
+            <span className="sub-field-hint">Bu tarihten önce iptal etmeyi unutma</span>
           </div>
           <div className="sub-field">
             <label className="sub-label">Not <span className="sub-label-hint">(opsiyonel)</span></label>
@@ -270,14 +275,21 @@ export default function SubscriptionTracker() {
           {sortedPays.map(pay => {
             const days = getDaysUntil(pay.date);
             const urgency = days <= 3 ? 'urgent' : days <= 7 ? 'soon' : 'normal';
+            const cancelDays = pay.cancelBy ? getDaysUntil(pay.cancelBy) : null;
+            const cancelUrgent = cancelDays !== null && cancelDays <= 5;
             return (
-              <div key={pay.id} className={`sub-item sub-item--${urgency} sub-item--pay-${pay.type}`}
+              <div key={pay.id} className={`sub-item sub-item--${urgency} ${pay.type === 'auto' ? 'sub-item--auto' : ''}`}
                 onClick={() => setEditingPay(pay)}>
                 <div className="sub-item-dot" />
                 <div className="sub-item-left">
                   <div className="sub-item-name-row">
-                    <span className="sub-pay-type-icon">{pay.type === 'card' ? '💳' : '✋'}</span>
+                    <span className="sub-pay-type-icon">{pay.type === 'auto' ? '⚡' : '✋'}</span>
                     <span className="sub-item-name">{pay.name}</span>
+                    {pay.cancelBy && cancelDays !== null && (
+                      <span className={`sub-cancel-badge ${cancelUrgent ? 'sub-cancel-badge--urgent' : ''}`}>
+                        ⚠ {cancelDays >= 0 ? `${cancelDays}g` : 'geçti'}
+                      </span>
+                    )}
                   </div>
                   <span className="sub-item-date">
                     {days === 0 ? 'Bugün' : days < 0 ? `${Math.abs(days)}g önce` : `${days}g sonra`}
