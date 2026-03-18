@@ -47,25 +47,23 @@ function useLocalStorage(key, def) {
 }
 
 // ─── Unified Modal ────────────────────────────────────────────
-// targetTab: 'subs' | 'pays' — where to save on Add
 const UNIFIED_DEFAULT = {
   name: '', date: '', price: '', currency: '₺',
-  recurring: true, autoCharge: false, type: 'manual',
+  recurring: false, autoCharge: false, type: 'manual',
   cancelBy: '', note: ''
 };
 
 function UnifiedModal({ initial, targetTab, onSaveSub, onSavePay, onClose }) {
   const isEdit = !!initial?.id;
-  // detect which list this item belongs to from caller
-  const initTab = initial?._tab || targetTab || 'subs';
-  const [tab, setTab] = useState(initTab);
+  const editTab = initial?._tab || targetTab || 'subs';
   const [form, setForm] = useState(initial || UNIFIED_DEFAULT);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const handleSave = () => {
     if (!form.name.trim() || !form.date) return;
     const item = { ...form, id: form.id || Date.now(), name: form.name.trim(), price: parseFloat(form.price) || 0 };
-    if (tab === 'subs') onSaveSub(item);
+    // decide target: edit goes back to original tab; add goes to current tab
+    if (editTab === 'subs') onSaveSub(item);
     else onSavePay(item);
     onClose();
   };
@@ -77,25 +75,15 @@ function UnifiedModal({ initial, targetTab, onSaveSub, onSavePay, onClose }) {
           <span className="sub-modal-title">{isEdit ? 'Düzenle' : 'Ekle'}</span>
           <button className="sub-modal-close" onClick={onClose}>×</button>
         </div>
-
-        {/* Tab selector — only shown when adding new */}
-        {!isEdit && (
-          <div className="sub-modal-tabs">
-            <button className={`sub-modal-tab ${tab === 'subs' ? 'active' : ''}`} onClick={() => setTab('subs')}>Abonelik</button>
-            <button className={`sub-modal-tab ${tab === 'pays' ? 'active' : ''}`} onClick={() => setTab('pays')}>Ödeme</button>
-          </div>
-        )}
-
         <div className="sub-modal-body">
           <div className="sub-field">
-            <label className="sub-label">{tab === 'subs' ? 'Servis Adı' : 'Açıklama'}</label>
-            <input className="sub-input"
-              placeholder={tab === 'subs' ? 'Netflix, Spotify...' : 'Elektrik, kira, alışveriş...'}
+            <label className="sub-label">Açıklama</label>
+            <input className="sub-input" placeholder="Netflix, elektrik, kira..."
               value={form.name} onChange={e => set('name', e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleSave()} autoFocus />
           </div>
           <div className="sub-field">
-            <label className="sub-label">Ödeme Tarihi</label>
+            <label className="sub-label">Tarih</label>
             <input className="sub-input" type="date" value={form.date} onChange={e => set('date', e.target.value)} />
           </div>
           <div className="sub-field">
@@ -108,38 +96,20 @@ function UnifiedModal({ initial, targetTab, onSaveSub, onSavePay, onClose }) {
                 onChange={e => set('price', e.target.value)} />
             </div>
           </div>
-
-          {tab === 'subs' && (
-            <>
-              <label className="sub-recurring-label">
-                <div className={`sub-toggle ${form.recurring ? 'on' : ''}`} onClick={() => set('recurring', !form.recurring)}>
-                  <div className="sub-toggle-knob" />
-                </div>
-                <span>Aylık tekrar</span>
-              </label>
-              <label className="sub-recurring-label">
-                <div className={`sub-toggle sub-toggle--auto ${form.autoCharge ? 'on' : ''}`} onClick={() => set('autoCharge', !form.autoCharge)}>
-                  <div className="sub-toggle-knob" />
-                </div>
-                <span>Otomatik ödeme <span className="sub-label-hint">(karttan otomatik çekiliyor)</span></span>
-              </label>
-            </>
-          )}
-
-          {tab === 'pays' && (
-            <div className="sub-field">
-              <label className="sub-label">Ödeme Tipi</label>
-              <div className="sub-type-row">
-                <button className={`sub-type-btn ${form.type === 'manual' ? 'active' : ''}`} onClick={() => set('type', 'manual')}>
-                  <span>✋</span> Manuel
-                </button>
-                <button className={`sub-type-btn sub-type-btn--auto ${form.type === 'auto' ? 'active' : ''}`} onClick={() => set('type', 'auto')}>
-                  <span>⚡</span> Otomatik
-                </button>
+          <div className="sub-toggles-row">
+            <label className="sub-toggle-item">
+              <div className={`sub-toggle ${form.recurring ? 'on' : ''}`} onClick={() => set('recurring', !form.recurring)}>
+                <div className="sub-toggle-knob" />
               </div>
-            </div>
-          )}
-
+              <span>Aylık tekrar</span>
+            </label>
+            <label className="sub-toggle-item">
+              <div className={`sub-toggle sub-toggle--auto ${form.autoCharge ? 'on' : ''}`} onClick={() => set('autoCharge', !form.autoCharge)}>
+                <div className="sub-toggle-knob" />
+              </div>
+              <span>Otomatik</span>
+            </label>
+          </div>
           <div className="sub-field">
             <label className="sub-label">İptal Son Tarihi <span className="sub-label-hint">(opsiyonel)</span></label>
             <input className="sub-input" type="date" value={form.cancelBy} onChange={e => set('cancelBy', e.target.value)} />
