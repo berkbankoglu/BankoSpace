@@ -216,8 +216,8 @@ export default function SubscriptionTracker() {
 
   const autoItems = sortByDays(items.filter(i => i.category === 'monthly-auto'));
   const manualItems = sortByDays(items.filter(i => i.category === 'monthly-manual'));
-  const oncePayItems = sortByDays(items.filter(i => i.category === 'once-payment' || i.category === 'once'));
-  const onceCancelItems = sortByDays(items.filter(i => i.category === 'once-cancel'));
+  const oncePayItems = sortByDays(items.filter(i => (i.category === 'once-payment' || i.category === 'once') && !i.done));
+  const onceCancelItems = sortByDays(items.filter(i => i.category === 'once-cancel' && !i.done));
 
   const totalAuto = autoItems.reduce((s, i) => s + (i.currency === '₺' ? i.price : 0), 0);
   const totalManual = manualItems.reduce((s, i) => s + (i.currency === '₺' ? i.price : 0), 0);
