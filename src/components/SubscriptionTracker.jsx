@@ -59,18 +59,15 @@ function AddModal({ initial, onSave, onDelete, onClose }) {
           <div className="sub-cat-grid">
             <button className={`sub-cat-btn ${form.category === 'monthly-auto' ? 'active active--auto' : ''}`}
               onClick={() => set('category', 'monthly-auto')}>
-              <span>⚡</span>
-              <span>Her Ay · Otomatik</span>
+              Her Ay · Otomatik
             </button>
             <button className={`sub-cat-btn ${form.category === 'monthly-manual' ? 'active active--manual' : ''}`}
               onClick={() => set('category', 'monthly-manual')}>
-              <span>✋</span>
-              <span>Her Ay · Manuel</span>
+              Her Ay · Manuel
             </button>
             <button className={`sub-cat-btn ${form.category === 'once' ? 'active active--once' : ''}`}
               onClick={() => set('category', 'once')}>
-              <span>◈</span>
-              <span>Tek Seferlik</span>
+              Tek Seferlik
             </button>
           </div>
 
@@ -100,10 +97,12 @@ function AddModal({ initial, onSave, onDelete, onClose }) {
           </div>
 
           <div className="sub-two-col">
-            <div className="sub-field">
-              <label className="sub-label">İptal Son Tarihi <span className="sub-label-hint">(opsiyonel)</span></label>
-              <input className="sub-input" type="date" value={form.cancelBy} onChange={e => set('cancelBy', e.target.value)} />
-            </div>
+            {form.category === 'once' && (
+              <div className="sub-field">
+                <label className="sub-label">İptal Son Tarihi <span className="sub-label-hint">(opsiyonel)</span></label>
+                <input className="sub-input" type="date" value={form.cancelBy} onChange={e => set('cancelBy', e.target.value)} />
+              </div>
+            )}
             <div className="sub-field">
               <label className="sub-label">Not <span className="sub-label-hint">(opsiyonel)</span></label>
               <input className="sub-input" placeholder="Ek bilgi..." value={form.note} onChange={e => set('note', e.target.value)} />
@@ -129,11 +128,8 @@ function Item({ item, onClick }) {
   const days = getDaysUntil(dateForCalc);
   const urgency = days <= 3 ? 'urgent' : days <= 7 ? 'soon' : 'normal';
   const cancelDays = item.cancelBy ? getDaysUntil(item.cancelBy) : null;
-  const icons = { 'monthly-auto': '⚡', 'monthly-manual': '✋', 'once': '◈' };
-
   return (
     <div className={`sub-item sub-item--${urgency} sub-item--${item.category}`} onClick={onClick}>
-      <span className="sub-item-icon">{icons[item.category]}</span>
       <div className="sub-item-left">
         <div className="sub-item-name-row">
           <span className="sub-item-name">{item.name}</span>
