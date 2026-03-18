@@ -27,6 +27,7 @@ export const SYNC_KEYS = [
   'invoiceBasePath',
   'streakData',
   'loginHeatmap',
+  'payments_v2',
   'bid_rules',
   'kana_learned_words',
   'kana_selected_rows',
