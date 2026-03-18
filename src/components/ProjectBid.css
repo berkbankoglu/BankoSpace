@@ -236,8 +236,8 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   color: var(--text-primary);
-  font-size: 14px;
-  padding: 8px 12px;
+  font-size: 15px;
+  padding: 10px 14px;
   outline: none;
   transition: border-color 0.12s;
   font-family: inherit;
@@ -250,9 +250,9 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   color: var(--text-primary);
-  font-size: 14px;
-  line-height: 1.6;
-  padding: 10px 12px;
+  font-size: 15px;
+  line-height: 1.8;
+  padding: 12px 14px;
   resize: vertical;
   font-family: inherit;
   outline: none;
