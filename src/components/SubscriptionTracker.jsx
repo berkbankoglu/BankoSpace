@@ -42,7 +42,8 @@ function AddModal({ initial, onSave, onDelete, onClose }) {
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const handleSave = () => {
-    if (!form.name.trim() || !form.date) return;
+    const needsDate = form.category !== 'once-cancel';
+    if (!form.name.trim() || (needsDate && !form.date)) return;
     onSave({ ...form, id: form.id || Date.now(), name: form.name.trim(), price: parseFloat(form.price) || 0 });
     onClose();
   };
@@ -105,42 +106,45 @@ function AddModal({ initial, onSave, onDelete, onClose }) {
               onKeyDown={e => e.key === 'Enter' && handleSave()} />
           </div>
 
-          <div className="sub-two-col">
-            <div className="sub-field">
-              <label className="sub-label">{form.category.startsWith('once') ? 'Tarih' : 'Her ay hangi gün'}</label>
-              <input className="sub-input" type="date" value={form.date} onChange={e => set('date', e.target.value)} />
-            </div>
-            <div className="sub-field">
-              <label className="sub-label">Tutar</label>
-              <div className="sub-price-row">
-                <select className="sub-select" value={form.currency} onChange={e => set('currency', e.target.value)}>
-                  <option>₺</option><option>$</option><option>€</option><option>£</option>
-                </select>
-                <input className="sub-input" placeholder="0.00" type="number" min="0" value={form.price}
-                  onChange={e => set('price', e.target.value)} />
-              </div>
-            </div>
-          </div>
-
-          <div className="sub-two-col">
-            {form.category === 'once-cancel' && (
+          {form.category !== 'once-cancel' && (
+            <div className="sub-two-col">
               <div className="sub-field">
-                <label className="sub-label">İptal Son Tarihi <span className="sub-label-hint">(opsiyonel)</span></label>
-                <input className="sub-input" type="date" value={form.cancelBy} onChange={e => set('cancelBy', e.target.value)} />
+                <label className="sub-label">{form.category.startsWith('once') ? 'Tarih' : 'Her ay hangi gün'}</label>
+                <input className="sub-input" type="date" value={form.date} onChange={e => set('date', e.target.value)} />
               </div>
-            )}
+              <div className="sub-field">
+                <label className="sub-label">Tutar</label>
+                <div className="sub-price-row">
+                  <select className="sub-select" value={form.currency} onChange={e => set('currency', e.target.value)}>
+                    <option>₺</option><option>$</option><option>€</option><option>£</option>
+                  </select>
+                  <input className="sub-input" placeholder="0.00" type="number" min="0" value={form.price}
+                    onChange={e => set('price', e.target.value)} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {form.category === 'once-cancel' && (
+            <div className="sub-field">
+              <label className="sub-label">İptal Son Tarihi</label>
+              <input className="sub-input" type="date" value={form.cancelBy} onChange={e => set('cancelBy', e.target.value)} />
+            </div>
+          )}
+
+          {form.category !== 'once-cancel' && (
             <div className="sub-field">
               <label className="sub-label">Not <span className="sub-label-hint">(opsiyonel)</span></label>
               <input className="sub-input" placeholder="Ek bilgi..." value={form.note} onChange={e => set('note', e.target.value)} />
             </div>
-          </div>
+          )}
         </div>
 
         <div className="sub-modal-footer">
           {isEdit && <button className="sub-delete-modal-btn" onClick={() => { onDelete(form.id); onClose(); }}>Sil</button>}
           <div className="sub-modal-footer-right">
             <button className="sub-cancel-btn" onClick={onClose}>İptal</button>
-            <button className="sub-confirm-btn" onClick={handleSave} disabled={!form.name.trim() || !form.date}>Kaydet</button>
+            <button className="sub-confirm-btn" onClick={handleSave} disabled={!form.name.trim() || (form.category !== 'once-cancel' && !form.date)}>Kaydet</button>
           </div>
         </div>
       </div>
