@@ -109,6 +109,15 @@ ${projectDetails}`, 1000);
 
       <div className="pb-main-row">
         <div className="pb-left">
+          <div className="pb-action-row">
+            <button className="pb-action-btn pb-analyze-btn" onClick={handleAnalyze} disabled={!!loading || !projectDetails.trim()}>
+              {loading === 'analyze' ? <><span className="pb-spinner" /> Analiz...</> : 'Analiz Et'}
+            </button>
+            <button className="pb-action-btn pb-bid-btn" onClick={handleBid} disabled={!!loading || !projectDetails.trim()}>
+              {loading === 'bid' ? <><span className="pb-spinner" /> Generating...</> : 'Teklif Yaz'}
+            </button>
+          </div>
+          {error && <div className="pb-error">{error}</div>}
           <div className="pb-field">
             <label className="pb-label">Client Name <span className="pb-optional">(optional)</span></label>
             <input className="pb-input" type="text" value={clientName} onChange={e => setClientName(e.target.value)} placeholder="Client name..." />
@@ -122,15 +131,6 @@ ${projectDetails}`, 1000);
               placeholder="Upwork ilanını veya proje açıklamasını buraya yapıştırın..."
             />
           </div>
-          <div className="pb-action-row">
-            <button className="pb-action-btn pb-analyze-btn" onClick={handleAnalyze} disabled={!!loading || !projectDetails.trim()}>
-              {loading === 'analyze' ? <><span className="pb-spinner" /> Analiz...</> : 'Analiz Et'}
-            </button>
-            <button className="pb-action-btn pb-bid-btn" onClick={handleBid} disabled={!!loading || !projectDetails.trim()}>
-              {loading === 'bid' ? <><span className="pb-spinner" /> Generating...</> : 'Teklif Yaz'}
-            </button>
-          </div>
-          {error && <div className="pb-error">{error}</div>}
         </div>
 
         {result && (
