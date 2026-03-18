@@ -56,20 +56,32 @@ function AddModal({ initial, onSave, onDelete, onClose }) {
         </div>
 
         <div className="sub-modal-body">
-          <div className="sub-cat-grid">
-            <button className={`sub-cat-btn ${form.category === 'monthly-auto' ? 'active active--auto' : ''}`}
-              onClick={() => set('category', 'monthly-auto')}>
-              Her Ay · Otomatik
-            </button>
-            <button className={`sub-cat-btn ${form.category === 'monthly-manual' ? 'active active--manual' : ''}`}
-              onClick={() => set('category', 'monthly-manual')}>
-              Her Ay · Manuel
+          {/* Birincil seçim: Her Ay / Tek Seferlik */}
+          <div className="sub-cat-grid sub-cat-grid--top">
+            <button className={`sub-cat-btn ${form.category !== 'once' ? 'active active--monthly' : ''}`}
+              onClick={() => set('category', form.category === 'once' ? 'monthly-auto' : form.category)}>
+              Her Ay
             </button>
             <button className={`sub-cat-btn ${form.category === 'once' ? 'active active--once' : ''}`}
               onClick={() => set('category', 'once')}>
               Tek Seferlik
             </button>
           </div>
+
+          {/* İkincil seçim: sadece Her Ay seçiliyken */}
+          {form.category !== 'once' && (
+            <div className="sub-cat-grid sub-cat-grid--sub">
+              <button className={`sub-cat-btn sub-cat-btn--sm ${form.category === 'monthly-auto' ? 'active active--auto' : ''}`}
+                onClick={() => set('category', 'monthly-auto')}>
+                Otomatik
+              </button>
+              <button className={`sub-cat-btn sub-cat-btn--sm ${form.category === 'monthly-manual' ? 'active active--manual' : ''}`}
+                onClick={() => set('category', 'monthly-manual')}>
+                Manuel
+              </button>
+            </div>
+          )}
+
 
           <div className="sub-field">
             <label className="sub-label">Açıklama</label>
@@ -187,7 +199,7 @@ export default function SubscriptionTracker() {
       <div className="sub-list">
         {items.length === 0 && (
           <div className="sub-empty">
-            <div className="sub-empty-icon">◈</div>
+            <div className="sub-empty-icon">—</div>
             <div>Henüz kayıt yok</div>
             <div className="sub-empty-hint">+ ile ekle</div>
           </div>
@@ -196,7 +208,7 @@ export default function SubscriptionTracker() {
         {autoItems.length > 0 && (
           <div className="sub-section">
             <div className="sub-section-header">
-              <span className="sub-section-title sub-section-title--auto">⚡ Her Ay · Otomatik</span>
+              <span className="sub-section-title sub-section-title--auto">Her Ay · Otomatik</span>
               {totalAuto > 0 && <span className="sub-section-total">₺{totalAuto.toFixed(0)}/ay</span>}
             </div>
             {autoItems.map(item => <Item key={item.id} item={item} onClick={() => setEditing(item)} />)}
@@ -206,7 +218,7 @@ export default function SubscriptionTracker() {
         {manualItems.length > 0 && (
           <div className="sub-section">
             <div className="sub-section-header">
-              <span className="sub-section-title sub-section-title--manual">✋ Her Ay · Manuel</span>
+              <span className="sub-section-title sub-section-title--manual">Her Ay · Manuel</span>
               {totalManual > 0 && <span className="sub-section-total">₺{totalManual.toFixed(0)}/ay</span>}
             </div>
             {manualItems.map(item => <Item key={item.id} item={item} onClick={() => setEditing(item)} />)}
@@ -216,7 +228,7 @@ export default function SubscriptionTracker() {
         {onceItems.length > 0 && (
           <div className="sub-section">
             <div className="sub-section-header">
-              <span className="sub-section-title sub-section-title--once">◈ Tek Seferlik</span>
+              <span className="sub-section-title sub-section-title--once">Tek Seferlik</span>
             </div>
             {onceItems.map(item => <Item key={item.id} item={item} onClick={() => setEditing(item)} />)}
           </div>
