@@ -205,7 +205,7 @@ export default function SubscriptionTracker() {
     });
   };
   const remove = (id) => setItems(prev => prev.filter(x => x.id !== id));
-  const complete = (id) => setItems(prev => prev.map(x => x.id === id ? { ...x, done: true } : x));
+  const complete = (id) => setItems(prev => prev.filter(x => x.id !== id));
 
   const sortByDays = (arr) => [...arr].sort((a, b) => {
     const isM = c => c === 'monthly-auto' || c === 'monthly-manual';
