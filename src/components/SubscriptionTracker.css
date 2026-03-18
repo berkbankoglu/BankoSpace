@@ -12,44 +12,120 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 10px 0 0;
+  padding: 8px 10px 8px 14px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
 
-.sub-tabs {
-  display: flex;
-  flex: 1;
-}
-
-.sub-tab {
-  flex: 1;
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--text-muted);
+.sub-header-title {
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.05em;
-  padding: 10px 8px;
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+/* ── Section headers inside list ── */
+.sub-section {
+  margin-bottom: 2px;
+}
+
+.sub-section-header {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 5px;
+  justify-content: space-between;
+  padding: 8px 14px 4px;
 }
-.sub-tab:hover { color: var(--text-secondary); }
-.sub-tab.active { color: var(--text-primary); border-bottom-color: var(--accent); }
 
-.sub-tab-badge, .sub-tab-count {
-  font-size: 9px;
+.sub-section-title {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.sub-section-title--auto   { color: #58a6ff; }
+.sub-section-title--manual { color: #d29922; }
+.sub-section-title--once   { color: var(--text-muted); }
+
+.sub-section-total {
+  font-size: 10px;
+  color: var(--text-muted);
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: 4px;
-  padding: 1px 4px;
-  color: var(--text-muted);
+  padding: 1px 6px;
 }
+
+/* ── Category item tones ── */
+.sub-item--monthly-auto   { background: rgba(88, 166, 255, 0.04); }
+.sub-item--monthly-auto:hover { background: rgba(88, 166, 255, 0.09); }
+.sub-item--monthly-manual { background: rgba(210, 153, 34, 0.04); }
+.sub-item--monthly-manual:hover { background: rgba(210, 153, 34, 0.08); }
+
+.sub-item-icon {
+  font-size: 13px;
+  flex-shrink: 0;
+  width: 16px;
+  text-align: center;
+}
+
+/* ── Category selector in modal ── */
+.sub-cat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+
+.sub-cat-btn {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 10px 6px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+.sub-cat-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.sub-cat-btn.active { color: var(--text-primary); }
+.sub-cat-btn.active--auto   { border-color: #58a6ff; background: rgba(88,166,255,0.1); }
+.sub-cat-btn.active--manual { border-color: #d29922; background: rgba(210,153,34,0.1); }
+.sub-cat-btn.active--once   { border-color: var(--border); background: var(--bg-hover); }
+
+/* ── Delete button in modal footer ── */
+.sub-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 14px 20px 18px;
+  border-top: 1px solid var(--border);
+}
+
+.sub-modal-footer-right {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.sub-delete-modal-btn {
+  background: none;
+  border: 1px solid rgba(248,81,73,0.35);
+  border-radius: var(--radius-sm);
+  color: var(--danger);
+  font-size: 12px;
+  padding: 7px 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+.sub-delete-modal-btn:hover { background: rgba(248,81,73,0.1); }
 
 .sub-total-row {
   display: flex;
@@ -462,12 +538,6 @@
   border-color: #d29922;
 }
 
-.sub-modal-footer {
-  display: flex;
-  gap: 8px;
-  padding: 14px 20px 18px;
-  border-top: 1px solid var(--border);
-}
 
 .sub-confirm-btn {
   flex: 1;

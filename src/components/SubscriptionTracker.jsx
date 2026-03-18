@@ -1,41 +1,28 @@
 import { useState, useEffect } from 'react';
 import './SubscriptionTracker.css';
 
-const SUB_KEY = 'subscriptions';
-const PAY_KEY = 'payments';
+const STORAGE_KEY = 'payments_v2';
 
-function todayIST() {
-  // Istanbul = UTC+3, always
+function todayLocal() {
   const now = new Date();
-  const istOffset = 3 * 60;
-  const localOffset = now.getTimezoneOffset();
-  const diff = (istOffset + localOffset) * 60 * 1000;
-  const ist = new Date(now.getTime() + diff);
-  ist.setHours(0, 0, 0, 0);
-  return ist;
+  now.setHours(0, 0, 0, 0);
+  return now;
 }
 
-function parseLocalDate(dateStr) {
-  const [y, m, d] = dateStr.split('-').map(Number);
+function parseLocalDate(str) {
+  const [y, m, d] = str.split('-').map(Number);
   return new Date(y, m - 1, d);
 }
 
 function getDaysUntil(dateStr) {
-  const today = todayIST();
-  const target = parseLocalDate(dateStr);
-  return Math.ceil((target - today) / (1000 * 60 * 60 * 24));
+  return Math.ceil((parseLocalDate(dateStr) - todayLocal()) / 86400000);
 }
 
-function getNextPayment(sub) {
-  const today = todayIST();
-  let next = parseLocalDate(sub.date);
-  if (sub.recurring) {
-    while (next < today) next.setMonth(next.getMonth() + 1);
-  }
-  const y = next.getFullYear();
-  const m = String(next.getMonth() + 1).padStart(2, '0');
-  const d = String(next.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+function getNextMonthly(dateStr) {
+  const today = todayLocal();
+  let d = parseLocalDate(dateStr);
+  while (d < today) d.setMonth(d.getMonth() + 1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
 function useLocalStorage(key, def) {
@@ -46,25 +33,17 @@ function useLocalStorage(key, def) {
   return [val, setVal];
 }
 
-// ─── Unified Modal ────────────────────────────────────────────
-const UNIFIED_DEFAULT = {
-  name: '', date: '', price: '', currency: '₺',
-  kind: 'sub', // 'sub' | 'pay'
-  recurring: false, autoCharge: false, type: 'manual',
-  cancelBy: '', note: ''
-};
+// category: 'monthly-auto' | 'monthly-manual' | 'once'
+const EMPTY_FORM = { name: '', date: '', price: '', currency: '₺', category: 'monthly-auto', cancelBy: '', note: '' };
 
-function UnifiedModal({ initial, targetTab, onSaveSub, onSavePay, onClose }) {
+function AddModal({ initial, onSave, onDelete, onClose }) {
   const isEdit = !!initial?.id;
-  const initKind = initial?._tab === 'pays' ? 'pay' : (targetTab === 'pays' ? 'pay' : 'sub');
-  const [form, setForm] = useState({ ...UNIFIED_DEFAULT, kind: initKind, ...(initial || {}) });
+  const [form, setForm] = useState(initial ? { ...EMPTY_FORM, ...initial } : EMPTY_FORM);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const handleSave = () => {
     if (!form.name.trim() || !form.date) return;
-    const item = { ...form, id: form.id || Date.now(), name: form.name.trim(), price: parseFloat(form.price) || 0 };
-    if (form.kind === 'sub') onSaveSub(item);
-    else onSavePay(item);
+    onSave({ ...form, id: form.id || Date.now(), name: form.name.trim(), price: parseFloat(form.price) || 0 });
     onClose();
   };
 
@@ -77,78 +56,48 @@ function UnifiedModal({ initial, targetTab, onSaveSub, onSavePay, onClose }) {
         </div>
 
         <div className="sub-modal-body">
-          {/* Tür seçimi */}
-          {!isEdit && (
-            <div className="sub-kind-row">
-              <button
-                className={`sub-kind-btn ${form.kind === 'sub' ? 'active' : ''}`}
-                onClick={() => set('kind', 'sub')}
-              >
-                <span className="sub-kind-icon">↻</span>
-                <span>Abonelik</span>
-              </button>
-              <button
-                className={`sub-kind-btn ${form.kind === 'pay' ? 'active' : ''}`}
-                onClick={() => set('kind', 'pay')}
-              >
-                <span className="sub-kind-icon">💳</span>
-                <span>Ödeme</span>
-              </button>
-            </div>
-          )}
+          <div className="sub-cat-grid">
+            <button className={`sub-cat-btn ${form.category === 'monthly-auto' ? 'active active--auto' : ''}`}
+              onClick={() => set('category', 'monthly-auto')}>
+              <span>⚡</span>
+              <span>Her Ay · Otomatik</span>
+            </button>
+            <button className={`sub-cat-btn ${form.category === 'monthly-manual' ? 'active active--manual' : ''}`}
+              onClick={() => set('category', 'monthly-manual')}>
+              <span>✋</span>
+              <span>Her Ay · Manuel</span>
+            </button>
+            <button className={`sub-cat-btn ${form.category === 'once' ? 'active active--once' : ''}`}
+              onClick={() => set('category', 'once')}>
+              <span>◈</span>
+              <span>Tek Seferlik</span>
+            </button>
+          </div>
 
           <div className="sub-field">
             <label className="sub-label">Açıklama</label>
-            <input className="sub-input"
-              placeholder={form.kind === 'sub' ? 'Netflix, Spotify...' : 'Elektrik, kira, alışveriş...'}
+            <input className="sub-input" autoFocus
+              placeholder={form.category === 'monthly-auto' ? 'Netflix, Spotify, iCloud...' : form.category === 'monthly-manual' ? 'Kira, elektrik, muhasebe...' : 'Alışveriş, fatura...'}
               value={form.name} onChange={e => set('name', e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleSave()} autoFocus />
+              onKeyDown={e => e.key === 'Enter' && handleSave()} />
           </div>
 
           <div className="sub-two-col">
             <div className="sub-field">
-              <label className="sub-label">Tarih</label>
+              <label className="sub-label">{form.category === 'once' ? 'Tarih' : 'Her ay hangi gün'}</label>
               <input className="sub-input" type="date" value={form.date} onChange={e => set('date', e.target.value)} />
             </div>
             <div className="sub-field">
-              <label className="sub-label">Fiyat</label>
+              <label className="sub-label">Tutar</label>
               <div className="sub-price-row">
                 <select className="sub-select" value={form.currency} onChange={e => set('currency', e.target.value)}>
                   <option>₺</option><option>$</option><option>€</option><option>£</option>
                 </select>
-                <input className="sub-input" placeholder="0.00" type="number" value={form.price}
+                <input className="sub-input" placeholder="0.00" type="number" min="0" value={form.price}
                   onChange={e => set('price', e.target.value)} />
               </div>
             </div>
           </div>
-
-          {form.kind === 'sub' && (
-            <div className="sub-toggles-row">
-              <label className="sub-toggle-item">
-                <div className={`sub-toggle ${form.recurring ? 'on' : ''}`} onClick={() => set('recurring', !form.recurring)}>
-                  <div className="sub-toggle-knob" />
-                </div>
-                <span>Aylık tekrar</span>
-              </label>
-              <label className="sub-toggle-item">
-                <div className={`sub-toggle sub-toggle--auto ${form.autoCharge ? 'on' : ''}`} onClick={() => set('autoCharge', !form.autoCharge)}>
-                  <div className="sub-toggle-knob" />
-                </div>
-                <span>Otomatik ödeme</span>
-              </label>
-            </div>
-          )}
-
-          {form.kind === 'pay' && (
-            <div className="sub-kind-row sub-kind-row--small">
-              <button className={`sub-kind-btn ${form.type === 'manual' ? 'active' : ''}`} onClick={() => set('type', 'manual')}>
-                <span>✋</span> Manuel
-              </button>
-              <button className={`sub-kind-btn sub-kind-btn--auto ${form.type === 'auto' ? 'active' : ''}`} onClick={() => set('type', 'auto')}>
-                <span>⚡</span> Otomatik
-              </button>
-            </div>
-          )}
 
           <div className="sub-two-col">
             <div className="sub-field">
@@ -163,140 +112,178 @@ function UnifiedModal({ initial, targetTab, onSaveSub, onSavePay, onClose }) {
         </div>
 
         <div className="sub-modal-footer">
-          <button className="sub-cancel-btn" onClick={onClose}>İptal</button>
-          <button className="sub-confirm-btn" onClick={handleSave} disabled={!form.name.trim() || !form.date}>Kaydet</button>
+          {isEdit && <button className="sub-delete-modal-btn" onClick={() => { onDelete(form.id); onClose(); }}>Sil</button>}
+          <div className="sub-modal-footer-right">
+            <button className="sub-cancel-btn" onClick={onClose}>İptal</button>
+            <button className="sub-confirm-btn" onClick={handleSave} disabled={!form.name.trim() || !form.date}>Kaydet</button>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-// ─── Main Panel (used in dashboard right column) ──────────────
-export default function SubscriptionTracker() {
-  const [subs, setSubs] = useLocalStorage(SUB_KEY, []);
-  const [pays, setPays] = useLocalStorage(PAY_KEY, []);
-  const [tab, setTab] = useState('subs');
-  const [showAdd, setShowAdd] = useState(false);
-  const [editing, setEditing] = useState(null); // { item, _tab }
+function Item({ item, onClick }) {
+  const isMonthly = item.category !== 'once';
+  const dateForCalc = isMonthly ? getNextMonthly(item.date) : item.date;
+  const days = getDaysUntil(dateForCalc);
+  const urgency = days <= 3 ? 'urgent' : days <= 7 ? 'soon' : 'normal';
+  const cancelDays = item.cancelBy ? getDaysUntil(item.cancelBy) : null;
+  const icons = { 'monthly-auto': '⚡', 'monthly-manual': '✋', 'once': '◈' };
 
-  const addSub = (s) => setSubs(p => [...p, s]);
-  const updateSub = (s) => setSubs(p => p.map(x => x.id === s.id ? s : x));
-  const deleteSub = (id) => setSubs(p => p.filter(x => x.id !== id));
-
-  const addPay = (s) => setPays(p => [...p, s]);
-  const updatePay = (s) => setPays(p => p.map(x => x.id === s.id ? s : x));
-  const deletePay = (id) => setPays(p => p.filter(x => x.id !== id));
-
-  const sortedSubs = [...subs].sort((a, b) =>
-    getDaysUntil(getNextPayment(a)) - getDaysUntil(getNextPayment(b))
+  return (
+    <div className={`sub-item sub-item--${urgency} sub-item--${item.category}`} onClick={onClick}>
+      <span className="sub-item-icon">{icons[item.category]}</span>
+      <div className="sub-item-left">
+        <div className="sub-item-name-row">
+          <span className="sub-item-name">{item.name}</span>
+          {cancelDays !== null && (
+            <span className={`sub-cancel-badge ${cancelDays <= 5 ? 'sub-cancel-badge--urgent' : ''}`}>
+              ⚠ {cancelDays >= 0 ? `${cancelDays}g` : 'geçti'}
+            </span>
+          )}
+        </div>
+        <span className="sub-item-date">
+          {days === 0 ? 'Bugün' : days < 0 ? `${Math.abs(days)}g önce` : `${days}g sonra`}
+          {item.note && <span className="sub-pay-note"> · {item.note}</span>}
+        </span>
+      </div>
+      <div className="sub-item-right">
+        {item.price > 0 && <span className="sub-item-price">{item.currency}{item.price.toFixed(2)}</span>}
+      </div>
+    </div>
   );
-  const sortedPays = [...pays].sort((a, b) => getDaysUntil(a.date) - getDaysUntil(b.date));
+}
 
-  const totalMonthly = subs.filter(s => s.recurring)
-    .reduce((sum, s) => sum + (s.currency === '₺' ? s.price : 0), 0);
+export default function SubscriptionTracker() {
+  const [items, setItems] = useLocalStorage(STORAGE_KEY, []);
+  const [showAdd, setShowAdd] = useState(false);
+  const [editing, setEditing] = useState(null);
+
+  const save = (item) => {
+    setItems(prev => {
+      const exists = prev.find(x => x.id === item.id);
+      return exists ? prev.map(x => x.id === item.id ? item : x) : [...prev, item];
+    });
+  };
+  const remove = (id) => setItems(prev => prev.filter(x => x.id !== id));
+
+  const sortByDays = (arr) => [...arr].sort((a, b) => {
+    const da = a.category !== 'once' ? getDaysUntil(getNextMonthly(a.date)) : getDaysUntil(a.date);
+    const db = b.category !== 'once' ? getDaysUntil(getNextMonthly(b.date)) : getDaysUntil(b.date);
+    return da - db;
+  });
+
+  const autoItems = sortByDays(items.filter(i => i.category === 'monthly-auto'));
+  const manualItems = sortByDays(items.filter(i => i.category === 'monthly-manual'));
+  const onceItems = sortByDays(items.filter(i => i.category === 'once'));
+
+  const totalAuto = autoItems.reduce((s, i) => s + (i.currency === '₺' ? i.price : 0), 0);
+  const totalManual = manualItems.reduce((s, i) => s + (i.currency === '₺' ? i.price : 0), 0);
 
   return (
     <div className="sub-tracker">
       <div className="sub-header">
-        <div className="sub-tabs">
-          <button className={`sub-tab ${tab === 'subs' ? 'active' : ''}`} onClick={() => setTab('subs')}>Abonelikler</button>
-          <button className={`sub-tab ${tab === 'pays' ? 'active' : ''}`} onClick={() => setTab('pays')}>Ödemeler</button>
-        </div>
+        <span className="sub-header-title">Ödemeler</span>
         <button className="sub-add-btn" onClick={() => setShowAdd(true)} title="Ekle">+</button>
       </div>
 
-      {tab === 'subs' && (
-        <div className="sub-list">
-          {sortedSubs.length === 0 && (
-            <div className="sub-empty"><div className="sub-empty-icon">◈</div><div>Abonelik yok</div><div className="sub-empty-hint">+ ile ekle</div></div>
-          )}
-          {sortedSubs.map(sub => {
-            const days = getDaysUntil(getNextPayment(sub));
-            const urgency = days <= 3 ? 'urgent' : days <= 7 ? 'soon' : 'normal';
-            const cancelDays = sub.cancelBy ? getDaysUntil(sub.cancelBy) : null;
-            return (
-              <div key={sub.id} className={`sub-item sub-item--${urgency} ${sub.autoCharge ? 'sub-item--auto' : ''}`}
-                onClick={() => setEditing({ ...sub, kind: 'sub', _tab: 'subs' })}>
-                <div className="sub-item-dot" />
-                <div className="sub-item-left">
-                  <div className="sub-item-name-row">
-                    <span className="sub-item-name">{sub.name}</span>
-                    {sub.autoCharge && <span className="sub-auto-badge" title="Otomatik">⚡</span>}
-                    {sub.cancelBy && cancelDays !== null && (
-                      <span className={`sub-cancel-badge ${cancelDays <= 5 ? 'sub-cancel-badge--urgent' : ''}`}>
-                        ⚠ {cancelDays >= 0 ? `${cancelDays}g` : 'geçti'}
-                      </span>
-                    )}
-                  </div>
-                  <span className="sub-item-date">
-                    {days === 0 ? 'Bugün' : days < 0 ? `${Math.abs(days)}g önce` : `${days}g sonra`}
-                    {sub.recurring && <span className="sub-recurring-badge">↻</span>}
-                  </span>
-                </div>
-                <div className="sub-item-right">
-                  {sub.price > 0 && <span className="sub-item-price">{sub.currency}{sub.price.toFixed(2)}</span>}
-                  <button className="sub-delete-btn" onClick={e => { e.stopPropagation(); deleteSub(sub.id); setEditing(null); }}>×</button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      <div className="sub-list">
+        {items.length === 0 && (
+          <div className="sub-empty">
+            <div className="sub-empty-icon">◈</div>
+            <div>Henüz kayıt yok</div>
+            <div className="sub-empty-hint">+ ile ekle</div>
+          </div>
+        )}
 
-      {tab === 'pays' && (
-        <div className="sub-list">
-          {sortedPays.length === 0 && (
-            <div className="sub-empty"><div className="sub-empty-icon">💳</div><div>Ödeme yok</div><div className="sub-empty-hint">+ ile ekle</div></div>
-          )}
-          {sortedPays.map(pay => {
-            const days = getDaysUntil(pay.date);
-            const urgency = days <= 3 ? 'urgent' : days <= 7 ? 'soon' : 'normal';
-            const cancelDays = pay.cancelBy ? getDaysUntil(pay.cancelBy) : null;
-            const cancelUrgent = cancelDays !== null && cancelDays <= 5;
-            return (
-              <div key={pay.id} className={`sub-item sub-item--${urgency} ${pay.type === 'auto' ? 'sub-item--auto' : ''}`}
-                onClick={() => setEditing({ ...pay, kind: 'pay', _tab: 'pays' })}>
-                <div className="sub-item-dot" />
-                <div className="sub-item-left">
-                  <div className="sub-item-name-row">
-                    <span className="sub-pay-type-icon">{pay.type === 'auto' ? '⚡' : '✋'}</span>
-                    <span className="sub-item-name">{pay.name}</span>
-                    {pay.cancelBy && cancelDays !== null && (
-                      <span className={`sub-cancel-badge ${cancelUrgent ? 'sub-cancel-badge--urgent' : ''}`}>
-                        ⚠ {cancelDays >= 0 ? `${cancelDays}g` : 'geçti'}
-                      </span>
-                    )}
-                  </div>
-                  <span className="sub-item-date">
-                    {days === 0 ? 'Bugün' : days < 0 ? `${Math.abs(days)}g önce` : `${days}g sonra`}
-                    {pay.note && <span className="sub-pay-note"> · {pay.note}</span>}
-                  </span>
-                </div>
-                <div className="sub-item-right">
-                  {pay.price > 0 && <span className="sub-item-price">{pay.currency}{pay.price.toFixed(2)}</span>}
-                  <button className="sub-delete-btn" onClick={e => { e.stopPropagation(); deletePay(pay.id); setEditing(null); }}>×</button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+        {autoItems.length > 0 && (
+          <div className="sub-section">
+            <div className="sub-section-header">
+              <span className="sub-section-title sub-section-title--auto">⚡ Her Ay · Otomatik</span>
+              {totalAuto > 0 && <span className="sub-section-total">₺{totalAuto.toFixed(0)}/ay</span>}
+            </div>
+            {autoItems.map(item => <Item key={item.id} item={item} onClick={() => setEditing(item)} />)}
+          </div>
+        )}
 
-      {showAdd && (
-        <UnifiedModal
-          targetTab={tab}
-          onSaveSub={addSub} onSavePay={addPay}
-          onClose={() => setShowAdd(false)}
-        />
-      )}
-      {editing && (
-        <UnifiedModal
-          initial={editing}
-          targetTab={editing._tab}
-          onSaveSub={updateSub} onSavePay={updatePay}
-          onClose={() => setEditing(null)}
-        />
-      )}
+        {manualItems.length > 0 && (
+          <div className="sub-section">
+            <div className="sub-section-header">
+              <span className="sub-section-title sub-section-title--manual">✋ Her Ay · Manuel</span>
+              {totalManual > 0 && <span className="sub-section-total">₺{totalManual.toFixed(0)}/ay</span>}
+            </div>
+            {manualItems.map(item => <Item key={item.id} item={item} onClick={() => setEditing(item)} />)}
+          </div>
+        )}
+
+        {onceItems.length > 0 && (
+          <div className="sub-section">
+            <div className="sub-section-header">
+              <span className="sub-section-title sub-section-title--once">◈ Tek Seferlik</span>
+            </div>
+            {onceItems.map(item => <Item key={item.id} item={item} onClick={() => setEditing(item)} />)}
+          </div>
+        )}
+      </div>
+
+      {showAdd && <AddModal onSave={save} onDelete={remove} onClose={() => setShowAdd(false)} />}
+      {editing && <AddModal initial={editing} onSave={save} onDelete={remove} onClose={() => setEditing(null)} />}
+    </div>
+  );
+}
+
+// ─── Widget for upcoming payments ─────────────────────────────
+export function SubscriptionWidget() {
+  const [items, setItems] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { return []; }
+  });
+
+  useEffect(() => {
+    const iv = setInterval(() => {
+      try { setItems(JSON.parse(localStorage.getItem(STORAGE_KEY)) || []); } catch {}
+    }, 2000);
+    return () => clearInterval(iv);
+  }, []);
+
+  const upcoming = items.map(item => {
+    const dateForCalc = item.category !== 'once' ? getNextMonthly(item.date) : item.date;
+    return { ...item, days: getDaysUntil(dateForCalc) };
+  }).filter(i => i.days >= 0 && i.days <= 14).sort((a, b) => a.days - b.days);
+
+  const cancelAlerts = items
+    .filter(i => i.cancelBy)
+    .map(i => ({ ...i, cancelDays: getDaysUntil(i.cancelBy) }))
+    .filter(i => i.cancelDays >= 0 && i.cancelDays <= 7)
+    .sort((a, b) => a.cancelDays - b.cancelDays);
+
+  if (upcoming.length === 0 && cancelAlerts.length === 0) return null;
+
+  const icons = { 'monthly-auto': '⚡', 'monthly-manual': '✋', 'once': '◈' };
+
+  return (
+    <div className="sub-widget">
+      <div className="sub-widget-title">Yaklaşan Ödemeler</div>
+      {cancelAlerts.map(item => (
+        <div key={'c-' + item.id} className="sub-widget-item sub-widget-item--cancel">
+          <span>⚠</span>
+          <span className="sub-widget-name">{item.name} iptal et</span>
+          <span className="sub-widget-days sub-widget-days--cancel">
+            {item.cancelDays === 0 ? 'Bugün!' : `${item.cancelDays}g`}
+          </span>
+        </div>
+      ))}
+      {upcoming.map(item => {
+        const urgency = item.days <= 3 ? 'urgent' : item.days <= 7 ? 'soon' : 'normal';
+        return (
+          <div key={item.id} className={`sub-widget-item sub-widget-item--${urgency}`}>
+            <span>{icons[item.category]}</span>
+            <span className="sub-widget-name">{item.name}</span>
+            <span className="sub-widget-days">{item.days === 0 ? 'Bugün!' : `${item.days}g`}</span>
+            {item.price > 0 && <span className="sub-widget-price">{item.currency}{item.price.toFixed(0)}</span>}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -308,70 +295,6 @@ export function SubscriptionPopup({ onClose }) {
       <div className="sub-popup" onClick={e => e.stopPropagation()}>
         <SubscriptionTracker />
       </div>
-    </div>
-  );
-}
-
-// ─── Widget for upcoming (dashboard top bar or elsewhere) ─────
-export function SubscriptionWidget() {
-  const [subs, setSubs] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(SUB_KEY)) || []; } catch { return []; }
-  });
-  const [pays, setPays] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(PAY_KEY)) || []; } catch { return []; }
-  });
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      try {
-        setSubs(JSON.parse(localStorage.getItem(SUB_KEY)) || []);
-        setPays(JSON.parse(localStorage.getItem(PAY_KEY)) || []);
-      } catch {}
-    }, 2000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const upcomingSubs = subs
-    .map(s => ({ ...s, days: getDaysUntil(getNextPayment(s)), kind: 'sub' }))
-    .filter(s => s.days >= 0 && s.days <= 14);
-
-  const upcomingPays = pays
-    .map(p => ({ ...p, days: getDaysUntil(p.date), kind: 'pay' }))
-    .filter(p => p.days >= 0 && p.days <= 14);
-
-  const cancelAlerts = subs
-    .filter(s => s.cancelBy)
-    .map(s => ({ ...s, cancelDays: getDaysUntil(s.cancelBy) }))
-    .filter(s => s.cancelDays >= 0 && s.cancelDays <= 7)
-    .sort((a, b) => a.cancelDays - b.cancelDays);
-
-  const all = [...upcomingSubs, ...upcomingPays].sort((a, b) => a.days - b.days);
-
-  if (all.length === 0 && cancelAlerts.length === 0) return null;
-
-  return (
-    <div className="sub-widget">
-      <div className="sub-widget-title">Yaklaşan Ödemeler</div>
-      {cancelAlerts.map(sub => (
-        <div key={'cancel-' + sub.id} className="sub-widget-item sub-widget-item--cancel">
-          <span className="sub-widget-cancel-icon">⚠</span>
-          <span className="sub-widget-name">{sub.name} iptal et</span>
-          <span className="sub-widget-days sub-widget-days--cancel">
-            {sub.cancelDays === 0 ? 'Bugün!' : `${sub.cancelDays}g`}
-          </span>
-        </div>
-      ))}
-      {all.map(item => {
-        const urgency = item.days <= 3 ? 'urgent' : item.days <= 7 ? 'soon' : 'normal';
-        return (
-          <div key={item.kind + item.id} className={`sub-widget-item sub-widget-item--${urgency}`}>
-            <span className="sub-widget-type-icon">{item.kind === 'pay' ? (item.type === 'card' ? '💳' : '✋') : (item.autoCharge ? '⚡' : '◈')}</span>
-            <span className="sub-widget-name">{item.name}</span>
-            <span className="sub-widget-days">{item.days === 0 ? 'Bugün!' : `${item.days}g`}</span>
-            {item.price > 0 && <span className="sub-widget-price">{item.currency}{item.price.toFixed(0)}</span>}
-          </div>
-        );
-      })}
     </div>
   );
 }
