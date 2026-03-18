@@ -456,6 +456,10 @@
   background: var(--accent-glow);
   color: var(--text-primary);
 }
+.sub-type-btn--auto.active {
+  border-color: var(--warning);
+  background: rgba(210, 153, 34, 0.12);
+}
 
 /* ── Popup overlay ── */
 .sub-popup-overlay {
