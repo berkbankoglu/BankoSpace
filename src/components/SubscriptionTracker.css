@@ -91,6 +91,12 @@
 .sub-item--soon   { border-left-color: var(--warning); }
 .sub-item--normal { border-left-color: var(--border); }
 
+/* Otomatik ödeme — farklı arka plan tonu */
+.sub-item--auto {
+  background: rgba(88, 166, 255, 0.04);
+}
+.sub-item--auto:hover { background: rgba(88, 166, 255, 0.09); }
+
 .sub-item-dot {
   width: 6px;
   height: 6px;
@@ -109,12 +115,47 @@
   gap: 2px;
 }
 
+.sub-item-name-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
 .sub-item-name {
   font-size: 13px;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.sub-auto-badge {
+  font-size: 11px;
+  color: var(--accent);
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.sub-cancel-badge {
+  font-size: 10px;
+  color: var(--warning);
+  background: rgba(210, 153, 34, 0.12);
+  border: 1px solid rgba(210, 153, 34, 0.25);
+  border-radius: 4px;
+  padding: 1px 5px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.sub-cancel-badge--urgent {
+  color: var(--danger);
+  background: rgba(248, 81, 73, 0.12);
+  border-color: rgba(248, 81, 73, 0.3);
+  animation: sub-pulse 1.5s ease-in-out infinite;
+}
+@keyframes sub-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 .sub-item-date {
@@ -294,6 +335,11 @@
   background: #000;
 }
 
+.sub-toggle--auto.on {
+  background: #d29922;
+  border-color: #d29922;
+}
+
 .sub-modal-footer {
   display: flex;
   gap: 8px;
@@ -366,3 +412,16 @@
 .sub-widget-item--urgent .sub-widget-days { color: var(--danger); }
 .sub-widget-item--soon   .sub-widget-days { color: var(--warning); }
 .sub-widget-price { color: var(--text-muted); font-size: 10px; flex-shrink: 0; }
+
+/* Cancel alert row in widget */
+.sub-widget-item--cancel {
+  border-left-color: var(--danger);
+  background: rgba(248, 81, 73, 0.05);
+}
+.sub-widget-cancel-icon { font-size: 11px; color: var(--danger); flex-shrink: 0; }
+.sub-widget-auto-icon { font-size: 11px; color: var(--accent); flex-shrink: 0; }
+.sub-widget-days--cancel { color: var(--danger) !important; }
+
+/* form hints */
+.sub-label-hint { color: var(--text-muted); font-weight: 400; font-size: 10px; }
+.sub-field-hint { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
