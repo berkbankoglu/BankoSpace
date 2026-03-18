@@ -4,23 +4,38 @@ import './SubscriptionTracker.css';
 const SUB_KEY = 'subscriptions';
 const PAY_KEY = 'payments';
 
+function todayIST() {
+  // Istanbul = UTC+3, always
+  const now = new Date();
+  const istOffset = 3 * 60;
+  const localOffset = now.getTimezoneOffset();
+  const diff = (istOffset + localOffset) * 60 * 1000;
+  const ist = new Date(now.getTime() + diff);
+  ist.setHours(0, 0, 0, 0);
+  return ist;
+}
+
+function parseLocalDate(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
 function getDaysUntil(dateStr) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const target = new Date(dateStr);
-  target.setHours(0, 0, 0, 0);
+  const today = todayIST();
+  const target = parseLocalDate(dateStr);
   return Math.ceil((target - today) / (1000 * 60 * 60 * 24));
 }
 
 function getNextPayment(sub) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  let next = new Date(sub.date);
-  next.setHours(0, 0, 0, 0);
+  const today = todayIST();
+  let next = parseLocalDate(sub.date);
   if (sub.recurring) {
     while (next < today) next.setMonth(next.getMonth() + 1);
   }
-  return next.toISOString().split('T')[0];
+  const y = next.getFullYear();
+  const m = String(next.getMonth() + 1).padStart(2, '0');
+  const d = String(next.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 function useLocalStorage(key, def) {
