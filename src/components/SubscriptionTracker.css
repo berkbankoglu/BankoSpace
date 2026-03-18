@@ -223,9 +223,30 @@
 }
 .sub-item:hover { background: var(--bg-hover); }
 
-.sub-item--urgent { border-left-color: var(--danger); }
-.sub-item--soon   { border-left-color: var(--warning); }
-.sub-item--normal { border-left-color: var(--border); }
+.sub-item--urgent  { border-left-color: var(--danger); }
+.sub-item--soon    { border-left-color: var(--warning); }
+.sub-item--normal  { border-left-color: var(--border); }
+.sub-item--overdue { border-left-color: #f85149; background: rgba(248,81,73,0.04); }
+.sub-item--done    { border-left-color: #3fb950; opacity: 0.5; }
+.sub-item--done .sub-item-name { text-decoration: line-through; color: var(--text-muted); }
+
+.sub-complete-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  color: #3fb950;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s, border-color 0.15s;
+  margin-left: 6px;
+}
+.sub-complete-btn:hover { background: rgba(63,185,80,0.15); border-color: #3fb950; }
 
 /* Otomatik ödeme — farklı arka plan tonu */
 .sub-item--auto {
