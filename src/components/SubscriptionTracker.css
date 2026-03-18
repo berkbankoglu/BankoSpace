@@ -292,6 +292,47 @@
 }
 .sub-modal-close:hover { color: var(--text-primary); }
 
+.sub-kind-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.sub-kind-row--small {
+  margin-bottom: 0;
+}
+.sub-kind-btn {
+  flex: 1;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 13px;
+  padding: 10px 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+.sub-kind-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.sub-kind-btn.active {
+  border-color: var(--accent);
+  background: var(--accent-glow);
+  color: var(--text-primary);
+}
+.sub-kind-btn--auto.active {
+  border-color: var(--warning);
+  background: rgba(210, 153, 34, 0.12);
+}
+.sub-kind-icon { font-size: 15px; }
+
+.sub-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
 .sub-toggles-row {
   display: flex;
   gap: 16px;
