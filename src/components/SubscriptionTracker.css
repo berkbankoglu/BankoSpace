@@ -292,6 +292,19 @@
 }
 .sub-modal-close:hover { color: var(--text-primary); }
 
+.sub-toggles-row {
+  display: flex;
+  gap: 16px;
+}
+.sub-toggle-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
 .sub-modal-tabs {
   display: flex;
   border-bottom: 1px solid var(--border);
