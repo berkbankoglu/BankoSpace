@@ -46,6 +46,8 @@
 .sub-section-title--auto   { color: #58a6ff; }
 .sub-section-title--manual { color: #d29922; }
 .sub-section-title--once   { color: var(--text-muted); }
+.sub-section-title--cancel { color: #f85149; }
+.sub-cat-btn.active--cancel { border-color: #f85149; background: rgba(248,81,73,0.1); }
 
 .sub-section-total {
   font-size: 10px;
