@@ -33,7 +33,7 @@ function useLocalStorage(key, def) {
   return [val, setVal];
 }
 
-// category: 'monthly-auto' | 'monthly-manual' | 'once'
+// category: 'monthly-auto' | 'monthly-manual' | 'once-payment' | 'once-cancel'
 const EMPTY_FORM = { name: '', date: '', price: '', currency: '₺', category: 'monthly-auto', cancelBy: '', note: '' };
 
 function AddModal({ initial, onSave, onDelete, onClose }) {
@@ -58,18 +58,18 @@ function AddModal({ initial, onSave, onDelete, onClose }) {
         <div className="sub-modal-body">
           {/* Birincil seçim: Her Ay / Tek Seferlik */}
           <div className="sub-cat-grid sub-cat-grid--top">
-            <button className={`sub-cat-btn ${form.category !== 'once' ? 'active active--monthly' : ''}`}
-              onClick={() => set('category', form.category === 'once' ? 'monthly-auto' : form.category)}>
+            <button className={`sub-cat-btn ${!form.category.startsWith('once') ? 'active active--monthly' : ''}`}
+              onClick={() => { if (form.category.startsWith('once')) set('category', 'monthly-auto'); }}>
               Her Ay
             </button>
-            <button className={`sub-cat-btn ${form.category === 'once' ? 'active active--once' : ''}`}
-              onClick={() => set('category', 'once')}>
+            <button className={`sub-cat-btn ${form.category.startsWith('once') ? 'active active--once' : ''}`}
+              onClick={() => { if (!form.category.startsWith('once')) set('category', 'once-payment'); }}>
               Tek Seferlik
             </button>
           </div>
 
-          {/* İkincil seçim: sadece Her Ay seçiliyken */}
-          {form.category !== 'once' && (
+          {/* Her Ay alt seçim: Otomatik / Manuel */}
+          {!form.category.startsWith('once') && (
             <div className="sub-cat-grid sub-cat-grid--sub">
               <button className={`sub-cat-btn sub-cat-btn--sm ${form.category === 'monthly-auto' ? 'active active--auto' : ''}`}
                 onClick={() => set('category', 'monthly-auto')}>
@@ -78,6 +78,20 @@ function AddModal({ initial, onSave, onDelete, onClose }) {
               <button className={`sub-cat-btn sub-cat-btn--sm ${form.category === 'monthly-manual' ? 'active active--manual' : ''}`}
                 onClick={() => set('category', 'monthly-manual')}>
                 Manuel
+              </button>
+            </div>
+          )}
+
+          {/* Tek Seferlik alt seçim: Ödeme / İptal */}
+          {form.category.startsWith('once') && (
+            <div className="sub-cat-grid sub-cat-grid--sub">
+              <button className={`sub-cat-btn sub-cat-btn--sm ${form.category === 'once-payment' ? 'active active--manual' : ''}`}
+                onClick={() => set('category', 'once-payment')}>
+                Ödeme
+              </button>
+              <button className={`sub-cat-btn sub-cat-btn--sm ${form.category === 'once-cancel' ? 'active active--cancel' : ''}`}
+                onClick={() => set('category', 'once-cancel')}>
+                İptal
               </button>
             </div>
           )}
@@ -109,7 +123,7 @@ function AddModal({ initial, onSave, onDelete, onClose }) {
           </div>
 
           <div className="sub-two-col">
-            {form.category === 'once' && (
+            {form.category === 'once-cancel' && (
               <div className="sub-field">
                 <label className="sub-label">İptal Son Tarihi <span className="sub-label-hint">(opsiyonel)</span></label>
                 <input className="sub-input" type="date" value={form.cancelBy} onChange={e => set('cancelBy', e.target.value)} />
@@ -135,7 +149,7 @@ function AddModal({ initial, onSave, onDelete, onClose }) {
 }
 
 function Item({ item, onClick }) {
-  const isMonthly = item.category !== 'once';
+  const isMonthly = item.category === 'monthly-auto' || item.category === 'monthly-manual';
   const dateForCalc = isMonthly ? getNextMonthly(item.date) : item.date;
   const days = getDaysUntil(dateForCalc);
   const urgency = days <= 3 ? 'urgent' : days <= 7 ? 'soon' : 'normal';
@@ -177,14 +191,16 @@ export default function SubscriptionTracker() {
   const remove = (id) => setItems(prev => prev.filter(x => x.id !== id));
 
   const sortByDays = (arr) => [...arr].sort((a, b) => {
-    const da = a.category !== 'once' ? getDaysUntil(getNextMonthly(a.date)) : getDaysUntil(a.date);
-    const db = b.category !== 'once' ? getDaysUntil(getNextMonthly(b.date)) : getDaysUntil(b.date);
+    const isM = c => c === 'monthly-auto' || c === 'monthly-manual';
+    const da = isM(a.category) ? getDaysUntil(getNextMonthly(a.date)) : getDaysUntil(a.date);
+    const db = isM(b.category) ? getDaysUntil(getNextMonthly(b.date)) : getDaysUntil(b.date);
     return da - db;
   });
 
   const autoItems = sortByDays(items.filter(i => i.category === 'monthly-auto'));
   const manualItems = sortByDays(items.filter(i => i.category === 'monthly-manual'));
-  const onceItems = sortByDays(items.filter(i => i.category === 'once'));
+  const oncePayItems = sortByDays(items.filter(i => i.category === 'once-payment' || i.category === 'once'));
+  const onceCancelItems = sortByDays(items.filter(i => i.category === 'once-cancel'));
 
   const totalAuto = autoItems.reduce((s, i) => s + (i.currency === '₺' ? i.price : 0), 0);
   const totalManual = manualItems.reduce((s, i) => s + (i.currency === '₺' ? i.price : 0), 0);
@@ -225,12 +241,21 @@ export default function SubscriptionTracker() {
           </div>
         )}
 
-        {onceItems.length > 0 && (
+        {oncePayItems.length > 0 && (
           <div className="sub-section">
             <div className="sub-section-header">
-              <span className="sub-section-title sub-section-title--once">Tek Seferlik</span>
+              <span className="sub-section-title sub-section-title--once">Tek Seferlik · Ödeme</span>
             </div>
-            {onceItems.map(item => <Item key={item.id} item={item} onClick={() => setEditing(item)} />)}
+            {oncePayItems.map(item => <Item key={item.id} item={item} onClick={() => setEditing(item)} />)}
+          </div>
+        )}
+
+        {onceCancelItems.length > 0 && (
+          <div className="sub-section">
+            <div className="sub-section-header">
+              <span className="sub-section-title sub-section-title--cancel">Tek Seferlik · İptal</span>
+            </div>
+            {onceCancelItems.map(item => <Item key={item.id} item={item} onClick={() => setEditing(item)} />)}
           </div>
         )}
       </div>
