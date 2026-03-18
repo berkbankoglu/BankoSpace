@@ -107,7 +107,7 @@ function AddModal({ initial, onSave, onDelete, onClose }) {
 
           <div className="sub-two-col">
             <div className="sub-field">
-              <label className="sub-label">{form.category === 'once' ? 'Tarih' : 'Her ay hangi gün'}</label>
+              <label className="sub-label">{form.category.startsWith('once') ? 'Tarih' : 'Her ay hangi gün'}</label>
               <input className="sub-input" type="date" value={form.date} onChange={e => set('date', e.target.value)} />
             </div>
             <div className="sub-field">
