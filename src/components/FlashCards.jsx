@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import './FlashCards.css';
+import { pushKeyToSupabase } from '../supabase';
 import { playTypeSoundThrottled, playClickSound, playAddSound, playDeleteSound } from '../utils/sounds';
 
 const DECK_COLORS = [
@@ -83,10 +84,12 @@ function FlashCards({ fullscreen = false }) {
   // Save data
   useEffect(() => {
     localStorage.setItem('flashCards', JSON.stringify(cards));
+    pushKeyToSupabase('flashCards', cards);
   }, [cards]);
 
   useEffect(() => {
     localStorage.setItem('flashCardGroups', JSON.stringify(decks));
+    pushKeyToSupabase('flashCardGroups', decks);
   }, [decks]);
 
   // Keyboard shortcuts for study mode
