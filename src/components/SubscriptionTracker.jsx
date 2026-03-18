@@ -152,30 +152,38 @@ function AddModal({ initial, onSave, onDelete, onClose }) {
   );
 }
 
-function Item({ item, onClick }) {
+function Item({ item, onClick, onComplete }) {
   const isMonthly = item.category === 'monthly-auto' || item.category === 'monthly-manual';
-  const dateForCalc = isMonthly ? getNextMonthly(item.date) : item.date;
-  const days = getDaysUntil(dateForCalc);
-  const urgency = days <= 3 ? 'urgent' : days <= 7 ? 'soon' : 'normal';
+  const isOnce = item.category === 'once-payment' || item.category === 'once-cancel' || item.category === 'once';
+  const dateForCalc = isMonthly ? getNextMonthly(item.date) : (item.date || item.cancelBy || '');
+  const days = dateForCalc ? getDaysUntil(dateForCalc) : null;
+  const isOverdue = !item.done && days !== null && days < 0;
+  const urgency = item.done ? 'done' : (days !== null ? (days <= 3 ? 'urgent' : days <= 7 ? 'soon' : 'normal') : 'normal');
   const cancelDays = item.cancelBy ? getDaysUntil(item.cancelBy) : null;
+
   return (
-    <div className={`sub-item sub-item--${urgency} sub-item--${item.category}`} onClick={onClick}>
+    <div className={`sub-item sub-item--${urgency} sub-item--${item.category} ${item.done ? 'sub-item--done' : ''} ${isOverdue ? 'sub-item--overdue' : ''}`} onClick={onClick}>
       <div className="sub-item-left">
         <div className="sub-item-name-row">
           <span className="sub-item-name">{item.name}</span>
-          {cancelDays !== null && (
+          {isOverdue && <span className="sub-cancel-badge sub-cancel-badge--urgent">gecikti</span>}
+          {cancelDays !== null && !isOverdue && (
             <span className={`sub-cancel-badge ${cancelDays <= 5 ? 'sub-cancel-badge--urgent' : ''}`}>
               ⚠ {cancelDays >= 0 ? `${cancelDays}g` : 'geçti'}
             </span>
           )}
         </div>
         <span className="sub-item-date">
-          {days === 0 ? 'Bugün' : days < 0 ? `${Math.abs(days)}g önce` : `${days}g sonra`}
+          {item.done ? 'Tamamlandı' : days === null ? '—' : days === 0 ? 'Bugün' : days < 0 ? `${Math.abs(days)}g gecikti` : `${days}g sonra`}
           {item.note && <span className="sub-pay-note"> · {item.note}</span>}
         </span>
       </div>
       <div className="sub-item-right">
         {item.price > 0 && <span className="sub-item-price">{item.currency}{item.price.toFixed(2)}</span>}
+        {isOnce && !item.done && (
+          <button className="sub-complete-btn" title="Tamamlandı olarak işaretle"
+            onClick={e => { e.stopPropagation(); onComplete(item.id); }}>✓</button>
+        )}
       </div>
     </div>
   );
@@ -193,6 +201,7 @@ export default function SubscriptionTracker() {
     });
   };
   const remove = (id) => setItems(prev => prev.filter(x => x.id !== id));
+  const complete = (id) => setItems(prev => prev.map(x => x.id === id ? { ...x, done: true } : x));
 
   const sortByDays = (arr) => [...arr].sort((a, b) => {
     const isM = c => c === 'monthly-auto' || c === 'monthly-manual';
@@ -250,7 +259,7 @@ export default function SubscriptionTracker() {
             <div className="sub-section-header">
               <span className="sub-section-title sub-section-title--once">Tek Seferlik · Ödeme</span>
             </div>
-            {oncePayItems.map(item => <Item key={item.id} item={item} onClick={() => setEditing(item)} />)}
+            {oncePayItems.map(item => <Item key={item.id} item={item} onClick={() => setEditing(item)} onComplete={complete} />)}
           </div>
         )}
 
@@ -259,7 +268,7 @@ export default function SubscriptionTracker() {
             <div className="sub-section-header">
               <span className="sub-section-title sub-section-title--cancel">Tek Seferlik · İptal</span>
             </div>
-            {onceCancelItems.map(item => <Item key={item.id} item={item} onClick={() => setEditing(item)} />)}
+            {onceCancelItems.map(item => <Item key={item.id} item={item} onClick={() => setEditing(item)} onComplete={complete} />)}
           </div>
         )}
       </div>
