@@ -1695,8 +1695,6 @@ function App({ session, onLogout }) {
           {/* Dashboard View */}
           {activeView === 'dashboard' && (
           <div className="dashboard-container" style={{ '--todo-font-size': fontSizeMap[todoFontSize], '--subtask-font-size': fontSizeMap[subtaskFontSize] }}>
-            {/* Upcoming Payments Widget */}
-            <SubscriptionWidget />
             {/* Todo Columns - resizable */}
             <div className="todo-columns" ref={columnsRef}>
               <div className="todo-col-wrapper" style={colWidths[0] ? { flex: `1 1 ${colWidths[0]}px`, minWidth: 0 } : { flex: 1, minWidth: 0 }}>
@@ -1746,26 +1744,7 @@ function App({ session, onLogout }) {
               </div>
               <div className="col-resize-handle" onMouseDown={e => startColResize(1, e)} onDoubleClick={() => { setColWidths(DEFAULT_COL_PX); localStorage.setItem('dashColWidths', JSON.stringify(DEFAULT_COL_PX)); }} />
               <div className="todo-col-wrapper" style={colWidths[2] ? { flex: `1 1 ${colWidths[2]}px`, minWidth: 0 } : { flex: 1, minWidth: 0 }}>
-                <CategoryColumn
-                  title={categoryNames.monthly}
-                  category="monthly"
-                  todos={todosByCategory.monthly}
-                  onAddTodo={addTodo}
-                  onToggleTodo={toggleTodo}
-                  onDeleteTodo={deleteTodo}
-                  onUpdateTodo={updateTodo}
-                  onRename={renameCategory}
-                  currentFilter={currentFilter}
-                  onAddSubtask={addSubtask}
-                  onToggleSubtask={toggleSubtask}
-                  onDeleteSubtask={deleteSubtask}
-                  onUpdateSubtask={updateSubtask}
-                  onReorder={reorderTodos}
-                  onTodoDragStart={handleTodoDragStart}
-                  draggingTodo={draggingTodo}
-                  dragOverCategory={dragOverCategory}
-                  dragOverTodoId={dragOverTodoId}
-                />
+                <SubscriptionTracker />
               </div>
             </div>
           </div>
