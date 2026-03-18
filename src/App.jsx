@@ -14,6 +14,7 @@ import ProjectBid from './components/ProjectBid';
 import Stocks from './components/Stocks';
 import JapaneseKana from './components/JapaneseKana';
 import Translate from './components/Translate';
+import SubscriptionTracker, { SubscriptionWidget } from './components/SubscriptionTracker';
 import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, setVolume, getVolume } from './utils/sounds';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
@@ -212,6 +213,7 @@ function App({ session, onLogout }) {
     const defaults = [
       { id: 'dashboard',  label: 'Dashboard',      view: 'dashboard',  hidden: false },
       { id: 'calendar',   label: 'Calendar',        view: 'calendar',   hidden: false },
+      { id: 'subscriptions', label: 'Abonelikler',  view: 'subscriptions', hidden: false },
       { id: 'references', label: 'References',      view: 'references', hidden: false },
       { id: 'flashcards', label: 'Flash Cards',     view: 'flashcards', hidden: false },
       { id: 'checklists', label: 'Checklists',      view: 'checklists', hidden: false },
@@ -1658,6 +1660,13 @@ function App({ session, onLogout }) {
             </div>
           )}
 
+          {/* Subscriptions View */}
+          {activeView === 'subscriptions' && (
+            <div style={{ height: '100%', padding: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <SubscriptionTracker />
+            </div>
+          )}
+
           {/* Project Bid View */}
           {activeView === 'projectbid' && (
             <div className="projectbid-fullscreen">
@@ -1686,6 +1695,8 @@ function App({ session, onLogout }) {
           {/* Dashboard View */}
           {activeView === 'dashboard' && (
           <div className="dashboard-container" style={{ '--todo-font-size': fontSizeMap[todoFontSize], '--subtask-font-size': fontSizeMap[subtaskFontSize] }}>
+            {/* Upcoming Payments Widget */}
+            <SubscriptionWidget />
             {/* Todo Columns - resizable */}
             <div className="todo-columns" ref={columnsRef}>
               <div className="todo-col-wrapper" style={colWidths[0] ? { flex: `1 1 ${colWidths[0]}px`, minWidth: 0 } : { flex: 1, minWidth: 0 }}>
