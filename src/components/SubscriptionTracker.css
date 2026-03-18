@@ -292,6 +292,25 @@
 }
 .sub-modal-close:hover { color: var(--text-primary); }
 
+.sub-modal-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+}
+.sub-modal-tab {
+  flex: 1;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 9px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.sub-modal-tab:hover { color: var(--text-secondary); }
+.sub-modal-tab.active { color: var(--text-primary); border-bottom-color: var(--accent); }
+
 .sub-modal-body {
   padding: 20px;
   display: flex;

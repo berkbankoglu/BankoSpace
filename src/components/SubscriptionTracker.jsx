@@ -46,29 +46,53 @@ function useLocalStorage(key, def) {
   return [val, setVal];
 }
 
-// ─── Sub Modal ────────────────────────────────────────────────
-const SUB_DEFAULT = { name: '', date: '', price: '', currency: '₺', recurring: true, autoCharge: false, cancelBy: '' };
+// ─── Unified Modal ────────────────────────────────────────────
+// targetTab: 'subs' | 'pays' — where to save on Add
+const UNIFIED_DEFAULT = {
+  name: '', date: '', price: '', currency: '₺',
+  recurring: true, autoCharge: false, type: 'manual',
+  cancelBy: '', note: ''
+};
 
-function SubModal({ initial, onSave, onClose }) {
-  const [form, setForm] = useState(initial || SUB_DEFAULT);
+function UnifiedModal({ initial, targetTab, onSaveSub, onSavePay, onClose }) {
+  const isEdit = !!initial?.id;
+  // detect which list this item belongs to from caller
+  const initTab = initial?._tab || targetTab || 'subs';
+  const [tab, setTab] = useState(initTab);
+  const [form, setForm] = useState(initial || UNIFIED_DEFAULT);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
   const handleSave = () => {
     if (!form.name.trim() || !form.date) return;
-    onSave({ ...form, id: form.id || Date.now(), name: form.name.trim(), price: parseFloat(form.price) || 0 });
+    const item = { ...form, id: form.id || Date.now(), name: form.name.trim(), price: parseFloat(form.price) || 0 };
+    if (tab === 'subs') onSaveSub(item);
+    else onSavePay(item);
     onClose();
   };
+
   return (
     <div className="sub-modal-overlay" onClick={onClose}>
       <div className="sub-modal" onClick={e => e.stopPropagation()}>
         <div className="sub-modal-header">
-          <span className="sub-modal-title">{form.id ? 'Abonelik Düzenle' : 'Abonelik Ekle'}</span>
+          <span className="sub-modal-title">{isEdit ? 'Düzenle' : 'Ekle'}</span>
           <button className="sub-modal-close" onClick={onClose}>×</button>
         </div>
+
+        {/* Tab selector — only shown when adding new */}
+        {!isEdit && (
+          <div className="sub-modal-tabs">
+            <button className={`sub-modal-tab ${tab === 'subs' ? 'active' : ''}`} onClick={() => setTab('subs')}>Abonelik</button>
+            <button className={`sub-modal-tab ${tab === 'pays' ? 'active' : ''}`} onClick={() => setTab('pays')}>Ödeme</button>
+          </div>
+        )}
+
         <div className="sub-modal-body">
           <div className="sub-field">
-            <label className="sub-label">Servis Adı</label>
-            <input className="sub-input" placeholder="Netflix, Spotify..." value={form.name}
-              onChange={e => set('name', e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSave()} autoFocus />
+            <label className="sub-label">{tab === 'subs' ? 'Servis Adı' : 'Açıklama'}</label>
+            <input className="sub-input"
+              placeholder={tab === 'subs' ? 'Netflix, Spotify...' : 'Elektrik, kira, alışveriş...'}
+              value={form.name} onChange={e => set('name', e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSave()} autoFocus />
           </div>
           <div className="sub-field">
             <label className="sub-label">Ödeme Tarihi</label>
@@ -84,83 +108,38 @@ function SubModal({ initial, onSave, onClose }) {
                 onChange={e => set('price', e.target.value)} />
             </div>
           </div>
-          <label className="sub-recurring-label">
-            <div className={`sub-toggle ${form.recurring ? 'on' : ''}`} onClick={() => set('recurring', !form.recurring)}>
-              <div className="sub-toggle-knob" />
-            </div>
-            <span>Aylık tekrar</span>
-          </label>
-          <label className="sub-recurring-label">
-            <div className={`sub-toggle sub-toggle--auto ${form.autoCharge ? 'on' : ''}`} onClick={() => set('autoCharge', !form.autoCharge)}>
-              <div className="sub-toggle-knob" />
-            </div>
-            <span>Otomatik ödeme <span className="sub-label-hint">(karttan otomatik çekiliyor)</span></span>
-          </label>
-          <div className="sub-field">
-            <label className="sub-label">İptal Son Tarihi <span className="sub-label-hint">(opsiyonel)</span></label>
-            <input className="sub-input" type="date" value={form.cancelBy} onChange={e => set('cancelBy', e.target.value)} />
-            <span className="sub-field-hint">Bu tarihten önce iptal etmeyi unutma</span>
-          </div>
-        </div>
-        <div className="sub-modal-footer">
-          <button className="sub-cancel-btn" onClick={onClose}>İptal</button>
-          <button className="sub-confirm-btn" onClick={handleSave} disabled={!form.name.trim() || !form.date}>Kaydet</button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
-// ─── Payment Modal ────────────────────────────────────────────
-const PAY_DEFAULT = { name: '', date: '', price: '', currency: '₺', type: 'manual', cancelBy: '', note: '' };
-// type: 'manual' = elle yapılan, 'auto' = otomatik
+          {tab === 'subs' && (
+            <>
+              <label className="sub-recurring-label">
+                <div className={`sub-toggle ${form.recurring ? 'on' : ''}`} onClick={() => set('recurring', !form.recurring)}>
+                  <div className="sub-toggle-knob" />
+                </div>
+                <span>Aylık tekrar</span>
+              </label>
+              <label className="sub-recurring-label">
+                <div className={`sub-toggle sub-toggle--auto ${form.autoCharge ? 'on' : ''}`} onClick={() => set('autoCharge', !form.autoCharge)}>
+                  <div className="sub-toggle-knob" />
+                </div>
+                <span>Otomatik ödeme <span className="sub-label-hint">(karttan otomatik çekiliyor)</span></span>
+              </label>
+            </>
+          )}
 
-function PayModal({ initial, onSave, onClose }) {
-  const [form, setForm] = useState(initial || PAY_DEFAULT);
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-  const handleSave = () => {
-    if (!form.name.trim() || !form.date) return;
-    onSave({ ...form, id: form.id || Date.now(), name: form.name.trim(), price: parseFloat(form.price) || 0 });
-    onClose();
-  };
-  return (
-    <div className="sub-modal-overlay" onClick={onClose}>
-      <div className="sub-modal" onClick={e => e.stopPropagation()}>
-        <div className="sub-modal-header">
-          <span className="sub-modal-title">{form.id ? 'Ödeme Düzenle' : 'Ödeme Ekle'}</span>
-          <button className="sub-modal-close" onClick={onClose}>×</button>
-        </div>
-        <div className="sub-modal-body">
-          <div className="sub-field">
-            <label className="sub-label">Açıklama</label>
-            <input className="sub-input" placeholder="Elektrik, kira, alışveriş..." value={form.name}
-              onChange={e => set('name', e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSave()} autoFocus />
-          </div>
-          <div className="sub-field">
-            <label className="sub-label">Ödeme Tarihi</label>
-            <input className="sub-input" type="date" value={form.date} onChange={e => set('date', e.target.value)} />
-          </div>
-          <div className="sub-field">
-            <label className="sub-label">Fiyat</label>
-            <div className="sub-price-row">
-              <select className="sub-select" value={form.currency} onChange={e => set('currency', e.target.value)}>
-                <option>₺</option><option>$</option><option>€</option><option>£</option>
-              </select>
-              <input className="sub-input" placeholder="0.00" type="number" value={form.price}
-                onChange={e => set('price', e.target.value)} />
+          {tab === 'pays' && (
+            <div className="sub-field">
+              <label className="sub-label">Ödeme Tipi</label>
+              <div className="sub-type-row">
+                <button className={`sub-type-btn ${form.type === 'manual' ? 'active' : ''}`} onClick={() => set('type', 'manual')}>
+                  <span>✋</span> Manuel
+                </button>
+                <button className={`sub-type-btn sub-type-btn--auto ${form.type === 'auto' ? 'active' : ''}`} onClick={() => set('type', 'auto')}>
+                  <span>⚡</span> Otomatik
+                </button>
+              </div>
             </div>
-          </div>
-          <div className="sub-field">
-            <label className="sub-label">Ödeme Tipi</label>
-            <div className="sub-type-row">
-              <button className={`sub-type-btn ${form.type === 'manual' ? 'active' : ''}`} onClick={() => set('type', 'manual')}>
-                <span>✋</span> Manuel
-              </button>
-              <button className={`sub-type-btn sub-type-btn--auto ${form.type === 'auto' ? 'active' : ''}`} onClick={() => set('type', 'auto')}>
-                <span>⚡</span> Otomatik
-              </button>
-            </div>
-          </div>
+          )}
+
           <div className="sub-field">
             <label className="sub-label">İptal Son Tarihi <span className="sub-label-hint">(opsiyonel)</span></label>
             <input className="sub-input" type="date" value={form.cancelBy} onChange={e => set('cancelBy', e.target.value)} />
@@ -168,8 +147,7 @@ function PayModal({ initial, onSave, onClose }) {
           </div>
           <div className="sub-field">
             <label className="sub-label">Not <span className="sub-label-hint">(opsiyonel)</span></label>
-            <input className="sub-input" placeholder="Ek bilgi..." value={form.note}
-              onChange={e => set('note', e.target.value)} />
+            <input className="sub-input" placeholder="Ek bilgi..." value={form.note} onChange={e => set('note', e.target.value)} />
           </div>
         </div>
         <div className="sub-modal-footer">
@@ -186,10 +164,8 @@ export default function SubscriptionTracker() {
   const [subs, setSubs] = useLocalStorage(SUB_KEY, []);
   const [pays, setPays] = useLocalStorage(PAY_KEY, []);
   const [tab, setTab] = useState('subs');
-  const [showAddSub, setShowAddSub] = useState(false);
-  const [showAddPay, setShowAddPay] = useState(false);
-  const [editingSub, setEditingSub] = useState(null);
-  const [editingPay, setEditingPay] = useState(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [editing, setEditing] = useState(null); // { item, _tab }
 
   const addSub = (s) => setSubs(p => [...p, s]);
   const updateSub = (s) => setSubs(p => p.map(x => x.id === s.id ? s : x));
@@ -211,26 +187,14 @@ export default function SubscriptionTracker() {
     <div className="sub-tracker">
       <div className="sub-header">
         <div className="sub-tabs">
-          <button className={`sub-tab ${tab === 'subs' ? 'active' : ''}`} onClick={() => setTab('subs')}>
-            Abonelikler
-            {totalMonthly > 0 && tab !== 'subs' && <span className="sub-tab-badge">₺{totalMonthly.toFixed(0)}</span>}
-          </button>
-          <button className={`sub-tab ${tab === 'pays' ? 'active' : ''}`} onClick={() => setTab('pays')}>
-            Ödemeler
-            {pays.length > 0 && <span className="sub-tab-count">{pays.length}</span>}
-          </button>
+          <button className={`sub-tab ${tab === 'subs' ? 'active' : ''}`} onClick={() => setTab('subs')}>Abonelikler</button>
+          <button className={`sub-tab ${tab === 'pays' ? 'active' : ''}`} onClick={() => setTab('pays')}>Ödemeler</button>
         </div>
-        <button className="sub-add-btn" onClick={() => tab === 'subs' ? setShowAddSub(true) : setShowAddPay(true)} title="Ekle">+</button>
+        <button className="sub-add-btn" onClick={() => setShowAdd(true)} title="Ekle">+</button>
       </div>
 
       {tab === 'subs' && (
         <div className="sub-list">
-          {totalMonthly > 0 && (
-            <div className="sub-total-row">
-              <span>Aylık toplam</span>
-              <span className="sub-total-amount">₺{totalMonthly.toFixed(0)}</span>
-            </div>
-          )}
           {sortedSubs.length === 0 && (
             <div className="sub-empty"><div className="sub-empty-icon">◈</div><div>Abonelik yok</div><div className="sub-empty-hint">+ ile ekle</div></div>
           )}
@@ -240,7 +204,7 @@ export default function SubscriptionTracker() {
             const cancelDays = sub.cancelBy ? getDaysUntil(sub.cancelBy) : null;
             return (
               <div key={sub.id} className={`sub-item sub-item--${urgency} ${sub.autoCharge ? 'sub-item--auto' : ''}`}
-                onClick={() => setEditingSub(sub)}>
+                onClick={() => setEditing({ ...sub, _tab: 'subs' })}>
                 <div className="sub-item-dot" />
                 <div className="sub-item-left">
                   <div className="sub-item-name-row">
@@ -259,7 +223,7 @@ export default function SubscriptionTracker() {
                 </div>
                 <div className="sub-item-right">
                   {sub.price > 0 && <span className="sub-item-price">{sub.currency}{sub.price.toFixed(2)}</span>}
-                  <button className="sub-delete-btn" onClick={e => { e.stopPropagation(); deleteSub(sub.id); }}>×</button>
+                  <button className="sub-delete-btn" onClick={e => { e.stopPropagation(); deleteSub(sub.id); setEditing(null); }}>×</button>
                 </div>
               </div>
             );
@@ -279,7 +243,7 @@ export default function SubscriptionTracker() {
             const cancelUrgent = cancelDays !== null && cancelDays <= 5;
             return (
               <div key={pay.id} className={`sub-item sub-item--${urgency} ${pay.type === 'auto' ? 'sub-item--auto' : ''}`}
-                onClick={() => setEditingPay(pay)}>
+                onClick={() => setEditing({ ...pay, _tab: 'pays' })}>
                 <div className="sub-item-dot" />
                 <div className="sub-item-left">
                   <div className="sub-item-name-row">
@@ -298,7 +262,7 @@ export default function SubscriptionTracker() {
                 </div>
                 <div className="sub-item-right">
                   {pay.price > 0 && <span className="sub-item-price">{pay.currency}{pay.price.toFixed(2)}</span>}
-                  <button className="sub-delete-btn" onClick={e => { e.stopPropagation(); deletePay(pay.id); }}>×</button>
+                  <button className="sub-delete-btn" onClick={e => { e.stopPropagation(); deletePay(pay.id); setEditing(null); }}>×</button>
                 </div>
               </div>
             );
@@ -306,10 +270,21 @@ export default function SubscriptionTracker() {
         </div>
       )}
 
-      {showAddSub && <SubModal onSave={addSub} onClose={() => setShowAddSub(false)} />}
-      {showAddPay && <PayModal onSave={addPay} onClose={() => setShowAddPay(false)} />}
-      {editingSub && <SubModal initial={editingSub} onSave={updateSub} onClose={() => setEditingSub(null)} />}
-      {editingPay && <PayModal initial={editingPay} onSave={updatePay} onClose={() => setEditingPay(null)} />}
+      {showAdd && (
+        <UnifiedModal
+          targetTab={tab}
+          onSaveSub={addSub} onSavePay={addPay}
+          onClose={() => setShowAdd(false)}
+        />
+      )}
+      {editing && (
+        <UnifiedModal
+          initial={editing}
+          targetTab={editing._tab}
+          onSaveSub={updateSub} onSavePay={updatePay}
+          onClose={() => setEditing(null)}
+        />
+      )}
     </div>
   );
 }
