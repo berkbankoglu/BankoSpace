@@ -12,9 +12,58 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
+  padding: 0 10px 0 0;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+}
+
+.sub-tabs {
+  display: flex;
+  flex: 1;
+}
+
+.sub-tab {
+  flex: 1;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  padding: 10px 8px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+.sub-tab:hover { color: var(--text-secondary); }
+.sub-tab.active { color: var(--text-primary); border-bottom-color: var(--accent); }
+
+.sub-tab-badge, .sub-tab-count {
+  font-size: 9px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 4px;
+  color: var(--text-muted);
+}
+
+.sub-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 14px;
+  font-size: 11px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+.sub-total-amount {
+  font-weight: 600;
+  color: var(--text-secondary);
 }
 
 .sub-header-left {
@@ -374,6 +423,58 @@
   transition: background 0.15s;
 }
 .sub-cancel-btn:hover { background: var(--bg-hover); }
+
+/* ── Payment type styles ── */
+.sub-pay-type-icon { font-size: 12px; flex-shrink: 0; }
+.sub-pay-note { color: var(--text-muted); font-size: 10px; }
+
+.sub-item--pay-card { background: rgba(63, 185, 80, 0.04); }
+.sub-item--pay-card:hover { background: rgba(63, 185, 80, 0.09); }
+
+.sub-type-row {
+  display: flex;
+  gap: 8px;
+}
+.sub-type-btn {
+  flex: 1;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+.sub-type-btn:hover { background: var(--bg-hover); }
+.sub-type-btn.active {
+  border-color: var(--accent);
+  background: var(--accent-glow);
+  color: var(--text-primary);
+}
+
+/* ── Popup overlay ── */
+.sub-popup-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9990;
+}
+.sub-popup {
+  width: 420px;
+  height: 560px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: 0 24px 48px rgba(0,0,0,0.7);
+}
 
 /* ---- Widget ---- */
 .sub-widget {

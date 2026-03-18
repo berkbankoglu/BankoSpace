@@ -14,7 +14,7 @@ import ProjectBid from './components/ProjectBid';
 import Stocks from './components/Stocks';
 import JapaneseKana from './components/JapaneseKana';
 import Translate from './components/Translate';
-import SubscriptionTracker, { SubscriptionWidget } from './components/SubscriptionTracker';
+import SubscriptionTracker, { SubscriptionWidget, SubscriptionPopup } from './components/SubscriptionTracker';
 import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, setVolume, getVolume } from './utils/sounds';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
@@ -205,6 +205,7 @@ function App({ session, onLogout }) {
 
 
   const [showSettings, setShowSettings] = useState(false);
+  const [showSubPopup, setShowSubPopup] = useState(false);
   const [showSidebarSettings, setShowSidebarSettings] = useState(false);
   const [settingsTab, setSettingsTab] = useState('account');
   const [soundVolume, setSoundVolume] = useState(() => getVolume());
@@ -213,7 +214,6 @@ function App({ session, onLogout }) {
     const defaults = [
       { id: 'dashboard',  label: 'Dashboard',      view: 'dashboard',  hidden: false },
       { id: 'calendar',   label: 'Calendar',        view: 'calendar',   hidden: false },
-      { id: 'subscriptions', label: 'Abonelikler',  view: 'subscriptions', hidden: false },
       { id: 'references', label: 'References',      view: 'references', hidden: false },
       { id: 'flashcards', label: 'Flash Cards',     view: 'flashcards', hidden: false },
       { id: 'checklists', label: 'Checklists',      view: 'checklists', hidden: false },
@@ -1215,6 +1215,13 @@ function App({ session, onLogout }) {
               >
                 ⏱
               </button>
+              <button
+                className="dashboard-timer-toggle-btn"
+                onClick={() => { playClickSound(); setShowSubPopup(s => !s); }}
+                title="Abonelikler & Ödemeler"
+              >
+                💳
+              </button>
             </div>
           </div>
         )}
@@ -1660,13 +1667,6 @@ function App({ session, onLogout }) {
             </div>
           )}
 
-          {/* Subscriptions View */}
-          {activeView === 'subscriptions' && (
-            <div style={{ height: '100%', padding: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-              <SubscriptionTracker />
-            </div>
-          )}
-
           {/* Project Bid View */}
           {activeView === 'projectbid' && (
             <div className="projectbid-fullscreen">
@@ -1771,6 +1771,9 @@ function App({ session, onLogout }) {
           </div>
         </div>
       )}
+
+      {/* Subscriptions & Payments Popup */}
+      {showSubPopup && <SubscriptionPopup onClose={() => setShowSubPopup(false)} />}
 
       {/* Timer Widget Overlay */}
       {timerWidgetOpen && (
