@@ -22,16 +22,23 @@ function getNextPayment(sub) {
   return next.toISOString().split('T')[0];
 }
 
-function AddModal({ onAdd, onClose }) {
-  const [name, setName] = useState('');
-  const [date, setDate] = useState('');
-  const [price, setPrice] = useState('');
-  const [currency, setCurrency] = useState('₺');
-  const [recurring, setRecurring] = useState(true);
+const DEFAULT_FORM = {
+  name: '', date: '', price: '', currency: '₺',
+  recurring: true, autoCharge: false, cancelBy: ''
+};
 
-  const handleAdd = () => {
-    if (!name.trim() || !date) return;
-    onAdd({ id: Date.now(), name: name.trim(), date, price: parseFloat(price) || 0, currency, recurring });
+function SubModal({ initial, onSave, onClose, title }) {
+  const [form, setForm] = useState(initial || DEFAULT_FORM);
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleSave = () => {
+    if (!form.name.trim() || !form.date) return;
+    onSave({
+      ...form,
+      id: form.id || Date.now(),
+      name: form.name.trim(),
+      price: parseFloat(form.price) || 0,
+    });
     onClose();
   };
 
@@ -39,58 +46,61 @@ function AddModal({ onAdd, onClose }) {
     <div className="sub-modal-overlay" onClick={onClose}>
       <div className="sub-modal" onClick={e => e.stopPropagation()}>
         <div className="sub-modal-header">
-          <span className="sub-modal-title">Abonelik Ekle</span>
+          <span className="sub-modal-title">{title}</span>
           <button className="sub-modal-close" onClick={onClose}>×</button>
         </div>
         <div className="sub-modal-body">
           <div className="sub-field">
             <label className="sub-label">Servis Adı</label>
-            <input
-              className="sub-input"
-              placeholder="Netflix, Spotify..."
-              value={name}
-              onChange={e => setName(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleAdd()}
-              autoFocus
-            />
+            <input className="sub-input" placeholder="Netflix, Spotify..." value={form.name}
+              onChange={e => set('name', e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSave()} autoFocus />
           </div>
           <div className="sub-field">
             <label className="sub-label">Ödeme Tarihi</label>
-            <input
-              className="sub-input"
-              type="date"
-              value={date}
-              onChange={e => setDate(e.target.value)}
-            />
+            <input className="sub-input" type="date" value={form.date}
+              onChange={e => set('date', e.target.value)} />
           </div>
           <div className="sub-field">
             <label className="sub-label">Fiyat</label>
             <div className="sub-price-row">
-              <select className="sub-select" value={currency} onChange={e => setCurrency(e.target.value)}>
-                <option>₺</option>
-                <option>$</option>
-                <option>€</option>
-                <option>£</option>
+              <select className="sub-select" value={form.currency} onChange={e => set('currency', e.target.value)}>
+                <option>₺</option><option>$</option><option>€</option><option>£</option>
               </select>
-              <input
-                className="sub-input"
-                placeholder="0.00"
-                type="number"
-                value={price}
-                onChange={e => setPrice(e.target.value)}
-              />
+              <input className="sub-input" placeholder="0.00" type="number" value={form.price}
+                onChange={e => set('price', e.target.value)} />
             </div>
           </div>
+
+          {/* Aylık tekrar */}
           <label className="sub-recurring-label">
-            <div className={`sub-toggle ${recurring ? 'on' : ''}`} onClick={() => setRecurring(r => !r)}>
+            <div className={`sub-toggle ${form.recurring ? 'on' : ''}`} onClick={() => set('recurring', !form.recurring)}>
               <div className="sub-toggle-knob" />
             </div>
             <span>Aylık tekrar</span>
           </label>
+
+          {/* Otomatik ödeme */}
+          <label className="sub-recurring-label">
+            <div className={`sub-toggle sub-toggle--auto ${form.autoCharge ? 'on' : ''}`} onClick={() => set('autoCharge', !form.autoCharge)}>
+              <div className="sub-toggle-knob" />
+            </div>
+            <span>Otomatik ödeme <span className="sub-label-hint">(karttan otomatik çekiliyor)</span></span>
+          </label>
+
+          {/* İptal tarihi */}
+          <div className="sub-field">
+            <label className="sub-label">
+              İptal Son Tarihi <span className="sub-label-hint">(opsiyonel)</span>
+            </label>
+            <input className="sub-input" type="date" value={form.cancelBy}
+              onChange={e => set('cancelBy', e.target.value)} />
+            <span className="sub-field-hint">Bu tarihten önce iptal etmeyi unutma</span>
+          </div>
         </div>
         <div className="sub-modal-footer">
           <button className="sub-cancel-btn" onClick={onClose}>İptal</button>
-          <button className="sub-confirm-btn" onClick={handleAdd} disabled={!name.trim() || !date}>Ekle</button>
+          <button className="sub-confirm-btn" onClick={handleSave} disabled={!form.name.trim() || !form.date}>Kaydet</button>
         </div>
       </div>
     </div>
@@ -102,13 +112,15 @@ export default function SubscriptionTracker() {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
     catch { return []; }
   });
-  const [showModal, setShowModal] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
+  const [editing, setEditing] = useState(null);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(subs));
   }, [subs]);
 
   const addSub = (sub) => setSubs(prev => [...prev, sub]);
+  const updateSub = (sub) => setSubs(prev => prev.map(s => s.id === sub.id ? sub : s));
   const deleteSub = (id) => setSubs(prev => prev.filter(s => s.id !== id));
 
   const sorted = [...subs].sort((a, b) =>
@@ -128,7 +140,7 @@ export default function SubscriptionTracker() {
             <span className="sub-monthly-total">₺{totalMonthly.toFixed(0)}/ay</span>
           )}
         </div>
-        <button className="sub-add-btn" onClick={() => setShowModal(true)} title="Ekle">+</button>
+        <button className="sub-add-btn" onClick={() => setShowAdd(true)} title="Ekle">+</button>
       </div>
 
       <div className="sub-list">
@@ -143,11 +155,26 @@ export default function SubscriptionTracker() {
           const nextDate = getNextPayment(sub);
           const days = getDaysUntil(nextDate);
           const urgency = days <= 3 ? 'urgent' : days <= 7 ? 'soon' : 'normal';
+          const cancelDays = sub.cancelBy ? getDaysUntil(sub.cancelBy) : null;
+          const cancelUrgent = cancelDays !== null && cancelDays <= 5;
+
           return (
-            <div key={sub.id} className={`sub-item sub-item--${urgency}`}>
+            <div key={sub.id}
+              className={`sub-item sub-item--${urgency} ${sub.autoCharge ? 'sub-item--auto' : ''}`}
+              onClick={() => setEditing(sub)}
+            >
               <div className="sub-item-dot" />
               <div className="sub-item-left">
-                <span className="sub-item-name">{sub.name}</span>
+                <div className="sub-item-name-row">
+                  <span className="sub-item-name">{sub.name}</span>
+                  {sub.autoCharge && <span className="sub-auto-badge" title="Otomatik ödeme">⚡</span>}
+                  {sub.cancelBy && (
+                    <span className={`sub-cancel-badge ${cancelUrgent ? 'sub-cancel-badge--urgent' : ''}`}
+                      title={`${cancelDays !== null && cancelDays >= 0 ? cancelDays + 'g içinde' : 'süresi geçti'} iptal et`}>
+                      ⚠ {cancelDays !== null && cancelDays >= 0 ? `${cancelDays}g` : 'geçti'}
+                    </span>
+                  )}
+                </div>
                 <span className="sub-item-date">
                   {days === 0 ? 'Bugün' : days < 0 ? `${Math.abs(days)}g önce` : `${days}g sonra`}
                   {sub.recurring && <span className="sub-recurring-badge">↻</span>}
@@ -157,14 +184,19 @@ export default function SubscriptionTracker() {
                 {sub.price > 0 && (
                   <span className="sub-item-price">{sub.currency}{sub.price.toFixed(2)}</span>
                 )}
-                <button className="sub-delete-btn" onClick={() => deleteSub(sub.id)}>×</button>
+                <button className="sub-delete-btn" onClick={e => { e.stopPropagation(); deleteSub(sub.id); }}>×</button>
               </div>
             </div>
           );
         })}
       </div>
 
-      {showModal && <AddModal onAdd={addSub} onClose={() => setShowModal(false)} />}
+      {showAdd && (
+        <SubModal title="Abonelik Ekle" onSave={addSub} onClose={() => setShowAdd(false)} />
+      )}
+      {editing && (
+        <SubModal title="Düzenle" initial={editing} onSave={updateSub} onClose={() => setEditing(null)} />
+      )}
     </div>
   );
 }
@@ -182,20 +214,37 @@ export function SubscriptionWidget() {
     return () => clearInterval(interval);
   }, []);
 
+  // Upcoming payments (14 days) + urgent cancel deadlines
   const upcoming = subs
     .map(sub => ({ ...sub, nextDate: getNextPayment(sub), days: getDaysUntil(getNextPayment(sub)) }))
     .filter(sub => sub.days >= 0 && sub.days <= 14)
     .sort((a, b) => a.days - b.days);
 
-  if (upcoming.length === 0) return null;
+  const cancelAlerts = subs
+    .filter(s => s.cancelBy)
+    .map(s => ({ ...s, cancelDays: getDaysUntil(s.cancelBy) }))
+    .filter(s => s.cancelDays >= 0 && s.cancelDays <= 7)
+    .sort((a, b) => a.cancelDays - b.cancelDays);
+
+  if (upcoming.length === 0 && cancelAlerts.length === 0) return null;
 
   return (
     <div className="sub-widget">
       <div className="sub-widget-title">Yaklaşan Ödemeler</div>
+      {cancelAlerts.map(sub => (
+        <div key={'cancel-' + sub.id} className="sub-widget-item sub-widget-item--cancel">
+          <span className="sub-widget-cancel-icon">⚠</span>
+          <span className="sub-widget-name">{sub.name} iptal et</span>
+          <span className="sub-widget-days sub-widget-days--cancel">
+            {sub.cancelDays === 0 ? 'Bugün!' : `${sub.cancelDays}g`}
+          </span>
+        </div>
+      ))}
       {upcoming.map(sub => {
         const urgency = sub.days <= 3 ? 'urgent' : sub.days <= 7 ? 'soon' : 'normal';
         return (
           <div key={sub.id} className={`sub-widget-item sub-widget-item--${urgency}`}>
+            {sub.autoCharge && <span className="sub-widget-auto-icon">⚡</span>}
             <span className="sub-widget-name">{sub.name}</span>
             <span className="sub-widget-days">{sub.days === 0 ? 'Bugün!' : `${sub.days}g`}</span>
             {sub.price > 0 && <span className="sub-widget-price">{sub.currency}{sub.price.toFixed(0)}</span>}
