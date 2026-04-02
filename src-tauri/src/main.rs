@@ -108,6 +108,18 @@ fn toggle_timer_window(app: tauri::AppHandle) {
 }
 
 #[tauri::command]
+fn toggle_kana_window(app: tauri::AppHandle) {
+    if let Some(w) = app.get_webview_window("kana-popup") {
+        if w.is_visible().unwrap_or(false) {
+            let _ = w.hide();
+        } else {
+            let _ = w.show();
+            let _ = w.set_focus();
+        }
+    }
+}
+
+#[tauri::command]
 async fn fetch_rss(url: String) -> Result<String, String> {
     let client = reqwest::Client::builder()
         .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
@@ -184,6 +196,7 @@ fn main() {
         .plugin(tauri_plugin_deep_link::init())
         .invoke_handler(tauri::generate_handler![
             toggle_timer_window,
+            toggle_kana_window,
             fetch_rss,
             fetch_post,
             fetch_tts,

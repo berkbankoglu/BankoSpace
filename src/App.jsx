@@ -229,7 +229,6 @@ function App({ session, onLogout }) {
   const [settingsTab, setSettingsTab] = useState('account');
   const [soundVolume, setSoundVolume] = useState(() => getVolume());
   const [activeView, setActiveView] = useState('dashboard');
-  const [showKanaPopup, setShowKanaPopup] = useState(false);
   const [sidebarItems, setSidebarItems] = useState(() => {
     const defaults = [
       { id: 'dashboard',  label: 'Dashboard',      view: 'dashboard',  hidden: false },
@@ -1609,7 +1608,7 @@ function App({ session, onLogout }) {
                     if (draggedSidebarItem) return;
                     playNavSound();
                     if (item.id === 'japanesekana') {
-                      setShowKanaPopup(true);
+                      setActiveView('japanesekana');
                       return;
                     }
                     setActiveView(item.view);
@@ -1707,14 +1706,9 @@ function App({ session, onLogout }) {
             <ToolsView />
           )}
 
-          {/* Japanese Kana Popup */}
-          {showKanaPopup && (
-            <div className="kana-popup-overlay" onClick={() => setShowKanaPopup(false)}>
-              <div className="kana-popup-modal" onClick={e => e.stopPropagation()}>
-                <button className="kana-popup-close" onClick={() => setShowKanaPopup(false)}>✕</button>
-                <JapaneseKana />
-              </div>
-            </div>
+          {/* Japanese Kana full page */}
+          {activeView === 'japanesekana' && (
+            <JapaneseKana />
           )}
 
 
