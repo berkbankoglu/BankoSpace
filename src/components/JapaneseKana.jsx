@@ -590,7 +590,7 @@ function WrongAnalysis({ pool, stats, onPracticeWrong, onResetWrong }) {
     <div className="wrong-analysis">
       <button className="wrong-analysis-toggle" onClick={() => setOpen(o => !o)}>
         <span className="wrong-analysis-badge">{wrongItems.length}</span>
-        Yanlış Analizi
+        Wrong Analysis
         <span style={{ marginLeft: 'auto' }}>{open ? '▲' : '▼'}</span>
       </button>
       {open && (
@@ -601,7 +601,7 @@ function WrongAnalysis({ pool, stats, onPracticeWrong, onResetWrong }) {
               const pct = Math.round((item.s.wrong / total) * 100);
               return (
                 <div key={item.char} className="wrong-analysis-row">
-                  <span className="wa-char" onClick={() => speakKana(item.char)} title="Dinle">{item.char}</span>
+                  <span className="wa-char" onClick={() => speakKana(item.char)} title="Listen">{item.char}</span>
                   <span className="wa-romaji">/{item.romaji}/</span>
                   <div className="wa-bar-wrap">
                     <div className="wa-bar" style={{ width: `${pct}%` }} />
@@ -617,14 +617,14 @@ function WrongAnalysis({ pool, stats, onPracticeWrong, onResetWrong }) {
               className="practice-wrong-btn"
               onClick={() => onPracticeWrong(wrongItems.map(i => i.char))}
             >
-              Yalnızca Yanlışları Çalış ({wrongItems.length})
+              Practice Wrong Only ({wrongItems.length})
             </button>
             <button
               className="practice-wrong-btn"
               style={{ background: '#374151', flex: '0 0 auto' }}
               onClick={onResetWrong}
             >
-              Sıfırla
+              Reset
             </button>
           </div>
         </div>
@@ -1144,7 +1144,7 @@ function StudyWordsSection({ selectedRows }) {
   function nextQuiz() {
     const nextIdx = quiz.idx + 1;
     if (nextIdx >= quizPool.length) {
-      // Tekrar başlat — yeni shuffle ile
+      // Restart — with a new shuffle
       const pool = buildShuffledPool(quiz.baseWords);
       setQuizPool(pool);
       setQuiz({ word: pool[0], input: "", feedback: null, answer: "", idx: 0, baseWords: quiz.baseWords });
@@ -1165,7 +1165,7 @@ function StudyWordsSection({ selectedRows }) {
         Study Words
         <span className="wrong-analysis-badge" style={{ marginLeft: '0.5rem' }}>{filteredWords.length}</span>
         {selectedWords.size > 0 && (
-          <span className="wrong-analysis-badge" style={{ marginLeft: '0.3rem', background: '#2563eb' }}>{selectedWords.size} seçili</span>
+          <span className="wrong-analysis-badge" style={{ marginLeft: '0.3rem', background: '#2563eb' }}>{selectedWords.size} selected</span>
         )}
         <span style={{ marginLeft: 'auto', fontSize: '0.78rem', color: '#8b949e', fontWeight: 400 }}>
           {selectedRows !== null ? 'filtered' : 'all rows'}
@@ -1177,7 +1177,7 @@ function StudyWordsSection({ selectedRows }) {
           {quiz ? (
             <div className="words-quiz">
               <div className="words-quiz-header">
-                <button className="reset-btn" onClick={() => setQuiz(null)}>Bitti</button>
+                <button className="reset-btn" onClick={() => setQuiz(null)}>Done</button>
                 <span className="words-quiz-progress">{quiz.idx + 1} / {quizPool.length} · ∞</span>
               </div>
               <div className={`flashcard${quiz.feedback ? ` flashcard--${quiz.feedback}` : ""}`}
@@ -1211,17 +1211,17 @@ function StudyWordsSection({ selectedRows }) {
           ) : (
             <>
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                <input className="words-search" type="text" placeholder="Ara..." value={search} onChange={e => setSearch(e.target.value)} />
+                <input className="words-search" type="text" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} />
                 <button className="submit-btn" style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
                   onClick={() => startQuiz(quizSource)} disabled={quizSource.length === 0}>
-                  {selectedWords.size > 0 ? `Seçilileri Quiz (${selectedWords.size})` : `Quiz Başlat (${filteredWords.length})`}
+                  {selectedWords.size > 0 ? `Quiz Selected (${selectedWords.size})` : `Start Quiz (${filteredWords.length})`}
                 </button>
                 {selectedWords.size > 0 && (
-                  <button className="reset-btn" onClick={() => setSelectedWords(new Set())}>Seçimi Temizle</button>
+                  <button className="reset-btn" onClick={() => setSelectedWords(new Set())}>Clear Selection</button>
                 )}
               </div>
               <div style={{ fontSize: '0.75rem', color: '#6e7681', marginBottom: '0.25rem' }}>
-                Karta tıkla: seç/kaldır &nbsp;·&nbsp; ✓ öğrendim işareti
+                Click card: select/deselect &nbsp;·&nbsp; ✓ mark as learned
               </div>
               <div className="words-grid">
                 {filteredWords.map(w => {
@@ -1234,11 +1234,11 @@ function StudyWordsSection({ selectedRows }) {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2 }}>
                         <span className="word-kana">{w.kana}</span>
                         <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
-                          <span className="word-learned-btn" onClick={(e) => { e.stopPropagation(); speakKana(w.kana, 1.0); }} title="Dinle">🔊</span>
+                          <span className="word-learned-btn" onClick={(e) => { e.stopPropagation(); speakKana(w.kana, 1.0); }} title="Listen">🔊</span>
                           <span
                             className={`word-learned-btn${isLearned ? ' word-learned-btn--active' : ''}`}
                             onClick={(e) => toggleLearned(w.kana, e)}
-                            title={isLearned ? 'Öğrenildi (kaldır)' : 'Öğrendim'}
+                            title={isLearned ? 'Learned (remove)' : 'Mark as learned'}
                           >✓</span>
                         </div>
                       </div>
@@ -1248,7 +1248,7 @@ function StudyWordsSection({ selectedRows }) {
                   );
                 })}
                 {filteredWords.length === 0 && (
-                  <div style={{ color: '#8b949e', padding: '1rem', textAlign: 'center', gridColumn: '1/-1' }}>Kelime bulunamadı.</div>
+                  <div style={{ color: '#8b949e', padding: '1rem', textAlign: 'center', gridColumn: '1/-1' }}>No words found.</div>
                 )}
               </div>
             </>

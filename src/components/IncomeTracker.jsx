@@ -28,9 +28,9 @@ function IncomeTracker() {
   });
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [selectedMonth, setSelectedMonth] = useState('all');
-  const [chartYear, setChartYear] = useState(new Date().getFullYear().toString()); // Grafik için yıl seçimi
+  const [chartYear, setChartYear] = useState(new Date().getFullYear().toString()); // Year selection for chart
   const [chartMode, setChartMode] = useState('monthly'); // 'monthly' veya 'yearly'
-  const [clientFilter, setClientFilter] = useState('all'); // Müşteri filtresi
+  const [clientFilter, setClientFilter] = useState('all'); // Client filtresi
   const [view, setView] = useState('dashboard'); // 'dashboard', 'list', 'add'
   const [collapsedSections, setCollapsedSections] = useState({ read: false, unread: false });
   const [sortOrder, setSortOrder] = useState('date-desc'); // 'date-desc', 'date-asc', 'amount-desc', 'amount-asc'
@@ -61,17 +61,17 @@ function IncomeTracker() {
       pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
       let fullText = '';
 
-      // Tüm sayfaları oku (max 5 sayfa - bellek için)
+      // Read all pages (max 5 pages - for memory)
       const maxPages = Math.min(pdf.numPages, 5);
       for (let i = 1; i <= maxPages; i++) {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
 
-        // items'ı daha iyi birleştir - boşluk ve satır sonları ekle
+        // Merge items better - add spaces and line breaks
         let pageText = '';
         let lastY = null;
         for (const item of textContent.items) {
-          // Yeni satır kontrolü
+          // New line check
           if (lastY !== null && Math.abs(item.transform[5] - lastY) > 5) {
             pageText += '\n';
           } else if (pageText.length > 0) {
@@ -104,11 +104,11 @@ function IncomeTracker() {
   const parseInvoiceText = (text, fileName) => {
     const errors = [];
 
-    // Belge Numarası
+    // Document Number
     const invoiceNoMatch = text.match(/GIB\d+/);
     const invoiceNo = invoiceNoMatch ? invoiceNoMatch[0] : fileName.replace('.pdf', '');
 
-    // Tarih - çeşitli formatlar dene
+    // Date - try various formats
     let date = null;
     const datePatterns = [
       // e-SMM spesifik formatlar
@@ -117,7 +117,7 @@ function IncomeTracker() {
       /Makbuz Tarihi[:\s]*(\d{2})[\/\.\-](\d{2})[\/\.\-](\d{4})/i,
       /Belge Tarihi[:\s]*(\d{2})[\/\.\-](\d{2})[\/\.\-](\d{4})/i,
       /Tarih[:\s]*(\d{2})[\/\.\-](\d{2})[\/\.\-](\d{4})/i,
-      // Genel tarih formatları
+      // General date formats
       /(\d{2})[\/\.\-](\d{2})[\/\.\-](20\d{2})/,
       // YYYY-MM-DD format
       /(20\d{2})[\/\.\-](\d{2})[\/\.\-](\d{2})/,
@@ -126,7 +126,7 @@ function IncomeTracker() {
     for (const pattern of datePatterns) {
       const match = text.match(pattern);
       if (match) {
-        // YYYY-MM-DD formatını kontrol et
+        // Check YYYY-MM-DD format
         if (match[1].length === 4) {
           // YYYY-MM-DD format
           date = `${match[1]}-${match[2]}-${match[3]}`;
@@ -143,16 +143,16 @@ function IncomeTracker() {
       date = new Date().toISOString().split('T')[0];
     }
 
-    // Alıcı / Müşteri - GIB e-SMM formatını algıla
+    // Recipient / Client - detect GIB e-SMM format
     let client = null;
     let fullClientInfo = null;
 
-    // GIB e-SMM formatında "ALICI BİLGİLERİ" bölümünü bul
-    // ve altındaki satırları oku
+    // Find the "ALICI BİLGİLERİ" section in GIB e-SMM format
+    // and read the lines below it
     const aliciBilgileriMatch = text.match(/ALICI\s*B[İI]LG[İI]LER[İI][\s\S]{0,200}/i);
     if (aliciBilgileriMatch) {
       const section = aliciBilgileriMatch[0];
-      // Bu bölümdeki ilk anlamlı ismi bul
+      // Find the first meaningful name in this section
       const lines = section.split(/[\n\r]+/).filter(l => l.trim().length > 0);
       for (const line of lines) {
         const cleaned = line.trim()
@@ -161,7 +161,7 @@ function IncomeTracker() {
           .replace(/^[:\s]+/, '')
           .trim();
 
-        // En az 2 kelime ve harf içeren satır isim olabilir
+        // A line with at least 2 words and letters can be a name
         if (cleaned.length > 3 && /[a-zA-ZğüşıöçĞÜŞİÖÇ]{2,}/i.test(cleaned) && !/^(Ad[ıi]|Soyad|Unvan|VKN|TCKN|Adres|Vergi|Daire)/i.test(cleaned)) {
           fullClientInfo = cleaned;
           break;
@@ -178,11 +178,11 @@ function IncomeTracker() {
         /Unvan[ıi]?\s*[:\s]*([A-Za-zğüşıöçĞÜŞİÖÇ\s]+)/i,
         // Direkt isim pattern'leri
         /(?:^|\n)\s*([A-Z][a-zA-Z]+\s+[A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?)\s*(?:\n|$)/m,
-        // İngilizce isimler - büyük harfle başlayan 2-3 kelime
+        // English names - 2-3 words starting with a capital
         /([A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/,
-        // ALICI satırından sonraki isim
+        // Name after the ALICI row
         /ALICI[:\s]*\n?\s*([A-Za-zğüşıöçĞÜŞİÖÇ][A-Za-zğüşıöçĞÜŞİÖÇ\s]{2,40})/i,
-        // Müşteri
+        // Client
         /Müşteri[:\s]*([^\n\r]+)/i,
         /Alıcı\s*Adı[:\s]*([^\n\r]+)/i,
         /Client[:\s]*([^\n\r]+)/i,
@@ -194,7 +194,7 @@ function IncomeTracker() {
         const match = text.match(pattern);
         if (match && match[1]) {
           const candidate = match[1].trim().replace(/^[:\s]+/, '').replace(/\s+/g, ' ');
-          // Geçersiz değerleri atla
+          // Skip invalid values
           if (candidate.length > 2 &&
               !/^(BİLGİLER|BILGILER|ALICI|VKN|TCKN|Vergi|Adres|Tarih|\d)/i.test(candidate)) {
             fullClientInfo = candidate;
@@ -204,9 +204,9 @@ function IncomeTracker() {
       }
     }
 
-    // Son çare: Metinde büyük harfle başlayan 2-3 kelimelik isimleri ara
+    // Last resort: search for 2-3 word capitalized names in the text
     if (!fullClientInfo) {
-      // Upwork, Fiverr gibi platform isimleri hariç
+      // Exclude platform names like Upwork, Fiverr
       const namePattern = /(?:^|\n)\s*([A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*(?:\n|$)/gm;
       const excludeWords = ['Freelance', 'Service', 'Payment', 'Invoice', 'Total', 'Amount', 'Upwork', 'Fiverr', 'United', 'States', 'Kingdom'];
       let match;
@@ -224,24 +224,24 @@ function IncomeTracker() {
     }
 
     if (fullClientInfo) {
-      // Gereksiz başlangıç kelimelerini ve karakterleri temizle
+      // Remove unnecessary leading words and characters
       fullClientInfo = fullClientInfo
         .replace(/^(BİLGİLER|BILGILER|BİLGİ|BILGI|ALICI|Alıcı|Ad[ıi]\s*Soyad[ıi]\s*[\/\\]?\s*Unvan[ıi]?)/gi, '')
-        .replace(/^[iİıI]\s+/i, '') // Baştaki tek 'i' harfini kaldır
-        .replace(/^[:\s]+/, '') // Baştaki : ve boşlukları kaldır
+        .replace(/^[iİıI]\s+/i, '') // Remove leading single 'i' character
+        .replace(/^[:\s]+/, '') // Remove leading colons and spaces
         .trim();
 
-      // Sadece isim kısmını al - ilk 2-4 kelime genelde isim
-      // Adres, şehir, ülke bilgilerini çıkar
+      // Take only the name part - first 2-4 words are usually the name
+      // Strip address, city, country info
       const words = fullClientInfo.split(/\s+/);
       const nameWords = [];
 
       for (const word of words) {
-        // Sayı içeriyorsa veya adres kelimeleri ise dur
+        // Stop if contains a number or address keywords
         if (/^\d/.test(word) || /^(Street|St\.|Ave|Avenue|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr|Way|Place|Pl|Court|Ct|Chemin|Rue|Strasse|Straße|No\.|Apt|Suite|Floor|Unit)/i.test(word)) {
           break;
         }
-        // Ülke veya şehir isimleri genelde sonlarda
+        // Country or city names usually appear at the end
         if (nameWords.length >= 2 && /^(United|USA|UK|Germany|France|Netherlands|Switzerland|Canada|Australia|Belgium|Austria|Ireland|Spain|Italy|Sweden|Norway|Denmark|Finland|Poland|Czech|Hungary|Romania|Bulgaria|Greece|Portugal|Turkey|India|China|Japan|Korea|Singapore|Hong|Dubai|UAE|Saudi|Israel|Brazil|Mexico|Argentina|Chile|Colombia|Peru)/i.test(word)) {
           break;
         }
@@ -263,14 +263,14 @@ function IncomeTracker() {
       client = 'Unknown';
     }
 
-    // Ülke bilgisini çıkar - sadece ALICI BİLGİLERİ bölümünden
+    // Extract country info - only from the ALICI BİLGİLERİ section
     let country = '';
 
-    // Önce ALICI BİLGİLERİ bölümünü bul
+    // First find the ALICI BİLGİLERİ section
     const aliciSection = text.match(/ALICI\s*B[İI]LG[İI]LER[İI][\s\S]{0,500}/i);
     let searchText = aliciSection ? aliciSection[0] : '';
 
-    // Eğer ALICI bölümü yoksa müşteri isminden sonraki 200 karaktere bak
+    // If no ALICI section, look at the 200 chars after the client name
     if (!searchText && fullClientInfo) {
       const clientIndex = text.indexOf(fullClientInfo);
       if (clientIndex !== -1) {
@@ -278,20 +278,20 @@ function IncomeTracker() {
       }
     }
 
-    // Eğer hala bulamadıysak tüm metinde ara ama Türkiye'yi atla
+    // If still not found, search the full text but skip Turkey
     if (!searchText) {
       searchText = text;
     }
 
     const countryPatterns = [
-      // Önce spesifik etiketlerle ülke ara (en yüksek öncelik)
+      // First search for country with specific labels (highest priority)
       /(?:Ülke|Ulke|Country|Nation|País|Pays|Land)[:\s]+([A-Za-zÀ-ÿ\s\-]+?)(?:\n|$|[,;])/i,
       /(?:Country|Ülke|Ulke)[:\s]*\n?\s*([A-Za-zÀ-ÿ\s\-]+?)(?:\n|$)/i,
-      // Adres satırındaki ülke
+      // Country in the address line
       /(?:Address|Adres)[:\s]*[^\n]*[\n\r]+[^\n]*[\n\r]+[^\n]*?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*$/im,
-      // Tam ülke isimleri (Türkiye HARİÇ - çünkü GİB formatında her yerde geçiyor)
+      // Full country names (excluding Turkey - appears everywhere in GIB format)
       /\b(United States of America|United States|United Kingdom|USA|UK|Germany|Deutschland|France|Netherlands|Holland|Switzerland|Schweiz|Canada|Australia|Belgium|Belgique|Austria|Österreich|Ireland|Spain|España|Italy|Italia|Sweden|Sverige|Norway|Norge|Denmark|Danmark|Finland|Suomi|Poland|Polska|Czech Republic|Czechia|Hungary|Romania|Bulgaria|Greece|Portugal|India|China|Japan|South Korea|Korea|Singapore|Hong Kong|Dubai|UAE|United Arab Emirates|Saudi Arabia|Israel|Brazil|Brasil|Mexico|México|Argentina|Chile|Colombia|Peru)\b/i,
-      // Kısaltmalar (TR HARİÇ)
+      // Abbreviations (excluding TR)
       /\b(US|GB|DE|FR|NL|CH|CA|AU|BE|AT|IE|ES|IT|SE|NO|DK|FI|PL|CZ|HU|RO|BG|GR|PT|IN|CN|JP|KR|SG|HK|AE|SA|IL|BR|MX|AR|CL|CO|PE)\b/,
     ];
 
@@ -300,12 +300,12 @@ function IncomeTracker() {
       if (match) {
         country = (match[1] || match[0]).trim();
 
-        // Geçersiz değerleri temizle
+        // Clean invalid values
         if (/^(bilgi|info|n\/a|none|-|\.|\s*|turkey|türkiye|tr)$/i.test(country)) {
           continue;
         }
 
-        // Kısa kodları ve alternatif isimleri tam isme çevir - MUST match world-atlas names
+        // Convert short codes and alternative names to full names - MUST match world-atlas names
         const countryMap = {
           'US': 'United States', 'USA': 'United States', 'United States of America': 'United States',
           'GB': 'United Kingdom', 'UK': 'United Kingdom',
@@ -349,7 +349,7 @@ function IncomeTracker() {
         };
         country = countryMap[country] || country;
 
-        // Eğer geçerli bir ülke bulduysak döngüden çık
+        // If a valid country was found, break out of the loop
         if (country && country.length > 1) {
           console.log('Found country:', country, 'in section:', aliciSection ? 'ALICI' : 'other');
           break;
@@ -361,10 +361,10 @@ function IncomeTracker() {
       country = '-';
     }
 
-    // USD Tutar - genişletilmiş pattern'ler
+    // USD Amount - extended patterns
     let amountUSD = 0;
     const usdPatterns = [
-      // e-SMM spesifik formatlar - GİB formatı
+      // e-SMM specific formats - GIB format
       /Vergiler Dahil Toplam[:\s]*([\d.,\s]+)\s*USD/i,
       /Ödenecek Tutar[:\s]*([\d.,\s]+)\s*USD/i,
       /Net Alınan(?:\s+Toplam)?[:\s]*([\d.,\s]+)\s*USD/i,
@@ -381,7 +381,7 @@ function IncomeTracker() {
       // Upwork / Freelancer spesifik
       /(?:Amount|Total|Fee|Payment|Invoice Total|Grand Total)[:\s]*([\d.,\s]+)\s*USD/i,
       /(?:Net|Gross)[:\s]*([\d.,\s]+)\s*USD/i,
-      // USD önce gelen formatlar
+      // Formats where USD comes first
       /USD[:\s]*([\d.,\s]+)/i,
       /\$[:\s]*([\d.,\s]+)/,
       // USD sonra gelen formatlar (daha esnek)
@@ -390,20 +390,20 @@ function IncomeTracker() {
       /([\d.,]+)\s*\$/,
     ];
 
-    // Sayı parse etme yardımcı fonksiyonu
+    // Helper function for parsing numbers
     const parseNumber = (str) => {
       if (!str) return 0;
-      // Boşlukları temizle
+      // Remove spaces
       let numStr = str.replace(/\s/g, '');
-      // Eğer nokta binlik ayracı ise (1.234,56)
+      // If dot is the thousands separator (1.234,56)
       if (numStr.includes(',') && numStr.indexOf('.') < numStr.indexOf(',')) {
         numStr = numStr.replace(/\./g, '').replace(',', '.');
       }
-      // Eğer virgül binlik ayracı ise (1,234.56)
+      // If comma is the thousands separator (1,234.56)
       else if (numStr.includes('.') && numStr.indexOf(',') < numStr.indexOf('.')) {
         numStr = numStr.replace(/,/g, '');
       }
-      // Sadece virgül var (548,33)
+      // Only comma present (548,33)
       else if (numStr.includes(',') && !numStr.includes('.')) {
         numStr = numStr.replace(',', '.');
       }
@@ -421,16 +421,16 @@ function IncomeTracker() {
       }
     }
 
-    // Eğer hala USD bulamadıysak, metinde "USD" kelimesini bulup en yakın sayıyı alalım
+    // If USD still not found, locate "USD" in text and grab the nearest number
     if (amountUSD === 0) {
       const usdIndex = text.toUpperCase().indexOf('USD');
       if (usdIndex !== -1) {
-        // USD'nin 100 karakter öncesi ve sonrasına bak (daha geniş arama)
+        // Look 100 chars before and after USD (wider search)
         const searchRange = text.substring(Math.max(0, usdIndex - 100), usdIndex + 100);
         const numbersInRange = searchRange.match(/[\d.,]+/g);
         if (numbersInRange) {
           for (const numStr of numbersInRange) {
-            // En az 1 karakter olan sayıları ara
+            // Search for numbers with at least 1 digit
             if (numStr.length >= 1) {
               let cleaned = numStr;
               if (cleaned.includes(',') && cleaned.indexOf('.') < cleaned.indexOf(',')) {
@@ -451,15 +451,15 @@ function IncomeTracker() {
       }
     }
 
-    // Son çare: Metindeki tüm sayıları tara ve mantıklı bir USD tutarı bul
+    // Last resort: scan all numbers in the text and find a reasonable USD amount
     if (amountUSD === 0) {
-      // Tüm ondalıklı sayıları bul
+      // Find all decimal numbers
       const allNumbers = text.match(/(\d+[.,]\d{2})/g);
       if (allNumbers) {
         for (const numStr of allNumbers) {
           let cleaned = numStr.replace(',', '.');
           const parsed = parseFloat(cleaned);
-          // Mantıklı USD aralığı: 1-50000
+          // Reasonable USD range: 1-50000
           if (!isNaN(parsed) && parsed >= 1 && parsed <= 50000) {
             amountUSD = parsed;
             break;
@@ -501,7 +501,7 @@ function IncomeTracker() {
       }
     }
 
-    // Açıklama / Hizmet
+    // Description / Service
     let description = 'Freelance Service';
     const descPatterns = [
       /Mal\/Hizmet Cinsi[:\s]*([^\n\r]+)/i,
@@ -661,7 +661,7 @@ function IncomeTracker() {
       try {
         let pdfData = await readFile(file.path);
         const extractResult = await extractPdfText(pdfData);
-        // Belleği serbest bırak
+        // Free memory
         pdfData = null;
 
         if (extractResult.error) {
@@ -672,13 +672,13 @@ function IncomeTracker() {
           parsedData = parseInvoiceText(extractResult.text, file.name);
 
           if (parsedData) {
-            // Başarı kriteri: PDF okunabildi ve tarih bulundu
-            // USD 0 olsa bile manuel düzenlenebilir
+            // Success criterion: PDF was readable and date was found
+            // Even if USD is 0 it can be edited manually
             readSuccess = parsedData.amountUSD > 0;
 
-            // USD bulunamasa bile en azından parse edildi - fatura listesine ekle
+            // Even if USD not found, it was at least parsed - add to invoice list
             if (!readSuccess && parsedData.client !== 'Unknown') {
-              // Müşteri bulunduysa kısmi başarı - yine de listeye ekleniyor
+              // Partial success if client found - still added to list
               failReason = `Amount not found - Manual edit required`;
             } else if (!readSuccess) {
               failReason = `USD amount not found`;
@@ -692,7 +692,7 @@ function IncomeTracker() {
         failReason = `Error: ${readErr.message || 'Could not read file'}`;
       }
 
-      // Her 5 PDF'de bir kısa bekleme yap (bellek temizliği için)
+      // Short wait every 5 PDFs (for memory cleanup)
       if (i > 0 && i % 5 === 0) {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
@@ -818,7 +818,7 @@ function IncomeTracker() {
   });
 
   // Calculate stats
-  // Tüm faturaları yıla göre grupla (filtre olmadan)
+  // Group all invoices by year (without filter)
   const allByYear = invoices.reduce((acc, inv) => {
     const year = inv.date.split('-')[0];
     if (!acc[year]) acc[year] = { total: 0, count: 0, byMonth: {} };
@@ -853,14 +853,14 @@ function IncomeTracker() {
     byYear: allByYear
   };
 
-  // Trend hesapla (önceki döneme göre)
+  // Calculate trend (compared to previous period)
   const calculateTrend = () => {
     if (selectedYear === 'all' || selectedMonth === 'all') return null;
 
     const currentMonthKey = `${selectedYear}-${selectedMonth}`;
     const currentAmount = stats.byMonth[currentMonthKey] || 0;
 
-    // Önceki ayı hesapla
+    // Calculate previous month
     let prevMonth = parseInt(selectedMonth) - 1;
     let prevYear = parseInt(selectedYear);
     if (prevMonth === 0) {
@@ -869,7 +869,7 @@ function IncomeTracker() {
     }
     const prevMonthKey = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
 
-    // Önceki ay verisi (tüm faturalardan)
+    // Previous month data (from all invoices)
     const prevAmount = invoices
       .filter(inv => inv.date.startsWith(prevMonthKey))
       .reduce((sum, inv) => sum + inv.amountUSD, 0);
@@ -1100,7 +1100,7 @@ function IncomeTracker() {
               <div className="it-chart-header">
                 <h3>Income Chart</h3>
                 <div className="it-chart-controls">
-                  {/* Monthly/Yıllık Seçimi */}
+                  {/* Monthly/Yearly Selection */}
                   <div className="it-chart-mode-selector">
                     <button
                       className={`it-mode-btn ${chartMode === 'monthly' ? 'active' : ''}`}
@@ -1115,7 +1115,7 @@ function IncomeTracker() {
                       Yearly
                     </button>
                   </div>
-                  {/* Yıl Seçimi (sadece aylık modda) */}
+                  {/* Year Selection (monthly mode only) */}
                   {chartMode === 'monthly' && (
                     <div className="it-chart-year-selector">
                       {years.filter(y => y !== 'all').slice(0, 5).map(year => (
@@ -1132,7 +1132,7 @@ function IncomeTracker() {
                 </div>
               </div>
 
-              {/* Sivri Dağ Şeklinde Bar Chart */}
+              {/* Mountain-shaped Bar Chart */}
               <div className="it-mountain-chart">
                 {(() => {
                   let chartData = [];
@@ -1147,7 +1147,7 @@ function IncomeTracker() {
                     }));
                     totalAmount = Object.values(yearData).reduce((a, b) => a + b, 0);
                   } else {
-                    // Yıllık veri
+                    // Yearly data
                     chartData = Object.entries(stats.byYear)
                       .sort((a, b) => a[0].localeCompare(b[0]))
                       .map(([year, data]) => ({
@@ -1193,7 +1193,7 @@ function IncomeTracker() {
             </div>
           </div>
 
-          {/* Müşteri Filtresi ve Top Müşteriler */}
+          {/* Client Filter and Top Clients */}
           <div className="it-charts">
             <div className="it-chart-card wide">
               <div className="it-chart-header">
@@ -1214,7 +1214,7 @@ function IncomeTracker() {
                 </div>
               </div>
 
-              {/* Müşteri Sıralaması */}
+              {/* Client Ranking */}
               <div className="it-client-ranking">
                 {Object.entries(stats.byClient)
                   .sort((a, b) => b[1] - a[1])
@@ -1423,7 +1423,7 @@ function IncomeTracker() {
       {/* List View */}
       {view === 'list' && (
         <div className="it-list-container">
-          {/* Sıralama Seçenekleri */}
+          {/* Sort Options */}
           <div className="it-sort-controls">
             <span className="it-sort-label">Sort:</span>
             <select
@@ -1442,7 +1442,7 @@ function IncomeTracker() {
 
           {/* Read Invoices */}
           {(() => {
-            // Sıralama fonksiyonu
+            // Sort function
             const sortInvoices = (invList) => {
               return [...invList].sort((a, b) => {
                 switch (sortOrder) {

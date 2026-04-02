@@ -10,11 +10,28 @@ import DailyChecklist from './components/DailyChecklist';
 import IncomeTracker from './components/IncomeTracker';
 import Notes from './components/Notes';
 import Calendar from './components/Calendar';
-import ProjectBid from './components/ProjectBid';
-import Stocks from './components/Stocks';
 import JapaneseKana from './components/JapaneseKana';
-import Translate from './components/Translate';
+import ToolsChat from './components/ToolsChat';
 import SubscriptionTracker, { SubscriptionWidget, SubscriptionPopup } from './components/SubscriptionTracker';
+import StockNews from './components/StockNews';
+
+function DashboardNews() {
+  const [tickers, setTickers] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('stock_tickers'));
+      return Array.isArray(saved) && saved.length > 0 ? saved : ['AAPL', 'NVDA', 'TSLA'];
+    } catch { return ['AAPL', 'NVDA', 'TSLA']; }
+  });
+  const [activeTicker, setActiveTicker] = useState('all');
+  return (
+    <StockNews
+      tickers={tickers}
+      setTickers={setTickers}
+      activeTicker={activeTicker}
+      setActiveTicker={setActiveTicker}
+    />
+  );
+}
 import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, setVolume, getVolume } from './utils/sounds';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
@@ -112,7 +129,7 @@ function App({ session, onLogout }) {
   const [updateAvailable, setUpdateAvailable] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  // Supabase sync — oturum açıksa otomatik aktif (runs once, not reactive to session prop)
+  // Supabase sync — active automatically if session exists (runs once, not reactive to session prop)
   useEffect(() => {
     let mounted = true;
     const origSetItem = localStorage.setItem.bind(localStorage);
@@ -128,10 +145,12 @@ function App({ session, onLogout }) {
         });
       }
 
+      const debounceTimers = {};
       localStorage.setItem = function(key, value) {
         origSetItem(key, value);
         if (SYNC_KEYS.includes(key)) {
-          pushKeyToSupabase(key, value);
+          clearTimeout(debounceTimers[key]);
+          debounceTimers[key] = setTimeout(() => pushKeyToSupabase(key, value), 2000);
         }
       };
 
@@ -159,7 +178,7 @@ function App({ session, onLogout }) {
           setUpdateAvailable(update);
         }
       } catch (error) {
-        // Güncelleme kontrolü sessizce başarısız olabilir
+        // Update check can fail silently
       }
     };
     checkForUpdates();
@@ -186,12 +205,12 @@ function App({ session, onLogout }) {
     }
   };
 
-  // Version check - otomatik güncelleme için
+  // Version check - for auto-update
   useEffect(() => {
     const savedVersion = localStorage.getItem('appVersion');
     if (savedVersion && savedVersion !== APP_VERSION) {
       console.log(`Version updated from ${savedVersion} to ${APP_VERSION}`);
-      // Eski versiyon uyarısı göster
+      // Show old version warning
       setShowUpdateWarning(true);
       // Cache'i temizle
       if ('caches' in window) {
@@ -210,6 +229,7 @@ function App({ session, onLogout }) {
   const [settingsTab, setSettingsTab] = useState('account');
   const [soundVolume, setSoundVolume] = useState(() => getVolume());
   const [activeView, setActiveView] = useState('dashboard');
+  const [showKanaPopup, setShowKanaPopup] = useState(false);
   const [sidebarItems, setSidebarItems] = useState(() => {
     const defaults = [
       { id: 'dashboard',  label: 'Dashboard',      view: 'dashboard',  hidden: false },
@@ -219,11 +239,8 @@ function App({ session, onLogout }) {
       { id: 'checklists', label: 'Checklists',      view: 'checklists', hidden: false },
       { id: 'income',     label: 'Income Tracker',  view: 'income',     hidden: false },
       { id: 'notes',      label: 'Notes',           view: 'notes',      hidden: false },
-      { id: 'projectbid',   label: 'Project Bid',     view: 'projectbid',   hidden: false },
-      { id: 'stocks',       label: 'Stocks',           view: 'stocks',       hidden: false },
-
+      { id: 'tools',        label: 'Tools',            view: 'tools',        hidden: false },
       { id: 'japanesekana', label: 'Japanese Kana',    view: 'japanesekana', hidden: false },
-      { id: 'translate',    label: 'Translate',        view: 'translate',    hidden: false },
     ];
     const saved = localStorage.getItem('sidebarOrder');
     if (saved) {
@@ -379,13 +396,11 @@ function App({ session, onLogout }) {
   });
 
 
-  // Todo'lar değiştiğinde localStorage'a kaydet
+  // Save to localStorage when todos change
   useEffect(() => {
-    console.log('Todos changed, saving to localStorage:', todos.length, 'items');
     const timestamp = new Date().toISOString();
     localStorage.setItem('todos', JSON.stringify(todos));
     localStorage.setItem('lastUpdated', timestamp);
-    console.log('localStorage updated at:', timestamp);
   }, [todos]);
 
 
@@ -502,7 +517,7 @@ function App({ session, onLogout }) {
     sidebarPositionsRef.current = {};
   }, [sidebarItems]);
 
-  // Theme değiştiğinde localStorage'a kaydet ve body'ye class ekle
+  // Save to localStorage and add class to body when theme changes
   useEffect(() => {
     localStorage.setItem('theme', theme);
     document.body.className = theme;
@@ -588,8 +603,12 @@ function App({ session, onLogout }) {
   };
 
 
+  const LONGTERM_COLORS = ['#667eea', '#f093fb', '#4ade80', '#60a5fa', '#fb923c', '#facc15', '#9ca3af', '#34d399', '#f472b6', '#a78bfa'];
   const addTodo = (category, text, dueDate = null) => {
     pushHistory(todos);
+    const autoColor = category === 'daily' ? '#f87171'
+      : category === 'longterm' ? LONGTERM_COLORS[Math.floor(Math.random() * LONGTERM_COLORS.length)]
+      : null;
     const newTodo = {
       id: Date.now(),
       text,
@@ -598,7 +617,8 @@ function App({ session, onLogout }) {
       createdAt: Date.now(),
       dueDate,
       subtasks: [],
-      order: todos.filter(t => t.category === category).length
+      order: -Date.now(),
+      color: autoColor
     };
     setTodos([newTodo, ...todos]);
     playAddSound();
@@ -670,7 +690,7 @@ function App({ session, onLogout }) {
 
     console.log('Category todos count:', categoryTodos.length);
 
-    // Sınır kontrolü
+    // Boundary check
     if (endIndex < 0 || endIndex >= categoryTodos.length) {
       console.log('Invalid endIndex');
       return;
@@ -966,7 +986,7 @@ function App({ session, onLogout }) {
   };
 
 
-  // Export: Tüm verileri JSON dosyası olarak indir
+  // Export: Download all data as a JSON file
   const exportData = async () => {
     try {
       const get = (key, fallback) => localStorage.getItem(key) || fallback;
@@ -1022,7 +1042,7 @@ function App({ session, onLogout }) {
     }
   };
 
-  // Import: JSON dosyasından verileri yükle
+  // Import: Load data from a JSON file
   const importData = async () => {
     try {
       const { open } = await import('@tauri-apps/plugin-dialog');
@@ -1181,10 +1201,10 @@ function App({ session, onLogout }) {
                   className="dashboard-timer-toggle-btn font-size-trigger"
                   onClick={() => setFontSizeOpen(o => !o)}
                   title="Font size"
-                ><span className="font-size-icon">T</span></button>
+                >Font</button>
                 {fontSizeOpen && (
                   <div className="font-size-dropdown">
-                    <div style={{fontSize:'10px',color:'#7d8590',padding:'4px 8px 2px',borderBottom:'1px solid #30363d',marginBottom:'2px'}}>Başlık</div>
+                    <div style={{fontSize:'10px',color:'#7d8590',padding:'4px 8px 2px',borderBottom:'1px solid #30363d',marginBottom:'2px'}}>Title</div>
                     {['S', 'M', 'L'].map(s => (
                       <button
                         key={s}
@@ -1213,14 +1233,14 @@ function App({ session, onLogout }) {
                 }}
                 title="Timer"
               >
-                ⏱
+                Timer
               </button>
               <button
                 className="dashboard-timer-toggle-btn"
                 onClick={() => { playClickSound(); setShowSubPopup(s => !s); }}
-                title="Abonelikler & Ödemeler"
+                title="Subscriptions & Payments"
               >
-                💳
+                Payments
               </button>
             </div>
           </div>
@@ -1289,6 +1309,12 @@ function App({ session, onLogout }) {
               </button>
             </div>
           </div>
+          {!sidebarCollapsed && session?.user?.email && (
+            <div className="sidebar-user-bar">
+              <span className="sidebar-user-name">{session.user.email.split('@')[0]}</span>
+              <button className="sidebar-logout-btn" onClick={async () => { await supabase.auth.signOut(); if (onLogout) onLogout(); }}>Sign Out</button>
+            </div>
+          )}
 
           {/* Settings Modal - Notion Style */}
           {showSidebarSettings && (
@@ -1297,30 +1323,30 @@ function App({ session, onLogout }) {
                 {/* Left nav */}
                 <div className="settings-modal-nav">
                   <div className="settings-modal-nav-section">
-                    <div className="settings-modal-nav-label">Hesap</div>
+                    <div className="settings-modal-nav-label">Account</div>
                     <button className={`settings-modal-nav-item ${settingsTab === 'account' ? 'active' : ''}`} onClick={() => setSettingsTab('account')}>
-                      <span className="settings-nav-icon">👤</span> Profil
+                      <span className="settings-nav-icon">👤</span> Profile
                     </button>
                     <button className={`settings-modal-nav-item ${settingsTab === 'ai' ? 'active' : ''}`} onClick={() => setSettingsTab('ai')}>
-                      <span className="settings-nav-icon">🤖</span> Yapay Zeka
+                      <span className="settings-nav-icon">🤖</span> AI
                     </button>
                     <button className={`settings-modal-nav-item ${settingsTab === 'sync' ? 'active' : ''}`} onClick={() => setSettingsTab('sync')}>
                       <span className="settings-nav-icon">☁</span> Cloud Sync
                     </button>
                   </div>
                   <div className="settings-modal-nav-section">
-                    <div className="settings-modal-nav-label">Uygulama</div>
+                    <div className="settings-modal-nav-label">App</div>
                     <button className={`settings-modal-nav-item ${settingsTab === 'appearance' ? 'active' : ''}`} onClick={() => setSettingsTab('appearance')}>
-                      <span className="settings-nav-icon">◑</span> Görünüm
+                      <span className="settings-nav-icon">◑</span> Appearance
                     </button>
                     <button className={`settings-modal-nav-item ${settingsTab === 'sound' ? 'active' : ''}`} onClick={() => setSettingsTab('sound')}>
-                      <span className="settings-nav-icon">🔊</span> Ses
+                      <span className="settings-nav-icon">🔊</span> Sound
                     </button>
                     <button className={`settings-modal-nav-item ${settingsTab === 'pages' ? 'active' : ''}`} onClick={() => setSettingsTab('pages')}>
-                      <span className="settings-nav-icon">📄</span> Sayfalar
+                      <span className="settings-nav-icon">📄</span> Pages
                     </button>
                     <button className={`settings-modal-nav-item ${settingsTab === 'data' ? 'active' : ''}`} onClick={() => setSettingsTab('data')}>
-                      <span className="settings-nav-icon">💾</span> Veri
+                      <span className="settings-nav-icon">💾</span> Data
                     </button>
                   </div>
                   <div className="settings-modal-nav-version">BankoSpace v{APP_VERSION}</div>
@@ -1332,7 +1358,7 @@ function App({ session, onLogout }) {
 
                   {settingsTab === 'account' && (
                     <div className="settings-modal-section">
-                      <h2 className="settings-modal-title">Profil</h2>
+                      <h2 className="settings-modal-title">Profile</h2>
                       {session ? (
                         <>
                           <div className="settings-row-card">
@@ -1340,27 +1366,27 @@ function App({ session, onLogout }) {
                               <div className="settings-row-avatar">{session.user?.email?.[0]?.toUpperCase()}</div>
                               <div>
                                 <div className="settings-row-name">{session.user?.email}</div>
-                                <div className="settings-row-sub">Aktif oturum</div>
+                                <div className="settings-row-sub">Active session</div>
                               </div>
                             </div>
                             <button
                               className="settings-action-btn danger"
                               onClick={async () => { await supabase.auth.signOut(); if (onLogout) onLogout(); }}
-                            >Çıkış Yap</button>
+                            >Sign Out</button>
                           </div>
                         </>
                       ) : (
-                        <div className="settings-empty-state">Giriş yapılmamış</div>
+                        <div className="settings-empty-state">Not signed in</div>
                       )}
                     </div>
                   )}
 
                   {settingsTab === 'ai' && (
                     <div className="settings-modal-section">
-                      <h2 className="settings-modal-title">Yapay Zeka</h2>
+                      <h2 className="settings-modal-title">AI</h2>
                       <div className="settings-field">
                         <label className="settings-field-label">Anthropic API Key</label>
-                        <div className="settings-field-desc">Claude AI özelliklerini kullanmak için API anahtarınızı girin</div>
+                        <div className="settings-field-desc">Enter your API key to use Claude AI features</div>
                         <input
                           type="password"
                           className="settings-field-input"
@@ -1368,8 +1394,13 @@ function App({ session, onLogout }) {
                           placeholder="sk-ant-..."
                           onBlur={e => {
                             const val = e.target.value.trim();
-                            if (val) localStorage.setItem('anthropic_api_key', val);
-                            else localStorage.removeItem('anthropic_api_key');
+                            if (val) {
+                              localStorage.setItem('anthropic_api_key', val);
+                              pushKeyToSupabase('anthropic_api_key', val);
+                            } else {
+                              localStorage.removeItem('anthropic_api_key');
+                              pushKeyToSupabase('anthropic_api_key', null);
+                            }
                           }}
                         />
                       </div>
@@ -1381,12 +1412,12 @@ function App({ session, onLogout }) {
                       <h2 className="settings-modal-title">Cloud Sync</h2>
                       <div className="settings-row-inline">
                         <div>
-                          <div className="settings-row-name">Supabase Senkronizasyon</div>
-                          <div className="settings-row-sub">Verilerinizi bulutta saklayın ve cihazlar arası senkronize edin</div>
+                          <div className="settings-row-name">Supabase Sync</div>
+                          <div className="settings-row-sub">Store your data in the cloud and sync across devices</div>
                         </div>
                         <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
                           <span className={`settings-sync-badge ${localStorage.getItem('supabase_sync_enabled')==='1' ? 'on' : 'off'}`}>
-                            {localStorage.getItem('supabase_sync_enabled')==='1' ? 'Aktif' : 'Kapalı'}
+                            {localStorage.getItem('supabase_sync_enabled')==='1' ? 'Active' : 'Off'}
                           </span>
                           <button
                             className="settings-action-btn"
@@ -1396,12 +1427,12 @@ function App({ session, onLogout }) {
                               else localStorage.setItem('supabase_sync_enabled', '1');
                               window.location.reload();
                             }}
-                          >{localStorage.getItem('supabase_sync_enabled')==='1' ? 'Kapat' : 'Aç'}</button>
+                          >{localStorage.getItem('supabase_sync_enabled')==='1' ? 'Disable' : 'Enable'}</button>
                           {localStorage.getItem('supabase_sync_enabled')==='1' && (
                             <button
                               className="settings-action-btn"
-                              onClick={async () => { await pushAllToSupabase(); alert('Tüm veriler yüklendi!'); }}
-                            >Sync Et</button>
+                              onClick={async () => { await pushAllToSupabase(); alert('All data uploaded!'); }}
+                            >Sync Now</button>
                           )}
                         </div>
                       </div>
@@ -1410,29 +1441,29 @@ function App({ session, onLogout }) {
 
                   {settingsTab === 'appearance' && (
                     <div className="settings-modal-section">
-                      <h2 className="settings-modal-title">Görünüm</h2>
+                      <h2 className="settings-modal-title">Appearance</h2>
 
                       <div className="settings-row-inline">
                         <div>
-                          <div className="settings-row-name">Tema</div>
-                          <div className="settings-row-sub">Açık veya koyu mod</div>
+                          <div className="settings-row-name">Theme</div>
+                          <div className="settings-row-sub">Light or dark mode</div>
                         </div>
                         <div className="settings-theme-toggle">
                           <button
                             className={`settings-theme-btn ${theme === 'light' ? 'active' : ''}`}
                             onClick={() => { if (theme !== 'light') toggleTheme(); }}
-                          >Açık</button>
+                          >Light</button>
                           <button
                             className={`settings-theme-btn ${theme === 'dark' ? 'active' : ''}`}
                             onClick={() => { if (theme !== 'dark') toggleTheme(); }}
-                          >Koyu</button>
+                          >Dark</button>
                         </div>
                       </div>
 
                       <div className="settings-row-inline" style={{marginTop:'16px'}}>
                         <div>
-                          <div className="settings-row-name">Todo Yazı Boyutu</div>
-                          <div className="settings-row-sub">Görev listesi metin boyutu</div>
+                          <div className="settings-row-name">Todo Font Size</div>
+                          <div className="settings-row-sub">Task list text size</div>
                         </div>
                         <div className="settings-size-group">
                           {['S','M','L'].map(s => (
@@ -1447,8 +1478,8 @@ function App({ session, onLogout }) {
 
                       <div className="settings-row-inline" style={{marginTop:'16px'}}>
                         <div>
-                          <div className="settings-row-name">Subtask Yazı Boyutu</div>
-                          <div className="settings-row-sub">Alt görev metin boyutu</div>
+                          <div className="settings-row-name">Subtask Font Size</div>
+                          <div className="settings-row-sub">Subtask text size</div>
                         </div>
                         <div className="settings-size-group">
                           {['S','M','L'].map(s => (
@@ -1463,8 +1494,8 @@ function App({ session, onLogout }) {
 
                       <div className="settings-row-inline" style={{marginTop:'16px'}}>
                         <div>
-                          <div className="settings-row-name">Emoji Kullan</div>
-                          <div className="settings-row-sub">Görev listesinde emoji göster</div>
+                          <div className="settings-row-name">Show Emoji</div>
+                          <div className="settings-row-sub">Show emoji in task list</div>
                         </div>
                         <div
                           className={`settings-toggle ${useEmoji ? 'on' : ''}`}
@@ -1515,7 +1546,7 @@ function App({ session, onLogout }) {
                   {settingsTab === 'pages' && (
                     <div className="settings-modal-section">
                       <h2 className="settings-modal-title">Sayfalar</h2>
-                      <div className="settings-field-desc" style={{marginBottom:'16px'}}>Kenar çubuğunda görünecek sayfaları seçin</div>
+                      <div className="settings-field-desc" style={{marginBottom:'16px'}}>Select pages to show in the sidebar</div>
                       {sidebarItems.filter(item => item.id !== 'dashboard').map(item => (
                         <div key={item.id} className="settings-page-row" onClick={() => togglePageVisibility(item.id)}>
                           <div>
@@ -1534,24 +1565,24 @@ function App({ session, onLogout }) {
                       <h2 className="settings-modal-title">Veri</h2>
                       <div className="settings-data-row">
                         <div>
-                          <div className="settings-row-name">Verileri Dışa Aktar</div>
-                          <div className="settings-row-sub">Tüm verilerinizi JSON dosyası olarak indirin</div>
+                          <div className="settings-row-name">Export Data</div>
+                          <div className="settings-row-sub">Download all your data as a JSON file</div>
                         </div>
                         <button className="settings-action-btn" onClick={() => { exportData(); closeSidebarSettings(); }}>Export</button>
                       </div>
                       <div className="settings-data-row">
                         <div>
-                          <div className="settings-row-name">Verileri İçe Aktar</div>
-                          <div className="settings-row-sub">JSON dosyasından verilerinizi yükleyin</div>
+                          <div className="settings-row-name">Import Data</div>
+                          <div className="settings-row-sub">Load your data from a JSON file</div>
                         </div>
                         <button className="settings-action-btn" onClick={() => { importData(); closeSidebarSettings(); }}>Import</button>
                       </div>
                       <div className="settings-data-row danger-row">
                         <div>
-                          <div className="settings-row-name" style={{color:'#f85149'}}>Tüm Verileri Sıfırla</div>
-                          <div className="settings-row-sub">Bu işlem geri alınamaz</div>
+                          <div className="settings-row-name" style={{color:'#f85149'}}>Reset All Data</div>
+                          <div className="settings-row-sub">This action cannot be undone</div>
                         </div>
-                        <button className="settings-action-btn danger" onClick={() => { resetAllData(); closeSidebarSettings(); }}>Sıfırla</button>
+                        <button className="settings-action-btn danger" onClick={() => { resetAllData(); closeSidebarSettings(); }}>Reset</button>
                       </div>
                     </div>
                   )}
@@ -1577,6 +1608,10 @@ function App({ session, onLogout }) {
                   onClick={() => {
                     if (draggedSidebarItem) return;
                     playNavSound();
+                    if (item.id === 'japanesekana') {
+                      setShowKanaPopup(true);
+                      return;
+                    }
                     setActiveView(item.view);
                   }}
                 >
@@ -1667,30 +1702,21 @@ function App({ session, onLogout }) {
             </div>
           )}
 
-          {/* Project Bid View */}
-          {activeView === 'projectbid' && (
-            <div className="projectbid-fullscreen">
-              <ProjectBid />
+          {/* Tools View: Project Bid + Translate */}
+          {activeView === 'tools' && (
+            <ToolsView />
+          )}
+
+          {/* Japanese Kana Popup */}
+          {showKanaPopup && (
+            <div className="kana-popup-overlay" onClick={() => setShowKanaPopup(false)}>
+              <div className="kana-popup-modal" onClick={e => e.stopPropagation()}>
+                <button className="kana-popup-close" onClick={() => setShowKanaPopup(false)}>✕</button>
+                <JapaneseKana />
+              </div>
             </div>
           )}
 
-          {/* Stocks View */}
-          {activeView === 'stocks' && (
-            <div className="stocks-fullscreen">
-              <Stocks session={session} />
-            </div>
-          )}
-
-
-          {/* Japanese Kana */}
-          {activeView === 'japanesekana' && <JapaneseKana />}
-
-          {/* Translate */}
-          {activeView === 'translate' && (
-            <div style={{ height: '100%', overflow: 'hidden' }}>
-              <Translate />
-            </div>
-          )}
 
           {/* Dashboard View */}
           {activeView === 'dashboard' && (
@@ -1744,7 +1770,14 @@ function App({ session, onLogout }) {
               </div>
               <div className="col-resize-handle" onMouseDown={e => startColResize(1, e)} onDoubleClick={() => { setColWidths(DEFAULT_COL_PX); localStorage.setItem('dashColWidths', JSON.stringify(DEFAULT_COL_PX)); }} />
               <div className="todo-col-wrapper" style={colWidths[2] ? { flex: `1 1 ${colWidths[2]}px`, minWidth: 0 } : { flex: 1, minWidth: 0 }}>
-                <SubscriptionTracker />
+                <div className="dash-right-col">
+                  <div className="dash-right-top">
+                    <SubscriptionTracker />
+                  </div>
+                  <div className="dash-right-bottom">
+                    <DashboardNews />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1900,6 +1933,10 @@ function TimerPopupWrapper({ isCompact: initialCompact = false }) {
 
 
 
+function ToolsView() {
+  return <ToolsChat />;
+}
+
 function AppWrapper() {
   // loggedIn: null=loading, false=logged out, true=logged in
   const [loggedIn, setLoggedIn] = useState(null);
@@ -1928,7 +1965,7 @@ function AppWrapper() {
   if (loggedIn === null) {
     return (
       <div style={{ width: '100vw', height: '100vh', background: '#0d1117', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ color: '#7d8590', fontSize: '14px' }}>Yükleniyor...</div>
+        <div style={{ color: '#7d8590', fontSize: '14px' }}>Loading...</div>
       </div>
     );
   }
@@ -1936,7 +1973,6 @@ function AppWrapper() {
   if (!loggedIn) {
     return <Login
       onLogin={(s) => { setInitialSession(s); setLoggedIn(true); }}
-      onGuest={() => { setInitialSession(null); setLoggedIn(true); }}
     />;
   }
 

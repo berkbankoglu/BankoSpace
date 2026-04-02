@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import './CategoryColumn.css';
-import { playTypeSoundThrottled } from '../utils/sounds';
+import { playTypeSoundThrottled, playCompleteSound, playUncompleteSound, playDeleteSound } from '../utils/sounds';
+
+const TODO_COLORS = ['#667eea', '#f093fb', '#4ade80', '#60a5fa', '#fb923c', '#f87171', '#facc15', '#9ca3af'];
 
 function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDeleteTodo, onUpdateTodo, currentFilter, onRename, onAddSubtask, onToggleSubtask, onDeleteSubtask, onUpdateSubtask, onReorder, onTodoDragStart, draggingTodo, dragOverCategory, dragOverTodoId }) {
   const [inputValue, setInputValue] = useState('');
@@ -21,6 +23,7 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
   const [dragOverSubtask, setDragOverSubtask] = useState(null); // { todoId, index }
   const [pressedSubtaskId, setPressedSubtaskId] = useState(null);
   const [completingIds, setCompletingIds] = useState(new Set());
+  const [colorPickerTodoId, setColorPickerTodoId] = useState(null);
   const inputRef = useRef(null);
   const editInputRef = useRef(null);
   const editSubtaskInputRef = useRef(null);
@@ -189,13 +192,6 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
         <span className="cc-count">{activeCount}</span>
       </div>
 
-      {/* Progress Bar */}
-      <div className="cc-progress">
-        <div className="cc-progress-bar">
-          <div className="cc-progress-fill" style={{ width: `${progress}%` }} />
-        </div>
-        <span className="cc-progress-text">{completedCount}/{totalCount}</span>
-      </div>
 
       {/* Add New Task - Top */}
       <div className="cc-add-row">
@@ -219,7 +215,9 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
             key={todo.id}
             data-todo-id={todo.id}
             className={`cc-item ${todo.completed ? 'completed' : ''} ${completingIds.has(todo.id) ? 'completing' : ''} ${draggingTodo && draggingTodo.todo.id === todo.id ? 'dragging' : ''} ${dragOverTodoId && String(dragOverTodoId) === String(todo.id) ? 'drag-target' : ''}`}
+            style={{}}
           >
+            {todo.color && <div className="cc-item-color-bar" style={{ background: todo.color }} />}
             {/* Top row: drag handle + checkbox + actions */}
             <div className="cc-item-top">
               <div className="cc-drag-handle" title="Surukle" onMouseDown={(e) => onTodoDragStart(e, todo)}>⠿</div>
@@ -244,6 +242,24 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
                   </span>
                 )}
                 <button
+                  className="cc-action-btn color-btn"
+                  onClick={(e) => { e.stopPropagation(); setColorPickerTodoId(colorPickerTodoId === todo.id ? null : todo.id); }}
+                  title="Renk"
+                  style={{ color: todo.color || '#8b949e' }}
+                >●</button>
+                {colorPickerTodoId === todo.id && (
+                  <div className="cc-color-picker" onClick={e => e.stopPropagation()}>
+                    {TODO_COLORS.map(c => (
+                      <button
+                        key={c}
+                        className="cc-color-swatch"
+                        style={{ background: c, outline: todo.color === c ? '2px solid white' : 'none' }}
+                        onClick={() => { onUpdateTodo(todo.id, { color: todo.color === c ? null : c }); setColorPickerTodoId(null); }}
+                      />
+                    ))}
+                  </div>
+                )}
+                <button
                   className="cc-action-btn edit-btn"
                   onClick={() => { setEditingTodoId(todo.id); setEditingTodoText(todo.text); }}
                   title="Edit"
@@ -255,7 +271,7 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
                 >{expandedTodos.has(todo.id) ? '−' : '+'}</button>
                 <button
                   className="cc-action-btn delete"
-                  onClick={() => onDeleteTodo(todo.id)}
+                  onClick={() => { playDeleteSound(); onDeleteTodo(todo.id); }}
                   title="Delete"
                 >×</button>
               </div>
@@ -308,7 +324,7 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
                         type="checkbox"
                         className="cc-checkbox small"
                         checked={subtask.completed}
-                        onChange={() => onToggleSubtask(todo.id, subtask.id)}
+                        onChange={() => { subtask.completed ? playUncompleteSound() : playCompleteSound(); onToggleSubtask(todo.id, subtask.id); }}
                       />
                       <span className="cc-checkmark small"></span>
                       {editingSubtaskId === subtask.id ? (
@@ -347,7 +363,7 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
                       >✎</button>
                       <button
                         className="cc-action-btn delete small"
-                        onClick={() => onDeleteSubtask(todo.id, subtask.id)}
+                        onClick={() => { playDeleteSound(); onDeleteSubtask(todo.id, subtask.id); }}
                       >×</button>
                     </div>
                   </div>

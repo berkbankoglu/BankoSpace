@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, forwardRef } from 'react';
 import './Notes.css';
 import { playTypeSoundThrottled, playClickSound, playAddSound, playDeleteSound } from '../utils/sounds';
+import { pushKeyToSupabase } from '../supabase';
 
 // Rich Text Editor Component
 const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, ref) => {
@@ -196,7 +197,9 @@ function Notes() {
   }, [sidebarWidth]);
 
   useEffect(() => {
-    localStorage.setItem('notes', JSON.stringify(notes));
+    const serialized = JSON.stringify(notes);
+    localStorage.setItem('notes', serialized);
+    pushKeyToSupabase('notes', serialized);
   }, [notes]);
 
   // Create new note directly without modal
@@ -709,7 +712,7 @@ function Notes() {
                     setLineSpacing(v);
                     localStorage.setItem('notesLineSpacing', String(v));
                   }}
-                  title="Satır aralığı"
+                  title="Line spacing"
                 >
                   {[1, 1.2, 1.4, 1.5, 1.7, 2, 2.5, 3].map(v => (
                     <option key={v} value={String(v)}>{v.toFixed(1)}</option>

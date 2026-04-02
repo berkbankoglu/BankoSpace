@@ -78,7 +78,7 @@ function DailyChecklist({ storageKey = 'dailyChecklist', title, onTitleChange })
       setItems([...items, newItem]);
       setNewItemText('');
       playAddSound();
-      // Input'a focus ver ki kullanıcı yazmaya devam edebilsin
+      // Focus the input so the user can keep typing
       setTimeout(() => inputRef.current?.focus(), 0);
     }
   };

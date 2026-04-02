@@ -10,6 +10,7 @@ function Timer({ isPopup = false, isCompact = false }) {
   const [isAlarming, setIsAlarming] = useState(false);
   const [hasTimerRun, setHasTimerRun] = useState(false);
   const alarmIntervalRef = useRef(null);
+  const audioCtxRef = useRef(null);
 
   useEffect(() => {
     let interval = null;
@@ -39,53 +40,48 @@ function Timer({ isPopup = false, isCompact = false }) {
   }, [timeLeft, isRunning, isAlarming, hasTimerRun]);
 
   useEffect(() => {
-    return () => { if (alarmIntervalRef.current) clearInterval(alarmIntervalRef.current); };
+    return () => {
+      if (alarmIntervalRef.current) clearInterval(alarmIntervalRef.current);
+      if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
+        audioCtxRef.current.close();
+      }
+    };
   }, []);
 
   const playAlarmOnce = () => {
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    oscillator.frequency.value = 800;
-    oscillator.type = 'sine';
-    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 1);
-    oscillator.start(audioContext.currentTime);
-    oscillator.stop(audioContext.currentTime + 1);
+    // Tek bir AudioContext yarat ve yeniden kullan, her seferinde yeni yaratma
+    if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+      audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    const ctx = audioCtxRef.current;
 
-    setTimeout(() => {
-      const osc2 = audioContext.createOscillator();
-      const gain2 = audioContext.createGain();
-      osc2.connect(gain2);
-      gain2.connect(audioContext.destination);
-      osc2.frequency.value = 800;
-      osc2.type = 'sine';
-      gain2.gain.setValueAtTime(0.3, audioContext.currentTime);
-      gain2.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 1);
-      osc2.start(audioContext.currentTime);
-      osc2.stop(audioContext.currentTime + 1);
-    }, 300);
+    const beep = (startOffset) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 800;
+      osc.type = 'sine';
+      const t = ctx.currentTime + startOffset;
+      gain.gain.setValueAtTime(0.3, t);
+      gain.gain.exponentialRampToValueAtTime(0.01, t + 1);
+      osc.start(t);
+      osc.stop(t + 1);
+    };
 
-    setTimeout(() => {
-      const osc3 = audioContext.createOscillator();
-      const gain3 = audioContext.createGain();
-      osc3.connect(gain3);
-      gain3.connect(audioContext.destination);
-      osc3.frequency.value = 800;
-      osc3.type = 'sine';
-      gain3.gain.setValueAtTime(0.3, audioContext.currentTime);
-      gain3.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 1);
-      osc3.start(audioContext.currentTime);
-      osc3.stop(audioContext.currentTime + 1);
-    }, 600);
+    beep(0);
+    beep(0.3);
+    beep(0.6);
   };
 
   const stopAlarm = () => {
     if (alarmIntervalRef.current) {
       clearInterval(alarmIntervalRef.current);
       alarmIntervalRef.current = null;
+    }
+    if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
+      audioCtxRef.current.close();
+      audioCtxRef.current = null;
     }
     setIsAlarming(false);
   };
@@ -173,15 +169,15 @@ function Timer({ isPopup = false, isCompact = false }) {
               onKeyDown={(e) => e.key === 'Enter' && handleSetTime()}
               min="0" max="59"
             />
-            <button className="timer-compact-btn confirm" onClick={handleSetTime} title="Onayla">✓</button>
-            <button className="timer-compact-btn cancel" onClick={() => setIsSettingTime(false)} title="İptal">✕</button>
+            <button className="timer-compact-btn confirm" onClick={handleSetTime} title="Confirm">✓</button>
+            <button className="timer-compact-btn cancel" onClick={() => setIsSettingTime(false)} title="Cancel">✕</button>
           </div>
         ) : (
           <>
             <div
               className={`timer-compact-display ${isAlarming ? 'alarming' : ''}`}
               onClick={() => !isRunning && setIsSettingTime(true)}
-              title={!isRunning ? 'Süreyi ayarla' : ''}
+              title={!isRunning ? 'Set time' : ''}
             >
               <span className="timer-compact-time">{formatTime(displayTime)}</span>
             </div>

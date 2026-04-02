@@ -63,9 +63,11 @@ export default function Portfolio() {
     results.forEach(r => { if (r.status === 'fulfilled') map[r.value.ticker] = r.value; });
     setQuotes(map);
     setLoadingQuotes(false);
-  }, [positions]);
+  }, []);
 
-  useEffect(() => { refreshQuotes(); }, [refreshQuotes]);
+  // Only re-fetch when the set of tickers actually changes, not on every positions update
+  const tickerKey = positions.map(p => p.ticker.toUpperCase()).sort().join(',');
+  useEffect(() => { refreshQuotes(); }, [tickerKey]);
 
   // Auto-fetch current price when ticker changes in form
   const handleFormTicker = (val) => {
@@ -132,7 +134,7 @@ export default function Portfolio() {
     });
     setEditId(pos.id);
     setFormCurrentPrice(null);
-    // Güncel fiyatı çek
+    // Fetch current price
     fetchQuote(pos.ticker).then(q => setFormCurrentPrice(q.price)).catch(() => {});
     setTab('add');
   };
@@ -192,9 +194,9 @@ export default function Portfolio() {
   return (
     <div className="pf-root">
 
-      {/* Toolbar — fiyatlar bar'ı gibi */}
+      {/* Toolbar — like a price bar */}
       <div className="pf-toolbar">
-        {/* Özet satırı */}
+        {/* Summary row */}
         <div className="pf-summary-row">
           <span className="pf-sum-item">Invested <b>${fmt(totalInvested)}</b></span>
           <span className="pf-sum-sep">·</span>
@@ -210,7 +212,7 @@ export default function Portfolio() {
           </span>
         </div>
 
-        {/* Sağ aksiyonlar */}
+        {/* Right actions */}
         <div className="pf-toolbar-right">
           <div className="pf-tab-bar">
             <button className={`stc-bottom-tab ${tab === 'open' ? 'active' : ''}`} onClick={() => setTab('open')}>
@@ -244,7 +246,7 @@ export default function Portfolio() {
                 <input
                   className={`pf-input ${fetchingPrice ? 'pf-input-loading' : ''}`}
                   type="number"
-                  placeholder="Alış $"
+                  placeholder="Buy $"
                   value={form.buyPrice}
                   onChange={e => setForm(f => ({ ...f, buyPrice: e.target.value }))}
                 />
@@ -278,7 +280,7 @@ export default function Portfolio() {
                     {preview >= 0 ? '+' : ''}${fmt(preview)}
                   </span>
                 )}
-                <button className="pf-icon-btn add" onClick={confirmSell} title="Sat">✓</button>
+                <button className="pf-icon-btn add" onClick={confirmSell} title="Sell">✓</button>
                 <button className="pf-icon-btn" onClick={() => { setTab('open'); setError(''); }}>✕</button>
               </div>
             );
@@ -286,7 +288,7 @@ export default function Portfolio() {
         </div>
       )}
 
-      {/* Açık pozisyonlar */}
+      {/* Open positions */}
       {tab === 'open' && (
         positions.length === 0
           ? <div className="stc-empty">No open positions yet.</div>
@@ -330,7 +332,7 @@ export default function Portfolio() {
           )
       )}
 
-      {/* Kapalı işlemler */}
+      {/* Closed trades */}
       {tab === 'closed' && (
         closedTrades.length === 0
           ? <div className="stc-empty">No closed trades yet.</div>

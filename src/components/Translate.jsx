@@ -1,23 +1,23 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import './Translate.css';
 
 const LANGUAGES = [
-  { code: 'tr', label: 'Türkçe' },
-  { code: 'en', label: 'İngilizce' },
-  { code: 'de', label: 'Almanca' },
-  { code: 'fr', label: 'Fransızca' },
-  { code: 'es', label: 'İspanyolca' },
-  { code: 'it', label: 'İtalyanca' },
-  { code: 'pt', label: 'Portekizce' },
-  { code: 'ru', label: 'Rusça' },
-  { code: 'ja', label: 'Japonca' },
-  { code: 'zh', label: 'Çince' },
-  { code: 'ko', label: 'Korece' },
-  { code: 'ar', label: 'Arapça' },
-  { code: 'nl', label: 'Hollandaca' },
-  { code: 'pl', label: 'Lehçe' },
-  { code: 'sv', label: 'İsveççe' },
+  { code: 'tr', label: 'Turkish' },
+  { code: 'en', label: 'English' },
+  { code: 'de', label: 'German' },
+  { code: 'fr', label: 'French' },
+  { code: 'es', label: 'Spanish' },
+  { code: 'it', label: 'Italian' },
+  { code: 'pt', label: 'Portuguese' },
+  { code: 'ru', label: 'Russian' },
+  { code: 'ja', label: 'Japanese' },
+  { code: 'zh', label: 'Chinese' },
+  { code: 'ko', label: 'Korean' },
+  { code: 'ar', label: 'Arabic' },
+  { code: 'nl', label: 'Dutch' },
+  { code: 'pl', label: 'Polish' },
+  { code: 'sv', label: 'Swedish' },
 ];
 
 export default function Translate() {
@@ -28,19 +28,28 @@ export default function Translate() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [rules, setRules] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('translate_rules') || '[]'); } catch { return []; }
+  });
+  const [showRules, setShowRules] = useState(false);
+  const [newRule, setNewRule] = useState('');
 
   const getLangLabel = (code) => LANGUAGES.find(l => l.code === code)?.label || code;
 
   const translate = useCallback(async (text, src, tgt) => {
     if (!text.trim()) { setOutputText(''); return; }
     const key = localStorage.getItem('anthropic_api_key');
-    if (!key) { setError('API key gerekli → Ayarlar → Yapay Zeka'); return; }
+    if (!key) { setError('API key required → Settings → AI'); return; }
 
     setLoading(true);
     setError('');
 
     try {
       const isShortInput = text.trim().split(/\s+/).length <= 6;
+      const savedRules = (() => { try { return JSON.parse(localStorage.getItem('translate_rules') || '[]'); } catch { return []; } })();
+      const rulesSection = savedRules.length > 0
+        ? `\n\nTranslation rules to follow:\n${savedRules.map((r, i) => `${i + 1}. ${r}`).join('\n')}`
+        : '';
       const body = JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 2048,
@@ -50,18 +59,18 @@ export default function Translate() {
             ? `Translate the following word or short phrase from ${getLangLabel(src)} to ${getLangLabel(tgt)}.
 
 Respond in this exact format (no extra text):
-**Çeviri:** <translation>
-**Anlam:** <brief explanation of meaning/usage in 1 sentence, in Turkish>
-**Örnek:** <one natural example sentence in ${getLangLabel(tgt)}, then its ${getLangLabel(src)} translation in parentheses>
+**Translation:** <translation>
+**Meaning:** <brief explanation of meaning/usage in 1 sentence, in English>
+**Example:** <one natural example sentence in ${getLangLabel(tgt)}, then its ${getLangLabel(src)} translation in parentheses>${rulesSection}
 
 Text: ${text}`
             : `Translate the following text from ${getLangLabel(src)} to ${getLangLabel(tgt)}.
 
 Respond in this exact format:
-**Çeviri:**
+**Translation:**
 <full translation>
 
-**Not:** <one brief note about tone, register, or key word choices if useful, in Turkish — skip if not helpful>
+**Note:** <one brief note about tone, register, or key word choices if useful — skip if not helpful>${rulesSection}
 
 Text: ${text}`
         }]
@@ -81,7 +90,7 @@ Text: ${text}`
       if (data.error) throw new Error(data.error.message);
       setOutputText(data.content[0].text.trim());
     } catch (e) {
-      setError('Çeviri başarısız: ' + (e?.message || 'Bilinmeyen hata'));
+      setError('Translation failed: ' + (e?.message || 'Unknown error'));
     } finally {
       setLoading(false);
     }
@@ -95,22 +104,10 @@ Text: ${text}`
   };
 
   const handleSwap = () => {
-    const prevSource = sourceLang;
-    const prevTarget = targetLang;
-    const prevInput = inputText;
-    const prevOutput = outputText;
-    setSourceLang(prevTarget);
-    setTargetLang(prevSource);
-    setInputText(prevOutput);
-    setOutputText(prevInput);
-  };
-
-  const handleSourceLangChange = (lang) => {
-    setSourceLang(lang);
-  };
-
-  const handleTargetLangChange = (lang) => {
-    setTargetLang(lang);
+    setSourceLang(targetLang);
+    setTargetLang(sourceLang);
+    setInputText(outputText);
+    setOutputText(inputText);
   };
 
   const copyOutput = () => {
@@ -120,95 +117,145 @@ Text: ${text}`
     setTimeout(() => setCopied(false), 1500);
   };
 
-  const renderOutput = (text) => {
-    return text.split('\n').map((line, i) => {
-      // **Label:** value → bold label
-      const match = line.match(/^\*\*(.+?)\*\*:(.*)$/);
-      if (match) {
-        return (
-          <div key={i} className="tr-output-line">
-            <span className="tr-output-label">{match[1]}:</span>
-            <span>{match[2]}</span>
-          </div>
-        );
-      }
-      return <div key={i} className="tr-output-line">{line || <br />}</div>;
-    });
+  const addRule = () => {
+    const trimmed = newRule.trim();
+    if (!trimmed) return;
+    const updated = [...rules, trimmed];
+    setRules(updated);
+    localStorage.setItem('translate_rules', JSON.stringify(updated));
+    setNewRule('');
   };
 
+  const removeRule = (i) => {
+    const updated = rules.filter((_, idx) => idx !== i);
+    setRules(updated);
+    localStorage.setItem('translate_rules', JSON.stringify(updated));
+  };
+
+  const renderOutput = (text) =>
+    text.split('\n').map((line, i) => {
+      const match = line.match(/^\*\*(.+?)\*\*:(.*)$/);
+      if (match) return (
+        <div key={i} className="pb-summary-row">
+          <span className="pb-summary-label">{match[1]}:</span>
+          <span className="pb-summary-value">{match[2].trim()}</span>
+        </div>
+      );
+      return line.trim() ? <div key={i} className="pb-summary-row pb-summary-plain">{line}</div> : null;
+    });
+
   return (
-    <div className="tr-wrap">
-      {/* Lang bar */}
-      <div className="tr-langbar">
-        <select className="tr-lang-select" value={sourceLang} onChange={(e) => handleSourceLangChange(e.target.value)}>
-          {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
-        </select>
-
-        <button className="tr-swap" onClick={handleSwap} title="Dilleri değiştir">⇄</button>
-
-        <select className="tr-lang-select" value={targetLang} onChange={(e) => handleTargetLangChange(e.target.value)}>
-          {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
-        </select>
+    <div className="pb-container">
+      {/* Header */}
+      <div className="pb-header">
+        <h2 className="pb-title">Translate</h2>
+        <button
+          className={`pb-rules-btn ${rules.length > 0 ? 'tr-has-rules' : ''}`}
+          onClick={() => setShowRules(s => !s)}
+        >
+          ⚙ Rules {rules.length > 0 ? `(${rules.length})` : ''}
+        </button>
       </div>
 
-      {/* Panels */}
-      <div className="tr-panels">
-        {/* Input panel */}
-        <div className="tr-panel tr-panel-input">
-          <textarea
-            className="tr-textarea"
-            placeholder="Metni buraya yazın, Enter ile çevirin..."
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            onKeyDown={handleKeyDown}
-            spellCheck={false}
-          />
-          <div className="tr-footer">
-            <span className="tr-hint">Enter → çevir &nbsp;·&nbsp; Shift+Enter → yeni satır</span>
-            <div className="tr-footer-actions">
-              <span className="tr-charcount">{inputText.length}</span>
-              {inputText && (
-                <button className="tr-btn" onClick={() => { setInputText(''); setOutputText(''); setError(''); }}>
-                  Temizle
-                </button>
-              )}
-              <button
-                className="tr-btn tr-btn-primary"
-                onClick={() => translate(inputText, sourceLang, targetLang)}
-                disabled={loading || !inputText.trim()}
-              >
-                {loading ? <span className="tr-spinner" /> : 'Çevir'}
-              </button>
-            </div>
+      {/* Rules panel */}
+      {showRules && (
+        <div className="pb-rules-panel">
+          <div className="pb-rules-header">
+            <span className="pb-rules-title">Translation Rules</span>
+            <button className="pb-close-btn" onClick={() => setShowRules(false)}>✕</button>
+          </div>
+          <div className="tr-rules-list">
+            {rules.length === 0 && <span className="tr-rules-empty">No rules yet</span>}
+            {rules.map((r, i) => (
+              <div key={i} className="tr-rule-item">
+                <span>{r}</span>
+                <button className="tr-rule-remove" onClick={() => removeRule(i)}>×</button>
+              </div>
+            ))}
+          </div>
+          <div className="tr-rules-add">
+            <input
+              className="tr-rules-input"
+              placeholder="Add a new rule... (e.g. Keep technical terms in English)"
+              value={newRule}
+              onChange={e => setNewRule(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') addRule(); }}
+            />
+            <button className="pb-save-btn" onClick={addRule}>Add</button>
           </div>
         </div>
+      )}
 
-        <div className="tr-divider" />
+      {/* Main row */}
+      <div className="pb-main-row">
+        {/* Left: controls + input */}
+        <div className="pb-left">
+          {/* Lang selector + action buttons */}
+          <div className="tr-lang-row">
+            <select className="pb-input tr-lang-select-pb" value={sourceLang} onChange={e => setSourceLang(e.target.value)}>
+              {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
+            </select>
+            <button className="pb-rules-btn tr-swap-pb" onClick={handleSwap} title="Swap languages">⇄</button>
+            <select className="pb-input tr-lang-select-pb" value={targetLang} onChange={e => setTargetLang(e.target.value)}>
+              {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
+            </select>
+          </div>
 
-        {/* Output panel */}
-        <div className="tr-panel tr-panel-output">
-          {loading ? (
-            <div className="tr-loading"><span className="tr-spinner tr-spinner-lg" /></div>
-          ) : (
-            <div className="tr-output">
-              {outputText
-                ? renderOutput(outputText)
-                : <span className="tr-empty">Çeviri burada görünecek...</span>
-              }
-            </div>
-          )}
-          <div className="tr-footer">
-            <span className="tr-charcount">{outputText.length}</span>
-            {outputText && (
-              <button className="tr-btn" onClick={copyOutput}>
-                {copied ? 'Kopyalandı ✓' : 'Kopyala'}
+          <div className="pb-action-row">
+            <button
+              className="pb-action-btn pb-bid-btn"
+              onClick={() => translate(inputText, sourceLang, targetLang)}
+              disabled={loading || !inputText.trim()}
+            >
+              {loading ? <><span className="pb-spinner" /> Translating...</> : 'Translate'}
+            </button>
+            {inputText && (
+              <button
+                className="pb-action-btn pb-analyze-btn"
+                onClick={() => { setInputText(''); setOutputText(''); setError(''); }}
+                style={{ flex: '0 0 auto', padding: '12px 20px' }}
+              >
+                Clear
               </button>
             )}
           </div>
-        </div>
-      </div>
 
-      {error && <div className="tr-error">{error}</div>}
+          {error && <div className="pb-error">{error}</div>}
+
+          <div className="pb-field pb-field-grow">
+            <label className="pb-label">Text <span className="pb-optional">(Enter → translate · Shift+Enter → new line)</span></label>
+            <textarea
+              className="pb-textarea pb-details"
+              value={inputText}
+              onChange={e => { setInputText(e.target.value); }}
+              onKeyDown={handleKeyDown}
+              placeholder="Enter text to translate..."
+              spellCheck={false}
+            />
+          </div>
+        </div>
+
+        {/* Right: output */}
+        {(outputText || loading) && (
+          <div className="pb-right">
+            <div className="pb-result-header">
+              <span className="pb-result-title">{getLangLabel(sourceLang)} → {getLangLabel(targetLang)}</span>
+              {outputText && (
+                <button className="pb-copy-btn" onClick={copyOutput}>
+                  {copied ? '✓ Copied' : 'Copy'}
+                </button>
+              )}
+            </div>
+            {loading ? (
+              <div className="pb-summary-body" style={{ alignItems: 'center', justifyContent: 'center' }}>
+                <span className="pb-spinner" style={{ width: 28, height: 28, borderWidth: 3 }} />
+              </div>
+            ) : (
+              <div className="pb-summary-body">{renderOutput(outputText)}</div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
