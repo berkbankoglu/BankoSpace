@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-shell';
 
-const REFRESH_MS = 5 * 1000;
+const REFRESH_MS = 60 * 1000;
 
 const POPULAR_STOCKS = [
   // Hisseler
@@ -222,7 +222,7 @@ async function fetchQuote(ticker) {
   return { ticker, price: marketPrice, change: marketChange, pct: marketPct, preMarket, postMarket, prevClose: yesterdayClose };
 }
 
-// Tek grup için satır listesi
+// Row list for a single group
 function GroupRows({ group, quotes, activeTicker, setActiveTicker, dragState, dragOver, setDragOver, onRemove, onDrop }) {
   return group.tickers.map((t, idx) => {
     const q = quotes[t];
@@ -300,7 +300,7 @@ function GroupRows({ group, quotes, activeTicker, setActiveTicker, dragState, dr
         <button
           className="stc-tv-btn"
           onClick={e => { e.stopPropagation(); open(`https://www.tradingview.com/chart/?symbol=${t}`); }}
-          title="TradingView'de Aç"
+          title="Open in TradingView"
         >↗</button>
         <button className="stc-remove" onClick={e => { e.stopPropagation(); onRemove(group.id, t); }} title={`Remove ${t}`}>×</button>
       </div>
@@ -327,7 +327,7 @@ export default function StockChart({ groups, saveGroups, activeTicker, setActive
   const [renamingId, setRenamingId] = useState(null);
   const [renameVal, setRenameVal] = useState('');
 
-  // Tüm ticker'ları çek
+  // Fetch all tickers
   const allTickers = [...new Set(groups.flatMap(g => g.tickers))];
 
   const loadAll = useCallback(() => {
@@ -357,12 +357,12 @@ export default function StockChart({ groups, saveGroups, activeTicker, setActive
     return () => window.removeEventListener('pointerup', cancel);
   }, []);
 
-  // Close picker on outside click (dropdown + grup + butonlar hariç)
+  // Close picker on outside click (except dropdown + group + buttons)
   useEffect(() => {
     const handler = (e) => {
       if (!showPicker) return;
       if (pickerDropdownRef.current && pickerDropdownRef.current.contains(e.target)) return;
-      // grup + butonlarına tıklamak kapatmasın — closest ile kontrol
+      // clicking group + buttons should not close — check with closest
       if (e.target.closest?.('.stc-group-add-btn')) return;
       closePicker();
     };
@@ -379,7 +379,7 @@ export default function StockChart({ groups, saveGroups, activeTicker, setActive
   };
 
   const deleteGroup = (gid) => {
-    if (groups.length <= 1) return; // en az 1 grup kalsın
+    if (groups.length <= 1) return; // keep at least 1 group
     const g = groups.find(x => x.id === gid);
     if (g) g.tickers.forEach(t => { if (activeTicker === t) setActiveTicker('all'); });
     saveGroups(groups.filter(x => x.id !== gid));
@@ -394,10 +394,10 @@ export default function StockChart({ groups, saveGroups, activeTicker, setActive
     if (activeTicker === t) setActiveTicker('all');
   };
 
-  // Sürükle-bırak: swap (aynı grup) veya gruplar arası taşıma
+  // Drag-and-drop: swap (same group) or move between groups
   const handleDrop = (fromGroupId, fromIdx, fromTicker, toGroupId, toIdx) => {
     if (fromGroupId === toGroupId) {
-      // Aynı grup: swap
+      // Same group: swap
       saveGroups(groups.map(g => {
         if (g.id !== fromGroupId) return g;
         const next = [...g.tickers];
@@ -405,7 +405,7 @@ export default function StockChart({ groups, saveGroups, activeTicker, setActive
         return { ...g, tickers: next };
       }));
     } else {
-      // Farklı grup: from'dan çıkar, to'ya ekle
+      // Different group: remove from source, add to target
       saveGroups(groups.map(g => {
         if (g.id === fromGroupId) return { ...g, tickers: g.tickers.filter(t => t !== fromTicker) };
         if (g.id === toGroupId) {

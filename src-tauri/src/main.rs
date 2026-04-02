@@ -120,6 +120,9 @@ async fn fetch_rss(url: String) -> Result<String, String> {
         .await
         .map_err(|e| e.to_string())?;
 
+    if !response.status().is_success() {
+        return Err(format!("HTTP {}", response.status()));
+    }
     let text = response.text().await.map_err(|e| e.to_string())?;
     Ok(text)
 }
@@ -166,6 +169,13 @@ async fn fetch_post(url: String, headers: std::collections::HashMap<String, Stri
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_notification::init())

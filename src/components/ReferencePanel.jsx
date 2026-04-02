@@ -39,7 +39,7 @@ function ReferencePanel() {
   const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0];
   const items = activeTab.items;
 
-  // Ref'leri güncel tut
+  // Keep refs up to date
   useEffect(() => {
     zoomLevelRef.current = zoomLevel;
   }, [zoomLevel]);
@@ -170,7 +170,7 @@ function ReferencePanel() {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
       if (e.target.contentEditable === 'true') return;
 
-      // Text düzenleme modunda CTRL+C/V için native clipboard kullan
+      // In text editing mode use native clipboard for CTRL+C/V
       if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'v')) {
         if (editingTextId !== null || editingCanvasId !== null) return;
       }
@@ -342,7 +342,7 @@ function ReferencePanel() {
       const isOverCanvas = canvasRef.current?.contains(e.target);
 
       if (isOverCanvas) {
-        // Canvas içinde: zoom (CTRL'ye gerek yok)
+        // Inside canvas: zoom (no CTRL needed)
         e.preventDefault();
 
         const rect = canvasRef.current.getBoundingClientRect();
@@ -351,26 +351,26 @@ function ReferencePanel() {
 
         const delta = e.deltaY > 0 ? -0.1 : 0.1;
 
-        // Mevcut değerleri ref'ten al
+        // Get current values from ref
         const currentZoom = zoomLevelRef.current;
         const currentPan = panOffsetRef.current;
 
         // Yeni zoom seviyesini hesapla
         const newZoom = Math.max(0.25, Math.min(3, currentZoom + delta));
 
-        // İmlecin işaret ettiği world koordinatını hesapla
+        // Calculate the world coordinate the cursor is pointing at
         const worldX = (mouseX - currentPan.x) / currentZoom;
         const worldY = (mouseY - currentPan.y) / currentZoom;
 
-        // Yeni pan offset: aynı world noktası imleçte kalacak
+        // New pan offset: the same world point stays under the cursor
         const newPanX = mouseX - worldX * newZoom;
         const newPanY = mouseY - worldY * newZoom;
 
-        // State'leri güncelle
+        // Update states
         setZoomLevel(newZoom);
         setPanOffset({ x: newPanX, y: newPanY });
       }
-      // Canvas dışında: normal scroll (preventDefault yok)
+      // Outside canvas: normal scroll (no preventDefault)
     };
 
     document.addEventListener('wheel', handleWheel, { passive: false });
@@ -391,7 +391,7 @@ function ReferencePanel() {
               const base64 = event.target.result;
               let imageSrc = base64;
 
-              // Firebase Storage'a yükle
+              // Upload to Firebase Storage
               if (storageService) {
                 try {
                   const itemId = Date.now();
@@ -399,7 +399,7 @@ function ReferencePanel() {
                   console.log('Image uploaded to Firebase Storage:', imageSrc);
                 } catch (error) {
                   console.error('Upload failed, using base64:', error);
-                  // base64 olarak kalır
+                  // stays as base64
                 }
               }
 
@@ -679,7 +679,7 @@ function ReferencePanel() {
             y: box.top,
             width: width,
             height: height,
-            items: [], // Canvas içindeki öğeler
+            items: [], // Items inside the canvas
             backgroundColor: 'rgba(40, 40, 40, 0.8)'
           };
           setItems(prev => [...prev, newCanvas]);
@@ -807,7 +807,7 @@ function ReferencePanel() {
       let newWidth = Math.max(50, resizeStart.width + deltaX);
       let newHeight = Math.max(50, resizeStart.height + deltaY);
 
-      // Görseller için aspect ratio her zaman korunur
+      // Aspect ratio is always preserved for images
       if (resizingItem.type === 'image' && resizeStart.width > 0 && resizeStart.height > 0) {
         const aspectRatio = resizeStart.width / resizeStart.height;
         newHeight = newWidth / aspectRatio;

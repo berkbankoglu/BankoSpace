@@ -56,56 +56,56 @@ function AddModal({ initial, onSave, onDelete, onClose }) {
     <div className="sub-modal-overlay" onClick={onClose}>
       <div className="sub-modal" onClick={e => e.stopPropagation()}>
         <div className="sub-modal-header">
-          <span className="sub-modal-title">{isEdit ? 'Düzenle' : 'Yeni Kayıt'}</span>
+          <span className="sub-modal-title">{isEdit ? 'Edit' : 'New Entry'}</span>
           <button className="sub-modal-close" onClick={onClose}>×</button>
         </div>
 
         <div className="sub-modal-body">
-          {/* Birincil seçim: Her Ay / Tek Seferlik */}
+          {/* Primary choice: Monthly / One-time */}
           <div className="sub-cat-grid sub-cat-grid--top">
             <button className={`sub-cat-btn ${!form.category.startsWith('once') ? 'active active--monthly' : ''}`}
               onClick={() => { if (form.category.startsWith('once')) set('category', 'monthly-auto'); }}>
-              Her Ay
+              Monthly
             </button>
             <button className={`sub-cat-btn ${form.category.startsWith('once') ? 'active active--once' : ''}`}
               onClick={() => { if (!form.category.startsWith('once')) set('category', 'once-payment'); }}>
-              Tek Seferlik
+              One-Time
             </button>
           </div>
 
-          {/* Her Ay alt seçim: Otomatik / Manuel */}
+          {/* Monthly sub-choice: Automatic / Manual */}
           {!form.category.startsWith('once') && (
             <div className="sub-cat-grid sub-cat-grid--sub">
               <button className={`sub-cat-btn sub-cat-btn--sm ${form.category === 'monthly-auto' ? 'active active--auto' : ''}`}
                 onClick={() => set('category', 'monthly-auto')}>
-                Otomatik
+                Automatic
               </button>
               <button className={`sub-cat-btn sub-cat-btn--sm ${form.category === 'monthly-manual' ? 'active active--manual' : ''}`}
                 onClick={() => set('category', 'monthly-manual')}>
-                Manuel
+                Manual
               </button>
             </div>
           )}
 
-          {/* Tek Seferlik alt seçim: Ödeme / İptal */}
+          {/* One-time sub-choice: Payment / Cancel */}
           {form.category.startsWith('once') && (
             <div className="sub-cat-grid sub-cat-grid--sub">
               <button className={`sub-cat-btn sub-cat-btn--sm ${form.category === 'once-payment' ? 'active active--manual' : ''}`}
                 onClick={() => set('category', 'once-payment')}>
-                Ödeme
+                Payment
               </button>
               <button className={`sub-cat-btn sub-cat-btn--sm ${form.category === 'once-cancel' ? 'active active--cancel' : ''}`}
                 onClick={() => set('category', 'once-cancel')}>
-                İptal
+                Cancel
               </button>
             </div>
           )}
 
 
           <div className="sub-field">
-            <label className="sub-label">Açıklama</label>
+            <label className="sub-label">Description</label>
             <input className="sub-input" autoFocus
-              placeholder={form.category === 'monthly-auto' ? 'Netflix, Spotify, iCloud...' : form.category === 'monthly-manual' ? 'Kira, elektrik, muhasebe...' : 'Alışveriş, fatura...'}
+              placeholder={form.category === 'monthly-auto' ? 'Netflix, Spotify, iCloud...' : form.category === 'monthly-manual' ? 'Rent, electricity, accounting...' : 'Shopping, bills...'}
               value={form.name} onChange={e => set('name', e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleSave()} />
           </div>
@@ -113,11 +113,11 @@ function AddModal({ initial, onSave, onDelete, onClose }) {
           {form.category !== 'once-cancel' && (
             <div className="sub-two-col">
               <div className="sub-field">
-                <label className="sub-label">{form.category.startsWith('once') ? 'Tarih' : 'Her ay hangi gün'}</label>
+                <label className="sub-label">{form.category.startsWith('once') ? 'Date' : 'Day of month'}</label>
                 <input className="sub-input" type="date" value={form.date} onChange={e => set('date', e.target.value)} />
               </div>
               <div className="sub-field">
-                <label className="sub-label">Tutar</label>
+                <label className="sub-label">Amount</label>
                 <div className="sub-price-row">
                   <select className="sub-select" value={form.currency} onChange={e => set('currency', e.target.value)}>
                     <option>₺</option><option>$</option><option>€</option><option>£</option>
@@ -131,24 +131,24 @@ function AddModal({ initial, onSave, onDelete, onClose }) {
 
           {form.category === 'once-cancel' && (
             <div className="sub-field">
-              <label className="sub-label">İptal Son Tarihi</label>
+              <label className="sub-label">Cancel By Date</label>
               <input className="sub-input" type="date" value={form.cancelBy} onChange={e => set('cancelBy', e.target.value)} />
             </div>
           )}
 
           {form.category !== 'once-cancel' && (
             <div className="sub-field">
-              <label className="sub-label">Not <span className="sub-label-hint">(opsiyonel)</span></label>
-              <input className="sub-input" placeholder="Ek bilgi..." value={form.note} onChange={e => set('note', e.target.value)} />
+              <label className="sub-label">Note <span className="sub-label-hint">(optional)</span></label>
+              <input className="sub-input" placeholder="Additional info..." value={form.note} onChange={e => set('note', e.target.value)} />
             </div>
           )}
         </div>
 
         <div className="sub-modal-footer">
-          {isEdit && <button className="sub-delete-modal-btn" onClick={() => { onDelete(form.id); onClose(); }}>Sil</button>}
+          {isEdit && <button className="sub-delete-modal-btn" onClick={() => { onDelete(form.id); onClose(); }}>Delete</button>}
           <div className="sub-modal-footer-right">
-            <button className="sub-cancel-btn" onClick={onClose}>İptal</button>
-            <button className="sub-confirm-btn" onClick={handleSave} disabled={!form.name.trim() || (form.category !== 'once-cancel' && !form.date)}>Kaydet</button>
+            <button className="sub-cancel-btn" onClick={onClose}>Cancel</button>
+            <button className="sub-confirm-btn" onClick={handleSave} disabled={!form.name.trim() || (form.category !== 'once-cancel' && !form.date)}>Save</button>
           </div>
         </div>
       </div>
@@ -170,22 +170,22 @@ function Item({ item, onClick, onComplete }) {
       <div className="sub-item-left">
         <div className="sub-item-name-row">
           <span className="sub-item-name">{item.name}</span>
-          {isOverdue && <span className="sub-cancel-badge sub-cancel-badge--urgent">gecikti</span>}
+          {isOverdue && <span className="sub-cancel-badge sub-cancel-badge--urgent">overdue</span>}
           {cancelDays !== null && !isOverdue && (
             <span className={`sub-cancel-badge ${cancelDays <= 5 ? 'sub-cancel-badge--urgent' : ''}`}>
-              ⚠ {cancelDays >= 0 ? `${cancelDays}g` : 'geçti'}
+              ⚠ {cancelDays >= 0 ? `${cancelDays}d` : 'past'}
             </span>
           )}
         </div>
         <span className="sub-item-date">
-          {item.done ? 'Tamamlandı' : days === null ? '—' : days === 0 ? 'Bugün' : days < 0 ? `${Math.abs(days)}g gecikti` : `${days}g sonra`}
+          {item.done ? 'Done' : days === null ? '—' : days === 0 ? 'Today' : days < 0 ? `${Math.abs(days)}d overdue` : `in ${days}d`}
           {item.note && <span className="sub-pay-note"> · {item.note}</span>}
         </span>
       </div>
       <div className="sub-item-right">
         {item.price > 0 && <span className="sub-item-price">{item.currency}{item.price.toFixed(2)}</span>}
         {isOnce && !item.done && (
-          <button className="sub-complete-btn" title="Tamamlandı olarak işaretle"
+          <button className="sub-complete-btn" title="Mark as done"
             onClick={e => { e.stopPropagation(); onComplete(item.id); }}>✓</button>
         )}
       </div>
@@ -225,24 +225,24 @@ export default function SubscriptionTracker() {
   return (
     <div className="sub-tracker">
       <div className="sub-header">
-        <span className="sub-header-title">Ödemeler</span>
-        <button className="sub-add-btn" onClick={() => setShowAdd(true)} title="Ekle">+</button>
+        <span className="sub-header-title">Payments</span>
+        <button className="sub-add-btn" onClick={() => setShowAdd(true)} title="Add">+</button>
       </div>
 
       <div className="sub-list">
         {items.length === 0 && (
           <div className="sub-empty">
             <div className="sub-empty-icon">—</div>
-            <div>Henüz kayıt yok</div>
-            <div className="sub-empty-hint">+ ile ekle</div>
+            <div>No entries yet</div>
+            <div className="sub-empty-hint">Add with +</div>
           </div>
         )}
 
         {autoItems.length > 0 && (
           <div className="sub-section">
             <div className="sub-section-header">
-              <span className="sub-section-title sub-section-title--auto">Her Ay · Otomatik</span>
-              {totalAuto > 0 && <span className="sub-section-total">₺{totalAuto.toFixed(0)}/ay</span>}
+              <span className="sub-section-title sub-section-title--auto">Monthly · Auto</span>
+              {totalAuto > 0 && <span className="sub-section-total">₺{totalAuto.toFixed(0)}/mo</span>}
             </div>
             {autoItems.map(item => <Item key={item.id} item={item} onClick={() => setEditing(item)} />)}
           </div>
@@ -251,8 +251,8 @@ export default function SubscriptionTracker() {
         {manualItems.length > 0 && (
           <div className="sub-section">
             <div className="sub-section-header">
-              <span className="sub-section-title sub-section-title--manual">Her Ay · Manuel</span>
-              {totalManual > 0 && <span className="sub-section-total">₺{totalManual.toFixed(0)}/ay</span>}
+              <span className="sub-section-title sub-section-title--manual">Monthly · Manual</span>
+              {totalManual > 0 && <span className="sub-section-total">₺{totalManual.toFixed(0)}/mo</span>}
             </div>
             {manualItems.map(item => <Item key={item.id} item={item} onClick={() => setEditing(item)} />)}
           </div>
@@ -261,7 +261,7 @@ export default function SubscriptionTracker() {
         {oncePayItems.length > 0 && (
           <div className="sub-section">
             <div className="sub-section-header">
-              <span className="sub-section-title sub-section-title--once">Tek Seferlik · Ödeme</span>
+              <span className="sub-section-title sub-section-title--once">One-Time · Payment</span>
             </div>
             {oncePayItems.map(item => <Item key={item.id} item={item} onClick={() => setEditing(item)} onComplete={complete} />)}
           </div>
@@ -270,7 +270,7 @@ export default function SubscriptionTracker() {
         {onceCancelItems.length > 0 && (
           <div className="sub-section">
             <div className="sub-section-header">
-              <span className="sub-section-title sub-section-title--cancel">Tek Seferlik · İptal</span>
+              <span className="sub-section-title sub-section-title--cancel">One-Time · Cancel</span>
             </div>
             {onceCancelItems.map(item => <Item key={item.id} item={item} onClick={() => setEditing(item)} onComplete={complete} />)}
           </div>
@@ -290,10 +290,17 @@ export function SubscriptionWidget() {
   });
 
   useEffect(() => {
+    const handler = (e) => {
+      if (!e.key || e.key === STORAGE_KEY) {
+        try { setItems(JSON.parse(localStorage.getItem(STORAGE_KEY)) || []); } catch {}
+      }
+    };
+    window.addEventListener('storage', handler);
+    // also refresh once a minute for day-change (days until)
     const iv = setInterval(() => {
       try { setItems(JSON.parse(localStorage.getItem(STORAGE_KEY)) || []); } catch {}
-    }, 2000);
-    return () => clearInterval(iv);
+    }, 60000);
+    return () => { window.removeEventListener('storage', handler); clearInterval(iv); };
   }, []);
 
   const upcoming = items.map(item => {
@@ -313,13 +320,13 @@ export function SubscriptionWidget() {
 
   return (
     <div className="sub-widget">
-      <div className="sub-widget-title">Yaklaşan Ödemeler</div>
+      <div className="sub-widget-title">Upcoming Payments</div>
       {cancelAlerts.map(item => (
         <div key={'c-' + item.id} className="sub-widget-item sub-widget-item--cancel">
           <span>⚠</span>
-          <span className="sub-widget-name">{item.name} iptal et</span>
+          <span className="sub-widget-name">Cancel {item.name}</span>
           <span className="sub-widget-days sub-widget-days--cancel">
-            {item.cancelDays === 0 ? 'Bugün!' : `${item.cancelDays}g`}
+            {item.cancelDays === 0 ? 'Today!' : `${item.cancelDays}d`}
           </span>
         </div>
       ))}
@@ -329,7 +336,7 @@ export function SubscriptionWidget() {
           <div key={item.id} className={`sub-widget-item sub-widget-item--${urgency}`}>
             <span>{icons[item.category]}</span>
             <span className="sub-widget-name">{item.name}</span>
-            <span className="sub-widget-days">{item.days === 0 ? 'Bugün!' : `${item.days}g`}</span>
+            <span className="sub-widget-days">{item.days === 0 ? 'Today!' : `${item.days}d`}</span>
             {item.price > 0 && <span className="sub-widget-price">{item.currency}{item.price.toFixed(0)}</span>}
           </div>
         );

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { createPortal } from 'react-dom';
+import './Stocks.css';
 import { invoke } from '@tauri-apps/api/core';
 import { sendNotification, isPermissionGranted, requestPermission } from '@tauri-apps/plugin-notification';
 import { open } from '@tauri-apps/plugin-shell';
@@ -8,10 +8,8 @@ const REFRESH_INTERVAL = 15 * 60 * 1000;
 const STORAGE_KEY = 'stock_seen_news';
 const FAVS_KEY = 'stock_favs';
 const TICKERS_KEY = 'stock_tickers';
-
 const DEFAULT_TICKERS = ['NBIS'];
 
-// Popular stocks for the searchable picker
 const POPULAR_STOCKS = [
   { ticker: 'AAPL',  name: 'Apple' },
   { ticker: 'MSFT',  name: 'Microsoft' },
@@ -23,7 +21,6 @@ const POPULAR_STOCKS = [
   { ticker: 'AMD',   name: 'AMD' },
   { ticker: 'INTC',  name: 'Intel' },
   { ticker: 'NFLX',  name: 'Netflix' },
-  { ticker: 'AMZN',  name: 'Amazon' },
   { ticker: 'PLTR',  name: 'Palantir' },
   { ticker: 'NBIS',  name: 'Nebius Group' },
   { ticker: 'CRWD',  name: 'CrowdStrike' },
@@ -39,87 +36,55 @@ const POPULAR_STOCKS = [
   { ticker: 'RGTI',  name: 'Rigetti' },
   { ticker: 'SOUN',  name: 'SoundHound' },
   { ticker: 'BBAI',  name: 'BigBear.ai' },
-  { ticker: 'BTBT',  name: 'Bit Digital' },
   { ticker: 'MARA',  name: 'Marathon Digital' },
   { ticker: 'RIOT',  name: 'Riot Platforms' },
   { ticker: 'CLSK',  name: 'CleanSpark' },
   { ticker: 'HIMS',  name: 'Hims & Hers' },
-  { ticker: 'CELH',  name: 'Celsius Holdings' },
   { ticker: 'SHOP',  name: 'Shopify' },
   { ticker: 'SQ',    name: 'Block (Square)' },
   { ticker: 'PYPL',  name: 'PayPal' },
   { ticker: 'UBER',  name: 'Uber' },
-  { ticker: 'LYFT',  name: 'Lyft' },
   { ticker: 'ABNB',  name: 'Airbnb' },
-  { ticker: 'DASH',  name: 'DoorDash' },
   { ticker: 'SPOT',  name: 'Spotify' },
-  { ticker: 'RBLX',  name: 'Roblox' },
-  { ticker: 'U',     name: 'Unity' },
-  { ticker: 'PATH',  name: 'UiPath' },
-  { ticker: 'AI',    name: 'C3.ai' },
-  { ticker: 'GTLB',  name: 'GitLab' },
-  { ticker: 'MDB',   name: 'MongoDB' },
   { ticker: 'NET',   name: 'Cloudflare' },
-  { ticker: 'ZS',    name: 'Zscaler' },
   { ticker: 'DDOG',  name: 'Datadog' },
-  { ticker: 'TEAM',  name: 'Atlassian' },
-  { ticker: 'NOW',   name: 'ServiceNow' },
   { ticker: 'CRM',   name: 'Salesforce' },
   { ticker: 'ORCL',  name: 'Oracle' },
-  { ticker: 'SAP',   name: 'SAP' },
-  { ticker: 'IBM',   name: 'IBM' },
-  { ticker: 'DELL',  name: 'Dell' },
-  { ticker: 'HPQ',   name: 'HP Inc.' },
+  { ticker: 'JPM',   name: 'JPMorgan' },
+  { ticker: 'GS',    name: 'Goldman Sachs' },
+  { ticker: 'BAC',   name: 'Bank of America' },
+  { ticker: 'RIVN',  name: 'Rivian' },
+  { ticker: 'NIO',   name: 'NIO' },
+  { ticker: 'BABA',  name: 'Alibaba' },
+  { ticker: 'IREN',  name: 'IREN' },
   { ticker: 'TSM',   name: 'TSMC' },
   { ticker: 'ASML',  name: 'ASML' },
   { ticker: 'QCOM',  name: 'Qualcomm' },
   { ticker: 'AVGO',  name: 'Broadcom' },
-  { ticker: 'TXN',   name: 'Texas Instruments' },
   { ticker: 'MU',    name: 'Micron' },
-  { ticker: 'WDC',   name: 'Western Digital' },
-  { ticker: 'JPM',   name: 'JPMorgan' },
-  { ticker: 'GS',    name: 'Goldman Sachs' },
-  { ticker: 'BAC',   name: 'Bank of America' },
-  { ticker: 'MS',    name: 'Morgan Stanley' },
   { ticker: 'V',     name: 'Visa' },
   { ticker: 'MA',    name: 'Mastercard' },
-  { ticker: 'BRK.B', name: 'Berkshire B' },
-  { ticker: 'JNJ',   name: 'Johnson & Johnson' },
-  { ticker: 'PFE',   name: 'Pfizer' },
-  { ticker: 'MRNA',  name: 'Moderna' },
   { ticker: 'LLY',   name: 'Eli Lilly' },
-  { ticker: 'ABBV',  name: 'AbbVie' },
-  { ticker: 'XOM',   name: 'ExxonMobil' },
-  { ticker: 'CVX',   name: 'Chevron' },
   { ticker: 'BA',    name: 'Boeing' },
-  { ticker: 'LMT',   name: 'Lockheed Martin' },
-  { ticker: 'GE',    name: 'GE Aerospace' },
-  { ticker: 'SPCE',  name: 'Virgin Galactic' },
-  { ticker: 'LCID',  name: 'Lucid Motors' },
-  { ticker: 'RIVN',  name: 'Rivian' },
-  { ticker: 'F',     name: 'Ford' },
-  { ticker: 'GM',    name: 'General Motors' },
-  { ticker: 'NIO',   name: 'NIO' },
-  { ticker: 'BYD',   name: 'BYD' },
-  { ticker: 'BABA',  name: 'Alibaba' },
-  { ticker: 'JD',    name: 'JD.com' },
-  { ticker: 'PDD',   name: 'PDD Holdings' },
-  { ticker: 'TCEHY', name: 'Tencent' },
   { ticker: 'BTC-USD', name: 'Bitcoin' },
   { ticker: 'ETH-USD', name: 'Ethereum' },
-  { ticker: 'IREN',   name: 'IREN' },
-  { ticker: 'RKLB',   name: 'Rocket Lab' },
 ];
 
-// Seeking Alpha RSS — ticker-specific, good quality
-function getSeekingAlphaUrl(ticker) {
-  return `https://seekingalpha.com/api/sa/combined/${encodeURIComponent(ticker)}.xml`;
+// Preset colors for tickers — cycles through palette
+const TICKER_PALETTE = [
+  '#58a6ff', '#3fb950', '#f0883e', '#a371f7',
+  '#ff7b72', '#e3b341', '#39d353', '#79c0ff',
+];
+const tickerColorCache = {};
+let paletteIdx = 0;
+function getTickerColor(ticker) {
+  if (!tickerColorCache[ticker]) {
+    tickerColorCache[ticker] = TICKER_PALETTE[paletteIdx % TICKER_PALETTE.length];
+    paletteIdx++;
+  }
+  return tickerColorCache[ticker];
 }
 
-// TradingView real-time feed — Reuters/DJ, general market
-const TV_FEED_URL = 'https://news-headlines.tradingview.com/v2/headlines?client=web&lang=en';
-
-// Company name keywords for TradingView title matching
 const TICKER_KEYWORDS = {
   AAPL: ['Apple'], MSFT: ['Microsoft'], GOOGL: ['Alphabet', 'Google'], AMZN: ['Amazon'],
   NVDA: ['Nvidia', 'NVIDIA'], META: ['Meta'], TSLA: ['Tesla'], AMD: ['AMD'],
@@ -134,6 +99,35 @@ const TICKER_KEYWORDS = {
   NBIS: ['Nebius'], IREN: ['IREN'],
 };
 
+const TV_FEED_URL = 'https://news-headlines.tradingview.com/v2/headlines?client=web&lang=en';
+
+function getSeekingAlphaUrl(ticker) {
+  return `https://seekingalpha.com/api/sa/combined/${encodeURIComponent(ticker)}.xml`;
+}
+function getYahooFinanceUrl(ticker) {
+  return `https://feeds.finance.yahoo.com/rss/2.0/headline?s=${encodeURIComponent(ticker)}&region=US&lang=en-US`;
+}
+
+function parseYahooRss(xml, ticker) {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xml, 'text/xml');
+    const items = Array.from(doc.querySelectorAll('item'));
+    return items.slice(0, 15).map((item, i) => {
+      const title = item.querySelector('title')?.textContent || '';
+      const link = item.querySelector('link')?.textContent || '';
+      const pubDate = item.querySelector('pubDate')?.textContent || '';
+      const description = item.querySelector('description')?.textContent?.replace(/<[^>]*>/g, '').trim() || '';
+      return {
+        id: `yf_${ticker}_${i}_${pubDate ? new Date(pubDate).getTime() : i}`,
+        title, description, link,
+        date: pubDate ? new Date(pubDate).toISOString() : new Date().toISOString(),
+        source: 'Yahoo Finance', ticker, provider: 'Yahoo',
+      };
+    });
+  } catch { return []; }
+}
+
 function parseSeekingAlphaXml(xml, ticker) {
   try {
     const parser = new DOMParser();
@@ -143,24 +137,17 @@ function parseSeekingAlphaXml(xml, ticker) {
       const title = item.querySelector('title')?.textContent || '';
       const pubDate = item.querySelector('pubDate')?.textContent || '';
       const guid = item.querySelector('guid')?.textContent || `sa_${ticker}_${i}`;
-      // link is a redirect page; use guid or construct direct URL
       const link = `https://seekingalpha.com/symbol/${ticker}/news`;
       const rawDesc = item.querySelector('description')?.textContent || '';
       const description = rawDesc.replace(/<[^>]*>/g, '').trim();
       return {
         id: `sa_${ticker}_${guid}`,
-        title,
-        description,
-        link,
+        title, description, link,
         date: pubDate ? new Date(pubDate).toISOString() : new Date().toISOString(),
-        source: 'Seeking Alpha',
-        ticker,
-        provider: 'SeekingAlpha',
+        source: 'Seeking Alpha', ticker, provider: 'SeekingAlpha',
       };
     });
-  } catch {
-    return [];
-  }
+  } catch { return []; }
 }
 
 function parseTvFeed(data, tickers) {
@@ -170,27 +157,21 @@ function parseTvFeed(data, tickers) {
     const tickerSet = new Set(tickers.map(t => t.toUpperCase()));
     const keywordMap = {};
     tickers.forEach(t => {
-      const kws = TICKER_KEYWORDS[t.toUpperCase()] || [];
-      kws.forEach(kw => { keywordMap[kw] = t; });
+      (TICKER_KEYWORDS[t.toUpperCase()] || []).forEach(kw => { keywordMap[kw] = t; });
     });
-
     for (const item of items) {
       const relSymbols = (item.relatedSymbols || []).map(r => r.symbol || '');
-      // find matching ticker via relatedSymbols
       let matchedTicker = null;
       for (const sym of relSymbols) {
-        const parts = sym.split(':');
-        const bare = parts[parts.length - 1].toUpperCase();
+        const bare = sym.split(':').pop().toUpperCase();
         if (tickerSet.has(bare)) { matchedTicker = bare; break; }
       }
-      // fallback: title keyword match
       if (!matchedTicker) {
         for (const [kw, t] of Object.entries(keywordMap)) {
           if (item.title.includes(kw)) { matchedTicker = t; break; }
         }
       }
       if (!matchedTicker) continue;
-
       results.push({
         id: `tv_${item.id}`,
         title: item.title || '',
@@ -203,155 +184,222 @@ function parseTvFeed(data, tickers) {
       });
     }
     return results;
-  } catch {
-    return [];
-  }
+  } catch { return []; }
 }
 
 function timeAgo(dateStr) {
   const diff = Date.now() - new Date(dateStr).getTime();
   const m = Math.floor(diff / 60000);
   if (m < 1) return 'just now';
-  if (m < 60) return `${m}m ago`;
+  if (m < 60) return `${m}m`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
+  if (h < 24) return `${h}h`;
+  return `${Math.floor(h / 24)}d`;
 }
 
 function playNewsSound() {
   try {
-    const AudioCtx = /** @type {typeof AudioContext} */ (window.AudioContext || window['webkitAudioContext']);
+    const AudioCtx = window.AudioContext || window['webkitAudioContext'];
     const ctx = new AudioCtx();
-    // İki kısa bip — dikkat çekici ama rahatsız etmez
     const beep = (freq, startTime, duration) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.frequency.value = freq;
-      osc.type = 'sine';
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = freq; osc.type = 'sine';
       gain.gain.setValueAtTime(0, startTime);
       gain.gain.linearRampToValueAtTime(0.25, startTime + 0.015);
       gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
-      osc.start(startTime);
-      osc.stop(startTime + duration);
+      osc.start(startTime); osc.stop(startTime + duration);
     };
     beep(880, ctx.currentTime, 0.12);
     beep(1100, ctx.currentTime + 0.16, 0.10);
   } catch {}
 }
 
-async function fetchAllNews(tickers) {
-  if (!tickers || tickers.length === 0) return [];
+// Geniş market feed listesi — çok kaynak = çok güncel haber
+const MARKET_FEEDS = [
+  // Yahoo Finance — büyük indeksler
+  { url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=%5EGSPC&region=US&lang=en-US', source: 'Yahoo Finance' },
+  { url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=%5EIXIC&region=US&lang=en-US', source: 'Yahoo Finance' },
+  { url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=%5EDJI&region=US&lang=en-US',  source: 'Yahoo Finance' },
+  { url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=%5ETNX&region=US&lang=en-US',  source: 'Yahoo Finance' },
+  { url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=GC%3DF&region=US&lang=en-US',  source: 'Yahoo Finance' },
+  { url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=CL%3DF&region=US&lang=en-US',  source: 'Yahoo Finance' },
+  { url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=BTC-USD&region=US&lang=en-US', source: 'Yahoo Finance' },
+  // Benzinga — çok sık güncellenir, anlık haberler
+  { url: 'https://www.benzinga.com/feed', source: 'Benzinga' },
+  { url: 'https://www.benzinga.com/rss/topic/markets', source: 'Benzinga' },
+  { url: 'https://www.benzinga.com/rss/topic/stocks', source: 'Benzinga' },
+  // Seeking Alpha — genel market
+  { url: 'https://seekingalpha.com/market_currents.xml', source: 'Seeking Alpha' },
+  { url: 'https://seekingalpha.com/feed.xml', source: 'Seeking Alpha' },
+  // Investopedia
+  { url: 'https://www.investopedia.com/feedbuilder/feed/getfeed/?feedName=rss_articles', source: 'Investopedia' },
+];
 
-  // 1. Seeking Alpha per-ticker RSS
-  const saResults = await Promise.allSettled(
-    tickers.map(async t => {
-      const text = await invoke('fetch_rss', { url: getSeekingAlphaUrl(t) });
-      return parseSeekingAlphaXml(text, t);
+function parseMarketRss(xml, source) {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xml, 'text/xml');
+    const items = Array.from(doc.querySelectorAll('item'));
+    return items.slice(0, 20).map((item, i) => {
+      const title = item.querySelector('title')?.textContent || '';
+      const link = item.querySelector('link')?.textContent || '';
+      const pubDate = item.querySelector('pubDate')?.textContent || '';
+      const description = item.querySelector('description')?.textContent?.replace(/<[^>]*>/g, '').trim() || '';
+      return {
+        id: `mkt_${source.replace(/\s/g, '')}_${i}_${pubDate ? new Date(pubDate).getTime() : i}`,
+        title, description, link,
+        date: pubDate ? new Date(pubDate).toISOString() : new Date().toISOString(),
+        source,
+        ticker: 'US Market',
+        provider: 'Market',
+        isMarket: true,
+      };
+    });
+  } catch { return []; }
+}
+
+async function fetchMarketNews() {
+  const results = await Promise.allSettled(
+    MARKET_FEEDS.map(async ({ url, source }) => {
+      const text = await invoke('fetch_rss', { url });
+      return parseMarketRss(text, source);
     })
   );
-  const saItems = saResults
-    .filter(r => r.status === 'fulfilled')
-    .flatMap(r => r.value);
-
-  // 2. TradingView real-time feed (Reuters/DJ)
-  let tvItems = [];
-  try {
-    const tvText = await invoke('fetch_rss', { url: TV_FEED_URL });
-    const tvData = JSON.parse(tvText);
-    tvItems = parseTvFeed(tvData, tickers);
-  } catch (e) {
-    console.warn('TradingView feed failed:', e);
-  }
-
-  const all = [...tvItems, ...saItems];
-
-  // Deduplicate by title
+  const cutoff = Date.now() - 48 * 60 * 60 * 1000; // 48 saatten eski haberleri gösterme
+  const all = results.filter(r => r.status === 'fulfilled').flatMap(r => r.value);
   const seen = new Set();
   const unique = all.filter(item => {
-    if (!item.title) return false;
+    if (!item.title || item.title.length < 10) return false;
+    if (new Date(item.date).getTime() < cutoff) return false;
     const key = item.title.toLowerCase().slice(0, 60);
     if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
+    seen.add(key); return true;
   });
-
   unique.sort((a, b) => new Date(b.date) - new Date(a.date));
   return unique;
 }
 
-async function fetchAiComment(title, tickers) {
-  const key = localStorage.getItem('anthropic_api_key');
+async function fetchAllNews(tickers) {
+  if (!tickers || tickers.length === 0) return [];
+  const saResults = await Promise.allSettled(
+    tickers.map(async t => {
+      try {
+        const text = await invoke('fetch_rss', { url: getSeekingAlphaUrl(t) });
+        const items = parseSeekingAlphaXml(text, t);
+        if (items.length > 0) return items;
+        throw new Error('empty');
+      } catch {
+        try {
+          const text = await invoke('fetch_rss', { url: getYahooFinanceUrl(t) });
+          return parseYahooRss(text, t);
+        } catch { return []; }
+      }
+    })
+  );
+  const saItems = saResults.filter(r => r.status === 'fulfilled').flatMap(r => r.value);
+
+  let tvItems = [];
+  try {
+    const tvText = await invoke('fetch_rss', { url: TV_FEED_URL });
+    tvItems = parseTvFeed(JSON.parse(tvText), tickers);
+  } catch {}
+
+  const cutoff = Date.now() - 72 * 60 * 60 * 1000; // ticker haberleri için 72 saat
+  const all = [...tvItems, ...saItems];
+  const seen = new Set();
+  const unique = all.filter(item => {
+    if (!item.title) return false;
+    if (new Date(item.date).getTime() < cutoff) return false;
+    const key = item.title.toLowerCase().slice(0, 60);
+    if (seen.has(key)) return false;
+    seen.add(key); return true;
+  });
+  unique.sort((a, b) => new Date(b.date) - new Date(a.date));
+  return unique;
+}
+
+async function fetchAiComment(title, tickers, description = '') {
+  let key = localStorage.getItem('anthropic_api_key');
   if (!key) throw new Error('NO_KEY');
-  const tickerCtx = tickers && tickers.length > 0 ? `Related tickers: ${tickers.join(', ')}\n` : '';
+  // Strip accidental quotes from stored key
+  key = key.trim().replace(/^["']|["']$/g, '');
+  if (!key.startsWith('sk-')) throw new Error('INVALID_KEY');
+
+  const validTickers = (tickers || []).filter(t => t && t !== 'US Market');
+  const tickerCtx = validTickers.length > 0 ? `Related tickers: ${validTickers.join(', ')}\n` : '';
+  const tickerLabel = validTickers.length > 0 ? validTickers.join(', ') + ' stock' : 'US markets';
+
   const bodyStr = JSON.stringify({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 400,
     messages: [{
       role: 'user',
-      content: `${tickerCtx}Hisse senedi haberi başlığı: "${title}"\n\nBu haberi ${tickers && tickers.length > 0 ? tickers.join(', ') + ' hissesi' : 'ilgili hisse'} açısından yatırımcı bakış açısıyla analiz et. Şu formatta JSON yanıt ver (başka hiçbir şey yazma, sadece JSON):\n{"yorum":"2 cümle Türkçe yorum, haberin ne anlama geldiğini açıkla","detay":"Varsa ekstra önemli bağlam veya dikkat edilmesi gereken nokta (max 1 cümle), yoksa boş string"}`
+      content: `${tickerCtx}Headline: "${title}"${description ? `\nSummary: ${description}` : ''}\n\nBu haberi ${tickerLabel} için yatırımcı perspektifinden Türkçe olarak analiz et. Sadece JSON formatında yanıt ver (başka hiçbir şey yazma):\n{"comment":"Haberin yatırımcılar için ne anlama geldiğini açıklayan 2 cümle","detail":"Dikkat edilmesi gereken önemli bir risk veya fırsat (1 cümle), yoksa boş string"}`
     }]
   });
   const text = await invoke('fetch_post', {
     url: 'https://api.anthropic.com/v1/messages',
-    headers: {
-      'x-api-key': key,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-    },
+    headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
     body: bodyStr,
   });
   const data = JSON.parse(text);
   if (data.error) throw new Error(data.error.message);
+  if (!data.content?.[0]?.text) throw new Error('Empty response from API');
   const raw = data.content[0].text.trim();
-  const jsonStart = raw.indexOf('{');
-  const jsonEnd = raw.lastIndexOf('}');
-  return JSON.parse(raw.slice(jsonStart, jsonEnd + 1));
+  const jsonStr = raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1);
+  if (!jsonStr) throw new Error('Could not parse AI response');
+  const parsed = JSON.parse(jsonStr);
+  if (!parsed.comment) throw new Error('Unexpected response format');
+  return parsed;
 }
 
-const SN_SIZES = ['S', 'M', 'L'];
-
-export default function StockNews({ tickers, setTickers, activeTicker, setActiveTicker, onSizeChange }) {
+export default function StockNews({ tickers, setTickers, activeTicker, setActiveTicker }) {
   const [showPicker, setShowPicker] = useState(false);
   const [pickerSearch, setPickerSearch] = useState('');
   const pickerRef = useRef(null);
-  const [snSize, setSnSize] = useState(() => localStorage.getItem('sn_size') || 'M');
-  const [showSizeMenu, setShowSizeMenu] = useState(false);
-  const sizeMenuRef = useRef(null);
-  const sizeBtnRef = useRef(null);
-  const [sizeMenuPos, setSizeMenuPos] = useState({ top: 0, right: 0 });
 
   const [news, setNews] = useState([]);
+  const [marketNews, setMarketNews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState('all');
   const [favs, setFavs] = useState(() => new Set(JSON.parse(localStorage.getItem(FAVS_KEY) || '[]')));
+  const [filterFavs, setFilterFavs] = useState(false);
   const seenRef = useRef(new Set(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')));
   const isFirstLoad = useRef(true);
-  // AI yorumları: { [itemId]: { status: 'loading'|'done'|'error', text: string } }
   const [aiComments, setAiComments] = useState({});
+  const [aiClosing, setAiClosing] = useState({});
+
+  const closeAiPanel = (id) => {
+    setAiClosing(prev => ({ ...prev, [id]: true }));
+    setTimeout(() => {
+      setAiComments(prev => ({ ...prev, [id]: { ...prev[id], collapsed: true } }));
+      setAiClosing(prev => { const n = { ...prev }; delete n[id]; return n; });
+    }, 250);
+  };
 
   const requestAiComment = async (item, e) => {
     e.stopPropagation();
     const id = item.id;
     if (aiComments[id]?.status === 'loading') return;
-    // toggle: eğer zaten gösteriliyorsa kapat
-    if (aiComments[id]?.status === 'done') {
-      setAiComments(prev => { const n = { ...prev }; delete n[id]; return n; });
+    if (aiComments[id]?.status === 'done' && !aiComments[id]?.collapsed) return; // açık ve hazır, tekrar istek atma
+    if (aiComments[id]?.status === 'done' && aiComments[id]?.collapsed) {
+      // gizli ama hazır — sadece aç, yeniden analiz etme
+      setAiComments(prev => ({ ...prev, [id]: { ...prev[id], collapsed: false } }));
       return;
     }
-    setAiComments(prev => ({ ...prev, [id]: { status: 'loading', text: '' } }));
+    setAiComments(prev => ({ ...prev, [id]: { status: 'loading' } }));
     try {
-      const text = await fetchAiComment(item.title, item.tickers);
-      setAiComments(prev => ({ ...prev, [id]: { status: 'done', text } }));
+      const result = await fetchAiComment(item.title, [item.ticker], item.description || '');
+      setAiComments(prev => ({ ...prev, [id]: { status: 'done', data: result } }));
     } catch (err) {
-      const msg = err?.message === 'NO_KEY'
-        ? 'API key missing (Flash Cards > 🔑)'
-        : `Error: ${err?.message || 'Unknown error'}`;
-      setAiComments(prev => ({ ...prev, [id]: { status: 'error', text: msg } }));
+      let msg = `Error: ${err?.message || 'Unknown'}`;
+      if (err?.message === 'NO_KEY') msg = 'API key missing — set it in Settings';
+      if (err?.message === 'INVALID_KEY') msg = 'Invalid API key — must start with sk-';
+      setAiComments(prev => ({ ...prev, [id]: { status: 'error', msg } }));
     }
   };
 
@@ -359,7 +407,6 @@ export default function StockNews({ tickers, setTickers, activeTicker, setActive
     localStorage.setItem(TICKERS_KEY, JSON.stringify(next));
     setTickers(next);
   };
-
 
   const toggleTicker = (t) => {
     if (tickers.includes(t)) {
@@ -373,30 +420,15 @@ export default function StockNews({ tickers, setTickers, activeTicker, setActive
     }
   };
 
-  // Close picker / size menu on outside click
   useEffect(() => {
     const handler = (e) => {
       if (pickerRef.current && !pickerRef.current.contains(e.target)) {
-        setShowPicker(false);
-        setPickerSearch('');
-      }
-      if (
-        sizeMenuRef.current && !sizeMenuRef.current.contains(e.target) &&
-        sizeBtnRef.current && !sizeBtnRef.current.contains(e.target)
-      ) {
-        setShowSizeMenu(false);
+        setShowPicker(false); setPickerSearch('');
       }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
-
-  const removeTicker = (t, e) => {
-    e.stopPropagation();
-    const next = tickers.filter(x => x !== t);
-    saveTickers(next);
-    if (activeTicker === t) setActiveTicker('all');
-  };
 
   const toggleFav = (id, e) => {
     e.stopPropagation();
@@ -417,10 +449,7 @@ export default function StockNews({ tickers, setTickers, activeTicker, setActive
     if (!granted) { const perm = await requestPermission(); granted = perm === 'granted'; }
     if (granted) {
       for (const item of newItems.slice(0, 2)) {
-        sendNotification({
-          title: item.ticker,
-          body: item.title,
-        });
+        sendNotification({ title: item.ticker, body: item.title });
       }
     }
   };
@@ -428,10 +457,14 @@ export default function StockNews({ tickers, setTickers, activeTicker, setActive
   const load = useCallback(async (notify = false) => {
     try {
       setError(null);
-      const activeTickers = tickers && tickers.length > 0 ? tickers : DEFAULT_TICKERS;
-      const items = await fetchAllNews(activeTickers);
+      const activeTickers = tickers?.length > 0 ? tickers : DEFAULT_TICKERS;
+      const [items, mktItems] = await Promise.all([
+        fetchAllNews(activeTickers),
+        fetchMarketNews(),
+      ]);
       const newItems = items.filter(n => !seenRef.current.has(n.id));
       setNews(items);
+      setMarketNews(mktItems);
       setLastUpdated(new Date());
       if (notify && newItems.length > 0) await notifyNew(newItems);
       if (isFirstLoad.current) {
@@ -440,7 +473,7 @@ export default function StockNews({ tickers, setTickers, activeTicker, setActive
         isFirstLoad.current = false;
       }
     } catch (e) {
-      setError('Could not load news: ' + (e?.message || String(e)));
+      setError('Failed to load: ' + (e?.message || String(e)));
     } finally {
       setLoading(false);
     }
@@ -455,167 +488,201 @@ export default function StockNews({ tickers, setTickers, activeTicker, setActive
   }, [load]);
 
   const filtered = useMemo(() => {
-    let items = news;
-    if (activeTicker !== 'all') items = items.filter(n => n.ticker === activeTicker);
-    if (filter === 'favorites') items = items.filter(n => favs.has(n.id));
+    let items = activeTicker === 'US_MARKET' ? marketNews : news;
+    if (activeTicker !== 'all' && activeTicker !== 'US_MARKET') items = items.filter(n => n.ticker === activeTicker);
+    if (filterFavs) items = items.filter(n => favs.has(n.id));
     if (search.trim()) {
       const q = search.toLowerCase();
       items = items.filter(n => n.title.toLowerCase().includes(q) || n.ticker.toLowerCase().includes(q));
     }
     return items;
-  }, [news, activeTicker, filter, search, favs]);
-
-  const favCount = useMemo(() => news.filter(n => favs.has(n.id)).length, [news, favs]);
+  }, [news, marketNews, activeTicker, filterFavs, search, favs]);
 
   return (
-    <div className={`stock-news-column sn-size-${snSize.toLowerCase()}`}>
-
-      {/* ── Toolbar ── */}
-      <div className="sn-toolbar">
-        <div className="sn-toolbar-left">
-          <span className="sn-brand">📰 Stock News</span>
-          {lastUpdated && <span className="sn-updated">{timeAgo(lastUpdated)}</span>}
-        </div>
-        <div className="sn-toolbar-right">
-          <input
-            className="sn-search"
-            placeholder="Search…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-          <button
-            className={`sn-filter-fav ${filter === 'favorites' ? 'active' : ''}`}
-            onClick={() => setFilter(f => f === 'favorites' ? 'all' : 'favorites')}
-            title="Saved"
-          >★{favCount > 0 ? ` ${favCount}` : ''}</button>
-          <button
-            className="sn-refresh"
-            onClick={() => { setLoading(true); load(true); }}
-            title="Refresh"
-          >↻</button>
-        </div>
-      </div>
-
-      {/* ── Ticker bar ── */}
-      <div className="sn-ticker-bar">
-        <button
-          className={`sn-tab ${activeTicker === 'all' ? 'active' : ''}`}
-          onClick={() => setActiveTicker('all')}
-        >All</button>
-        {tickers.map(t => (
-          <span key={t} className={`sn-tab ${activeTicker === t ? 'active' : ''}`}>
-            <span className="sn-tab-label" onClick={() => setActiveTicker(t)}>{t}</span>
-            <button className="sn-tab-x" onClick={e => removeTicker(t, e)}>×</button>
-          </span>
-        ))}
-        {/* Add ticker */}
-        <div className="sn-add-wrap" ref={pickerRef}>
-          <button className="sn-add-btn" onClick={() => setShowPicker(p => !p)}>＋</button>
-          {showPicker && (
-            <div className="sn-picker-dropdown">
+    <div className="sn-root">
+      {/* ── Header ── */}
+      <div className="sn-header">
+        <div className="sn-header-top">
+          <div className="sn-header-left">
+            <span className="sn-title">Market News</span>
+            {lastUpdated && <span className="sn-updated-badge">{timeAgo(lastUpdated)} ago</span>}
+          </div>
+          <div className="sn-header-right">
+            <div className="sn-search-wrap">
               <input
-                className="sn-picker-search"
-                placeholder="Search ticker…"
-                value={pickerSearch}
-                onChange={e => setPickerSearch(e.target.value)}
-                autoFocus
+                className="sn-search"
+                placeholder="Search news…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
               />
-              <div className="sn-picker-list">
-                {POPULAR_STOCKS
-                  .filter((s, idx, arr) => arr.findIndex(x => x.ticker === s.ticker) === idx)
-                  .filter(s => {
-                    const q = pickerSearch.toLowerCase();
-                    return !q || s.ticker.toLowerCase().includes(q) || s.name.toLowerCase().includes(q);
-                  })
-                  .map(s => (
-                    <button
-                      key={s.ticker}
-                      className={`sn-picker-item ${tickers.includes(s.ticker) ? 'selected' : ''}`}
-                      onMouseDown={e => { e.preventDefault(); toggleTicker(s.ticker); }}
-                    >
-                      <span className="sn-picker-ticker">{s.ticker}</span>
-                      <span className="sn-picker-name">{s.name}</span>
-                      {tickers.includes(s.ticker) && <span className="sn-picker-check">✓</span>}
-                    </button>
-                  ))}
-              </div>
             </div>
-          )}
+            <button
+              className={`sn-icon-btn ${filterFavs ? 'active-fav' : ''}`}
+              onClick={() => setFilterFavs(f => !f)}
+              title="Saved"
+            >★</button>
+            <button
+              className="sn-icon-btn"
+              onClick={() => { setLoading(true); load(true); }}
+              title="Refresh"
+            >↻</button>
+          </div>
+        </div>
+
+        {/* ── Ticker chips ── */}
+        <div className="sn-ticker-row">
+          <button
+            className={`sn-chip ${activeTicker === 'all' ? 'active' : ''}`}
+            onClick={() => setActiveTicker('all')}
+          >All</button>
+          <button
+            className={`sn-chip sn-chip-market ${activeTicker === 'US_MARKET' ? 'active' : ''}`}
+            onClick={() => setActiveTicker('US_MARKET')}
+          >🇺🇸 US Market</button>
+          {tickers.map(t => {
+            const color = getTickerColor(t);
+            return (
+              <span
+                key={t}
+                className={`sn-chip ${activeTicker === t ? 'active' : ''}`}
+                style={activeTicker === t ? { color, borderColor: color, background: `${color}18` } : { borderColor: `${color}40`, color: `${color}99` }}
+              >
+                <span onClick={() => setActiveTicker(t)}>{t}</span>
+                <button className="sn-chip-x" onClick={() => {
+                  const next = tickers.filter(x => x !== t);
+                  saveTickers(next);
+                  if (activeTicker === t) setActiveTicker('all');
+                }}>×</button>
+              </span>
+            );
+          })}
+          <div className="sn-add-wrap" ref={pickerRef}>
+            <button className="sn-add-chip" onClick={() => setShowPicker(p => !p)}>+ Add</button>
+            {showPicker && (
+              <div className="sn-picker">
+                <input
+                  className="sn-picker-input"
+                  placeholder="Search ticker…"
+                  value={pickerSearch}
+                  onChange={e => setPickerSearch(e.target.value)}
+                  autoFocus
+                />
+                <div className="sn-picker-list">
+                  {POPULAR_STOCKS
+                    .filter((s, idx, arr) => arr.findIndex(x => x.ticker === s.ticker) === idx)
+                    .filter(s => {
+                      const q = pickerSearch.toLowerCase();
+                      return !q || s.ticker.toLowerCase().includes(q) || s.name.toLowerCase().includes(q);
+                    })
+                    .map(s => (
+                      <button
+                        key={s.ticker}
+                        className={`sn-picker-item ${tickers.includes(s.ticker) ? 'selected' : ''}`}
+                        onMouseDown={e => { e.preventDefault(); toggleTicker(s.ticker); }}
+                      >
+                        <span className="sn-picker-ticker">{s.ticker}</span>
+                        <span className="sn-picker-name">{s.name}</span>
+                        {tickers.includes(s.ticker) && <span className="sn-picker-check">✓</span>}
+                      </button>
+                    ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* ── News list ── */}
-      <div className="sn-list">
+      {/* ── News feed ── */}
+      <div className="sn-feed">
         {loading && (
-          <div className="sn-state">
+          <div className="sn-center-state">
             <span className="sn-spinner" />
-            Loading news…
+            <span>Loading news…</span>
           </div>
         )}
-        {error && <div className="sn-state sn-error">{error}</div>}
+        {error && <div className="sn-center-state sn-err-text">{error}</div>}
         {!loading && !error && filtered.length === 0 && (
-          <div className="sn-state">No news found</div>
+          <div className="sn-center-state">No news found</div>
         )}
-        {!loading && !error && filtered.map((item, i) => (
-          <div
-            key={item.id || i}
-            className={`sn-card ${!seenRef.current.has(item.id) ? 'sn-card--unread' : ''}`}
-          >
-            {/* top meta: ticker + source + time */}
-            <div className="sn-card-meta">
-              <span className="sn-card-ticker">{item.ticker}</span>
-              {item.provider === 'TradingView' && <span className="sn-live-badge">LIVE</span>}
-              {item.source && <span className="sn-card-source">{item.source}</span>}
-              <span className="sn-card-dot">·</span>
-              <span className="sn-card-time">{timeAgo(item.date)}</span>
-              <div className="sn-card-actions">
-                <button
-                  className={`sn-ai-btn ${aiComments[item.id]?.status === 'done' ? 'active' : ''}`}
-                  onClick={e => requestAiComment(item, e)}
-                  title="AI analiz"
-                >
-                  {aiComments[item.id]?.status === 'loading'
-                    ? <span className="sn-spin-sm" />
-                    : '✦ AI'}
-                </button>
-                <button
-                  className={`sn-fav-btn ${favs.has(item.id) ? 'active' : ''}`}
-                  onClick={e => toggleFav(item.id, e)}
-                >★</button>
-              </div>
-            </div>
-
-            {/* headline */}
+        {!loading && !error && filtered.map((item, i) => {
+          const color = getTickerColor(item.ticker);
+          const isUnread = !seenRef.current.has(item.id);
+          const ai = aiComments[item.id];
+          return (
             <div
-              className="sn-card-title"
-              onClick={() => {
-                seenRef.current.add(item.id);
-                localStorage.setItem(STORAGE_KEY, JSON.stringify([...seenRef.current].slice(-500)));
-                open(item.link).catch(() => {});
-              }}
-            >{item.title}</div>
-
-            {/* description */}
-            {item.description && (
-              <div className="sn-card-desc">{item.description}</div>
-            )}
-            {/* AI panel */}
-            {aiComments[item.id] && aiComments[item.id].status !== 'loading' && (
-              <div className={`sn-ai-panel ${aiComments[item.id].status}`}>
-                {aiComments[item.id].status === 'error' ? (
-                  <span className="sn-ai-err">{aiComments[item.id].text}</span>
-                ) : (
-                  <>
-                    <div className="sn-ai-yorum">{aiComments[item.id].text.yorum}</div>
-                    {aiComments[item.id].text.detay && (
-                      <div className="sn-ai-detay">{aiComments[item.id].text.detay}</div>
-                    )}
-                  </>
+              key={item.id || i}
+              className={`sn-card ${isUnread ? 'unread' : ''} ${ai?.status === 'done' ? 'sn-card-expanded' : ''}`}
+              style={{ '--ticker-color': color }}
+            >
+              <div className="sn-card-accent" />
+              <div className="sn-card-inner">
+                <div className="sn-card-top">
+                  <span className="sn-card-ticker" style={{ color, background: `${color}18`, borderColor: `${color}30` }}>
+                    {item.ticker}
+                  </span>
+                  {item.provider === 'TradingView' && <span className="sn-live">LIVE</span>}
+                  {item.source && <span className="sn-card-source">{item.source}</span>}
+                  <span className="sn-card-time">{timeAgo(item.date)}</span>
+                  <div className="sn-card-actions">
+                    <button
+                      className={`sn-ai-btn ${ai?.status === 'done' ? 'on' : ''}`}
+                      onClick={e => requestAiComment(item, e)}
+                      title="AI Analysis"
+                    >
+                      {ai?.status === 'loading' ? <span className="sn-spin-sm" /> : '✦ AI'}
+                    </button>
+                    <button
+                      className="sn-fav-btn"
+                      onClick={e => { e.stopPropagation(); seenRef.current.add(item.id); localStorage.setItem(STORAGE_KEY, JSON.stringify([...seenRef.current].slice(-500))); open(item.link).catch(() => {}); }}
+                      title="Open article"
+                    >↗</button>
+                    <button
+                      className={`sn-fav-btn ${favs.has(item.id) ? 'on' : ''}`}
+                      onClick={e => toggleFav(item.id, e)}
+                    >★</button>
+                  </div>
+                </div>
+                <div className="sn-card-headline">{item.title}</div>
+                {item.description && (
+                  <div className="sn-card-desc">{item.description}</div>
+                )}
+                {/* AI panel — card içinde, aşağıya açılır */}
+                {ai && ai.status !== 'loading' && (
+                  <div className={`sn-ai-wrap${ai.collapsed ? ' collapsed' : ''}${aiClosing[item.id] ? ' closing' : ''}`}>
+                    <div className="sn-ai-wrap-inner">
+                      {/* Expanded content */}
+                      <div className="sn-ai-expand-inner">
+                        {ai.status === 'error' ? (
+                          <p className="sn-ai-err">{ai.msg}</p>
+                        ) : ai.data ? (
+                          <>
+                            <p className="sn-ai-comment">{ai.data.comment}</p>
+                            {ai.data.detail && <p className="sn-ai-detail">{ai.data.detail}</p>}
+                          </>
+                        ) : (
+                          <p className="sn-ai-err">No response received</p>
+                        )}
+                      </div>
+                      {/* Toggle button — changes label based on state */}
+                      <button
+                        className="sn-ai-toggle-btn"
+                        onClick={() => {
+                          if (ai.collapsed) {
+                            setAiComments(prev => ({ ...prev, [item.id]: { ...prev[item.id], collapsed: false } }));
+                          } else {
+                            closeAiPanel(item.id);
+                          }
+                        }}
+                      >
+                        {ai.collapsed ? '▼ AI yorumunu göster' : '▲ Gizle'}
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
-            )}
-          </div>
-        ))}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

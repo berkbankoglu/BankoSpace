@@ -144,11 +144,11 @@ export default function StockChat() {
         </div>
 
         {!loggedIn ? (
-          <div className="schat-no-session">Sohbet için giriş yapman gerekiyor</div>
+          <div className="schat-no-session">You need to log in to chat</div>
         ) : !usernameSet ? (
           <div className="schat-username-setup">
-            <div className="schat-username-title">Kullanıcı adını seç</div>
-            <div className="schat-username-sub">Diğer kullanıcılar bu ismi görecek</div>
+            <div className="schat-username-title">Choose a username</div>
+            <div className="schat-username-sub">Other users will see this name</div>
             <input
               className="schat-username-input"
               placeholder="kullaniciadi"
@@ -158,17 +158,17 @@ export default function StockChat() {
               onKeyDown={e => e.key === 'Enter' && saveUsername()}
               autoFocus
             />
-            <button className="schat-username-btn" onClick={saveUsername}>Devam</button>
+            <button className="schat-username-btn" onClick={saveUsername}>Continue</button>
           </div>
         ) : (
           <>
             <div className="schat-messages">
-              {loading && <div className="schat-loading">Yükleniyor...</div>}
+              {loading && <div className="schat-loading">Loading...</div>}
               {!loading && messages.length === 0 && (
                 <div className="schat-empty">
                   <div className="schat-empty-icon">💬</div>
-                  <div>#{channel} kanalında henüz mesaj yok</div>
-                  <div className="schat-empty-sub">İlk mesajı sen gönder!</div>
+                  <div>No messages yet in #{channel}</div>
+                  <div className="schat-empty-sub">Be the first to send a message!</div>
                 </div>
               )}
               {messages.map((msg, i) => {

@@ -414,7 +414,7 @@ function FlashCards({ fullscreen = false }) {
           <h2>Flash Cards</h2>
         </div>
 
-        {/* AI Asistan — sidebar içi */}
+        {/* AI Assistant — inside sidebar */}
         <div className="fc-ai-panel">
           <div className="fc-ai-panel-header">
             <span className="fc-ai-panel-title">AI Asistan</span>

@@ -1,11 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = 'https://fzbjqztfdsquinnpgzir.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_72FqkpVbwfctYhmbPL12pQ_v0O-STU-';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ6YmpxenRmZHNxdWlubnBnemlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzNTIzMTgsImV4cCI6MjA4ODkyODMxOH0.qRTQqN1PHY7coRaN_bfuJfTB584X4U1hIC5oKsAmlAo';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// Tüm sync edilecek localStorage key'leri
+// All localStorage keys to sync
 export const SYNC_KEYS = [
   'todos',
   'categoryNames',
@@ -29,22 +29,34 @@ export const SYNC_KEYS = [
   'loginHeatmap',
   'payments_v2',
   'bid_rules',
+  'analyze_rules',
   'kana_learned_words',
   'kana_selected_rows',
+  'kana_stats',
+  'kana_prefs',
+  'kana_best_score',
   'sidebarOrder',
   'todoFontSize',
+  'subtaskFontSize',
   'theme',
   'soundVolume',
   'anthropic_api_key',
+  'translate_rules',
+  'dailyChecklistColor',
+  'longtermChecklistColor',
+  'dashColWidths',
+  'notesSidebarWidth',
+  'notesLineSpacing',
+  'chat_username',
 ];
 
-// Mevcut kullanıcı ID'sini al
+// Get current user ID
 async function getUserId() {
   const { data: { user } } = await supabase.auth.getUser();
   return user?.id || null;
 }
 
-// Supabase'den tüm veriyi çek ve localStorage'a yaz
+// Pull all data from Supabase and write to localStorage
 export async function pullFromSupabase() {
   try {
     const userId = await getUserId();
@@ -60,7 +72,8 @@ export async function pullFromSupabase() {
     if (data && data.length > 0) {
       data.forEach(({ key, value }) => {
         if (value !== null && value !== undefined) {
-          localStorage.setItem(key, JSON.stringify(value));
+          // String primitives (e.g. api key) must be stored raw, not double-stringified
+          localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
         }
       });
       return true;
@@ -100,7 +113,7 @@ export async function pushKeyToSupabase(key, value) {
   }
 }
 
-// Tüm localStorage'ı Supabase'e yükle (ilk kurulum)
+// Upload all localStorage to Supabase (initial setup)
 export async function pushAllToSupabase() {
   const userId = await getUserId();
   if (!userId) return;

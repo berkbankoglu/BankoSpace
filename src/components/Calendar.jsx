@@ -94,7 +94,7 @@ function Calendar({ todos, onToggleTodo, onUpdateTodo }) {
   const today = new Date();
   const selectedDateTodos = selectedDate ? getTodosForDate(selectedDate) : [];
 
-  const monthLabel = currentDate.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' });
+  const monthLabel = currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   return (
     <div className="calendar-container">
@@ -113,7 +113,7 @@ function Calendar({ todos, onToggleTodo, onUpdateTodo }) {
         {/* Calendar Grid */}
         <div className="calendar-grid-wrapper">
           <div className="calendar-weekdays">
-            {['Pzr', 'Pzt', 'Sal', 'Car', 'Per', 'Cum', 'Cmt'].map(d => (
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
               <div key={d} className="calendar-weekday">{d}</div>
             ))}
           </div>
@@ -157,7 +157,7 @@ function Calendar({ todos, onToggleTodo, onUpdateTodo }) {
           {selectedDate ? (
             <>
               <h3 className="calendar-panel-title">
-                {selectedDate.toLocaleDateString('tr-TR', { weekday: 'long', month: 'long', day: 'numeric' })}
+                {selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
               </h3>
               <div className="calendar-panel-todos">
                 {selectedDateTodos.length === 0 ? (
@@ -185,7 +185,7 @@ function Calendar({ todos, onToggleTodo, onUpdateTodo }) {
               </div>
             </>
           ) : (
-            <div className="calendar-panel-empty">Gorevleri gormek icin bir gun secin</div>
+            <div className="calendar-panel-empty">Select a day to see tasks</div>
           )}
         </div>
       </div>

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { supabase } from '../supabase';
 import './Login.css';
 
-export default function Login({ onLogin, onGuest }) {
+export default function Login({ onLogin }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
@@ -17,7 +17,7 @@ export default function Login({ onLogin, onGuest }) {
     setMessage('');
 
     if (isRegister && password !== passwordConfirm) {
-      setError('Şifreler eşleşmiyor.');
+      setError('Passwords do not match.');
       return;
     }
 
@@ -27,14 +27,23 @@ export default function Login({ onLogin, onGuest }) {
       if (isRegister) {
         const { error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
-        setMessage('Kayıt başarılı! Email adresinizi doğrulayın.');
+        setMessage('Registration successful! Please verify your email.');
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         onLogin(data.session);
       }
     } catch (err) {
-      setError(err.message || 'Bir hata oluştu');
+      const msg = err.message || '';
+      if (msg.includes('Invalid login credentials') || msg.includes('invalid_credentials')) {
+        setError('Invalid email or password');
+      } else if (msg.includes('Email not confirmed')) {
+        setError('Please verify your email first');
+      } else if (msg.includes('User already registered')) {
+        setError('An account with this email already exists');
+      } else {
+        setError(msg || 'An error occurred');
+      }
     } finally {
       setLoading(false);
     }
@@ -51,7 +60,7 @@ export default function Login({ onLogin, onGuest }) {
     <div className="login-wrapper">
       <div className="login-box">
         <div className="login-logo">BankoSpace</div>
-        <div className="login-subtitle">Kişisel çalışma alanınız</div>
+        <div className="login-subtitle">Your personal workspace</div>
 
         <form onSubmit={handleSubmit} className="login-form">
           <div className="login-field">
@@ -66,7 +75,7 @@ export default function Login({ onLogin, onGuest }) {
             />
           </div>
           <div className="login-field">
-            <label>Şifre</label>
+            <label>Password</label>
             <input
               type="password"
               value={password}
@@ -78,7 +87,7 @@ export default function Login({ onLogin, onGuest }) {
           </div>
           {isRegister && (
             <div className="login-field">
-              <label>Şifre Tekrar</label>
+              <label>Confirm Password</label>
               <input
                 type="password"
                 value={passwordConfirm}
@@ -94,23 +103,18 @@ export default function Login({ onLogin, onGuest }) {
           {message && <div className="login-success">{message}</div>}
 
           <button type="submit" className="login-btn" disabled={loading}>
-            {loading ? '...' : isRegister ? 'Kayıt Ol' : 'Giriş Yap'}
+            {loading ? '...' : isRegister ? 'Sign Up' : 'Sign In'}
           </button>
         </form>
 
         <div className="login-toggle">
           {isRegister ? (
-            <>Zaten hesabın var mı? <span onClick={() => switchMode(false)}>Giriş Yap</span></>
+            <>Already have an account? <span onClick={() => switchMode(false)}>Sign In</span></>
           ) : (
-            <>Hesabın yok mu? <span onClick={() => switchMode(true)}>Kayıt Ol</span></>
+            <>Don't have an account? <span onClick={() => switchMode(true)}>Sign Up</span></>
           )}
         </div>
 
-        <div className="login-divider"><span>veya</span></div>
-
-        <button className="login-guest-btn" onClick={onGuest}>
-          Giriş yapmadan devam et
-        </button>
       </div>
     </div>
   );
