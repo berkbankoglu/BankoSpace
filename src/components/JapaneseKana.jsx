@@ -1266,22 +1266,37 @@ function StudyWordsSection({ selectedRows }) {
 // ── Root component ────────────────────────────────────────────────────────────
 
 export default function JapaneseKana() {
+  const [tab, setTab] = useState("Guide");
+  const [selectedRows, setSelectedRows] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('kana_selected_rows')) || null; } catch { return null; }
+  });
+
   return (
     <div className="japanese-kana">
       <div className="jk-header">
         <div className="jk-tabs">
-          <span className="jk-tab jk-tab--active">Guide</span>
+          {["Guide", "Practice"].map((t) => (
+            <button
+              key={t}
+              className={`jk-tab${tab === t ? " jk-tab--active" : ""}`}
+              onClick={() => setTab(t)}
+            >
+              {t}
+            </button>
+          ))}
         </div>
-        <button
-          className="jk-practice-popup-btn"
-          onClick={openKanaPopup}
-          title="Open Practice in floating window"
-        >
-          ▶ Practice
-        </button>
+        {tab === "Practice" && (
+          <button
+            className="jk-practice-popup-btn"
+            onClick={openKanaPopup}
+            title="Open Practice in floating window"
+          >
+            ⧉ Pop-up
+          </button>
+        )}
       </div>
       <div className="jk-body">
-        <GuideTab />
+        {tab === "Guide" ? <GuideTab /> : <PracticeTab selectedRows={selectedRows} setSelectedRows={setSelectedRows} />}
       </div>
     </div>
   );
