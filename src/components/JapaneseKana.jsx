@@ -3,6 +3,10 @@ import { invoke } from "@tauri-apps/api/core";
 import { getAudioContext, getMasterGain, getVolume } from "../utils/sounds";
 import "./JapaneseKana.css";
 
+function openKanaPopup() {
+  invoke('toggle_kana_window').catch(() => {});
+}
+
 function getJapaneseVoice() {
   const voices = window.speechSynthesis.getVoices();
   // Prefer ja-JP voices, prioritize Google/Microsoft quality voices
@@ -679,7 +683,7 @@ function StatsBar({ pool, stats }) {
 
 // ── Practice Tab ──────────────────────────────────────────────────────────────
 
-function PracticeTab({ selectedRows, setSelectedRows }) {
+export function PracticeTab({ selectedRows, setSelectedRows }) {
   const prefs = loadPrefs();
 
   const [mode, setMode] = useState(prefs.mode || "Hiragana");
@@ -1262,30 +1266,22 @@ function StudyWordsSection({ selectedRows }) {
 // ── Root component ────────────────────────────────────────────────────────────
 
 export default function JapaneseKana() {
-  const [tab, setTab] = useState("Guide");
-  const [selectedRows, setSelectedRows] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('kana_selected_rows')) || null; } catch { return null; }
-  });
-
   return (
     <div className="japanese-kana">
       <div className="jk-header">
         <div className="jk-tabs">
-          {["Guide", "Practice"].map((t) => (
-            <button
-              key={t}
-              className={`jk-tab${tab === t ? " jk-tab--active" : ""}`}
-              onClick={() => setTab(t)}
-            >
-              {t}
-            </button>
-          ))}
+          <span className="jk-tab jk-tab--active">Guide</span>
         </div>
-
+        <button
+          className="jk-practice-popup-btn"
+          onClick={openKanaPopup}
+          title="Open Practice in floating window"
+        >
+          ▶ Practice
+        </button>
       </div>
-
       <div className="jk-body">
-        {tab === "Guide" ? <GuideTab /> : <PracticeTab selectedRows={selectedRows} setSelectedRows={setSelectedRows} />}
+        <GuideTab />
       </div>
     </div>
   );

@@ -14,13 +14,27 @@
 .jk-header {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: space-between;
   padding: 0.6rem 1rem;
   border-bottom: 1px solid #30363d;
   background: #161b22;
   flex-wrap: wrap;
   gap: 0.75rem;
 }
+
+.jk-practice-popup-btn {
+  padding: 6px 16px;
+  background: #1f6feb;
+  border: none;
+  border-radius: 7px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.jk-practice-popup-btn:hover { background: #388bfd; }
 
 .jk-title {
   margin: 0;

@@ -13,6 +13,7 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'index.html'),
         timer: resolve(__dirname, 'timer.html'),
+        kana: resolve(__dirname, 'kana.html'),
       }
     }
   }

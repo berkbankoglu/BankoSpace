@@ -40,6 +40,19 @@
         "url": "index.html"
       },
       {
+        "title": "Kana Practice",
+        "label": "kana-popup",
+        "width": 340,
+        "height": 420,
+        "resizable": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "visible": false,
+        "url": "kana.html",
+        "center": true,
+        "skipTaskbar": true
+      },
+      {
         "title": "Timer",
         "label": "timer-popup",
         "width": 260,
@@ -60,7 +73,7 @@
         {
           "identifier": "main-capability",
           "description": "Main app capabilities",
-          "windows": ["main", "timer-popup"],
+          "windows": ["main", "timer-popup", "kana-popup"],
           "permissions": [
             "dialog:default",
             "dialog:allow-save",
