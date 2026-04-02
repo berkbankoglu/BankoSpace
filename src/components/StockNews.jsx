@@ -216,25 +216,28 @@ function playNewsSound() {
   } catch {}
 }
 
-// Geniş market feed listesi — çok kaynak = çok güncel haber
+// Market feed listesi — sadece Tauri'den erişilebilen açık RSS kaynakları
 const MARKET_FEEDS = [
-  // Yahoo Finance — büyük indeksler
+  // Yahoo Finance — indeks bazlı (en güvenilir)
   { url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=%5EGSPC&region=US&lang=en-US', source: 'Yahoo Finance' },
   { url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=%5EIXIC&region=US&lang=en-US', source: 'Yahoo Finance' },
   { url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=%5EDJI&region=US&lang=en-US',  source: 'Yahoo Finance' },
-  { url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=%5ETNX&region=US&lang=en-US',  source: 'Yahoo Finance' },
-  { url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=GC%3DF&region=US&lang=en-US',  source: 'Yahoo Finance' },
-  { url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=CL%3DF&region=US&lang=en-US',  source: 'Yahoo Finance' },
-  { url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=BTC-USD&region=US&lang=en-US', source: 'Yahoo Finance' },
-  // Benzinga — çok sık güncellenir, anlık haberler
-  { url: 'https://www.benzinga.com/feed', source: 'Benzinga' },
-  { url: 'https://www.benzinga.com/rss/topic/markets', source: 'Benzinga' },
-  { url: 'https://www.benzinga.com/rss/topic/stocks', source: 'Benzinga' },
-  // Seeking Alpha — genel market
-  { url: 'https://seekingalpha.com/market_currents.xml', source: 'Seeking Alpha' },
-  { url: 'https://seekingalpha.com/feed.xml', source: 'Seeking Alpha' },
-  // Investopedia
-  { url: 'https://www.investopedia.com/feedbuilder/feed/getfeed/?feedName=rss_articles', source: 'Investopedia' },
+  { url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=%5ERNK&region=US&lang=en-US',  source: 'Yahoo Finance' }, // Russell 2000
+  { url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=%5EVIX&region=US&lang=en-US',  source: 'Yahoo Finance' }, // VIX
+  { url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=%5ETNX&region=US&lang=en-US',  source: 'Yahoo Finance' }, // 10Y Treasury
+  { url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=GC%3DF&region=US&lang=en-US',  source: 'Yahoo Finance' }, // Gold
+  { url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=CL%3DF&region=US&lang=en-US',  source: 'Yahoo Finance' }, // Oil
+  { url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=BTC-USD&region=US&lang=en-US', source: 'Yahoo Finance' }, // Bitcoin
+  { url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=ETH-USD&region=US&lang=en-US', source: 'Yahoo Finance' }, // Ethereum
+  { url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=EURUSD%3DX&region=US&lang=en-US', source: 'Yahoo Finance' }, // EUR/USD
+  // Reuters
+  { url: 'https://feeds.reuters.com/reuters/businessNews', source: 'Reuters' },
+  { url: 'https://feeds.reuters.com/reuters/technologyNews', source: 'Reuters' },
+  // Google News — Finance
+  { url: 'https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGx6TVdZU0FtVnVHZ0pWVXlnQVAB?hl=en-US&gl=US&ceid=US:en', source: 'Google News' },
+  { url: 'https://news.google.com/rss/search?q=stock+market+when:1d&hl=en-US&gl=US&ceid=US:en', source: 'Google News' },
+  { url: 'https://news.google.com/rss/search?q=nasdaq+OR+SP500+OR+dow+jones+when:1d&hl=en-US&gl=US&ceid=US:en', source: 'Google News' },
+  { url: 'https://news.google.com/rss/search?q=federal+reserve+OR+inflation+OR+interest+rates+when:1d&hl=en-US&gl=US&ceid=US:en', source: 'Google News' },
 ];
 
 function parseMarketRss(xml, source) {
@@ -267,7 +270,7 @@ async function fetchMarketNews() {
       return parseMarketRss(text, source);
     })
   );
-  const cutoff = Date.now() - 48 * 60 * 60 * 1000; // 48 saatten eski haberleri gösterme
+  const cutoff = Date.now() - 72 * 60 * 60 * 1000; // 72 saatten eski haberleri gösterme
   const all = results.filter(r => r.status === 'fulfilled').flatMap(r => r.value);
   const seen = new Set();
   const unique = all.filter(item => {
