@@ -6415,8 +6415,7 @@ body.light .sync-status.synced {
 
 .freeform-container {
     width: 100%;
-    height: 1200px;
-    max-height: 1200px;
+    height: 100%;
     display: flex;
     flex-direction: row;
     background: #0d1117;
@@ -6424,90 +6423,176 @@ body.light .sync-status.synced {
     overflow: hidden;
 }
 
-/* Vertical layout for freeform */
-.freeform-container.vertical-layout {
+/* Board sidebar — right of app sidebar, left of canvas */
+.freeform-board-sidebar {
+    width: 150px;
+    min-width: 150px;
+    background: #0d1117;
+    border-right: 1px solid #21262d;
+    display: flex;
     flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
-/* Tab bar - Chrome style - sits above toolbar */
-.freeform-tab-bar {
+.freeform-board-list {
     display: flex;
-    align-items: flex-end;
-    padding: 0 15px;
-    background: #161b22;
-    min-height: 36px;
+    flex-direction: column;
+    gap: 1px;
+    padding: 8px 6px;
 }
 
-/* Board tabs - horizontal Chrome style */
-.freeform-board-tabs {
-    display: flex;
-    align-items: flex-end;
-    gap: 2px;
-}
-
-.freeform-board-tab {
-    padding: 8px 16px;
-    color: #484f58;
-    cursor: pointer;
+.freeform-board-item {
     display: flex;
     align-items: center;
-    gap: 8px;
-    transition: all 0.2s;
-    border-radius: 4px 8px 0 0;
-    background: #161b22;
+    justify-content: space-between;
+    padding: 7px 10px;
+    cursor: pointer;
+    color: #484f58;
     font-size: 13px;
-    border: 1px solid transparent;
-    border-bottom: none;
-    position: relative;
-    margin-bottom: -1px;
+    border-radius: 5px;
+    transition: all 0.15s;
+    gap: 4px;
 }
 
-.freeform-board-tab:hover {
-    background: #1c2128;
-    color: #c9d1d9;
+.freeform-board-item span {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
 }
 
-.freeform-board-tab.active {
+.freeform-board-item:hover {
     background: #161b22;
     color: #c9d1d9;
-    border-color: #21262d;
 }
 
-.freeform-board-tab .freeform-tab-close {
+.freeform-board-item.active {
+    background: rgba(88,166,255,0.15);
+    color: #5c7cfa;
+}
+
+.freeform-board-input {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #c9d1d9;
+    font-size: 13px;
+    flex: 1;
+    min-width: 0;
+    width: 100%;
+}
+
+.freeform-board-del {
     background: none;
     border: none;
     color: #484f58;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 13px;
     padding: 0 2px;
-    line-height: 1;
-    margin-left: 4px;
     opacity: 0;
-    transition: opacity 0.2s;
+    transition: opacity 0.15s;
+    flex-shrink: 0;
 }
 
-.freeform-board-tab:hover .freeform-tab-close,
-.freeform-board-tab.active .freeform-tab-close {
+.freeform-board-item:hover .freeform-board-del,
+.freeform-board-item.active .freeform-board-del {
     opacity: 1;
 }
 
-.freeform-board-tab .freeform-tab-close:hover {
-    color: #ff6b6b;
-}
+.freeform-board-del:hover { color: #ff6b6b; }
 
-.freeform-board-add {
-    padding: 4px 10px;
-    background: transparent;
+.freeform-board-add-btn {
+    margin-top: 4px;
+    padding: 7px 10px;
+    background: none;
     border: none;
     color: #484f58;
     cursor: pointer;
-    font-size: 18px;
-    margin-left: 4px;
-    margin-bottom: 4px;
+    font-size: 12px;
+    text-align: left;
+    border-radius: 5px;
+    transition: color 0.15s;
+    width: 100%;
 }
 
-.freeform-board-add:hover {
+.freeform-board-add-btn:hover { color: #c9d1d9; }
+
+.freeform-confirm-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.freeform-confirm-modal {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 20px 24px;
+    min-width: 260px;
+    max-width: 320px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.freeform-confirm-title {
     color: #c9d1d9;
+    font-size: 14px;
+    font-weight: 500;
+    margin: 0;
+}
+
+.freeform-confirm-sub {
+    color: #8b949e;
+    font-size: 12px;
+    margin: 0;
+}
+
+.freeform-confirm-btns {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 8px;
+}
+
+.freeform-confirm-cancel {
+    padding: 6px 14px;
+    background: #21262d;
+    border: 1px solid #30363d;
+    border-radius: 5px;
+    color: #c9d1d9;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.freeform-confirm-cancel:hover { background: #2d333b; }
+
+.freeform-confirm-delete {
+    padding: 6px 14px;
+    background: #da3633;
+    border: 1px solid #f85149;
+    border-radius: 5px;
+    color: #fff;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.freeform-confirm-delete:hover { background: #b91c1c; }
+
+/* Right main area: toolbar + canvas */
+.freeform-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+    position: relative;
 }
 
 /* Toolbar container */
@@ -6515,11 +6600,6 @@ body.light .sync-status.synced {
     background: #161b22;
     border-bottom: 1px solid #21262d;
     padding: 8px 15px;
-}
-
-/* Old sidebar - hidden in vertical layout */
-.freeform-sidebar {
-    display: none;
 }
 
 .freeform-sidebar-tabs {
@@ -6627,11 +6707,12 @@ body.light .sync-status.synced {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 6px 12px;
-    background: rgba(42, 42, 42, 0.95);
-    border-radius: 4px;
-    border: 1px solid rgba(88, 166, 255, 0.2);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    padding: 6px 0;
+    background: transparent;
+    border-radius: 0;
+    border: none;
+    border-top: 1px solid #21262d;
+    box-shadow: none;
     flex-basis: 100%;
     width: 100%;
     justify-content: flex-start;
@@ -6792,7 +6873,8 @@ body.light .sync-status.synced {
     font-size: 13px;
     padding: 0;
     outline: none;
-    min-width: 60px;
+    min-width: 0;
+    width: 100%;
 }
 
 .freeform-tab-close {
@@ -8146,6 +8228,88 @@ body.light .sidebar-settings-version {
   border: 1px dashed #5c7cfa;
 }
 
+/* Board list under References in sidebar */
+.sidebar-boards {
+  margin: 2px 8px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sidebar-board-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 12px 5px 28px;
+  cursor: pointer;
+  color: #484f58;
+  font-size: 12px;
+  border-radius: 4px;
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.sidebar-board-item:hover {
+  background: rgba(255,255,255,0.05);
+  color: #c9d1d9;
+}
+
+.sidebar-board-item.active {
+  background: rgba(88,166,255,0.15);
+  color: #5c7cfa;
+}
+
+.sidebar-board-item span {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-board-input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #c9d1d9;
+  font-size: 12px;
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+}
+
+.sidebar-board-del {
+  background: none;
+  border: none;
+  color: #484f58;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+
+.sidebar-board-item:hover .sidebar-board-del,
+.sidebar-board-item.active .sidebar-board-del {
+  opacity: 1;
+}
+
+.sidebar-board-del:hover { color: #ff6b6b; }
+
+.sidebar-board-add {
+  padding: 4px 12px 4px 28px;
+  background: none;
+  border: none;
+  color: #484f58;
+  cursor: pointer;
+  font-size: 12px;
+  text-align: left;
+  width: 100%;
+  transition: color 0.15s;
+}
+
+.sidebar-board-add:hover { color: #c9d1d9; }
+
 .sidebar-drag-ghost {
   position: fixed;
   z-index: 10000;
@@ -8348,10 +8512,11 @@ body {
 
 /* References Full Screen */
 .references-fullscreen {
-  padding: 20px;
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .references-header {

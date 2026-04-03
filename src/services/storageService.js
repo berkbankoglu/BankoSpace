@@ -32,12 +32,12 @@ class StorageService {
     });
   }
 
-  // Store base64 directly
+  // Store base64 directly — returns the itemId (not base64) so callers store only a reference
   async uploadBase64(base64String, itemId) {
     const images = this._getImages();
     images[itemId] = base64String;
     this._saveImages(images);
-    return base64String;
+    return String(itemId);
   }
 
   // Delete image from localStorage

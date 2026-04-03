@@ -229,6 +229,7 @@ function App({ session, onLogout }) {
   const [settingsTab, setSettingsTab] = useState('account');
   const [soundVolume, setSoundVolume] = useState(() => getVolume());
   const [activeView, setActiveView] = useState('dashboard');
+
   const [sidebarItems, setSidebarItems] = useState(() => {
     const defaults = [
       { id: 'dashboard',  label: 'Dashboard',      view: 'dashboard',  hidden: false },

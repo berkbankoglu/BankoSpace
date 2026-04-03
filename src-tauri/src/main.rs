@@ -123,6 +123,7 @@ fn toggle_kana_window(app: tauri::AppHandle) {
 async fn fetch_rss(url: String) -> Result<String, String> {
     let client = reqwest::Client::builder()
         .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+        .timeout(std::time::Duration::from_secs(10))
         .build()
         .map_err(|e| e.to_string())?;
 
@@ -148,6 +149,7 @@ async fn fetch_tts(text: String, slow: bool) -> Result<Vec<u8>, String> {
     );
     let client = reqwest::Client::builder()
         .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+        .timeout(std::time::Duration::from_secs(10))
         .build()
         .map_err(|e| e.to_string())?;
     let response = client
@@ -166,6 +168,7 @@ async fn fetch_tts(text: String, slow: bool) -> Result<Vec<u8>, String> {
 #[tauri::command]
 async fn fetch_post(url: String, headers: std::collections::HashMap<String, String>, body: String) -> Result<String, String> {
     let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(60))
         .build()
         .map_err(|e| e.to_string())?;
 
