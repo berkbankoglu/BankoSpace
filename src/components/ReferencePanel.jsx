@@ -2,11 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import StorageService from '../services/storageService';
 
 function ReferencePanel() {
-  const [tabs, setTabs] = useState([{
-    id: 1,
-    name: 'Board 1',
-    items: [] // images, texts, sticky notes
-  }]);
+  const [tabs, setTabs] = useState([{ id: 1, name: 'Board 1', items: [] }]);
   const [activeTabId, setActiveTabId] = useState(1);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
@@ -29,6 +25,7 @@ function ReferencePanel() {
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [clipboard, setClipboard] = useState(null);
   const [storageService, setStorageService] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null); // { tabId, tabName, itemCount }
 
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -38,6 +35,17 @@ function ReferencePanel() {
 
   const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0];
   const items = activeTab.items;
+
+  // item.src can be a numeric ID (stored in StorageService) or a legacy base64 string
+  const getItemSrc = (src) => {
+    if (!src) return '';
+    if (src.startsWith('data:')) return src; // legacy base64 already in item
+    if (storageService) {
+      const resolved = storageService.getImageUrl(src);
+      if (resolved) return resolved;
+    }
+    return src;
+  };
 
   // Keep refs up to date
   useEffect(() => {
@@ -158,9 +166,22 @@ function ReferencePanel() {
     setStorageService(new StorageService('local-user'));
   }, []);
 
-  // Save to localStorage
+  // Save to localStorage — strip base64 src from image items before saving (they're in StorageService)
   useEffect(() => {
-    localStorage.setItem('freeformTabs', JSON.stringify(tabs));
+    try {
+      const tabsToSave = tabs.map(tab => ({
+        ...tab,
+        items: tab.items.map(item => {
+          if (item.type === 'image' && item.src && item.src.startsWith('data:')) {
+            return { ...item, src: '' }; // don't persist inline base64
+          }
+          return item;
+        })
+      }));
+      localStorage.setItem('freeformTabs', JSON.stringify(tabsToSave));
+    } catch (e) {
+      console.error('Failed to save tabs:', e);
+    }
   }, [tabs]);
 
 
@@ -389,24 +410,26 @@ function ReferencePanel() {
             const img = new Image();
             img.onload = async () => {
               const base64 = event.target.result;
-              let imageSrc = base64;
+              const itemId = Date.now();
+              let imageSrc = String(itemId); // always store ID reference, never inline base64
 
-              // Upload to Firebase Storage
+              // Save base64 under itemId in StorageService
               if (storageService) {
                 try {
-                  const itemId = Date.now();
-                  imageSrc = await storageService.uploadBase64(base64, itemId);
-                  console.log('Image uploaded to Firebase Storage:', imageSrc);
+                  await storageService.uploadBase64(base64, itemId);
                 } catch (error) {
-                  console.error('Upload failed, using base64:', error);
-                  // stays as base64
+                  console.error('StorageService upload failed:', error);
+                  imageSrc = base64; // last resort fallback
                 }
+              } else {
+                // StorageService not ready yet, store temporarily
+                imageSrc = base64;
               }
 
               const newItem = {
-                id: Date.now(),
+                id: itemId,
                 type: 'image',
-                src: imageSrc,  // URL veya base64
+                src: imageSrc,  // ID reference or fallback base64
                 x: -panOffset.x / zoomLevel + 100,
                 y: -panOffset.y / zoomLevel + 100,
                 width: img.width,
@@ -954,11 +977,19 @@ function ReferencePanel() {
 
   const deleteTab = (tabId) => {
     if (tabs.length === 1) return;
+    const tab = tabs.find(t => t.id === tabId);
+    setDeleteConfirm({ tabId, tabName: tab?.name || 'Board', itemCount: tab?.items?.length || 0 });
+  };
+
+  const confirmDeleteTab = () => {
+    if (!deleteConfirm) return;
+    const { tabId } = deleteConfirm;
     const newTabs = tabs.filter(t => t.id !== tabId);
     setTabs(newTabs);
     if (activeTabId === tabId) {
       setActiveTabId(newTabs[0].id);
     }
+    setDeleteConfirm(null);
   };
 
   const renameTab = (tabId, newName) => {
@@ -1315,44 +1346,40 @@ function ReferencePanel() {
   };
 
   return (
-    <div className="freeform-container vertical-layout">
-      {/* Board Tabs - Chrome style tab bar */}
-      <div className="freeform-tab-bar">
-        <div className="freeform-board-tabs">
+    <div className="freeform-container">
+      {/* Board list sidebar */}
+      <div className="freeform-board-sidebar">
+        <div className="freeform-board-list">
           {tabs.map(tab => (
             <div
               key={tab.id}
-              className={`freeform-board-tab ${tab.id === activeTabId ? 'active' : ''}`}
+              className={`freeform-board-item${tab.id === activeTabId ? ' active' : ''}`}
               onClick={() => setActiveTabId(tab.id)}
             >
               {editingTabId === tab.id ? (
                 <input
-                  className="freeform-tab-input"
+                  className="freeform-board-input"
                   value={tab.name}
-                  onChange={(e) => renameTab(tab.id, e.target.value)}
+                  onChange={e => renameTab(tab.id, e.target.value)}
                   onBlur={() => setEditingTabId(null)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === 'Escape') setEditingTabId(null);
-                  }}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') setEditingTabId(null); }}
                   autoFocus
-                  onClick={(e) => e.stopPropagation()}
+                  onClick={e => e.stopPropagation()}
                 />
               ) : (
-                <span onDoubleClick={(e) => { e.stopPropagation(); setEditingTabId(tab.id); }}>
-                  {tab.name}
-                </span>
+                <span onDoubleClick={e => { e.stopPropagation(); setEditingTabId(tab.id); }}>{tab.name}</span>
               )}
               {tabs.length > 1 && (
-                <button
-                  className="freeform-tab-close"
-                  onClick={(e) => { e.stopPropagation(); deleteTab(tab.id); }}
-                >×</button>
+                <button className="freeform-board-del" onClick={e => { e.stopPropagation(); deleteTab(tab.id); }}>×</button>
               )}
             </div>
           ))}
-          <button className="freeform-board-add" onClick={addNewTab}>+</button>
+          <button className="freeform-board-add-btn" onClick={addNewTab}>+ Board</button>
         </div>
       </div>
+
+      {/* Toolbar + canvas */}
+      <div className="freeform-main">
 
       {/* Toolbar */}
       <div className="freeform-toolbar-container">
@@ -1636,7 +1663,7 @@ function ReferencePanel() {
                   }}
                   onMouseDown={(e) => handleItemMouseDown(e, item)}
                 >
-                  <img src={item.src} alt="" draggable={false} />
+                  <img src={getItemSrc(item.src)} alt="" draggable={false} />
                   {isSelected && (
                     <div
                       className="freeform-resize-handle"
@@ -1665,6 +1692,11 @@ function ReferencePanel() {
                     <textarea
                       value={item.content}
                       onChange={(e) => {
+                        // Auto-resize: expand width/height to fit content
+                        e.target.style.width = '1px';
+                        e.target.style.height = '1px';
+                        e.target.style.width = Math.max(80, e.target.scrollWidth) + 'px';
+                        e.target.style.height = Math.max(item.fontSize * 1.5 + 16, e.target.scrollHeight) + 'px';
                         setItems(prev => prev.map(i =>
                           i.id === item.id ? { ...i, content: e.target.value } : i
                         ));
@@ -1673,12 +1705,10 @@ function ReferencePanel() {
                         if (e.key === 'Escape') {
                           e.preventDefault();
                           setEditingTextId(null);
-                          // Delete if empty - check current input value
                           if (!e.target.value.trim()) {
                             setItems(prev => prev.filter(i => i.id !== item.id));
                           }
                         }
-                        // Cmd/Ctrl + Enter to finish editing
                         if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
                           e.preventDefault();
                           setEditingTextId(null);
@@ -1689,7 +1719,6 @@ function ReferencePanel() {
                       }}
                       onBlur={(e) => {
                         setEditingTextId(null);
-                        // Delete if empty - check current input value
                         if (!e.target.value.trim()) {
                           setItems(prev => prev.filter(i => i.id !== item.id));
                         }
@@ -1708,7 +1737,8 @@ function ReferencePanel() {
                         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
                         padding: '8px 12px',
                         margin: 0,
-                        width: `${item.content.trim() ? Math.max(80, Math.max(...(item.content.split('\n').map(line => line.length))) * (item.fontSize * 0.5)) : 80}px`,
+                        minWidth: '80px',
+                        width: `${item.content.trim() ? Math.max(80, Math.max(...(item.content.split('\n').map(line => line.length))) * (item.fontSize * 0.62) + 24) : 80}px`,
                         height: `${Math.max(item.fontSize * 1.5 + 16, (item.content.split('\n').length) * (item.fontSize * 1.5) + 16)}px`,
                         maxWidth: 'none',
                         borderRadius: '4px',
@@ -2008,6 +2038,7 @@ function ReferencePanel() {
                               <input
                                 type="text"
                                 value={childItem.content}
+                                size={Math.max(10, childItem.content.length + 2)}
                                 onChange={(e) => {
                                   setItems(prev => prev.map(i =>
                                     i.id === item.id
@@ -2086,7 +2117,7 @@ function ReferencePanel() {
                               height: `${childItem.height}px`
                             }}
                           >
-                            <img src={childItem.src} alt="" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                            <img src={getItemSrc(childItem.src)} alt="" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                           </div>
                         );
                       }
@@ -2188,7 +2219,24 @@ function ReferencePanel() {
         <div><kbd>Cmd/Ctrl + C/V</kbd> Copy/Paste</div>
         <div><kbd>Cmd/Ctrl + Wheel</kbd> Zoom</div>
       </div>
-    </div>
+      </div>{/* end freeform-main */}
+
+      {/* Delete confirmation modal */}
+      {deleteConfirm && (
+        <div className="freeform-confirm-overlay" onClick={() => setDeleteConfirm(null)}>
+          <div className="freeform-confirm-modal" onClick={e => e.stopPropagation()}>
+            <p className="freeform-confirm-title">"{deleteConfirm.tabName}" silinsin mi?</p>
+            {deleteConfirm.itemCount > 0 && (
+              <p className="freeform-confirm-sub">İçindeki {deleteConfirm.itemCount} öğe de silinecek.</p>
+            )}
+            <div className="freeform-confirm-btns">
+              <button className="freeform-confirm-cancel" onClick={() => setDeleteConfirm(null)}>İptal</button>
+              <button className="freeform-confirm-delete" onClick={confirmDeleteTab}>Sil</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>{/* end freeform-container */}
   );
 }
 

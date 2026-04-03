@@ -238,6 +238,10 @@ const MARKET_FEEDS = [
   { url: 'https://news.google.com/rss/search?q=stock+market+when:1d&hl=en-US&gl=US&ceid=US:en', source: 'Google News' },
   { url: 'https://news.google.com/rss/search?q=nasdaq+OR+SP500+OR+dow+jones+when:1d&hl=en-US&gl=US&ceid=US:en', source: 'Google News' },
   { url: 'https://news.google.com/rss/search?q=federal+reserve+OR+inflation+OR+interest+rates+when:1d&hl=en-US&gl=US&ceid=US:en', source: 'Google News' },
+  { url: 'https://news.google.com/rss/search?q=AI+OR+artificial+intelligence+when:1d&hl=en-US&gl=US&ceid=US:en', source: 'Google News' },
+  { url: 'https://news.google.com/rss/search?q=cryptocurrency+OR+bitcoin+OR+crypto+when:1d&hl=en-US&gl=US&ceid=US:en', source: 'Google News' },
+  { url: 'https://news.google.com/rss/search?q=earnings+OR+revenue+OR+profit+when:1d&hl=en-US&gl=US&ceid=US:en', source: 'Google News' },
+  { url: 'https://news.google.com/rss/search?q=economy+OR+GDP+OR+recession+when:1d&hl=en-US&gl=US&ceid=US:en', source: 'Google News' },
 ];
 
 function parseMarketRss(xml, source) {
@@ -263,13 +267,23 @@ function parseMarketRss(xml, source) {
   } catch { return []; }
 }
 
+async function fetchInBatches(feeds, batchSize = 5) {
+  const results = [];
+  for (let i = 0; i < feeds.length; i += batchSize) {
+    const batch = feeds.slice(i, i + batchSize);
+    const batchResults = await Promise.allSettled(
+      batch.map(async ({ url, source }) => {
+        const text = await invoke('fetch_rss', { url });
+        return parseMarketRss(text, source);
+      })
+    );
+    results.push(...batchResults);
+  }
+  return results;
+}
+
 async function fetchMarketNews() {
-  const results = await Promise.allSettled(
-    MARKET_FEEDS.map(async ({ url, source }) => {
-      const text = await invoke('fetch_rss', { url });
-      return parseMarketRss(text, source);
-    })
-  );
+  const results = await fetchInBatches(MARKET_FEEDS, 5);
   const cutoff = Date.now() - 72 * 60 * 60 * 1000; // 72 saatten eski haberleri gösterme
   const all = results.filter(r => r.status === 'fulfilled').flatMap(r => r.value);
   const seen = new Set();
@@ -286,21 +300,26 @@ async function fetchMarketNews() {
 
 async function fetchAllNews(tickers) {
   if (!tickers || tickers.length === 0) return [];
-  const saResults = await Promise.allSettled(
-    tickers.map(async t => {
-      try {
-        const text = await invoke('fetch_rss', { url: getSeekingAlphaUrl(t) });
-        const items = parseSeekingAlphaXml(text, t);
-        if (items.length > 0) return items;
-        throw new Error('empty');
-      } catch {
+  const saResults = [];
+  for (let i = 0; i < tickers.length; i += 4) {
+    const batch = tickers.slice(i, i + 4);
+    const batchResults = await Promise.allSettled(
+      batch.map(async t => {
         try {
-          const text = await invoke('fetch_rss', { url: getYahooFinanceUrl(t) });
-          return parseYahooRss(text, t);
-        } catch { return []; }
-      }
-    })
-  );
+          const text = await invoke('fetch_rss', { url: getSeekingAlphaUrl(t) });
+          const items = parseSeekingAlphaXml(text, t);
+          if (items.length > 0) return items;
+          throw new Error('empty');
+        } catch {
+          try {
+            const text = await invoke('fetch_rss', { url: getYahooFinanceUrl(t) });
+            return parseYahooRss(text, t);
+          } catch { return []; }
+        }
+      })
+    );
+    saResults.push(...batchResults);
+  }
   const saItems = saResults.filter(r => r.status === 'fulfilled').flatMap(r => r.value);
 
   let tvItems = [];
