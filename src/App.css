@@ -9454,11 +9454,35 @@ body.light .search-no-results {
   min-height: 0;
 }
 .dash-right-top {
-  flex: 1;
   min-height: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+.dash-right-resize-handle {
+  height: 6px;
+  cursor: ns-resize;
+  background: transparent;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.dash-right-resize-handle::after {
+  content: '';
+  position: absolute;
+  left: 20%;
+  right: 20%;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 2px;
+  background: #30363d;
+  border-radius: 2px;
+  transition: background 0.15s;
+}
+
+.dash-right-resize-handle:hover::after {
+  background: #58a6ff;
 }
 .dash-right-bottom {
   flex: 1;
