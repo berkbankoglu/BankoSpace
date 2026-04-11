@@ -345,9 +345,9 @@ export default function StockChart({ groups, saveGroups, activeTicker, setActive
   }, [JSON.stringify(allTickers)]);
 
   useEffect(() => {
-    loadAll();
+    const delay = setTimeout(() => loadAll(), 6000);
     const id = setInterval(loadAll, REFRESH_MS);
-    return () => clearInterval(id);
+    return () => { clearTimeout(delay); clearInterval(id); };
   }, [loadAll]);
 
   // Cancel drag globally

@@ -8,28 +8,68 @@ import Timer from './components/Timer';
 import FlashCards from './components/FlashCards';
 import DailyChecklist from './components/DailyChecklist';
 import IncomeTracker from './components/IncomeTracker';
+import SilkroadCalc from './components/SilkroadCalc';
 import Notes from './components/Notes';
 import Calendar from './components/Calendar';
 import JapaneseKana from './components/JapaneseKana';
 import ToolsChat from './components/ToolsChat';
 import SubscriptionTracker, { SubscriptionWidget, SubscriptionPopup } from './components/SubscriptionTracker';
 import StockNews from './components/StockNews';
+import Translate from './components/Translate';
+import ProjectBid from './components/ProjectBid';
 
-function DashboardNews() {
-  const [tickers, setTickers] = useState(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem('stock_tickers'));
-      return Array.isArray(saved) && saved.length > 0 ? saved : ['AAPL', 'NVDA', 'TSLA'];
-    } catch { return ['AAPL', 'NVDA', 'TSLA']; }
-  });
-  const [activeTicker, setActiveTicker] = useState('all');
+const QUICK_BUTTONS = [
+  { id: 'translate',  label: 'Translate',   desc: 'Text translation' },
+  { id: 'bid',        label: 'Write Bid',   desc: 'Project proposal' },
+];
+
+function QuickLaunchPanel() {
+  const [activePopup, setActivePopup] = useState(null);
+
+  const openPopup = (id) => setActivePopup(id);
+  const closePopup = () => setActivePopup(null);
+
+  const renderPopupContent = () => {
+    switch (activePopup) {
+      case 'translate': return <Translate />;
+      case 'bid': return <ProjectBid />;
+      default: return null;
+    }
+  };
+
+  const getPopupTitle = () => {
+    const btn = QUICK_BUTTONS.find(b => b.id === activePopup);
+    return btn?.label || '';
+  };
+
   return (
-    <StockNews
-      tickers={tickers}
-      setTickers={setTickers}
-      activeTicker={activeTicker}
-      setActiveTicker={setActiveTicker}
-    />
+    <>
+      <div className="ql-panel">
+        <div className="ql-title">Quick Launch</div>
+        <div className="ql-grid">
+          {QUICK_BUTTONS.map(btn => (
+            <button key={btn.id} className="ql-btn" onClick={() => openPopup(btn.id)}>
+              <span className="ql-label">{btn.label}</span>
+              <span className="ql-desc">{btn.desc}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {activePopup && renderPopupContent() && (
+        <div className="ql-popup-overlay" onClick={closePopup}>
+          <div className="ql-popup-modal" onClick={e => e.stopPropagation()}>
+            <div className="ql-popup-header">
+              <span className="ql-popup-title">{getPopupTitle()}</span>
+              <button className="ql-popup-close" onClick={closePopup}>✕</button>
+            </div>
+            <div className="ql-popup-body">
+              {renderPopupContent()}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, setVolume, getVolume } from './utils/sounds';
@@ -150,7 +190,7 @@ function App({ session, onLogout }) {
         origSetItem(key, value);
         if (SYNC_KEYS.includes(key)) {
           clearTimeout(debounceTimers[key]);
-          debounceTimers[key] = setTimeout(() => pushKeyToSupabase(key, value), 2000);
+          debounceTimers[key] = setTimeout(() => pushKeyToSupabase(key, value), 300000);
         }
       };
 
@@ -241,6 +281,7 @@ function App({ session, onLogout }) {
       { id: 'notes',      label: 'Notes',           view: 'notes',      hidden: false },
       { id: 'tools',        label: 'Tools',            view: 'tools',        hidden: false },
       { id: 'japanesekana', label: 'Japanese Kana',    view: 'japanesekana', hidden: false },
+      { id: 'silkroad',     label: 'Silkroad Calc',    view: 'silkroad',     hidden: false },
     ];
     const saved = localStorage.getItem('sidebarOrder');
     if (saved) {
@@ -1676,6 +1717,13 @@ function App({ session, onLogout }) {
             </div>
           )}
 
+          {/* Silkroad Calc */}
+          {activeView === 'silkroad' && (
+            <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <SilkroadCalc />
+            </div>
+          )}
+
           {/* Income Tracker Full Screen View */}
           {activeView === 'income' && (
             <div className="income-fullscreen">
@@ -1770,7 +1818,7 @@ function App({ session, onLogout }) {
                     <SubscriptionTracker />
                   </div>
                   <div className="dash-right-bottom">
-                    <DashboardNews />
+                    <QuickLaunchPanel />
                   </div>
                 </div>
               </div>

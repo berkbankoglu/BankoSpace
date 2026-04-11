@@ -44,16 +44,26 @@ export const SYNC_KEYS = [
   'translate_rules',
   'dailyChecklistColor',
   'longtermChecklistColor',
+  'dailyChecklistLastReset',
+  'longtermChecklistLastReset',
   'dashColWidths',
   'notesSidebarWidth',
   'notesLineSpacing',
   'chat_username',
 ];
 
-// Get current user ID
+// Cache userId to avoid network call on every push
+let cachedUserId = null;
+supabase.auth.onAuthStateChange((_event, session) => {
+  cachedUserId = session?.user?.id || null;
+});
+
+// Get current user ID (uses cache, falls back to network once)
 async function getUserId() {
+  if (cachedUserId) return cachedUserId;
   const { data: { user } } = await supabase.auth.getUser();
-  return user?.id || null;
+  cachedUserId = user?.id || null;
+  return cachedUserId;
 }
 
 // Pull all data from Supabase and write to localStorage

@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import './Translate.css';
+import './ProjectBid.css';
 
 const LANGUAGES = [
   { code: 'tr', label: 'Turkish' },
@@ -45,7 +46,6 @@ export default function Translate() {
     setError('');
 
     try {
-      const isShortInput = text.trim().split(/\s+/).length <= 6;
       const savedRules = (() => { try { return JSON.parse(localStorage.getItem('translate_rules') || '[]'); } catch { return []; } })();
       const rulesSection = savedRules.length > 0
         ? `\n\nTranslation rules to follow:\n${savedRules.map((r, i) => `${i + 1}. ${r}`).join('\n')}`
@@ -55,22 +55,7 @@ export default function Translate() {
         max_tokens: 2048,
         messages: [{
           role: 'user',
-          content: isShortInput
-            ? `Translate the following word or short phrase from ${getLangLabel(src)} to ${getLangLabel(tgt)}.
-
-Respond in this exact format (no extra text):
-**Translation:** <translation>
-**Meaning:** <brief explanation of meaning/usage in 1 sentence, in English>
-**Example:** <one natural example sentence in ${getLangLabel(tgt)}, then its ${getLangLabel(src)} translation in parentheses>${rulesSection}
-
-Text: ${text}`
-            : `Translate the following text from ${getLangLabel(src)} to ${getLangLabel(tgt)}.
-
-Respond in this exact format:
-**Translation:**
-<full translation>
-
-**Note:** <one brief note about tone, register, or key word choices if useful — skip if not helpful>${rulesSection}
+          content: `Translate the following text from ${getLangLabel(src)} to ${getLangLabel(tgt)}. Make it natural and fluent — fix grammar mistakes, awkward phrasing, and typos in the source if any, then produce a clean idiomatic translation. Output ONLY the translated text, no explanations, no labels, no extra commentary.${rulesSection}
 
 Text: ${text}`
         }]
@@ -132,17 +117,9 @@ Text: ${text}`
     localStorage.setItem('translate_rules', JSON.stringify(updated));
   };
 
-  const renderOutput = (text) =>
-    text.split('\n').map((line, i) => {
-      const match = line.match(/^\*\*(.+?)\*\*:(.*)$/);
-      if (match) return (
-        <div key={i} className="pb-summary-row">
-          <span className="pb-summary-label">{match[1]}:</span>
-          <span className="pb-summary-value">{match[2].trim()}</span>
-        </div>
-      );
-      return line.trim() ? <div key={i} className="pb-summary-row pb-summary-plain">{line}</div> : null;
-    });
+  const renderOutput = (text) => (
+    <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7, fontSize: 15, color: '#c9d1d9' }}>{text}</div>
+  );
 
   return (
     <div className="pb-container">
