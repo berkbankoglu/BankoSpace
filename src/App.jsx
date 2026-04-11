@@ -279,7 +279,7 @@ function App({ session, onLogout }) {
       { id: 'checklists', label: 'Checklists',      view: 'checklists', hidden: false },
       { id: 'income',     label: 'Income Tracker',  view: 'income',     hidden: false },
       { id: 'notes',      label: 'Notes',           view: 'notes',      hidden: false },
-      { id: 'tools',        label: 'Tools',            view: 'tools',        hidden: false },
+      { id: 'tools',        label: 'Tools',            view: 'tools',        hidden: true },
       { id: 'japanesekana', label: 'Japanese Kana',    view: 'japanesekana', hidden: false },
       { id: 'silkroad',     label: 'Silkroad Calc',    view: 'silkroad',     hidden: false },
     ];
@@ -291,7 +291,10 @@ function App({ session, onLogout }) {
         .filter(item => defaults.find(d => d.id === item.id))
         .map(item => {
           const def = defaults.find(d => d.id === item.id);
-          return { ...def, ...item };
+          const merged = { ...def, ...item };
+          // Force hidden state for items that should always be hidden
+          if (def.hidden) merged.hidden = true;
+          return merged;
         });
       defaults.forEach(def => {
         if (!merged.find(m => m.id === def.id)) merged.push(def);
