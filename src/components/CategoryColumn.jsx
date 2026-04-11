@@ -303,11 +303,14 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
                 />
               ) : (
                 <span className="cc-text" onDoubleClick={() => { setEditingTodoId(todo.id); setEditingTodoText(todo.text); }}>{todo.text}</span>
+                {todo.subtasks && todo.subtasks.length > 0 && !expandedTodos.has(todo.id) && (
+                  <span className="cc-subtask-count-hint">+{todo.subtasks.length}</span>
+                )}
               )}
             </label>
 
             {/* Subtasks */}
-            {expandedTodos.has(todo.id) && (
+            <div className={`cc-subtasks-wrapper${expandedTodos.has(todo.id) ? ' expanded' : ''}`}>
               <div className="cc-subtasks">
                 {todo.subtasks && todo.subtasks.map((subtask, sIdx) => (
                   <div
@@ -384,7 +387,7 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
                   />
                 </div>
               </div>
-            )}
+            </div>
           </div>
         ))}
       </div>
