@@ -19,8 +19,8 @@ import Translate from './components/Translate';
 import ProjectBid from './components/ProjectBid';
 
 const QUICK_BUTTONS = [
-  { id: 'translate',  label: 'Translate',   desc: 'Text translation' },
-  { id: 'bid',        label: 'Write Bid',   desc: 'Project proposal' },
+  { id: 'translate',  label: 'Translate',   desc: 'T' },
+  { id: 'bid',        label: 'AI Generate', desc: 'W' },
 ];
 
 function QuickLaunchPanel() {
@@ -28,6 +28,19 @@ function QuickLaunchPanel() {
 
   const openPopup = (id) => setActivePopup(id);
   const closePopup = () => setActivePopup(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'Escape') { closePopup(); return; }
+      if (activePopup) return;
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement?.isContentEditable) return;
+      if (e.key === 't' || e.key === 'T') openPopup('translate');
+      if (e.key === 'w' || e.key === 'W') openPopup('bid');
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [activePopup]);
 
   const renderPopupContent = () => {
     switch (activePopup) {
@@ -372,7 +385,8 @@ function App({ session, onLogout }) {
   const [todoFontSize, setTodoFontSize] = useState(() => localStorage.getItem('todoFontSize') || 'M');
   const [subtaskFontSize, setSubtaskFontSize] = useState(() => localStorage.getItem('subtaskFontSize') || 'M');
   const [fontSizeOpen, setFontSizeOpen] = useState(false);
-  const fontSizeMap = { S: '11px', M: '13px', L: '16px' };
+  const fontSizeMap = { S: '11px', M: '13px', L: '16px', XL: '20px' };
+  const subtaskFontSizeMap = { S: '11px', M: '14px', L: '17px', XL: '21px' };
   const [useEmoji, setUseEmoji] = useState(() => localStorage.getItem('useEmoji') !== 'false');
   const [timerWidgetOpen, setTimerWidgetOpen] = useState(false);
   const [timerWidgetCompact, setTimerWidgetCompact] = useState(true);
@@ -1249,7 +1263,7 @@ function App({ session, onLogout }) {
                 {fontSizeOpen && (
                   <div className="font-size-dropdown">
                     <div style={{fontSize:'10px',color:'#7d8590',padding:'4px 8px 2px',borderBottom:'1px solid #30363d',marginBottom:'2px'}}>Title</div>
-                    {['S', 'M', 'L'].map(s => (
+                    {['S', 'M', 'L', 'XL'].map(s => (
                       <button
                         key={s}
                         className={`font-size-option ${todoFontSize === s ? 'active' : ''}`}
@@ -1257,7 +1271,7 @@ function App({ session, onLogout }) {
                       >{s}</button>
                     ))}
                     <div style={{fontSize:'10px',color:'#7d8590',padding:'6px 8px 2px',borderTop:'1px solid #30363d',borderBottom:'1px solid #30363d',margin:'2px 0'}}>Subtask</div>
-                    {['S', 'M', 'L'].map(s => (
+                    {['S', 'M', 'L', 'XL'].map(s => (
                       <button
                         key={'sub-'+s}
                         className={`font-size-option ${subtaskFontSize === s ? 'active' : ''}`}
@@ -1766,7 +1780,7 @@ function App({ session, onLogout }) {
 
           {/* Dashboard View */}
           {activeView === 'dashboard' && (
-          <div className="dashboard-container" style={{ '--todo-font-size': fontSizeMap[todoFontSize], '--subtask-font-size': fontSizeMap[subtaskFontSize] }}>
+          <div className="dashboard-container" style={{ '--todo-font-size': fontSizeMap[todoFontSize], '--subtask-font-size': subtaskFontSizeMap[subtaskFontSize] }}>
             {/* Todo Columns - resizable */}
             <div className="todo-columns" ref={columnsRef}>
               <div className="todo-col-wrapper" style={colWidths[0] ? { flex: `1 1 ${colWidths[0]}px`, minWidth: 0 } : { flex: 1, minWidth: 0 }}>
@@ -1816,14 +1830,7 @@ function App({ session, onLogout }) {
               </div>
               <div className="col-resize-handle" onMouseDown={e => startColResize(1, e)} onDoubleClick={() => { setColWidths(DEFAULT_COL_PX); localStorage.setItem('dashColWidths', JSON.stringify(DEFAULT_COL_PX)); }} />
               <div className="todo-col-wrapper" style={colWidths[2] ? { flex: `1 1 ${colWidths[2]}px`, minWidth: 0 } : { flex: 1, minWidth: 0 }}>
-                <div className="dash-right-col">
-                  <div className="dash-right-top">
-                    <SubscriptionTracker />
-                  </div>
-                  <div className="dash-right-bottom">
-                    <QuickLaunchPanel />
-                  </div>
-                </div>
+                <DashRightCol />
               </div>
             </div>
           </div>
@@ -1978,6 +1985,46 @@ function TimerPopupWrapper({ isCompact: initialCompact = false }) {
 }
 
 
+
+function DashRightCol() {
+  const [topPct, setTopPct] = useState(() => {
+    const saved = localStorage.getItem('dashRightSplit');
+    return saved ? Number(saved) : 60;
+  });
+  const dragging = useRef(false);
+  const containerRef = useRef(null);
+
+  const onMouseDown = (e) => {
+    e.preventDefault();
+    dragging.current = true;
+    const onMove = (e) => {
+      if (!dragging.current || !containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const pct = Math.min(85, Math.max(15, ((e.clientY - rect.top) / rect.height) * 100));
+      setTopPct(pct);
+      localStorage.setItem('dashRightSplit', String(pct));
+    };
+    const onUp = () => {
+      dragging.current = false;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  return (
+    <div className="dash-right-col" ref={containerRef}>
+      <div className="dash-right-top" style={{ flex: `0 0 ${topPct}%` }}>
+        <SubscriptionTracker />
+      </div>
+      <div className="dash-right-resize-handle" onMouseDown={onMouseDown} />
+      <div className="dash-right-bottom" style={{ flex: 1 }}>
+        <QuickLaunchPanel />
+      </div>
+    </div>
+  );
+}
 
 function ToolsView() {
   return <ToolsChat />;
