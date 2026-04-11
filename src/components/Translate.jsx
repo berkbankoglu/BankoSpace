@@ -212,26 +212,28 @@ Text: ${text}`
           </div>
         </div>
 
-        {/* Right: output */}
-        {(outputText || loading) && (
-          <div className="pb-right">
-            <div className="pb-result-header">
-              <span className="pb-result-title">{getLangLabel(sourceLang)} → {getLangLabel(targetLang)}</span>
-              {outputText && (
-                <button className="pb-copy-btn" onClick={copyOutput}>
-                  {copied ? '✓ Copied' : 'Copy'}
-                </button>
-              )}
-            </div>
-            {loading ? (
-              <div className="pb-summary-body" style={{ alignItems: 'center', justifyContent: 'center' }}>
-                <span className="pb-spinner" style={{ width: 28, height: 28, borderWidth: 3 }} />
-              </div>
-            ) : (
-              <div className="pb-summary-body">{renderOutput(outputText)}</div>
+        {/* Right: output — always visible */}
+        <div className="pb-right">
+          <div className="pb-result-header">
+            <span className="pb-result-title">{getLangLabel(sourceLang)} → {getLangLabel(targetLang)}</span>
+            {outputText && (
+              <button className="pb-copy-btn" onClick={copyOutput}>
+                {copied ? '✓ Copied' : 'Copy'}
+              </button>
             )}
           </div>
-        )}
+          {loading ? (
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span className="pb-spinner" style={{ width: 28, height: 28, borderWidth: 3 }} />
+            </div>
+          ) : outputText ? (
+            <div className="pb-summary-body">{renderOutput(outputText)}</div>
+          ) : (
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#484f58', fontSize: 13 }}>
+              Translation will appear here
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
