@@ -1,0 +1,304 @@
+.sro-calc {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 32px 40px;
+  background: #0d1117;
+  color: #c9d1d9;
+  overflow-y: auto;
+}
+
+.sro-header {
+  margin-bottom: 28px;
+}
+
+.sro-title {
+  font-size: 22px;
+  font-weight: 600;
+  color: #e6edf3;
+  margin: 0 0 4px;
+}
+
+.sro-sub {
+  font-size: 13px;
+  color: #484f58;
+  margin: 0;
+}
+
+.sro-body {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+/* Input card */
+.sro-card {
+  background: #161b22;
+  border: 1px solid #21262d;
+  border-radius: 10px;
+  padding: 20px 24px;
+  min-width: 320px;
+}
+
+.sro-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #8b949e;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 18px;
+}
+
+.sro-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+
+.sro-field label {
+  font-size: 13px;
+  color: #8b949e;
+}
+
+.sro-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sro-input-row button {
+  width: 32px;
+  height: 32px;
+  background: #21262d;
+  border: 1px solid #30363d;
+  border-radius: 5px;
+  color: #c9d1d9;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.sro-input-row button:hover { background: #2d333b; }
+
+.sro-input-row input {
+  width: 90px;
+  height: 32px;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 5px;
+  color: #e6edf3;
+  font-size: 14px;
+  text-align: center;
+  outline: none;
+  padding: 0 8px;
+}
+
+.sro-input-row input:focus { border-color: #5c7cfa; }
+
+.sro-hint {
+  font-size: 11px;
+  color: #484f58;
+}
+
+/* Preset buttons */
+.sro-preset-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.sro-preset {
+  padding: 5px 12px;
+  background: #21262d;
+  border: 1px solid #30363d;
+  border-radius: 5px;
+  color: #8b949e;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.sro-preset:hover { background: #2d333b; color: #c9d1d9; }
+.sro-preset.active { background: rgba(92,124,250,0.2); border-color: #5c7cfa; color: #5c7cfa; }
+
+.sro-custom-price {
+  width: 80px;
+  height: 32px;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 5px;
+  color: #e6edf3;
+  font-size: 13px;
+  text-align: center;
+  outline: none;
+  padding: 0 6px;
+}
+
+.sro-custom-price:focus, .sro-custom-price.active { border-color: #5c7cfa; }
+
+/* Result */
+.sro-result-area {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 280px;
+  flex: 1;
+}
+
+.sro-result-card {
+  background: #161b22;
+  border: 1px solid #21262d;
+  border-radius: 10px;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sro-result-card.profit { border-color: rgba(63, 185, 80, 0.4); }
+.sro-result-card.loss   { border-color: rgba(248, 81, 73, 0.4); }
+
+.sro-result-badge {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.sro-result-card.profit .sro-result-badge { color: #3fb950; }
+.sro-result-card.loss   .sro-result-badge { color: #f85149; }
+
+.sro-result-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: #8b949e;
+}
+
+.sro-result-row strong { color: #c9d1d9; font-size: 14px; }
+.sro-result-row.big strong { font-size: 20px; }
+.sro-result-row.big { color: #c9d1d9; font-size: 14px; }
+
+.sro-result-row .green { color: #3fb950; }
+.sro-result-row .red   { color: #f85149; }
+
+.sro-result-divider {
+  height: 1px;
+  background: #21262d;
+  margin: 4px 0;
+}
+
+/* Breakeven */
+.sro-breakeven-card {
+  background: #161b22;
+  border: 1px solid #21262d;
+  border-radius: 10px;
+  padding: 16px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sro-breakeven-card h4 {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #484f58;
+}
+
+/* Verdict */
+.sro-verdict {
+  padding: 14px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.sro-verdict.profit { background: rgba(63,185,80,0.1); color: #3fb950; border: 1px solid rgba(63,185,80,0.3); }
+.sro-verdict.loss   { background: rgba(248,81,73,0.1);  color: #f85149; border: 1px solid rgba(248,81,73,0.3); }
+
+/* Conversion table */
+.sro-convert-card { min-width: 280px; }
+
+.sro-convert-cols {
+  display: flex;
+  gap: 0;
+}
+
+.sro-convert-divider-v {
+  width: 1px;
+  background: #21262d;
+  margin: 0 16px;
+}
+
+.sro-convert-rate {
+  font-size: 12px;
+  color: #484f58;
+  margin: 0 0 14px;
+}
+
+.sro-convert-rate strong { color: #8b949e; }
+
+.sro-convert-header {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #484f58;
+  margin-bottom: 10px;
+}
+
+.sro-convert-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  font-size: 13px;
+  border-bottom: 1px solid #21262d;
+}
+
+.sro-convert-row:last-child { border-bottom: none; }
+
+.sro-convert-row span:first-child {
+  color: #8b949e;
+  width: 52px;
+  flex-shrink: 0;
+}
+
+.sro-convert-arrow { color: #30363d; font-size: 11px; }
+
+.sro-convert-row strong { color: #e6edf3; font-size: 13px; }
+
+/* Arena Coin Section */
+.sro-arena-section {
+  margin-top: 32px;
+  border-top: 1px solid #21262d;
+  padding-top: 24px;
+}
+
+.sro-arena-rate {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: rgba(92,124,250,0.1);
+  border: 1px solid rgba(92,124,250,0.3);
+  border-radius: 6px;
+  font-size: 13px;
+  color: #8b949e;
+}
+
+.sro-arena-rate strong { color: #5c7cfa; font-size: 15px; }
+
+.sro-arena-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #e6edf3;
+  margin: 0 0 16px;
+}

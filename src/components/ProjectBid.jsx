@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './ProjectBid.css';
 
-const DEFAULT_RULES = `Follow these rules when writing a bid:
+const DEFAULT_BID_RULES = `Follow these rules when writing a bid:
 - Be concise (max 150 words)
 - Show that you understood the client's problem
 - Mention your experience with a concrete example
@@ -9,12 +9,23 @@ const DEFAULT_RULES = `Follow these rules when writing a bid:
 - Use a sincere and professional tone
 - Write in English`;
 
+const DEFAULT_ANALYZE_RULES = `Analyze the following project listing. Respond in this exact format (nothing else):
+
+**What they want:** <2-3 sentences: what exactly the client wants to build, what problem it solves>
+**Tasks:** <bullet-point list of everything that needs to be done, miss nothing>
+**Tech/Domain:** <technologies, tools, platforms to be used>
+**Timeline:** <duration and deadline if specified, otherwise "Not specified">
+**Budget:** <budget range if specified, otherwise "Not specified">
+**Notes:** <special requirements, preferences, or expectations that must/must not be done>
+**Difficulty:** <Easy / Medium / Hard — why>`;
+
 export default function ProjectBid() {
   const [projectDetails, setProjectDetails] = useState('');
   const [clientName, setClientName] = useState('');
-  const [bidRules, setBidRules] = useState(() => localStorage.getItem('bid_rules') || DEFAULT_RULES);
-  const [rulesEdit, setRulesEdit] = useState(bidRules);
-  const [showRules, setShowRules] = useState(false);
+  const [bidRules, setBidRules] = useState(() => localStorage.getItem('bid_rules') || DEFAULT_BID_RULES);
+  const [analyzeRules, setAnalyzeRules] = useState(() => localStorage.getItem('analyze_rules') || DEFAULT_ANALYZE_RULES);
+  const [rulesEdit, setRulesEdit] = useState('');
+  const [showRules, setShowRules] = useState(null); // 'bid' | 'analyze' | null
 
   const [result, setResult] = useState('');
   const [resultType, setResultType] = useState(null); // 'analyze' | 'bid'
@@ -43,18 +54,7 @@ export default function ProjectBid() {
     setResultType(null);
     try {
       const res = await callApi(
-        `Analyze the following project listing. Respond in this exact format (nothing else):
-
-**What they want:** <2-3 sentences: what exactly the client wants to build, what problem it solves>
-**Tasks:** <bullet-point list of everything that needs to be done, miss nothing>
-**Tech/Domain:** <technologies, tools, platforms to be used>
-**Timeline:** <duration and deadline if specified, otherwise "Not specified">
-**Budget:** <budget range if specified, otherwise "Not specified">
-**Notes:** <special requirements, preferences, or expectations that must/must not be done>
-**Difficulty:** <Easy / Medium / Hard — why>
-
-Project listing:
-${projectDetails}`, 1000);
+        `${analyzeRules}\n\nProject listing:\n${projectDetails}`, 1000);
       if (res) { setResult(res); setResultType('analyze'); }
     } catch (e) { setError(e.message || 'Analysis failed.'); }
     finally { setLoading(null); }
@@ -67,7 +67,7 @@ ${projectDetails}`, 1000);
     setResultType(null);
     try {
       const res = await callApi(
-        `You are an experienced Upwork freelancer. Write a bid proposal for the following project.\n\n[Bid Rules]\n${bidRules}\n\n[Client Name]\n${clientName.trim() || 'Not specified'}\n\n[Project Details]\n${projectDetails}\n\nWrite only the bid text, nothing else.`, 600);
+        `You are an experienced Upwork freelancer. Write a short bid proposal. Follow ALL rules strictly.\n\n[Rules]\n${bidRules}\n\nCRITICAL RULES (override everything else):\n1. ${clientName.trim() ? `The bid MUST begin with exactly "Hi ${clientName.trim()}, " (inline, immediately followed by the rest of the text on the SAME line — no line break after the greeting).` : 'No client name provided, skip greeting name.'}\n2. Do NOT list what you will do. Do NOT mention specific tasks, tools, or deliverables.\n3. You may use ONE single general word to hint at the domain (e.g. "design", "development", "editing") — nothing more.\n4. If the client mentions a deadline or timeline, acknowledge it naturally and confirm you can meet it easily.\n\n[Project]\n${projectDetails}\n\nOutput only the bid text.`, 400);
       if (res) { setResult(res); setResultType('bid'); }
     } catch (e) { setError(e.message || 'Failed to generate bid.'); }
     finally { setLoading(null); }
@@ -89,18 +89,27 @@ ${projectDetails}`, 1000);
     <div className="pb-container">
       <div className="pb-header">
         <h2 className="pb-title">Project Bid</h2>
-        <button className="pb-rules-btn" onClick={() => { setRulesEdit(bidRules); setShowRules(s => !s); }}>
-          ⚙ Rules
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="pb-rules-btn" onClick={() => { setRulesEdit(analyzeRules); setShowRules(v => v === 'analyze' ? null : 'analyze'); }}>
+            ⚙ Analyze Rules
+          </button>
+          <button className="pb-rules-btn" onClick={() => { setRulesEdit(bidRules); setShowRules(v => v === 'bid' ? null : 'bid'); }}>
+            ⚙ Bid Rules
+          </button>
+        </div>
       </div>
 
       {showRules && (
         <div className="pb-rules-panel">
           <div className="pb-rules-header">
-            <span className="pb-rules-title">Bid Rules</span>
+            <span className="pb-rules-title">{showRules === 'analyze' ? 'Analyze Rules' : 'Bid Rules'}</span>
             <div className="pb-rules-actions">
-              <button className="pb-save-btn" onClick={() => { setBidRules(rulesEdit); localStorage.setItem('bid_rules', rulesEdit); setShowRules(false); }}>Save</button>
-              <button className="pb-close-btn" onClick={() => setShowRules(false)}>✕</button>
+              <button className="pb-save-btn" onClick={() => {
+                if (showRules === 'analyze') { setAnalyzeRules(rulesEdit); localStorage.setItem('analyze_rules', rulesEdit); }
+                else { setBidRules(rulesEdit); localStorage.setItem('bid_rules', rulesEdit); }
+                setShowRules(null);
+              }}>Save</button>
+              <button className="pb-close-btn" onClick={() => setShowRules(null)}>✕</button>
             </div>
           </div>
           <textarea className="pb-rules-textarea" value={rulesEdit} onChange={e => setRulesEdit(e.target.value)} />
@@ -133,21 +142,21 @@ ${projectDetails}`, 1000);
           </div>
         </div>
 
-        {result && (
-          <div className="pb-right">
-            <div className="pb-result-header">
-              <span className="pb-result-title">{resultType === 'analyze' ? 'Project Analysis' : 'Generated Bid'}</span>
-              <button className="pb-copy-btn" onClick={() => { navigator.clipboard.writeText(result); setCopied(true); setTimeout(() => setCopied(false), 1500); }}>
-                {copied ? '✓ Copied' : 'Copy'}
-              </button>
-            </div>
-            {resultType === 'analyze' ? (
-              <div className="pb-summary-body">{renderAnalysis(result)}</div>
-            ) : (
-              <textarea className="pb-textarea pb-output" value={result} onChange={e => setResult(e.target.value)} />
-            )}
+        <div className="pb-right">
+          <div className="pb-result-header">
+            <span className="pb-result-title">{resultType === 'analyze' ? 'Project Analysis' : 'Generated Bid'}</span>
+            {result && <button className="pb-copy-btn" onClick={() => { navigator.clipboard.writeText(result); setCopied(true); setTimeout(() => setCopied(false), 1500); }}>{copied ? '✓ Copied' : 'Copy'}</button>}
           </div>
-        )}
+          {loading ? (
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span className="pb-spinner" style={{ width: 28, height: 28, borderWidth: 3 }} />
+            </div>
+          ) : resultType === 'analyze' ? (
+            <div className="pb-summary-body">{renderAnalysis(result)}</div>
+          ) : resultType === 'bid' ? (
+            <textarea className="pb-textarea pb-output" value={result} onChange={e => setResult(e.target.value)} />
+          ) : null}
+        </div>
       </div>
     </div>
   );

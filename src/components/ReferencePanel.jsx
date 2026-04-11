@@ -2219,7 +2219,7 @@ function ReferencePanel() {
         <div><kbd>Cmd/Ctrl + C/V</kbd> Copy/Paste</div>
         <div><kbd>Cmd/Ctrl + Wheel</kbd> Zoom</div>
       </div>
-      </div>{/* end freeform-main */}
+      </div>
 
       {/* Delete confirmation modal */}
       {deleteConfirm && (
@@ -2236,7 +2236,7 @@ function ReferencePanel() {
           </div>
         </div>
       )}
-    </div>{/* end freeform-container */}
+    </div>
   );
 }
 

@@ -9470,60 +9470,143 @@ body.light .search-no-results {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
 }
-.dash-right-bottom .sn-root {
-  background: transparent !important;
-  border-radius: var(--radius-lg) !important;
-  overflow: hidden !important;
+/* Quick Launch Panel */
+.ql-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 14px;
+  overflow-y: auto;
 }
-.dash-right-bottom .sn-header {
-  background: transparent !important;
-  padding: 8px 14px 0 !important;
+
+.ql-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #e6edf3;
+  margin-bottom: 10px;
 }
-.dash-right-bottom .sn-header-top {
-  margin-bottom: 8px !important;
+
+.ql-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
 }
-.dash-right-bottom .sn-title {
-  font-size: 11px !important;
-  font-weight: 600 !important;
-  letter-spacing: 0.08em !important;
-  text-transform: uppercase !important;
-  color: var(--text-primary) !important;
+
+.ql-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 10px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-left: 3px solid #58a6ff;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.1s;
+  text-align: left;
+  width: 100%;
 }
-.dash-right-bottom .sn-updated-badge {
-  display: none !important;
+
+.ql-btn:hover {
+  background: var(--bg-hover);
 }
-.dash-right-bottom .sn-ticker-row {
-  padding-bottom: 8px !important;
+
+.ql-label {
+  font-size: var(--todo-font-size, 12px);
+  font-weight: 500;
+  color: #c9d1d9;
+  line-height: 1;
 }
-.dash-right-bottom .sn-feed {
-  padding: 8px 10px !important;
+
+.ql-desc {
+  font-size: calc(var(--todo-font-size, 12px) - 2px);
+  color: #484f58;
+  line-height: 1;
 }
-.dash-right-bottom .sn-root .sn-card {
-  margin-bottom: 6px !important;
-  padding: 8px 10px !important;
-  border-radius: 6px !important;
+
+.ql-popup-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.dash-right-bottom .sn-root .sn-card-headline {
-  font-size: var(--todo-font-size, 13px) !important;
-  font-weight: 500 !important;
-  margin-bottom: 0 !important;
+
+.ql-popup-modal {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  width: 92vw;
+  max-width: 1100px;
+  height: 85vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
-.dash-right-bottom .sn-root .sn-card-desc {
-  display: none !important;
+
+.ql-popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid #21262d;
+  flex-shrink: 0;
 }
-.dash-right-bottom .sn-root .sn-card-source {
-  display: none !important;
+
+.ql-popup-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e6edf3;
 }
-.dash-right-bottom .sn-root .sn-ai-panel {
-  display: none !important;
+
+.ql-popup-close {
+  background: none;
+  border: none;
+  color: #8b949e;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1;
 }
-.dash-right-bottom .sn-search-wrap {
-  display: none !important;
+
+.ql-popup-close:hover { color: #e6edf3; background: #21262d; }
+
+.ql-popup-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
-.dash-right-bottom .sn-icon-btn {
-  width: 24px !important;
-  height: 24px !important;
-  font-size: 11px !important;
+
+/* Popup içinde tool header'dan sadece title'ı gizle, butonlar kalsın */
+.ql-popup-body .pb-header .pb-title {
+  display: none;
+}
+.ql-popup-body .pb-header {
+  padding-bottom: 8px;
+  margin-bottom: 0;
+  justify-content: flex-end;
+}
+
+.ql-popup-body .pb-container {
+  height: 100%;
+  padding: 20px 24px;
+  overflow: hidden;
+  max-width: 100%;
+  margin: 0;
+}
+
+.ql-popup-body {
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Font size control — tüm dashboard elementleri etkilensin */

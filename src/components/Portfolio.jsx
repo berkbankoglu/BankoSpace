@@ -67,7 +67,10 @@ export default function Portfolio() {
 
   // Only re-fetch when the set of tickers actually changes, not on every positions update
   const tickerKey = positions.map(p => p.ticker.toUpperCase()).sort().join(',');
-  useEffect(() => { refreshQuotes(); }, [tickerKey]);
+  useEffect(() => {
+    const t = setTimeout(() => refreshQuotes(), 5000);
+    return () => clearTimeout(t);
+  }, [tickerKey]);
 
   // Auto-fetch current price when ticker changes in form
   const handleFormTicker = (val) => {

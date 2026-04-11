@@ -480,13 +480,10 @@ export default function StockNews({ tickers, setTickers, activeTicker, setActive
     try {
       setError(null);
       const activeTickers = tickers?.length > 0 ? tickers : DEFAULT_TICKERS;
-      const [items, mktItems] = await Promise.all([
-        fetchAllNews(activeTickers),
-        fetchMarketNews(),
-      ]);
+      // Ticker news önce — market news ayrı ve lazy
+      const items = await fetchAllNews(activeTickers);
       const newItems = items.filter(n => !seenRef.current.has(n.id));
       setNews(items);
-      setMarketNews(mktItems);
       setLastUpdated(new Date());
       if (notify && newItems.length > 0) await notifyNew(newItems);
       if (isFirstLoad.current) {
@@ -501,13 +498,32 @@ export default function StockNews({ tickers, setTickers, activeTicker, setActive
     }
   }, [tickers]);
 
+  const loadMarket = useCallback(async () => {
+    try {
+      const mktItems = await fetchMarketNews();
+      setMarketNews(mktItems);
+    } catch {}
+  }, []);
+
   useEffect(() => {
     setLoading(true);
     isFirstLoad.current = true;
-    load(false);
+    // 4 saniye bekle — uygulama açılırken UI önce render edilsin
+    const delay = setTimeout(() => {
+      load(false);
+    }, 4000);
     const interval = setInterval(() => load(true), REFRESH_INTERVAL);
-    return () => clearInterval(interval);
+    return () => { clearTimeout(delay); clearInterval(interval); };
   }, [load]);
+
+  // Market news sadece US_MARKET sekmesi açıldığında yükle
+  const marketLoadedRef = useRef(false);
+  useEffect(() => {
+    if (activeTicker === 'US_MARKET' && !marketLoadedRef.current) {
+      marketLoadedRef.current = true;
+      loadMarket();
+    }
+  }, [activeTicker, loadMarket]);
 
   const filtered = useMemo(() => {
     let items = activeTicker === 'US_MARKET' ? marketNews : news;
