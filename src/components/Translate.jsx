@@ -208,6 +208,7 @@ Text: ${text}`
               onKeyDown={handleKeyDown}
               placeholder="Enter text to translate..."
               spellCheck={false}
+              autoFocus
             />
           </div>
         </div>
