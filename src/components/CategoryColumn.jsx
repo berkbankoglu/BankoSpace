@@ -302,10 +302,12 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
                   autoFocus
                 />
               ) : (
-                <span className="cc-text" onDoubleClick={() => { setEditingTodoId(todo.id); setEditingTodoText(todo.text); }}>{todo.text}</span>
-                {todo.subtasks && todo.subtasks.length > 0 && !expandedTodos.has(todo.id) && (
-                  <span className="cc-subtask-count-hint">+{todo.subtasks.length}</span>
-                )}
+                <>
+                  <span className="cc-text" onDoubleClick={() => { setEditingTodoId(todo.id); setEditingTodoText(todo.text); }}>{todo.text}</span>
+                  {todo.subtasks && todo.subtasks.length > 0 && !expandedTodos.has(todo.id) && (
+                    <span className="cc-subtask-count-hint">+{todo.subtasks.length}</span>
+                  )}
+                </>
               )}
             </label>
 

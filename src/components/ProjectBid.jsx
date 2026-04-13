@@ -138,6 +138,7 @@ export default function ProjectBid() {
               value={projectDetails}
               onChange={e => { setProjectDetails(e.target.value); setResult(''); setResultType(null); }}
               placeholder="Paste the Upwork listing or project description here..."
+              autoFocus
             />
           </div>
         </div>
