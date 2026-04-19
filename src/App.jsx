@@ -35,8 +35,8 @@ function QuickLaunchPanel() {
       if (activePopup) return;
       const tag = document.activeElement?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement?.isContentEditable) return;
-      if (e.key === 't' || e.key === 'T') openPopup('translate');
-      if (e.key === 'w' || e.key === 'W') openPopup('bid');
+      if (e.key === 't' || e.key === 'T') { e.preventDefault(); openPopup('translate'); }
+      if (e.key === 'w' || e.key === 'W') { e.preventDefault(); openPopup('bid'); }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);

@@ -35,6 +35,7 @@ export const SYNC_KEYS = [
   'kana_stats',
   'kana_prefs',
   'kana_best_score',
+  'kana_cell_colors',
   'sidebarOrder',
   'todoFontSize',
   'subtaskFontSize',

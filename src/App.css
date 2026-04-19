@@ -7752,6 +7752,25 @@ body.light .view-title {
 }
 
 /* Kana Popup */
+/* ── Kana popup window layout ── */
+.kana-popup-content .practice-tab {
+  height: 100%;
+  gap: 0.75rem;
+  overflow: hidden;
+  padding: 8px 10px;
+}
+
+.kana-popup-content .stats-bar,
+.kana-popup-content .wrong-analysis,
+.kana-popup-content .study-words-section {
+  display: none !important;
+}
+
+.kana-popup-content .flashcard-area {
+  flex: 1;
+  min-height: 0;
+}
+
 .kana-popup-overlay {
   position: fixed;
   inset: 0;

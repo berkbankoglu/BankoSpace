@@ -1025,13 +1025,26 @@
 .fc-ai-panel {
   width: 100%;
   background: #0d1117;
-  border-bottom: 1px solid #21262d;
+  border-bottom: none;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
   padding: 0;
   flex-shrink: 0;
-  max-height: 420px;
+}
+
+.fc-ai-resize-handle {
+  width: 100%;
+  height: 6px;
+  background: #21262d;
+  cursor: ns-resize;
+  flex-shrink: 0;
+  position: relative;
+  transition: background 0.15s;
+}
+
+.fc-ai-resize-handle:hover {
+  background: #5c7cfa;
 }
 
 .fc-ai-panel-header {

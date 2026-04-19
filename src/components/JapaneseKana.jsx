@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getAudioContext, getMasterGain, getVolume } from "../utils/sounds";
+import { pushKeyToSupabase } from "../supabase";
 import "./JapaneseKana.css";
 
 function openKanaPopup() {
@@ -521,31 +522,53 @@ function buildTransposedGrid(rows) {
   return grid;
 }
 
-function KanaTable({ rows, title, colLabels = COL_LABELS }) {
+const CELL_COLORS = [null, '#f85149', '#d2a800', '#3fb950']; // null=none, red, yellow, green
+
+function loadCellColors() {
+  try { return JSON.parse(localStorage.getItem('kana_cell_colors') || '{}'); } catch { return {}; }
+}
+function saveCellColors(obj) {
+  localStorage.setItem('kana_cell_colors', JSON.stringify(obj));
+  pushKeyToSupabase('kana_cell_colors', obj);
+}
+
+function KanaTable({ rows, title, colLabels = COL_LABELS, cellColors, onCellColor, searchQuery }) {
   const grid = buildTransposedGrid(rows);
   return (
     <div className="kana-table-wrapper">
       <h3 className="kana-table-title">{title}</h3>
-      <div className="kana-grid" style={{ gridTemplateColumns: `28px repeat(${colLabels.length}, 1fr)` }}>
-        {/* Header row */}
+      <div className="kana-grid" style={{ gridTemplateColumns: `28px repeat(${colLabels.length}, 72px)` }}>
         <div className="kana-grid-row">
           <span className="kana-vowel-label" />
           {colLabels.map((c) => (
             <span key={c} className="kana-col-label">{c}</span>
           ))}
         </div>
-        {/* Vowel rows */}
         {grid.map((row, vi) => (
           <div key={vi} className="kana-grid-row">
             <span className="kana-vowel-label">{VOWEL_LABELS[vi]}</span>
             {row.map((p, ci) =>
-              p ? (
-                <div key={ci} className="kana-cell kana-cell--clickable" onClick={() => speakKana(p.char)} title="Click to hear">
-                  <span className="kana-char">{p.char}</span>
-                  <span className="kana-romaji">{p.romaji}</span>
-                  <span className="kana-speak-icon">🔊</span>
-                </div>
-              ) : (
+              p ? (() => {
+                const colorIdx = cellColors[p.char] || 0;
+                const borderColor = CELL_COLORS[colorIdx];
+                const q = searchQuery.trim().toLowerCase();
+                const isMatch = q && p.romaji.toLowerCase().includes(q);
+                return (
+                  <div
+                    key={ci}
+                    className={`kana-cell kana-cell--clickable${isMatch ? ' kana-cell--match' : ''}`}
+                    style={borderColor ? { borderColor, boxShadow: `0 0 0 1px ${borderColor}` } : {}}
+                    onClick={() => onCellColor(p.char)}
+                    title={p.romaji}
+                  >
+                    <span className="kana-char">{p.char}</span>
+                    <span className="kana-romaji">{p.romaji}</span>
+                    {colorIdx > 0 && (
+                      <span className="kana-color-dot" style={{ background: CELL_COLORS[colorIdx] }} />
+                    )}
+                  </div>
+                );
+              })() : (
                 <div key={ci} className="kana-cell kana-cell--empty" />
               )
             )}
@@ -557,17 +580,46 @@ function KanaTable({ rows, title, colLabels = COL_LABELS }) {
 }
 
 function GuideTab() {
+  const [cellColors, setCellColors] = useState(loadCellColors);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const handleCellColor = (char) => {
+    setCellColors(prev => {
+      const next = { ...prev, [char]: ((prev[char] || 0) + 1) % CELL_COLORS.length };
+      saveCellColors(next);
+      return next;
+    });
+  };
+
+  const tableProps = { cellColors, onCellColor: handleCellColor, searchQuery };
+
   return (
     <div className="guide-tab">
+      {/* Search + legend */}
+      <div className="guide-toolbar">
+        <input
+          className="guide-search"
+          placeholder="Search romaji (e.g. ka, shi, tsu...)"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+        />
+        <div className="guide-legend">
+          <span className="guide-legend-hint">Right-click to mark:</span>
+          {CELL_COLORS.slice(1).map((c, i) => (
+            <span key={i} className="guide-legend-dot" style={{ background: c }} />
+          ))}
+        </div>
+      </div>
+
       <div className="guide-section-label">Basic — 清音</div>
       <div className="guide-tables-row">
-        <KanaTable rows={HIRAGANA_ROWS} title="Hiragana" />
-        <KanaTable rows={KATAKANA_ROWS} title="Katakana" />
+        <KanaTable rows={HIRAGANA_ROWS} title="Hiragana" {...tableProps} />
+        <KanaTable rows={KATAKANA_ROWS} title="Katakana" {...tableProps} />
       </div>
       <div className="guide-section-label">Voiced &amp; Semi-voiced — 濁音・半濁音</div>
       <div className="guide-tables-row">
-        <KanaTable rows={HIRAGANA_VOICED_ROWS} title="Hiragana voiced" colLabels={VOICED_COL_LABELS} />
-        <KanaTable rows={KATAKANA_VOICED_ROWS} title="Katakana voiced" colLabels={VOICED_COL_LABELS} />
+        <KanaTable rows={HIRAGANA_VOICED_ROWS} title="Hiragana voiced" colLabels={VOICED_COL_LABELS} {...tableProps} />
+        <KanaTable rows={KATAKANA_VOICED_ROWS} title="Katakana voiced" colLabels={VOICED_COL_LABELS} {...tableProps} />
       </div>
     </div>
   );
@@ -689,6 +741,7 @@ export function PracticeTab({ selectedRows, setSelectedRows }) {
   const [mode, setMode] = useState(prefs.mode || "Hiragana");
   const [direction, setDirection] = useState(prefs.direction || "Kana → Romaji");
   const [includeVoiced, setIncludeVoiced] = useState(() => prefs.includeVoiced ?? false);
+  const [colorFilter, setColorFilter] = useState(new Set()); // Set of active color indices
 
   const [stats, setStats] = useState(loadStats);
   const [current, setCurrent] = useState(null);
@@ -716,7 +769,16 @@ export function PracticeTab({ selectedRows, setSelectedRows }) {
   const pool = selectedRows === null
     ? basePool
     : basePool.filter(item => selectedRows.includes(item.char));
-  const effectivePool = pool.length > 0 ? pool : basePool;
+
+  // Filter by color mark
+  const cellColors = loadCellColors();
+  const hasColorFilter = colorFilter.size > 0;
+  const colorFilteredPool = hasColorFilter
+    ? basePool.filter(item => colorFilter.has(cellColors[item.char] || 0))
+    : pool;
+  const effectivePool = (hasColorFilter ? colorFilteredPool : pool).length > 0
+    ? (hasColorFilter ? colorFilteredPool : pool)
+    : basePool;
 
   // Row groups for selection UI
   const hiraganaRows = HIRAGANA_ROWS.map((row, i) => ({ label: ROW_LABELS[i], items: row.map(parseEntry).filter(Boolean) }));
@@ -954,10 +1016,34 @@ export function PracticeTab({ selectedRows, setSelectedRows }) {
         <button className="reset-btn" onClick={resetStats}>
           Reset Stats
         </button>
+
+        {/* Color filters */}
+        <div className="color-filter-group">
+          {[
+            { idx: 1, color: '#f85149', label: 'Red' },
+            { idx: 2, color: '#d2a800', label: 'Yellow' },
+            { idx: 3, color: '#3fb950', label: 'Green' },
+          ].map(({ idx, color, label }) => {
+            const count = basePool.filter(item => (cellColors[item.char] || 0) === idx).length;
+            return (
+              <button
+                key={idx}
+                className={`color-filter-btn${colorFilter.has(idx) ? ' active' : ''}`}
+                style={{ '--cf-color': color }}
+                onClick={() => { setColorFilter(prev => { const next = new Set(prev); next.has(idx) ? next.delete(idx) : next.add(idx); return next; }); setSelectedRows(null); }}
+                title={`Practice ${label} marked (${count})`}
+                disabled={count === 0}
+              >
+                <span className="cf-dot" style={{ background: color }} />
+                {count}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Row selection */}
-      <div className="row-select-bar">
+      {/* Row selection — hidden when color filter active */}
+      <div className="row-select-bar" style={hasColorFilter ? { display: 'none' } : {}}>
         <div className="row-select-label">Practice rows:</div>
         <div className="row-select-groups">
           {visibleRowGroups.map((group) => {

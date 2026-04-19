@@ -55,6 +55,11 @@ function FlashCards({ fullscreen = false }) {
   const [aiMode, setAiMode] = useState('single'); // 'single' | 'bulk'
   const [bulkPrompt, setBulkPrompt] = useState('');
   const [bulkResults, setBulkResults] = useState(null); // array of {front, back}
+  const [aiPanelHeight, setAiPanelHeight] = useState(() => {
+    return parseInt(localStorage.getItem('fc_ai_panel_height') || '340', 10);
+  });
+  const sidebarRef = useRef(null);
+  const isResizingRef = useRef(false);
 
   // Reload from localStorage when flashcards-updated event fires (from QuickNote)
   useEffect(() => {
@@ -225,7 +230,7 @@ function FlashCards({ fullscreen = false }) {
         max_tokens: 400,
         messages: [{
           role: 'user',
-          content: `Word/concept: "${aiWord}"\n\nRespond in this JSON format only (nothing else, just JSON):\n{"word":"original word/concept","translation":"short English translation or equivalent (max 5 words)","explanation":"detailed English explanation in 2-3 sentences, what it means and how it is used"}`
+          content: `Word/concept: "${aiWord}"\n\nRespond in this JSON format only (nothing else, just JSON):\n{"word":"original word/concept","translation":"short Turkish translation or equivalent (max 5 words)","explanation":"detailed Turkish explanation in 2-3 sentences, what it means and how it is used"}`
         }]
       });
       const text = await invoke('fetch_post', {
@@ -409,13 +414,13 @@ function FlashCards({ fullscreen = false }) {
   return (
     <div className={`fc-wrapper ${fullscreen ? 'fullscreen' : ''}`}>
       {/* Left Sidebar Menu */}
-      <div className="fc-sidebar">
+      <div className="fc-sidebar" ref={sidebarRef}>
         <div className="fc-sidebar-header" style={{ display: 'none' }}>
           <h2>Flash Cards</h2>
         </div>
 
         {/* AI Assistant — inside sidebar */}
-        <div className="fc-ai-panel">
+        <div className="fc-ai-panel" style={{ maxHeight: aiPanelHeight, minHeight: 120 }}>
           <div className="fc-ai-panel-header">
             <span className="fc-ai-panel-title">AI Asistan</span>
             <button
@@ -553,6 +558,31 @@ function FlashCards({ fullscreen = false }) {
             </div>
           )}
         </div>
+
+        {/* Resize handle between AI panel and deck list */}
+        <div
+          className="fc-ai-resize-handle"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            isResizingRef.current = true;
+            const startY = e.clientY;
+            const startHeight = aiPanelHeight;
+            const onMove = (ev) => {
+              if (!isResizingRef.current) return;
+              const delta = ev.clientY - startY;
+              const newH = Math.max(120, Math.min(700, startHeight + delta));
+              setAiPanelHeight(newH);
+              localStorage.setItem('fc_ai_panel_height', String(newH));
+            };
+            const onUp = () => {
+              isResizingRef.current = false;
+              window.removeEventListener('mousemove', onMove);
+              window.removeEventListener('mouseup', onUp);
+            };
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('mouseup', onUp);
+          }}
+        />
 
         <div className="fc-menu">
           {/* New Deck Section */}
