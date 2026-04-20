@@ -64,7 +64,7 @@ export default function KanaApp() {
       </div>
 
       {/* Practice content */}
-      <div className="kana-popup-content" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <div className="kana-popup-content" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
         <PracticeTab selectedRows={selectedRows} setSelectedRows={setSelectedRows} />
       </div>
     </div>
