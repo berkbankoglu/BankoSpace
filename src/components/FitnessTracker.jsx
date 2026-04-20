@@ -205,57 +205,60 @@ export default function FitnessTracker() {
 
           {/* Sağ: profil butonu */}
           <div className="ft-hero-actions">
-            {!editingProfile
-              ? <button className="ft-btn-ghost" onClick={() => { setDraft(profile); setEditingProfile(true); }}>
-                  {hasProfile ? 'Profili Düzenle' : '+ Profil Oluştur'}
-                </button>
-              : <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="ft-btn-accent" onClick={saveProfile}>Kaydet</button>
-                  <button className="ft-btn-ghost" onClick={() => setEditingProfile(false)}>İptal</button>
-                </div>
-            }
+            <button className="ft-btn-ghost" onClick={() => { setDraft(profile); setEditingProfile(true); }}>
+              {hasProfile ? 'Profili Düzenle' : '+ Profil Oluştur'}
+            </button>
           </div>
         </div>
 
-        {/* Profil edit formu */}
+        {/* Profil popup */}
         {editingProfile && (
-          <div className="ft-card">
-            <div className="ft-card-label" style={{ marginBottom: 12 }}>Profil Bilgileri</div>
-            <div className="ft-profile-grid">
-              {[
-                { key: 'gender',       label: 'Cinsiyet',   type: 'select', opts: [['male','Erkek'],['female','Kadın']] },
-                { key: 'age',          label: 'Yaş',        type: 'number', ph: '25' },
-                { key: 'height',       label: 'Boy (cm)',   type: 'number', ph: '175' },
-                { key: 'weight',       label: 'Kilo (kg)',  type: 'number', ph: '75' },
-                { key: 'targetWeight', label: 'Hedef (kg)', type: 'number', ph: '70' },
-                { key: 'waist',        label: 'Bel (cm)',   type: 'number', ph: '85' },
-                { key: 'neck',         label: 'Boyun (cm)', type: 'number', ph: '38' },
-                ...(draft.gender === 'female' ? [{ key: 'hip', label: 'Kalça (cm)', type: 'number', ph: '95' }] : []),
-              ].map(f => (
-                <label key={f.key} className="ft-label">
-                  {f.label}
-                  {f.type === 'select'
-                    ? <select className="ft-input" value={draft[f.key]} onChange={e => setDraft(p => ({ ...p, [f.key]: e.target.value }))}>
-                        {f.opts.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                      </select>
-                    : <input className="ft-input" type="number" placeholder={f.ph} value={draft[f.key]} onChange={e => setDraft(p => ({ ...p, [f.key]: e.target.value }))} />
-                  }
+          <div className="ft-popup-overlay" onClick={() => setEditingProfile(false)}>
+            <div className="ft-popup" onClick={e => e.stopPropagation()}>
+              <div className="ft-popup-header">
+                <span className="ft-popup-title">Profil Bilgileri</span>
+                <button className="ft-popup-close" onClick={() => setEditingProfile(false)}>✕</button>
+              </div>
+              <div className="ft-profile-grid">
+                {[
+                  { key: 'gender',       label: 'Cinsiyet',   type: 'select', opts: [['male','Erkek'],['female','Kadın']] },
+                  { key: 'age',          label: 'Yaş',        type: 'number', ph: '25' },
+                  { key: 'height',       label: 'Boy (cm)',   type: 'number', ph: '175' },
+                  { key: 'weight',       label: 'Kilo (kg)',  type: 'number', ph: '75' },
+                  { key: 'targetWeight', label: 'Hedef (kg)', type: 'number', ph: '70' },
+                  { key: 'waist',        label: 'Bel (cm)',   type: 'number', ph: '85' },
+                  { key: 'neck',         label: 'Boyun (cm)', type: 'number', ph: '38' },
+                  ...(draft.gender === 'female' ? [{ key: 'hip', label: 'Kalça (cm)', type: 'number', ph: '95' }] : []),
+                ].map(f => (
+                  <label key={f.key} className="ft-label">
+                    {f.label}
+                    {f.type === 'select'
+                      ? <select className="ft-input" value={draft[f.key]} onChange={e => setDraft(p => ({ ...p, [f.key]: e.target.value }))}>
+                          {f.opts.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                        </select>
+                      : <input className="ft-input" type="number" placeholder={f.ph} value={draft[f.key]} onChange={e => setDraft(p => ({ ...p, [f.key]: e.target.value }))} />
+                    }
+                  </label>
+                ))}
+                <label className="ft-label" style={{ gridColumn: '1/-1' }}>
+                  Aktivite
+                  <select className="ft-input" value={draft.activity} onChange={e => setDraft(p => ({ ...p, activity: e.target.value }))}>
+                    {ACTIVITY.map(a => <option key={a.key} value={a.key}>{a.label}</option>)}
+                  </select>
                 </label>
-              ))}
-              <label className="ft-label" style={{ gridColumn: '1/-1' }}>
-                Aktivite
-                <select className="ft-input" value={draft.activity} onChange={e => setDraft(p => ({ ...p, activity: e.target.value }))}>
-                  {ACTIVITY.map(a => <option key={a.key} value={a.key}>{a.label}</option>)}
-                </select>
-              </label>
-              <label className="ft-label" style={{ gridColumn: '1/-1' }}>
-                Hedef
-                <select className="ft-input" value={draft.goal} onChange={e => setDraft(p => ({ ...p, goal: e.target.value }))}>
-                  <option value="cut">Yağ Yakma (Kalori Açığı -500)</option>
-                  <option value="maintain">Kilo Koruma</option>
-                  <option value="bulk">Kas Kazanımı (+300)</option>
-                </select>
-              </label>
+                <label className="ft-label" style={{ gridColumn: '1/-1' }}>
+                  Hedef
+                  <select className="ft-input" value={draft.goal} onChange={e => setDraft(p => ({ ...p, goal: e.target.value }))}>
+                    <option value="cut">Yağ Yakma (Kalori Açığı -500)</option>
+                    <option value="maintain">Kilo Koruma</option>
+                    <option value="bulk">Kas Kazanımı (+300)</option>
+                  </select>
+                </label>
+              </div>
+              <div className="ft-popup-footer">
+                <button className="ft-btn-ghost" onClick={() => setEditingProfile(false)}>İptal</button>
+                <button className="ft-btn-accent" onClick={saveProfile}>Kaydet</button>
+              </div>
             </div>
           </div>
         )}
