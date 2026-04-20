@@ -51,29 +51,28 @@
 
 /* ── ANA LAYOUT: kilo dar solda + 3 eşit kutu ── */
 .ft-main-layout {
-  display: flex;
+  display: grid;
+  grid-template-columns: 220px 1fr 1fr 1fr;
   gap: 12px;
   align-items: stretch;
   min-height: 0;
 }
 
 .ft-weight-col {
-  width: 220px;
-  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
 }
 
-/* 3 eşit kutu */
-.ft-three-col {
+.ft-weight-col .ft-card {
   flex: 1;
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 12px;
-  align-items: start;
-  min-width: 0;
+}
+
+/* 3 eşit kutu — içerik olarak display:contents kullanarak grid'e katılır */
+.ft-three-col {
+  display: contents;
 }
 
 .ft-fill-card {
-  height: 100%;
   box-sizing: border-box;
 }
 
