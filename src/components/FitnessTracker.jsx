@@ -92,6 +92,10 @@ export default function FitnessTracker() {
   const [draft, setDraft]                   = useState(profile);
   const [weightLog, setWeightLog]           = useState(() => load('ft_weight_log', []));
   const [weightInput, setWeightInput]       = useState('');
+  const [addDate, setAddDate]               = useState(today());
+  const [editingIdx, setEditingIdx]         = useState(null);  // index in reversed list
+  const [editDate, setEditDate]             = useState('');
+  const [editVal, setEditVal]               = useState('');
 
   useEffect(() => { save('ft_weight_log', weightLog); }, [weightLog]);
 
@@ -113,10 +117,33 @@ export default function FitnessTracker() {
   function addWeight() {
     const v = parseFloat(weightInput);
     if (!v) return;
-    setWeightLog(prev => [...prev.filter(e => e.date !== today()), { date: today(), value: v }].sort((a, b) => a.date.localeCompare(b.date)));
+    setWeightLog(prev => [...prev.filter(e => e.date !== addDate), { date: addDate, value: v }].sort((a, b) => a.date.localeCompare(b.date)));
     setWeightInput('');
+    // if it's today or the most recent date, update profile weight too
     setProfile(p => { const np = { ...p, weight: v }; save('ft_profile', np); return np; });
     setDraft(p => ({ ...p, weight: v }));
+  }
+
+  function startEdit(reversedIdx, entry) {
+    setEditingIdx(reversedIdx);
+    setEditDate(entry.date);
+    setEditVal(String(entry.value));
+  }
+
+  function saveEdit(originalDate) {
+    const v = parseFloat(editVal);
+    if (!v || !editDate) { setEditingIdx(null); return; }
+    setWeightLog(prev => {
+      // remove old entry by original date, add new one with editDate
+      const filtered = prev.filter(e => e.date !== originalDate);
+      return [...filtered, { date: editDate, value: v }].sort((a, b) => a.date.localeCompare(b.date));
+    });
+    setEditingIdx(null);
+  }
+
+  function deleteEntry(date) {
+    setWeightLog(prev => prev.filter(e => e.date !== date));
+    setEditingIdx(null);
   }
 
   return (
@@ -245,6 +272,7 @@ export default function FitnessTracker() {
             </div>
 
             <div className="ft-weight-input-row">
+              <input type="date" className="ft-input ft-date-sm" value={addDate} onChange={e => setAddDate(e.target.value)} />
               <input className="ft-input" type="number" step="0.1" placeholder="75.5 kg"
                 value={weightInput}
                 onChange={e => setWeightInput(e.target.value)}
@@ -261,14 +289,26 @@ export default function FitnessTracker() {
             {weightLog.length === 0 && <div className="ft-empty">Henüz kilo kaydı yok</div>}
 
             <div className="ft-weight-list">
-              {[...weightLog].reverse().slice(0, 6).map((e, i) => (
-                <div key={i} className="ft-list-row">
-                  <span className="ft-list-date">{e.date}</span>
-                  <span className="ft-list-val">{e.value} kg</span>
-                  {profile.targetWeight && (
-                    <span className="ft-list-sub">{(e.value - profile.targetWeight).toFixed(1)} kg</span>
-                  )}
-                </div>
+              {[...weightLog].reverse().slice(0, 8).map((e, i) => (
+                editingIdx === i ? (
+                  <div key={i} className="ft-list-row ft-list-editing">
+                    <input type="date" className="ft-input ft-edit-input" value={editDate} onChange={ev => setEditDate(ev.target.value)} />
+                    <input type="number" step="0.1" className="ft-input ft-edit-input" value={editVal} onChange={ev => setEditVal(ev.target.value)}
+                      onKeyDown={ev => { if (ev.key === 'Enter') saveEdit(e.date); if (ev.key === 'Escape') setEditingIdx(null); }} />
+                    <button className="ft-btn-accent ft-edit-save" onClick={() => saveEdit(e.date)}>✓</button>
+                    <button className="ft-del-btn" onClick={() => deleteEntry(e.date)} title="Sil">×</button>
+                    <button className="ft-btn-ghost ft-edit-cancel" onClick={() => setEditingIdx(null)}>İptal</button>
+                  </div>
+                ) : (
+                  <div key={i} className="ft-list-row ft-list-clickable" onClick={() => startEdit(i, e)} title="Düzenlemek için tıkla">
+                    <span className="ft-list-date">{e.date}</span>
+                    <span className="ft-list-val">{e.value} kg</span>
+                    {profile.targetWeight && (
+                      <span className="ft-list-sub">{(e.value - profile.targetWeight).toFixed(1)} kg</span>
+                    )}
+                    <span className="ft-list-edit-hint">✎</span>
+                  </div>
+                )
               ))}
             </div>
           </div>
