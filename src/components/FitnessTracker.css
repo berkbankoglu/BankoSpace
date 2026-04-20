@@ -49,18 +49,33 @@
 
 .ft-hero-actions { flex-shrink: 0; padding-top: 2px; }
 
-/* ── 3 KOLON LAYOUT ── */
-.ft-three-col {
-  display: grid;
-  grid-template-columns: 240px 1fr 240px;
+/* ── ANA LAYOUT: kilo dar solda + 3 eşit kutu ── */
+.ft-main-layout {
+  display: flex;
   gap: 12px;
   align-items: stretch;
-  flex: 1;
   min-height: 0;
 }
 
-.ft-panel { display: flex; flex-direction: column; gap: 12px; }
-.ft-panel-plate { align-items: stretch; }
+.ft-weight-col {
+  width: 220px;
+  flex-shrink: 0;
+}
+
+/* 3 eşit kutu */
+.ft-three-col {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+  align-items: start;
+  min-width: 0;
+}
+
+.ft-fill-card {
+  height: 100%;
+  box-sizing: border-box;
+}
 
 /* ── CARDS ── */
 .ft-card {

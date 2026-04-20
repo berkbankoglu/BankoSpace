@@ -411,13 +411,11 @@ export default function FitnessTracker() {
           </div>
         )}
 
-        {/* ══ 3 PANEL ══ */}
-        <div className="ft-three-col">
+        {/* ══ ANA LAYOUT: Kilo (dar, sol) + 3 eşit kutu ══ */}
+        <div className="ft-main-layout">
 
-          {/* ── SOL: Kilo Takibi + Öğün Log ── */}
-          <div className="ft-panel ft-panel-left">
-
-            {/* Kilo Takibi */}
+          {/* ── Kilo Takibi (dar, sol) ── */}
+          <div className="ft-weight-col">
             <div className="ft-card">
               <div className="ft-card-header">
                 <div className="ft-card-label">Kilo Takibi</div>
@@ -460,16 +458,17 @@ export default function FitnessTracker() {
                 ))}
               </div>
             </div>
+          </div>
 
-            {/* Öğün Log */}
-            <div className="ft-card ft-meal-log-card">
+          {/* ── 3 eşit kutu ── */}
+          <div className="ft-three-col">
+
+            {/* Kutu 1: Öğün Log */}
+            <div className="ft-card ft-fill-card">
               <div className="ft-card-header">
                 <div className="ft-card-label">Öğün Geçmişi</div>
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                  <input type="date" className="ft-input ft-date-sm" value={mealDate} onChange={e => setMealDate(e.target.value)} />
-                </div>
+                <input type="date" className="ft-input ft-date-sm" value={mealDate} onChange={e => setMealDate(e.target.value)} />
               </div>
-              {/* Günlük özet */}
               <div className="ft-log-summary">
                 <span className="ft-log-kcal" style={{ color: todayKcal > goalKcal && goalKcal ? '#f85149' : '#5c7cfa' }}>
                   {todayKcal} kcal
@@ -480,7 +479,6 @@ export default function FitnessTracker() {
                   · Y <b style={{ color: '#3fb950' }}>{todayFat}g</b>
                 </span>
               </div>
-              {/* Öğün grupları */}
               {MEAL_TYPES.map(type => {
                 const items = todayMeals.filter(m => m.type === type);
                 if (!items.length) return null;
@@ -503,11 +501,9 @@ export default function FitnessTracker() {
               })}
               {todayMeals.length === 0 && <div className="ft-empty">Henüz öğün eklenmedi</div>}
             </div>
-          </div>
 
-          {/* ── ORTA: Tabak ── */}
-          <div className="ft-panel ft-panel-plate">
-            <div className="ft-card ft-plate-card">
+            {/* Kutu 2: Tabak */}
+            <div className="ft-card ft-fill-card ft-plate-card">
               <div className="ft-card-header">
                 <div className="ft-card-label">Tabak</div>
                 <select className="ft-input" style={{ width: 110 }} value={plateMealType} onChange={e => setPlateMealType(e.target.value)}>
@@ -515,7 +511,6 @@ export default function FitnessTracker() {
                 </select>
               </div>
 
-              {/* Drop zone */}
               <div
                 className={`ft-plate-drop${plateOver ? ' ft-plate-over' : ''}`}
                 onDragOver={e => { e.preventDefault(); setPlateOver(true); }}
@@ -541,7 +536,6 @@ export default function FitnessTracker() {
                 )}
               </div>
 
-              {/* Tabak toplamları */}
               {plate.length > 0 && (
                 <div className="ft-plate-totals">
                   <div className="ft-plate-total-kcal">{plateKcal} kcal</div>
@@ -556,11 +550,9 @@ export default function FitnessTracker() {
                 </div>
               )}
             </div>
-          </div>
 
-          {/* ── SAĞ: Yiyecek Arama ── */}
-          <div className="ft-panel ft-panel-search">
-            <div className="ft-card ft-search-card">
+            {/* Kutu 3: Yiyecek Arama */}
+            <div className="ft-card ft-fill-card ft-search-card">
               <div className="ft-card-header">
                 <div className="ft-card-label">Yiyecek Ara</div>
               </div>
@@ -612,9 +604,10 @@ export default function FitnessTracker() {
                 })}
               </div>
             </div>
-          </div>
 
+          </div>
         </div>
+
       </div>
     </div>
   );
