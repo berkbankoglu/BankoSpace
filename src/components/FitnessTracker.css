@@ -86,18 +86,15 @@
   padding-top: 4px;
 }
 
-/* ── BOTTOM ROW ── */
-.ft-bottom-row {
-  display: flex;
+/* ── MAIN GRID 2-col ── */
+.ft-grid {
+  display: grid;
+  grid-template-columns: 320px 1fr;
   gap: 14px;
-  align-items: flex-start;
+  align-items: start;
 }
 
-/* ── WEIGHT CARD (dar, solda) ── */
-.ft-weight-card {
-  width: 320px;
-  flex-shrink: 0;
-}
+.ft-weight-card { /* inherits from ft-card */ }
 
 /* ── CARDS ── */
 .ft-card {
@@ -327,6 +324,147 @@
   padding-top: 4px;
   border-top: 1px solid #21262d;
 }
+
+/* ── KALORI ÖZETİ ── */
+.ft-cal-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.ft-cal-main { display: flex; align-items: baseline; gap: 4px; }
+
+.ft-cal-num {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.ft-cal-of {
+  font-size: 13px;
+  color: #484f58;
+}
+
+.ft-macro-pills {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ft-mpill {
+  font-size: 12px;
+  font-weight: 600;
+  background: #21262d;
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+
+/* ── ÖĞÜN EKLEME FORMU ── */
+.ft-meal-add-form {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.ft-meal-add-form .ft-input { min-width: 0; }
+
+/* ── ARAMA DROPDOWN ── */
+.ft-search-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #1c2128;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  z-index: 200;
+  max-height: 220px;
+  overflow-y: auto;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+}
+
+.ft-search-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background 0.1s;
+  border-bottom: 1px solid #21262d44;
+}
+.ft-search-item:last-child { border-bottom: none; }
+.ft-search-item:hover { background: #21262d; }
+
+.ft-search-name { font-size: 13px; color: #c9d1d9; }
+.ft-search-kcal { font-size: 11px; color: #5c7cfa; white-space: nowrap; margin-left: 8px; }
+
+/* ── ÖĞÜN GRUBU ── */
+.ft-meal-group { margin-bottom: 6px; }
+
+.ft-group-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  font-weight: 700;
+  color: #484f58;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  padding: 5px 0 3px;
+  border-bottom: 1px solid #21262d;
+  margin-bottom: 2px;
+}
+
+/* ── KALORİ KÜTÜPHANESİ POPUP ── */
+.ft-popup-wide {
+  width: 680px !important;
+  max-width: 94vw !important;
+}
+
+.ft-lib-table {
+  display: flex;
+  flex-direction: column;
+  max-height: 420px;
+  overflow-y: auto;
+  margin-top: 8px;
+  border: 1px solid #21262d;
+  border-radius: 8px;
+}
+
+.ft-lib-header {
+  display: grid;
+  grid-template-columns: 1fr 80px 60px 50px 50px 50px;
+  gap: 8px;
+  padding: 7px 12px;
+  background: #21262d;
+  font-size: 10px;
+  font-weight: 700;
+  color: #484f58;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  position: sticky;
+  top: 0;
+}
+
+.ft-lib-row {
+  display: grid;
+  grid-template-columns: 1fr 80px 60px 50px 50px 50px;
+  gap: 8px;
+  padding: 7px 12px;
+  border-bottom: 1px solid #21262d44;
+  cursor: pointer;
+  transition: background 0.1s;
+  font-size: 12px;
+}
+.ft-lib-row:last-child { border-bottom: none; }
+.ft-lib-row:hover { background: #21262d; }
+
+.ft-lib-name { color: #c9d1d9; }
+.ft-lib-cell { color: #8b949e; white-space: nowrap; }
+.ft-lib-kcal { color: #5c7cfa; font-weight: 700; }
 
 /* ── HELPERS ── */
 .ft-empty { font-size: 12px; color: #484f58; padding: 10px 0; text-align: center; }
