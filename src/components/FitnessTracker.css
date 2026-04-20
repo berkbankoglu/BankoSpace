@@ -1,4 +1,8 @@
-.ft-container {
+/* ════════════════════════════════════════════
+   FITNESS TRACKER — Dashboard layout
+   ════════════════════════════════════════════ */
+
+.ft-root {
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -8,82 +12,133 @@
   overflow: hidden;
 }
 
-/* ── Scroll wrapper ── */
 .ft-scroll {
   flex: 1;
   overflow-y: auto;
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  max-width: 860px;
-  width: 100%;
-  margin: 0 auto;
-  box-sizing: border-box;
-}
-
-.ft-scroll::-webkit-scrollbar { width: 5px; }
-.ft-scroll::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
-
-/* ── Tab bar ── */
-.ft-tab-bar {
-  display: flex;
-  gap: 2px;
-  padding: 10px 16px 0;
-  border-bottom: 1px solid #21262d;
-  flex-shrink: 0;
-}
-
-.ft-tab {
-  padding: 8px 18px;
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: #8b949e;
-  font-size: 13px;
-  font-weight: 500;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all 0.15s;
-  margin-bottom: -1px;
-}
-
-.ft-tab:hover { color: #c9d1d9; }
-.ft-tab.active { color: #e6edf3; border-bottom-color: #5c7cfa; }
-
-/* ── Body ── */
-.ft-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px;
-}
-
-.ft-body::-webkit-scrollbar { width: 5px; }
-.ft-body::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
-
-.ft-section {
+  padding: 16px 18px 24px;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  max-width: 860px;
-  margin: 0 auto;
 }
 
-/* ── Cards ── */
-.ft-card {
+/* ── HERO BANNER ── */
+.ft-hero {
+  background: linear-gradient(135deg, #161b22 0%, #1c2128 100%);
+  border: 1px solid #21262d;
+  border-radius: 10px;
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.ft-hero-left { display: flex; flex-direction: column; gap: 10px; }
+
+.ft-hero-greeting {
+  font-size: 14px;
+  color: #8b949e;
+  font-weight: 500;
+}
+
+.ft-hero-accent {
+  color: #58a6ff;
+  font-weight: 700;
+}
+
+.ft-hero-stats {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-wrap: wrap;
+}
+
+.ft-hs-item {
+  display: flex;
+  flex-direction: column;
+  padding: 0 18px;
+}
+
+.ft-hs-item:first-child { padding-left: 0; }
+
+.ft-hs-val {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.ft-hs-label {
+  font-size: 11px;
+  color: #484f58;
+  margin-top: 2px;
+  white-space: nowrap;
+}
+
+.ft-hs-sep {
+  width: 1px;
+  height: 32px;
+  background: #21262d;
+  flex-shrink: 0;
+}
+
+/* ── STAT STRIP (BMR/TDEE/Hedef/Makrolar) ── */
+.ft-stat-strip {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ft-sc {
+  flex: 1;
+  min-width: 90px;
   background: #161b22;
   border: 1px solid #21262d;
   border-radius: 8px;
-  padding: 16px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  text-align: center;
 }
 
-.ft-card-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #8b949e;
+.ft-sc-icon { font-size: 14px; margin-bottom: 2px; }
+
+.ft-sc-val {
+  font-size: 18px;
+  font-weight: 700;
+  color: #e6edf3;
+  line-height: 1;
+}
+
+.ft-sc-label {
+  font-size: 10px;
+  color: #484f58;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  margin-bottom: 14px;
+  letter-spacing: 0.06em;
+  margin-top: 2px;
+}
+
+/* ── MAIN GRID 2-col ── */
+.ft-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 700px) {
+  .ft-grid { grid-template-columns: 1fr; }
+}
+
+.ft-col { display: flex; flex-direction: column; gap: 14px; }
+
+/* ── CARDS ── */
+.ft-card {
+  background: #161b22;
+  border: 1px solid #21262d;
+  border-radius: 10px;
+  padding: 16px;
 }
 
 .ft-card-header {
@@ -93,9 +148,17 @@
   margin-bottom: 14px;
 }
 
-.ft-card-header .ft-card-title { margin-bottom: 0; }
+.ft-card-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #8b949e;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
 
-/* ── Profile grid ── */
+/* ── PROFILE EDIT CARD ── */
+.ft-profile-edit-card { padding: 16px; }
+
 .ft-profile-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -110,6 +173,7 @@
   color: #8b949e;
 }
 
+/* ── INPUTS ── */
 .ft-input {
   background: #0d1117;
   border: 1px solid #30363d;
@@ -124,121 +188,28 @@
   box-sizing: border-box;
 }
 
-.ft-input:focus { border-color: #5c7cfa; }
+.ft-input:focus { border-color: #58a6ff; }
 
-/* ── Stats row ── */
-.ft-stats-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 10px;
-}
+.ft-date-sm { width: 138px !important; cursor: pointer; }
 
-.ft-stat-card {
-  background: #161b22;
-  border: 1px solid #21262d;
-  border-radius: 8px;
-  padding: 14px 16px;
-  text-align: center;
-}
-
-.ft-stat-label {
-  font-size: 11px;
-  font-weight: 600;
-  color: #484f58;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  margin-bottom: 6px;
-}
-
-.ft-stat-value {
-  font-size: 22px;
-  font-weight: 700;
-  color: #e6edf3;
-  line-height: 1.1;
-}
-
-.ft-stat-sub {
-  font-size: 11px;
-  color: #484f58;
-  margin-top: 4px;
-}
-
-/* ── Macros ── */
-.ft-macros-row {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.ft-macro-item {
-  flex: 1;
-  min-width: 90px;
-  background: #0d1117;
-  border: 1px solid #21262d;
+/* ── BUTTONS ── */
+.ft-btn-accent {
+  padding: 7px 14px;
+  background: #1f3b5a;
+  border: 1px solid #58a6ff44;
   border-radius: 6px;
-  padding: 10px 12px;
-  text-align: center;
-  border-top: 3px solid var(--mc);
-}
-
-.ft-macro-val {
-  display: block;
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--mc);
-}
-
-.ft-macro-label {
-  display: block;
-  font-size: 11px;
-  color: #484f58;
-  margin-top: 3px;
-}
-
-/* ── Weight entry row ── */
-.ft-row-inline {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-/* ── Buttons ── */
-.ft-btn-primary {
-  padding: 7px 16px;
-  background: #21262d;
-  border: 1px solid #30363d;
-  border-radius: 6px;
-  color: #c9d1d9;
+  color: #58a6ff;
   font-size: 13px;
   font-family: inherit;
+  font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.15s;
 }
+.ft-btn-accent:hover { background: #2d5280; border-color: #58a6ff; }
 
-.ft-btn-primary:hover {
-  background: #30363d;
-  border-color: #5c7cfa;
-  color: #e6edf3;
-}
-
-.ft-del-btn {
-  background: none;
-  border: none;
-  color: #484f58;
-  font-size: 16px;
-  cursor: pointer;
-  padding: 0 4px;
-  line-height: 1;
-  transition: color 0.15s;
-  flex-shrink: 0;
-}
-.ft-del-btn:hover { color: #f85149; }
-
-/* ── Ghost button ── */
 .ft-btn-ghost {
-  padding: 5px 12px;
+  padding: 6px 12px;
   background: transparent;
   border: 1px solid #30363d;
   border-radius: 6px;
@@ -247,52 +218,148 @@
   font-family: inherit;
   cursor: pointer;
   transition: all 0.15s;
+  white-space: nowrap;
 }
-.ft-btn-ghost:hover { border-color: #5c7cfa; color: #c9d1d9; }
+.ft-btn-ghost:hover { border-color: #58a6ff; color: #c9d1d9; }
 
-/* ── Profile pills (view mode) ── */
-.ft-profile-view { padding: 2px 0; }
-
-.ft-profile-pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.ft-pill {
+.ft-btn-sm {
+  padding: 5px 11px;
   background: #21262d;
   border: 1px solid #30363d;
-  border-radius: 20px;
-  padding: 4px 12px;
-  font-size: 12px;
+  border-radius: 6px;
   color: #c9d1d9;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.ft-btn-sm:hover { background: #30363d; border-color: #58a6ff; }
+
+.ft-del-btn {
+  background: none;
+  border: none;
+  color: #484f58;
+  font-size: 15px;
+  cursor: pointer;
+  padding: 0 3px;
+  line-height: 1;
+  transition: color 0.15s;
+  flex-shrink: 0;
+}
+.ft-del-btn:hover { color: #f85149; }
+
+/* ── BADGE ── */
+.ft-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  background: #58a6ff18;
+  border: 1px solid #58a6ff33;
+  color: #58a6ff;
+  border-radius: 20px;
 }
 
-.ft-pill-goal {
-  border-color: #5c7cfa44;
-  color: #5c7cfa;
-  background: #5c7cfa11;
+/* ── WEIGHT INPUT ROW ── */
+.ft-weight-input-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
 }
 
-/* ── Nutrition progress bars (new layout) ── */
-.ft-nut-bars {
+.ft-weight-input-row .ft-input { flex: 1; }
+
+/* ── SPARKLINE ── */
+.ft-sparkline-wrap {
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.ft-chart-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #484f58;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+
+/* ── LIST ROWS ── */
+.ft-list-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid #21262d44;
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+
+.ft-list-row:last-child { border-bottom: none; }
+
+.ft-list-date { color: #484f58; min-width: 88px; font-size: 11px; }
+.ft-list-val  { color: #c9d1d9; font-weight: 600; white-space: nowrap; }
+.ft-list-sub  { color: #484f58; font-size: 11px; white-space: nowrap; }
+.ft-list-name { flex: 1; color: #c9d1d9; min-width: 80px; }
+
+.ft-weight-list { display: flex; flex-direction: column; margin-top: 4px; }
+
+/* ── SUMMARY ROW ── */
+.ft-summary-row {
+  display: flex;
+  gap: 14px;
+  font-size: 12px;
+  color: #484f58;
+  padding: 8px 0 0;
+  border-top: 1px solid #21262d;
+  margin-top: 6px;
+}
+
+/* ── MACRO RINGS ── */
+.ft-macro-rings {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 14px;
+}
+
+.ft-ring-item {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 12px;
+  align-items: center;
+  gap: 3px;
 }
 
-.ft-nut-bar-row {
+.ft-ring-val {
+  font-size: 13px;
+  font-weight: 700;
+  color: #e6edf3;
+  margin-top: 2px;
+}
+
+.ft-ring-label {
+  font-size: 10px;
+  color: #484f58;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ── PROGRESS BARS ── */
+.ft-bars { display: flex; flex-direction: column; gap: 7px; margin-bottom: 12px; }
+
+.ft-bar-row {
   display: grid;
-  grid-template-columns: 60px 1fr 80px;
+  grid-template-columns: 52px 1fr 72px;
   align-items: center;
-  gap: 10px;
-  font-size: 12px;
+  gap: 8px;
+  font-size: 11px;
   color: #8b949e;
 }
 
+.ft-bar-label { white-space: nowrap; }
+.ft-bar-nums  { text-align: right; white-space: nowrap; font-size: 10px; }
+
 .ft-bar-bg {
-  height: 7px;
+  height: 6px;
   background: #21262d;
   border-radius: 4px;
   overflow: hidden;
@@ -301,186 +368,69 @@
 .ft-bar-fill {
   height: 100%;
   border-radius: 4px;
-  transition: width 0.3s;
+  transition: width 0.35s ease;
 }
 
-.ft-nut-val {
-  font-size: 11px;
-  color: #8b949e;
-  text-align: right;
-  white-space: nowrap;
-}
-
-/* ── Macro tags (inline in meal row) ── */
-.ft-macro-tag {
-  font-size: 11px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  white-space: nowrap;
-}
-
-/* ── Chart label ── */
-.ft-chart-label {
-  font-size: 11px;
-  font-weight: 600;
-  color: #484f58;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  margin-bottom: 6px;
-}
-
-/* ── Hint / empty ── */
-.ft-hint { font-size: 12px; color: #484f58; }
-.ft-empty { font-size: 13px; color: #484f58; padding: 12px 0; text-align: center; }
-
-/* ── Date row ── */
-.ft-date-row { display: flex; align-items: center; gap: 10px; }
-.ft-date-input { width: 160px !important; cursor: pointer; }
-
-/* ── Nutrition bars ── */
-.ft-nutrition-summary { display: flex; flex-direction: column; gap: 10px; }
-
-.ft-nut-bar-wrap { display: flex; flex-direction: column; gap: 4px; }
-
-.ft-nut-bar-label {
-  display: flex;
-  justify-content: space-between;
+.ft-net-row {
   font-size: 12px;
   color: #8b949e;
+  padding-top: 6px;
+  border-top: 1px solid #21262d44;
 }
 
-.ft-nut-bar-bg {
-  height: 7px;
-  background: #21262d;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.ft-nut-bar-fill {
-  height: 100%;
-  border-radius: 4px;
-  transition: width 0.3s;
-}
-
-.ft-net-kcal {
-  font-size: 13px;
-  font-weight: 600;
-  color: #c9d1d9;
-  margin-top: 4px;
-}
-
-/* ── Meal rows ── */
-.ft-meal-group { margin-bottom: 10px; }
-
-.ft-meal-group-label {
-  font-size: 11px;
-  font-weight: 600;
-  color: #484f58;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  padding: 4px 0;
-  margin-bottom: 4px;
-  border-bottom: 1px solid #21262d;
-}
-
-.ft-meal-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 4px;
-  border-bottom: 1px solid #21262d22;
-  font-size: 13px;
-  flex-wrap: wrap;
-}
-
-.ft-meal-name { flex: 1; color: #c9d1d9; min-width: 100px; }
-.ft-meal-kcal { color: #5c7cfa; font-weight: 600; white-space: nowrap; }
-.ft-meal-macro { font-size: 11px; padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
-.ft-p { background: #f8514922; color: #f85149; }
-.ft-c { background: #d2a80022; color: #d2a800; }
-.ft-f { background: #3fb95022; color: #3fb950; }
-
-/* ── Form ── */
-.ft-form {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+/* ── INLINE FORM ── */
+.ft-inline-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
   padding: 12px 0;
+  border-top: 1px solid #21262d;
   border-bottom: 1px solid #21262d;
   margin-bottom: 12px;
 }
 
-.ft-form .ft-input { flex: 1; min-width: 80px; }
+/* ── MEAL GROUPS ── */
+.ft-meal-group { margin-bottom: 8px; }
 
-/* ── Workout rows ── */
-.ft-workout-row {
+.ft-group-label {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 4px;
-  border-bottom: 1px solid #21262d22;
-  font-size: 13px;
-  flex-wrap: wrap;
-}
-
-.ft-wk-type { font-weight: 600; color: #e6edf3; min-width: 80px; }
-.ft-wk-dur { color: #58a6ff; white-space: nowrap; }
-.ft-wk-kcal { color: #3fb950; white-space: nowrap; }
-.ft-wk-notes { color: #8b949e; font-size: 12px; flex: 1; }
-
-.ft-wk-summary {
-  font-size: 12px;
+  justify-content: space-between;
+  font-size: 10px;
+  font-weight: 700;
   color: #484f58;
-  padding: 8px 4px 0;
-  border-top: 1px solid #21262d;
-  margin-top: 8px;
-}
-
-/* ── Weight log ── */
-.ft-weight-log { margin-top: 12px; display: flex; flex-direction: column; gap: 4px; }
-
-.ft-weight-row {
-  display: flex;
-  gap: 16px;
-  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
   padding: 4px 0;
-  border-bottom: 1px solid #21262d22;
-  color: #c9d1d9;
+  border-bottom: 1px solid #21262d;
+  margin-bottom: 2px;
 }
 
-.ft-weight-row span:first-child { color: #484f58; min-width: 100px; }
+.ft-group-kcal { color: #5c7cfa; font-weight: 700; }
 
-/* ── Chart ── */
-.ft-chart-svg {
-  width: 100%;
-  height: 100px;
-  display: block;
+/* ── TAGS ── */
+.ft-tag {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
 }
+.ft-tag-p { background: #f8514918; color: #f85149; }
+.ft-tag-c { background: #d2992218; color: #d29922; }
+.ft-tag-f { background: #3fb95018; color: #3fb950; }
 
-.ft-chart-empty {
-  font-size: 12px;
-  color: #484f58;
-  text-align: center;
-  padding: 20px 0;
-}
+/* ── MEASUREMENT TABLE ── */
+.ft-meas-table { display: flex; flex-direction: column; }
 
-/* ── Measurements ── */
-.ft-meas-row {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  font-size: 13px;
-  padding: 6px 4px;
-  border-bottom: 1px solid #21262d22;
-  align-items: center;
-}
-
-.ft-meas-date { color: #484f58; min-width: 100px; }
-
-.ft-meas-val {
+.ft-meas-chip {
   background: #21262d;
-  padding: 2px 8px;
+  border: 1px solid #30363d;
   border-radius: 4px;
-  font-size: 12px;
+  padding: 2px 7px;
+  font-size: 11px;
   color: #c9d1d9;
+  white-space: nowrap;
 }
+
+/* ── HELPERS ── */
+.ft-empty  { font-size: 12px; color: #484f58; padding: 10px 0; text-align: center; }
+.ft-hint   { font-size: 11px; color: #484f58; }
