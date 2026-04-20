@@ -92,11 +92,11 @@
 }
 
 .ft-card-label {
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 700;
   color: #8b949e;
   text-transform: uppercase;
-  letter-spacing: 0.09em;
+  letter-spacing: 0.07em;
 }
 
 /* ── INPUTS & BUTTONS ── */
@@ -105,9 +105,9 @@
   border: 1px solid #30363d;
   border-radius: 6px;
   color: #c9d1d9;
-  font-size: 12px;
+  font-size: 14px;
   font-family: inherit;
-  padding: 6px 9px;
+  padding: 7px 10px;
   outline: none;
   transition: border-color 0.15s;
   width: 100%;
@@ -118,12 +118,12 @@
 .ft-date-sm { cursor: pointer; }
 
 .ft-btn-accent {
-  padding: 6px 13px;
+  padding: 7px 14px;
   background: #1f3b5a;
   border: 1px solid #58a6ff44;
   border-radius: 6px;
   color: #58a6ff;
-  font-size: 12px;
+  font-size: 14px;
   font-family: inherit;
   font-weight: 600;
   cursor: pointer;
@@ -133,12 +133,12 @@
 .ft-btn-accent:hover { background: #2d5280; border-color: #58a6ff; }
 
 .ft-btn-ghost {
-  padding: 6px 12px;
+  padding: 7px 13px;
   background: transparent;
   border: 1px solid #30363d;
   border-radius: 6px;
   color: #8b949e;
-  font-size: 12px;
+  font-size: 13px;
   font-family: inherit;
   cursor: pointer;
   transition: all 0.15s;
@@ -147,12 +147,12 @@
 .ft-btn-ghost:hover { border-color: #58a6ff; color: #c9d1d9; }
 
 .ft-btn-sm {
-  padding: 4px 10px;
+  padding: 6px 12px;
   background: #21262d;
   border: 1px solid #30363d;
   border-radius: 6px;
   color: #c9d1d9;
-  font-size: 12px;
+  font-size: 13px;
   font-family: inherit;
   cursor: pointer;
   white-space: nowrap;
@@ -207,22 +207,22 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 0;
+  padding: 6px 0;
   border-bottom: 1px solid #21262d44;
-  font-size: 11px;
+  font-size: 13px;
 }
 .ft-list-row:last-child { border-bottom: none; }
 
-.ft-list-clickable { cursor: pointer; border-radius: 4px; padding: 4px 2px; }
+.ft-list-clickable { cursor: pointer; border-radius: 4px; padding: 6px 4px; }
 .ft-list-clickable:hover { background: #21262d55; }
 .ft-list-clickable:hover .ft-list-edit-hint { opacity: 1; }
 
-.ft-list-date { color: #484f58; min-width: 80px; }
+.ft-list-date { color: #484f58; min-width: 88px; }
 .ft-list-val  { color: #c9d1d9; font-weight: 600; white-space: nowrap; }
 .ft-list-sub  { color: #484f58; }
 .ft-list-name { flex: 1; color: #c9d1d9; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.ft-list-edit-hint { color: #484f58; font-size: 11px; margin-left: auto; opacity: 0; transition: opacity 0.15s; flex-shrink: 0; }
+.ft-list-edit-hint { color: #484f58; font-size: 13px; margin-left: auto; opacity: 0; transition: opacity 0.15s; flex-shrink: 0; }
 
 .ft-list-editing {
   background: #1c2128;
@@ -247,19 +247,19 @@
   padding-bottom: 10px;
   border-bottom: 1px solid #21262d;
 }
-.ft-log-kcal   { font-size: 20px; font-weight: 800; line-height: 1; }
-.ft-log-macros { font-size: 11px; color: #484f58; }
+.ft-log-kcal   { font-size: 22px; font-weight: 800; line-height: 1; }
+.ft-log-macros { font-size: 13px; color: #484f58; }
 
 .ft-meal-group { margin-bottom: 4px; }
 .ft-group-label {
   display: flex;
   justify-content: space-between;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 700;
   color: #484f58;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
-  padding: 5px 0 3px;
+  letter-spacing: 0.06em;
+  padding: 6px 0 4px;
   border-bottom: 1px solid #21262d;
   margin-bottom: 2px;
 }
@@ -326,10 +326,10 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: 13px;
   background: #21262d99;
   border-radius: 6px;
-  padding: 5px 8px;
+  padding: 6px 10px;
   backdrop-filter: blur(4px);
 }
 .ft-plate-name { flex: 1; color: #c9d1d9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
@@ -372,7 +372,7 @@
 .ft-food-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   overflow-y: auto;
   max-height: 520px;
 }
@@ -381,41 +381,41 @@
   background: #0d1117;
   border: 1px solid #21262d;
   border-radius: 7px;
-  padding: 8px 10px;
+  padding: 10px 12px;
   cursor: grab;
   transition: border-color 0.15s, background 0.15s;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
 }
 .ft-food-item:hover { border-color: #30363d; background: #161b22; }
 .ft-food-item:active { cursor: grabbing; border-color: #58a6ff; }
 
 .ft-food-info { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
-.ft-food-name { font-size: 12px; color: #c9d1d9; font-weight: 500; }
-.ft-food-kcal { font-size: 12px; color: #5c7cfa; font-weight: 700; white-space: nowrap; flex-shrink: 0; }
+.ft-food-name { font-size: 14px; color: #c9d1d9; font-weight: 500; }
+.ft-food-kcal { font-size: 14px; color: #5c7cfa; font-weight: 700; white-space: nowrap; flex-shrink: 0; }
 
 .ft-food-macros {
   display: flex;
-  gap: 8px;
-  font-size: 10px;
+  gap: 10px;
+  font-size: 12px;
 }
 
 .ft-food-actions {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   margin-top: 2px;
 }
 
 .ft-qty-input {
-  width: 56px !important;
+  width: 64px !important;
   text-align: center;
-  padding: 3px 5px !important;
-  font-size: 11px !important;
+  padding: 4px 6px !important;
+  font-size: 13px !important;
 }
 
-.ft-food-unit { font-size: 10px; color: #484f58; }
+.ft-food-unit { font-size: 12px; color: #484f58; }
 
 /* ── POPUP ── */
 .ft-popup-overlay {
@@ -463,4 +463,4 @@
 .ft-label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: #8b949e; }
 
 /* ── HELPERS ── */
-.ft-empty { font-size: 12px; color: #484f58; padding: 12px 0; text-align: center; }
+.ft-empty { font-size: 13px; color: #484f58; padding: 12px 0; text-align: center; }
