@@ -115,7 +115,7 @@
 }
 .ft-input:focus { border-color: #58a6ff; }
 
-.ft-date-sm { width: 128px !important; flex: none !important; cursor: pointer; }
+.ft-date-sm { cursor: pointer; }
 
 .ft-btn-accent {
   padding: 6px 13px;
@@ -185,12 +185,18 @@
 
 /* ── KİLO TAKİBİ ── */
 .ft-weight-input-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 6px;
   margin-bottom: 8px;
-  align-items: center;
 }
-.ft-weight-input-row .ft-input { flex: 1; min-width: 0; }
+.ft-weight-input-row .ft-date-sm {
+  grid-column: 1 / -1;
+  width: 100% !important;
+}
+.ft-weight-input-row .ft-btn-accent {
+  width: 100%;
+}
 
 .ft-sparkline-wrap { border-radius: 6px; overflow: hidden; margin-bottom: 6px; }
 
