@@ -59,96 +59,170 @@ function save(key, val) {
   pushKeyToSupabase(key, val);
 }
 
+// unit: 'g' → gram bazlı (kcal/makro per 100g)
+// unit: 'adet', perUnit: N → 1 adet = N gram eşdeğeri (kcal/makro per adet)
 const FOOD_DB = [
-  { name: 'Tavuk göğsü (ızgara)', kcal: 165, p: 31,  c: 0,   f: 3.6 },
-  { name: 'Tavuk but (ızgara)',    kcal: 209, p: 26,  c: 0,   f: 11  },
-  { name: 'Dana kıyma (%20 yağ)', kcal: 254, p: 17,  c: 0,   f: 20  },
-  { name: 'Dana bonfile',          kcal: 271, p: 26,  c: 0,   f: 18  },
-  { name: 'Dana antrikot',         kcal: 291, p: 24,  c: 0,   f: 21  },
-  { name: 'Kuzu pirzola',          kcal: 294, p: 25,  c: 0,   f: 21  },
-  { name: 'Hindi göğsü',           kcal: 135, p: 30,  c: 0,   f: 1   },
-  { name: 'Sucuk',                 kcal: 450, p: 16,  c: 1,   f: 42  },
-  { name: 'Salam',                 kcal: 300, p: 14,  c: 2,   f: 26  },
-  { name: 'Pastırma',              kcal: 230, p: 32,  c: 1,   f: 11  },
-  { name: 'Somon (ızgara)',        kcal: 208, p: 20,  c: 0,   f: 13  },
-  { name: 'Ton balığı (konserve)', kcal: 116, p: 26,  c: 0,   f: 1   },
-  { name: 'Hamsi',                 kcal: 131, p: 20,  c: 0,   f: 5   },
-  { name: 'Çipura',                kcal: 128, p: 21,  c: 0,   f: 4   },
-  { name: 'Levrek',                kcal: 124, p: 24,  c: 0,   f: 3   },
-  { name: 'Karides',               kcal: 99,  p: 24,  c: 0,   f: 0.3 },
-  { name: 'Yumurta (1 adet ~60g)',kcal: 78,  p: 6,   c: 0.6, f: 5   },
-  { name: 'Yumurta akı',           kcal: 17,  p: 4,   c: 0.2, f: 0   },
-  { name: 'Süt (%3.2)',            kcal: 61,  p: 3.2, c: 4.8, f: 3.2 },
-  { name: 'Yoğurt (%3)',           kcal: 59,  p: 3.5, c: 4.7, f: 3   },
-  { name: 'Yoğurt (light)',        kcal: 35,  p: 5,   c: 3.8, f: 0.2 },
-  { name: 'Kefir',                 kcal: 52,  p: 3.4, c: 4.7, f: 1.5 },
-  { name: 'Beyaz peynir (%40)',    kcal: 264, p: 17,  c: 2,   f: 21  },
-  { name: 'Kaşar peyniri',         kcal: 386, p: 25,  c: 1,   f: 31  },
-  { name: 'Lor peyniri',           kcal: 98,  p: 11,  c: 3,   f: 4   },
-  { name: 'Labne',                 kcal: 170, p: 10,  c: 4,   f: 13  },
-  { name: 'Tereyağı',              kcal: 717, p: 0.9, c: 0.1, f: 81  },
-  { name: 'Beyaz ekmek (dilim)',   kcal: 79,  p: 2.7, c: 15,  f: 1   },
-  { name: 'Tam buğday ekmek',      kcal: 69,  p: 3.6, c: 11,  f: 1.1 },
-  { name: 'Pirinç (pişmiş)',       kcal: 130, p: 2.7, c: 28,  f: 0.3 },
-  { name: 'Makarna (pişmiş)',      kcal: 131, p: 5,   c: 25,  f: 1.1 },
-  { name: 'Yulaf ezmesi (kuru)',   kcal: 389, p: 17,  c: 66,  f: 7   },
-  { name: 'Bulgur (pişmiş)',       kcal: 83,  p: 3,   c: 19,  f: 0.2 },
-  { name: 'Mercimek (pişmiş)',     kcal: 116, p: 9,   c: 20,  f: 0.4 },
-  { name: 'Nohut (pişmiş)',        kcal: 164, p: 9,   c: 27,  f: 2.6 },
-  { name: 'Fasulye (pişmiş)',      kcal: 127, p: 8.7, c: 23,  f: 0.5 },
-  { name: 'Patates (haşlanmış)',   kcal: 87,  p: 1.9, c: 20,  f: 0.1 },
-  { name: 'Patates kızartması',    kcal: 312, p: 3.4, c: 41,  f: 15  },
-  { name: 'Mısır (haşlanmış)',     kcal: 96,  p: 3.4, c: 21,  f: 1.5 },
-  { name: 'Domates',               kcal: 18,  p: 0.9, c: 3.9, f: 0.2 },
-  { name: 'Salatalık',             kcal: 15,  p: 0.7, c: 3.6, f: 0.1 },
-  { name: 'Biber (yeşil)',         kcal: 20,  p: 0.9, c: 4.6, f: 0.2 },
-  { name: 'Ispanak',               kcal: 23,  p: 2.9, c: 3.6, f: 0.4 },
-  { name: 'Brokoli',               kcal: 34,  p: 2.8, c: 7,   f: 0.4 },
-  { name: 'Havuç',                 kcal: 41,  p: 0.9, c: 10,  f: 0.2 },
-  { name: 'Kabak',                 kcal: 17,  p: 1.2, c: 3.1, f: 0.3 },
-  { name: 'Patlıcan',              kcal: 25,  p: 1,   c: 5.9, f: 0.2 },
-  { name: 'Soğan',                 kcal: 40,  p: 1.1, c: 9.3, f: 0.1 },
-  { name: 'Marul',                 kcal: 15,  p: 1.4, c: 2.9, f: 0.2 },
-  { name: 'Bezelye',               kcal: 81,  p: 5.4, c: 14,  f: 0.4 },
-  { name: 'Avokado',               kcal: 160, p: 2,   c: 9,   f: 15  },
-  { name: 'Elma',                  kcal: 52,  p: 0.3, c: 14,  f: 0.2 },
-  { name: 'Muz',                   kcal: 89,  p: 1.1, c: 23,  f: 0.3 },
-  { name: 'Portakal',              kcal: 47,  p: 0.9, c: 12,  f: 0.1 },
-  { name: 'Üzüm',                  kcal: 69,  p: 0.7, c: 18,  f: 0.2 },
-  { name: 'Çilek',                 kcal: 32,  p: 0.7, c: 7.7, f: 0.3 },
-  { name: 'Kivi',                  kcal: 61,  p: 1.1, c: 15,  f: 0.5 },
-  { name: 'Karpuz',                kcal: 30,  p: 0.6, c: 7.6, f: 0.2 },
-  { name: 'Kavun',                 kcal: 34,  p: 0.8, c: 8.2, f: 0.2 },
-  { name: 'Badem',                 kcal: 579, p: 21,  c: 22,  f: 50  },
-  { name: 'Ceviz',                 kcal: 654, p: 15,  c: 14,  f: 65  },
-  { name: 'Antep fıstığı',         kcal: 562, p: 20,  c: 28,  f: 45  },
-  { name: 'Fıstık ezmesi',         kcal: 588, p: 25,  c: 20,  f: 50  },
-  { name: 'Zeytinyağı',            kcal: 884, p: 0,   c: 0,   f: 100 },
-  { name: 'Zeytin (siyah)',        kcal: 115, p: 0.8, c: 6,   f: 11  },
-  { name: 'Ayran',                 kcal: 38,  p: 2,   c: 2.8, f: 2   },
-  { name: 'Portakal suyu (taze)', kcal: 45,  p: 0.7, c: 10,  f: 0.2 },
-  { name: 'Sütlü kahve (latte)',  kcal: 54,  p: 2.4, c: 6,   f: 2.5 },
-  { name: 'Kola',                  kcal: 42,  p: 0,   c: 10.6,f: 0   },
-  { name: 'Pizza (dilim)',         kcal: 266, p: 11,  c: 33,  f: 10  },
-  { name: 'Hamburger',             kcal: 295, p: 17,  c: 24,  f: 14  },
-  { name: 'Döner (tavuk dürüm)',  kcal: 218, p: 14,  c: 22,  f: 8   },
-  { name: 'Kebap (şiş)',           kcal: 195, p: 20,  c: 0,   f: 12  },
-  { name: 'Lahmacun',              kcal: 230, p: 11,  c: 30,  f: 8   },
-  { name: 'Gözleme (peynirli)',    kcal: 280, p: 10,  c: 35,  f: 12  },
-  { name: 'Börek (su böreği)',     kcal: 258, p: 8,   c: 30,  f: 12  },
-  { name: 'Simit',                 kcal: 285, p: 9,   c: 55,  f: 4   },
-  { name: 'Poğaça (sade)',         kcal: 310, p: 7,   c: 42,  f: 13  },
-  { name: 'Çikolata (sütlü)',      kcal: 535, p: 8,   c: 59,  f: 30  },
-  { name: 'Çikolata (bitter)',     kcal: 546, p: 5,   c: 60,  f: 31  },
-  { name: 'Dondurma (vanilyalı)', kcal: 207, p: 3.5, c: 24,  f: 11  },
-  { name: 'Baklava (dilim)',       kcal: 337, p: 4,   c: 40,  f: 18  },
-  { name: 'Cips (patates)',        kcal: 536, p: 7,   c: 53,  f: 35  },
-  { name: 'Kuru incir',            kcal: 249, p: 3.3, c: 64,  f: 0.9 },
-  { name: 'Hurma',                 kcal: 277, p: 1.8, c: 75,  f: 0.2 },
-  { name: 'Protein tozu (servis)', kcal: 120, p: 25,  c: 3,   f: 1.5 },
-  { name: 'Yulaf ezmesi (pişmiş)',kcal: 71,  p: 2.5, c: 12,  f: 1.4 },
-  { name: 'Tatlı patates',         kcal: 86,  p: 1.6, c: 20,  f: 0.1 },
-  { name: 'Sarımsak',              kcal: 149, p: 6.4, c: 33,  f: 0.5 },
+  { name: 'Tavuk göğsü (ızgara)', kcal: 165, p: 31,  c: 0,   f: 3.6, unit: 'g' },
+  { name: 'Tavuk but (ızgara)',    kcal: 209, p: 26,  c: 0,   f: 11,  unit: 'g' },
+  { name: 'Dana kıyma (%20 yağ)', kcal: 254, p: 17,  c: 0,   f: 20,  unit: 'g' },
+  { name: 'Dana bonfile',          kcal: 271, p: 26,  c: 0,   f: 18,  unit: 'g' },
+  { name: 'Dana antrikot',         kcal: 291, p: 24,  c: 0,   f: 21,  unit: 'g' },
+  { name: 'Kuzu pirzola',          kcal: 294, p: 25,  c: 0,   f: 21,  unit: 'g' },
+  { name: 'Hindi göğsü',           kcal: 135, p: 30,  c: 0,   f: 1,   unit: 'g' },
+  { name: 'Sucuk',                 kcal: 450, p: 16,  c: 1,   f: 42,  unit: 'g' },
+  { name: 'Salam',                 kcal: 300, p: 14,  c: 2,   f: 26,  unit: 'g' },
+  { name: 'Pastırma',              kcal: 230, p: 32,  c: 1,   f: 11,  unit: 'g' },
+  { name: 'Somon (ızgara)',        kcal: 208, p: 20,  c: 0,   f: 13,  unit: 'g' },
+  { name: 'Ton balığı (konserve)', kcal: 116, p: 26,  c: 0,   f: 1,   unit: 'g' },
+  { name: 'Hamsi',                 kcal: 131, p: 20,  c: 0,   f: 5,   unit: 'g' },
+  { name: 'Çipura',                kcal: 128, p: 21,  c: 0,   f: 4,   unit: 'g' },
+  { name: 'Levrek',                kcal: 124, p: 24,  c: 0,   f: 3,   unit: 'g' },
+  { name: 'Karides',               kcal: 99,  p: 24,  c: 0,   f: 0.3, unit: 'g' },
+  { name: 'Yumurta',               kcal: 78,  p: 6,   c: 0.6, f: 5,   unit: 'adet', perUnit: 60 },
+  { name: 'Yumurta akı',           kcal: 17,  p: 4,   c: 0.2, f: 0,   unit: 'adet', perUnit: 30 },
+  { name: 'Süt (%3.2)',            kcal: 61,  p: 3.2, c: 4.8, f: 3.2, unit: 'g' },
+  { name: 'Yoğurt (%3)',           kcal: 59,  p: 3.5, c: 4.7, f: 3,   unit: 'g' },
+  { name: 'Yoğurt (light)',        kcal: 35,  p: 5,   c: 3.8, f: 0.2, unit: 'g' },
+  { name: 'Kefir',                 kcal: 52,  p: 3.4, c: 4.7, f: 1.5, unit: 'g' },
+  { name: 'Beyaz peynir (%40)',    kcal: 264, p: 17,  c: 2,   f: 21,  unit: 'g' },
+  { name: 'Kaşar peyniri',         kcal: 386, p: 25,  c: 1,   f: 31,  unit: 'g' },
+  { name: 'Lor peyniri',           kcal: 98,  p: 11,  c: 3,   f: 4,   unit: 'g' },
+  { name: 'Labne',                 kcal: 170, p: 10,  c: 4,   f: 13,  unit: 'g' },
+  { name: 'Tereyağı',              kcal: 717, p: 0.9, c: 0.1, f: 81,  unit: 'g' },
+  { name: 'Beyaz ekmek (dilim)',   kcal: 79,  p: 2.7, c: 15,  f: 1,   unit: 'adet', perUnit: 30 },
+  { name: 'Tam buğday ekmek',      kcal: 69,  p: 3.6, c: 11,  f: 1.1, unit: 'adet', perUnit: 30 },
+  { name: 'Pirinç (pişmiş)',       kcal: 130, p: 2.7, c: 28,  f: 0.3, unit: 'g' },
+  { name: 'Makarna (pişmiş)',      kcal: 131, p: 5,   c: 25,  f: 1.1, unit: 'g' },
+  { name: 'Yulaf ezmesi (kuru)',   kcal: 389, p: 17,  c: 66,  f: 7,   unit: 'g' },
+  { name: 'Bulgur (pişmiş)',       kcal: 83,  p: 3,   c: 19,  f: 0.2, unit: 'g' },
+  { name: 'Mercimek (pişmiş)',     kcal: 116, p: 9,   c: 20,  f: 0.4, unit: 'g' },
+  { name: 'Nohut (pişmiş)',        kcal: 164, p: 9,   c: 27,  f: 2.6, unit: 'g' },
+  { name: 'Fasulye (pişmiş)',      kcal: 127, p: 8.7, c: 23,  f: 0.5, unit: 'g' },
+  { name: 'Patates (haşlanmış)',   kcal: 87,  p: 1.9, c: 20,  f: 0.1, unit: 'g' },
+  { name: 'Patates kızartması',    kcal: 312, p: 3.4, c: 41,  f: 15,  unit: 'g' },
+  { name: 'Mısır (haşlanmış)',     kcal: 96,  p: 3.4, c: 21,  f: 1.5, unit: 'g' },
+  { name: 'Domates',               kcal: 18,  p: 0.9, c: 3.9, f: 0.2, unit: 'adet', perUnit: 120 },
+  { name: 'Salatalık',             kcal: 15,  p: 0.7, c: 3.6, f: 0.1, unit: 'adet', perUnit: 200 },
+  { name: 'Biber (yeşil)',         kcal: 20,  p: 0.9, c: 4.6, f: 0.2, unit: 'adet', perUnit: 100 },
+  { name: 'Ispanak',               kcal: 23,  p: 2.9, c: 3.6, f: 0.4, unit: 'g' },
+  { name: 'Brokoli',               kcal: 34,  p: 2.8, c: 7,   f: 0.4, unit: 'g' },
+  { name: 'Havuç',                 kcal: 41,  p: 0.9, c: 10,  f: 0.2, unit: 'adet', perUnit: 80 },
+  { name: 'Kabak',                 kcal: 17,  p: 1.2, c: 3.1, f: 0.3, unit: 'adet', perUnit: 200 },
+  { name: 'Patlıcan',              kcal: 25,  p: 1,   c: 5.9, f: 0.2, unit: 'adet', perUnit: 300 },
+  { name: 'Soğan',                 kcal: 40,  p: 1.1, c: 9.3, f: 0.1, unit: 'adet', perUnit: 100 },
+  { name: 'Marul',                 kcal: 15,  p: 1.4, c: 2.9, f: 0.2, unit: 'g' },
+  { name: 'Bezelye',               kcal: 81,  p: 5.4, c: 14,  f: 0.4, unit: 'g' },
+  { name: 'Avokado',               kcal: 160, p: 2,   c: 9,   f: 15,  unit: 'adet', perUnit: 150 },
+  { name: 'Elma',                  kcal: 52,  p: 0.3, c: 14,  f: 0.2, unit: 'adet', perUnit: 180 },
+  { name: 'Muz',                   kcal: 89,  p: 1.1, c: 23,  f: 0.3, unit: 'adet', perUnit: 120 },
+  { name: 'Portakal',              kcal: 47,  p: 0.9, c: 12,  f: 0.1, unit: 'adet', perUnit: 180 },
+  { name: 'Üzüm',                  kcal: 69,  p: 0.7, c: 18,  f: 0.2, unit: 'g' },
+  { name: 'Çilek',                 kcal: 32,  p: 0.7, c: 7.7, f: 0.3, unit: 'adet', perUnit: 12 },
+  { name: 'Kivi',                  kcal: 61,  p: 1.1, c: 15,  f: 0.5, unit: 'adet', perUnit: 75 },
+  { name: 'Karpuz',                kcal: 30,  p: 0.6, c: 7.6, f: 0.2, unit: 'g' },
+  { name: 'Kavun',                 kcal: 34,  p: 0.8, c: 8.2, f: 0.2, unit: 'g' },
+  { name: 'Badem',                 kcal: 579, p: 21,  c: 22,  f: 50,  unit: 'adet', perUnit: 1.2 },
+  { name: 'Ceviz',                 kcal: 654, p: 15,  c: 14,  f: 65,  unit: 'adet', perUnit: 5 },
+  { name: 'Antep fıstığı',         kcal: 562, p: 20,  c: 28,  f: 45,  unit: 'adet', perUnit: 0.7 },
+  { name: 'Fıstık ezmesi',         kcal: 588, p: 25,  c: 20,  f: 50,  unit: 'g' },
+  { name: 'Zeytinyağı',            kcal: 884, p: 0,   c: 0,   f: 100, unit: 'g' },
+  { name: 'Zeytin (siyah)',        kcal: 115, p: 0.8, c: 6,   f: 11,  unit: 'adet', perUnit: 5 },
+  { name: 'Ayran',                 kcal: 38,  p: 2,   c: 2.8, f: 2,   unit: 'g' },
+  { name: 'Portakal suyu (taze)',  kcal: 45,  p: 0.7, c: 10,  f: 0.2, unit: 'g' },
+  { name: 'Sütlü kahve (latte)',   kcal: 54,  p: 2.4, c: 6,   f: 2.5, unit: 'g' },
+  { name: 'Kola',                  kcal: 42,  p: 0,   c: 10.6,f: 0,   unit: 'g' },
+  { name: 'Pizza (dilim)',         kcal: 266, p: 11,  c: 33,  f: 10,  unit: 'adet', perUnit: 100 },
+  { name: 'Hamburger',             kcal: 295, p: 17,  c: 24,  f: 14,  unit: 'adet', perUnit: 150 },
+  { name: 'Döner (tavuk dürüm)',   kcal: 218, p: 14,  c: 22,  f: 8,   unit: 'adet', perUnit: 250 },
+  { name: 'Kebap (şiş)',           kcal: 195, p: 20,  c: 0,   f: 12,  unit: 'g' },
+  { name: 'Lahmacun',              kcal: 230, p: 11,  c: 30,  f: 8,   unit: 'adet', perUnit: 120 },
+  { name: 'Gözleme (peynirli)',    kcal: 280, p: 10,  c: 35,  f: 12,  unit: 'adet', perUnit: 200 },
+  { name: 'Börek (su böreği)',     kcal: 258, p: 8,   c: 30,  f: 12,  unit: 'g' },
+  { name: 'Simit',                 kcal: 285, p: 9,   c: 55,  f: 4,   unit: 'adet', perUnit: 120 },
+  { name: 'Poğaça (sade)',         kcal: 310, p: 7,   c: 42,  f: 13,  unit: 'adet', perUnit: 80 },
+  { name: 'Çikolata (sütlü)',      kcal: 535, p: 8,   c: 59,  f: 30,  unit: 'g' },
+  { name: 'Çikolata (bitter)',     kcal: 546, p: 5,   c: 60,  f: 31,  unit: 'g' },
+  { name: 'Dondurma (vanilyalı)',  kcal: 207, p: 3.5, c: 24,  f: 11,  unit: 'g' },
+  { name: 'Baklava (dilim)',       kcal: 337, p: 4,   c: 40,  f: 18,  unit: 'adet', perUnit: 80 },
+  { name: 'Cips (patates)',        kcal: 536, p: 7,   c: 53,  f: 35,  unit: 'g' },
+  { name: 'Kuru incir',            kcal: 249, p: 3.3, c: 64,  f: 0.9, unit: 'adet', perUnit: 20 },
+  { name: 'Hurma',                 kcal: 277, p: 1.8, c: 75,  f: 0.2, unit: 'adet', perUnit: 24 },
+  { name: 'Protein tozu (servis)', kcal: 120, p: 25,  c: 3,   f: 1.5, unit: 'adet', perUnit: 30 },
+  { name: 'Yulaf ezmesi (pişmiş)', kcal: 71,  p: 2.5, c: 12,  f: 1.4, unit: 'g' },
+  { name: 'Tatlı patates',         kcal: 86,  p: 1.6, c: 20,  f: 0.1, unit: 'g' },
+  { name: 'Sarımsak',              kcal: 149, p: 6.4, c: 33,  f: 0.5, unit: 'adet', perUnit: 4 },
+
+  // ── Meyveler ──
+  { name: 'Erik',                  kcal: 20,  p: 0.5, c: 5,   f: 0.1, unit: 'adet', perUnit: 40 },
+  { name: 'Armut',                 kcal: 57,  p: 0.4, c: 15,  f: 0.1, unit: 'adet', perUnit: 100 },
+  { name: 'İncir (taze)',          kcal: 74,  p: 0.8, c: 19,  f: 0.3, unit: 'g' },
+  { name: 'Şeftali',               kcal: 38,  p: 0.9, c: 9,   f: 0.3, unit: 'adet', perUnit: 80 },
+  { name: 'Kayısı',                kcal: 7,   p: 0.2, c: 1.7, f: 0.1, unit: 'adet', perUnit: 12 },
+  { name: 'Kiraz',                 kcal: 63,  p: 1.1, c: 16,  f: 0.2, unit: 'g' },
+  { name: 'Vişne',                 kcal: 50,  p: 1.0, c: 12,  f: 0.3, unit: 'g' },
+  { name: 'Nar',                   kcal: 83,  p: 1.7, c: 19,  f: 1.2, unit: 'g' },
+  { name: 'Trabzon hurması',       kcal: 96,  p: 0.8, c: 25,  f: 0.3, unit: 'adet', perUnit: 168 },
+  { name: 'Malta eriği',           kcal: 30,  p: 0.6, c: 7,   f: 0.2, unit: 'adet', perUnit: 70 },
+  { name: 'Dut',                   kcal: 43,  p: 1.4, c: 9.8, f: 0.4, unit: 'g' },
+  { name: 'Böğürtlen',             kcal: 43,  p: 1.4, c: 10,  f: 0.5, unit: 'g' },
+  { name: 'Ahududu',               kcal: 52,  p: 1.2, c: 12,  f: 0.7, unit: 'g' },
+  { name: 'Yaban mersini',         kcal: 57,  p: 0.7, c: 14,  f: 0.3, unit: 'g' },
+  { name: 'Mandalina',             kcal: 47,  p: 0.7, c: 12,  f: 0.3, unit: 'adet', perUnit: 88 },
+  { name: 'Greyfurt',              kcal: 42,  p: 0.8, c: 11,  f: 0.1, unit: 'g' },
+  { name: 'Limon',                 kcal: 17,  p: 0.6, c: 5,   f: 0.3, unit: 'adet', perUnit: 58 },
+  { name: 'Ananas',                kcal: 50,  p: 0.5, c: 13,  f: 0.1, unit: 'g' },
+  { name: 'Mango',                 kcal: 60,  p: 0.8, c: 15,  f: 0.4, unit: 'g' },
+  { name: 'Papaya',                kcal: 43,  p: 0.6, c: 11,  f: 0.3, unit: 'g' },
+  { name: 'Hindistan cevizi',      kcal: 354, p: 3.3, c: 15,  f: 35,  unit: 'g' },
+  { name: 'Kuru erik',             kcal: 240, p: 2.3, c: 63,  f: 0.4, unit: 'g' },
+  { name: 'Kuru kayısı',           kcal: 241, p: 3.6, c: 62,  f: 0.5, unit: 'g' },
+
+  // ── Kahvaltılık ──
+  { name: 'Bal',                   kcal: 304, p: 0.3, c: 82,  f: 0,   unit: 'g' },
+  { name: 'Reçel',                 kcal: 280, p: 0.4, c: 70,  f: 0,   unit: 'g' },
+  { name: 'Tahin',                 kcal: 595, p: 17,  c: 21,  f: 53,  unit: 'g' },
+  { name: 'Pekmez',                kcal: 265, p: 0.5, c: 66,  f: 0.1, unit: 'g' },
+  { name: 'Kaymak',                kcal: 263, p: 4,   c: 5,   f: 26,  unit: 'g' },
+  { name: 'Menemen (porsiyon)',    kcal: 326, p: 17,  c: 4,   f: 27,  unit: 'adet', perUnit: 250 },
+  { name: 'Sucuklu yumurta',       kcal: 446, p: 26,  c: 2,   f: 36,  unit: 'adet', perUnit: 250 },
+
+  // ── Çorbalar ──
+  { name: 'Mercimek çorbası',      kcal: 94,  p: 3.5, c: 11,  f: 4,   unit: 'g' },
+  { name: 'Tarhana çorbası',       kcal: 151, p: 2,   c: 11,  f: 8,   unit: 'g' },
+  { name: 'Domates çorbası',       kcal: 62,  p: 1.5, c: 9,   f: 2,   unit: 'g' },
+  { name: 'Yayla çorbası',         kcal: 68,  p: 3,   c: 7,   f: 3,   unit: 'g' },
+  { name: 'Ezogelin çorbası',      kcal: 88,  p: 3.5, c: 12,  f: 3,   unit: 'g' },
+
+  // ── Türk Yemekleri ──
+  { name: 'İmam bayıldı (porsiyon)', kcal: 280, p: 3, c: 25,  f: 18,  unit: 'adet', perUnit: 200 },
+  { name: 'Dolma (yaprak)',         kcal: 70,  p: 2.5, c: 8,   f: 3,   unit: 'adet', perUnit: 40 },
+  { name: 'Sarma',                 kcal: 70,  p: 2.5, c: 8,   f: 3,   unit: 'adet', perUnit: 40 },
+  { name: 'Köfte',                 kcal: 150, p: 12,  c: 3,   f: 9,   unit: 'adet', perUnit: 60 },
+  { name: 'Kuru fasulye',          kcal: 127, p: 8.7, c: 23,  f: 0.5, unit: 'g' },
+  { name: 'Pilav (pirinç)',        kcal: 130, p: 2.7, c: 28,  f: 0.3, unit: 'g' },
+  { name: 'Su böreği (dilim)',     kcal: 200, p: 6,   c: 20,  f: 10,  unit: 'adet', perUnit: 80 },
+  { name: 'Kol böreği',            kcal: 280, p: 5,   c: 22,  f: 18,  unit: 'adet', perUnit: 70 },
+  { name: 'Ispanaklı börek',       kcal: 220, p: 6,   c: 24,  f: 11,  unit: 'g' },
+  { name: 'Mücver (kabak)',        kcal: 180, p: 5,   c: 12,  f: 12,  unit: 'adet', perUnit: 80 },
+  { name: 'Patates köftesi',       kcal: 145, p: 4,   c: 20,  f: 5,   unit: 'adet', perUnit: 70 },
+  { name: 'Çiğ köfte (dürüm)',    kcal: 210, p: 4,   c: 38,  f: 4,   unit: 'adet', perUnit: 150 },
+  { name: 'Mantı (porsiyon)',      kcal: 320, p: 14,  c: 40,  f: 10,  unit: 'g' },
+  { name: 'Türlü (sebze yemeği)', kcal: 90,  p: 2,   c: 12,  f: 4,   unit: 'g' },
+
+  // ── Fındık & Kuruyemiş ──
+  { name: 'Fındık',               kcal: 628, p: 14,  c: 17,  f: 61,  unit: 'g' },
+  { name: 'Kaju',                  kcal: 553, p: 18,  c: 30,  f: 44,  unit: 'g' },
+  { name: 'Çam fıstığı',          kcal: 673, p: 14,  c: 13,  f: 68,  unit: 'g' },
+  { name: 'Ay çekirdeği',         kcal: 584, p: 21,  c: 20,  f: 51,  unit: 'g' },
+  { name: 'Kabak çekirdeği',      kcal: 559, p: 30,  c: 11,  f: 49,  unit: 'g' },
+  { name: 'Leblebi',               kcal: 364, p: 20,  c: 61,  f: 5,   unit: 'g' },
+  { name: 'Mısır (patlamış)',      kcal: 375, p: 12,  c: 74,  f: 4.5, unit: 'g' },
+
+  // ── İçecekler ──
+  { name: 'Türk kahvesi (sade)',   kcal: 2,   p: 0.2, c: 0,   f: 0,   unit: 'adet', perUnit: 60 },
+  { name: 'Çay (şekersiz)',        kcal: 1,   p: 0,   c: 0.2, f: 0,   unit: 'adet', perUnit: 200 },
+  { name: 'Salep',                 kcal: 102, p: 2.5, c: 20,  f: 1.5, unit: 'g' },
+  { name: 'Boza',                  kcal: 80,  p: 3,   c: 17,  f: 0.5, unit: 'g' },
 ];
 
 const MEAL_TYPES = ['Kahvaltı', 'Öğle', 'Akşam', 'Ara Öğün'];
@@ -177,12 +251,50 @@ function MiniSparkline({ entries, color = '#5c7cfa', height = 50 }) {
   );
 }
 
-const EMPTY_PROFILE = { gender: 'male', age: '', weight: '', height: '', waist: '', neck: '', hip: '', activity: 'light', goal: 'maintain', targetWeight: '' };
+const EMPTY_PROFILE = { gender: 'male', age: '', weight: '', height: '', waist: '', neck: '', hip: '', activity: 'light' };
+const EMPTY_GOAL    = { type: 'maintain', targetWeight: '', days: '' }; // type: cut | maintain | bulk
+
+// Resize handle hook
+function useResize(initialPx, min, max) {
+  const [size, setSize] = useState(initialPx);
+  const dragging = useRef(false);
+  const startX = useRef(0);
+  const startSize = useRef(initialPx);
+
+  const onMouseDown = (e) => {
+    dragging.current = true;
+    startX.current = e.clientX;
+    startSize.current = size;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
+
+  useEffect(() => {
+    const onMove = (e) => {
+      if (!dragging.current) return;
+      const delta = e.clientX - startX.current;
+      setSize(Math.min(max, Math.max(min, startSize.current + delta)));
+    };
+    const onUp = () => {
+      dragging.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+  }, [min, max]);
+
+  return [size, onMouseDown];
+}
 
 export default function FitnessTracker() {
   const [profile, setProfile]               = useState(() => load('ft_profile', EMPTY_PROFILE));
+  const [goal, setGoal]                     = useState(() => load('ft_goal', EMPTY_GOAL));
   const [editingProfile, setEditingProfile] = useState(false);
+  const [editingGoal, setEditingGoal]       = useState(false);
   const [draft, setDraft]                   = useState(profile);
+  const [goalDraft, setGoalDraft]           = useState(goal);
 
   // Kilo takibi
   const [weightLog, setWeightLog]   = useState(() => load('ft_weight_log', []));
@@ -192,20 +304,27 @@ export default function FitnessTracker() {
   const [editDate, setEditDate]       = useState('');
   const [editVal, setEditVal]         = useState('');
 
-  // Öğün log
-  const [meals, setMeals]     = useState(() => load('ft_meals', {}));
+  // Menü log: { [date]: [ { id, name: 'Tabak adı', items: [...], kcal, p, c, f } ] }
+  const [meals, setMeals]       = useState(() => load('ft_meals', {}));
   const [mealDate, setMealDate] = useState(today());
+  const [selectedMenuIds, setSelectedMenuIds] = useState([]);
 
-  // Tabak (orta panel) — geçici, kaydedilmez
-  const [plate, setPlate] = useState([]);  // { food, qty, id }
+  // Tabak
+  const [plate, setPlate]       = useState([]);
   const [plateOver, setPlateOver] = useState(false);
+  const [plateName, setPlateName] = useState('');
 
-  // Sağ panel — arama
+  // Arama
   const [searchQ, setSearchQ]   = useState('');
-  const [dragQty, setDragQty]   = useState({});  // foodName -> qty string
+  const [dragQty, setDragQty]   = useState({});
 
-  // Tabak öğün tipi seçimi
-  const [plateMealType, setPlateMealType] = useState('Kahvaltı');
+  // Resize handles: panel dividers
+  const [w0, onDown0] = useResize(220, 140, 400); // kilo genişliği
+  const [w1, onDown1] = useResize(280, 160, 600); // öğün genişliği
+  const [w2, onDown2] = useResize(280, 160, 600); // tabak genişliği
+  // arama: kalan tüm alan (flex:1)
+  // Menü sidebar iç resize
+  const [menuSideW, onMenuSideDown] = useResize(110, 60, 220);
 
   useEffect(() => { save('ft_weight_log', weightLog); }, [weightLog]);
   useEffect(() => { save('ft_meals', meals); }, [meals]);
@@ -215,19 +334,53 @@ export default function FitnessTracker() {
   const bmi      = calcBMI(profile.weight, profile.height);
   const bmiData  = bmiInfo(bmi);
   const bodyFat  = calcBodyFat(profile);
-  const goalKcal = profile.goal === 'cut' ? tdee - 500 : profile.goal === 'bulk' ? tdee + 300 : tdee;
-  const proteinTarget = profile.weight ? Math.round(profile.weight * 2) : null;
-  const fatTarget     = goalKcal ? Math.round(goalKcal * 0.25 / 9) : null;
-  const carbTarget    = (goalKcal && proteinTarget && fatTarget)
-    ? Math.round((goalKcal - proteinTarget * 4 - fatTarget * 9) / 4) : null;
   const lastWeight = weightLog.length > 0 ? weightLog[weightLog.length - 1].value : (profile.weight || null);
   const hasProfile = profile.weight && profile.height && profile.age;
 
-  const todayMeals   = meals[mealDate] || [];
-  const todayKcal    = todayMeals.reduce((s, m) => s + m.kcal, 0);
-  const todayProtein = todayMeals.reduce((s, m) => s + m.p, 0);
-  const todayCarb    = todayMeals.reduce((s, m) => s + m.c, 0);
-  const todayFat     = todayMeals.reduce((s, m) => s + m.f, 0);
+  // Günlük kalori hedefi — hedef + süreye göre hesapla
+  function calcGoalKcal() {
+    if (!tdee) return null;
+    if (goal.type === 'maintain') return tdee;
+    if (goal.type === 'bulk') {
+      // Bulk: günlük +300 sabit (süre varsa daha agresif olmaz, bulk yavaş olmalı)
+      return tdee + 300;
+    }
+    // cut: hedef kilo & süre varsa dinamik hesapla
+    if (goal.type === 'cut') {
+      const curW  = parseFloat(lastWeight || profile.weight);
+      const tgtW  = parseFloat(goal.targetWeight);
+      const days  = parseInt(goal.days);
+      if (curW && tgtW && days > 0 && curW > tgtW) {
+        const kgToLose    = curW - tgtW;
+        const kcalToLose  = kgToLose * 7700; // ~7700 kcal per kg fat
+        const dailyDeficit = Math.round(kcalToLose / days);
+        // Güvenli aralık: max -1000 kcal/gün (daha fazlası sağlıksız)
+        const safeDeficit = Math.min(dailyDeficit, 1000);
+        return Math.max(1200, tdee - safeDeficit);
+      }
+      return tdee - 500; // fallback
+    }
+    return tdee;
+  }
+  const goalKcal = calcGoalKcal();
+
+  // Süreye göre tahmini bilgiler
+  const goalInfo = (() => {
+    if (!tdee || goal.type !== 'cut') return null;
+    const curW = parseFloat(lastWeight || profile.weight);
+    const tgtW = parseFloat(goal.targetWeight);
+    const days = parseInt(goal.days);
+    if (!curW || !tgtW || !days || curW <= tgtW) return null;
+    const kgToLose   = curW - tgtW;
+    const deficit    = tdee - goalKcal;
+    const actualDays = Math.round((kgToLose * 7700) / deficit);
+    const weeklyLoss = Math.round((deficit * 7) / 7700 * 10) / 10;
+    return { deficit, weeklyLoss, actualDays };
+  })();
+
+  const proteinTarget = profile.weight ? Math.round(profile.weight * 2) : null;
+
+  const dayMenus = meals[mealDate] || [];
 
   // Tabak toplamları
   const plateKcal    = plate.reduce((s, i) => s + i.kcal, 0);
@@ -235,14 +388,15 @@ export default function FitnessTracker() {
   const plateCarb    = plate.reduce((s, i) => s + i.c, 0);
   const plateFat     = plate.reduce((s, i) => s + i.f, 0);
 
-  // Arama sonuçları
+  // Arama sonuçları — boşken liste gösterme
   const searchResults = searchQ.trim()
     ? FOOD_DB.filter(f => f.name.toLowerCase().includes(searchQ.toLowerCase()))
-    : FOOD_DB;
+    : [];
 
   // Drag & Drop
   function onDragStart(e, food) {
-    const qty = parseFloat(dragQty[food.name]) || 100;
+    const defaultQty = food.unit === 'adet' ? 1 : 100;
+    const qty = parseFloat(dragQty[food.name]) || defaultQty;
     e.dataTransfer.setData('application/json', JSON.stringify({ food, qty }));
   }
 
@@ -256,11 +410,14 @@ export default function FitnessTracker() {
   }
 
   function addToPlate(food, qty) {
-    const ratio = qty / 100;
+    // adet ise: ratio = qty (adet sayısı), kcal/makro direkt per-adet
+    // gram ise: ratio = qty/100
+    const ratio = food.unit === 'adet' ? qty : qty / 100;
     setPlate(prev => [...prev, {
       id: Date.now() + Math.random(),
       name: food.name,
       qty,
+      unit: food.unit || 'g',
       kcal: Math.round(food.kcal * ratio),
       p:    Math.round(food.p * ratio * 10) / 10,
       c:    Math.round(food.c * ratio * 10) / 10,
@@ -272,21 +429,34 @@ export default function FitnessTracker() {
     setPlate(prev => prev.filter(i => i.id !== id));
   }
 
-  function addPlateToLog() {
+  function savePlate() {
     if (plate.length === 0) return;
-    const entries = plate.map(i => ({ ...i, type: plateMealType, id: Date.now() + Math.random() }));
-    setMeals(prev => ({ ...prev, [mealDate]: [...(prev[mealDate] || []), ...entries] }));
+    const name = plateName.trim() || 'Tabak';
+    const kcal = Math.round(plate.reduce((s, i) => s + i.kcal, 0));
+    const p    = Math.round(plate.reduce((s, i) => s + i.p, 0) * 10) / 10;
+    const c    = Math.round(plate.reduce((s, i) => s + i.c, 0) * 10) / 10;
+    const f    = Math.round(plate.reduce((s, i) => s + i.f, 0) * 10) / 10;
+    const menu = { id: Date.now(), name, items: plate, kcal, p, c, f };
+    setMeals(prev => ({ ...prev, [mealDate]: [...(prev[mealDate] || []), menu] }));
     setPlate([]);
+    setPlateName('');
   }
 
-  function removeMealEntry(id) {
+  function removeMenu(id) {
     setMeals(prev => ({ ...prev, [mealDate]: prev[mealDate].filter(m => m.id !== id) }));
+    setSelectedMenuIds(prev => prev.filter(i => i !== id));
   }
 
   function saveProfile() {
     setProfile(draft);
     save('ft_profile', draft);
     setEditingProfile(false);
+  }
+
+  function saveGoal() {
+    setGoal(goalDraft);
+    save('ft_goal', goalDraft);
+    setEditingGoal(false);
   }
 
   function addWeight() {
@@ -353,8 +523,11 @@ export default function FitnessTracker() {
             </>}
           </div>
           <div className="ft-hero-actions">
+            <button className="ft-btn-ghost" onClick={() => { setGoalDraft(goal); setEditingGoal(true); }}>
+              Hedef
+            </button>
             <button className="ft-btn-ghost" onClick={() => { setDraft(profile); setEditingProfile(true); }}>
-              {hasProfile ? 'Profili Düzenle' : '+ Profil Oluştur'}
+              Profil
             </button>
           </div>
         </div>
@@ -369,13 +542,12 @@ export default function FitnessTracker() {
               </div>
               <div className="ft-profile-grid">
                 {[
-                  { key: 'gender',       label: 'Cinsiyet',   type: 'select', opts: [['male','Erkek'],['female','Kadın']] },
-                  { key: 'age',          label: 'Yaş',        type: 'number', ph: '25' },
-                  { key: 'height',       label: 'Boy (cm)',   type: 'number', ph: '175' },
-                  { key: 'weight',       label: 'Kilo (kg)',  type: 'number', ph: '75' },
-                  { key: 'targetWeight', label: 'Hedef (kg)', type: 'number', ph: '70' },
-                  { key: 'waist',        label: 'Bel (cm)',   type: 'number', ph: '85' },
-                  { key: 'neck',         label: 'Boyun (cm)', type: 'number', ph: '38' },
+                  { key: 'gender', label: 'Cinsiyet', type: 'select', opts: [['male','Erkek'],['female','Kadın']] },
+                  { key: 'age',    label: 'Yaş',       type: 'number', ph: '25' },
+                  { key: 'height', label: 'Boy (cm)',  type: 'number', ph: '175' },
+                  { key: 'weight', label: 'Kilo (kg)', type: 'number', ph: '75' },
+                  { key: 'waist',  label: 'Bel (cm)',  type: 'number', ph: '85' },
+                  { key: 'neck',   label: 'Boyun (cm)',type: 'number', ph: '38' },
                   ...(draft.gender === 'female' ? [{ key: 'hip', label: 'Kalça (cm)', type: 'number', ph: '95' }] : []),
                 ].map(f => (
                   <label key={f.key} className="ft-label">
@@ -389,17 +561,9 @@ export default function FitnessTracker() {
                   </label>
                 ))}
                 <label className="ft-label" style={{ gridColumn: '1/-1' }}>
-                  Aktivite
+                  Aktivite Seviyesi
                   <select className="ft-input" value={draft.activity} onChange={e => setDraft(p => ({ ...p, activity: e.target.value }))}>
                     {ACTIVITY.map(a => <option key={a.key} value={a.key}>{a.label}</option>)}
-                  </select>
-                </label>
-                <label className="ft-label" style={{ gridColumn: '1/-1' }}>
-                  Hedef
-                  <select className="ft-input" value={draft.goal} onChange={e => setDraft(p => ({ ...p, goal: e.target.value }))}>
-                    <option value="cut">Yağ Yakma (Kalori Açığı -500)</option>
-                    <option value="maintain">Kilo Koruma</option>
-                    <option value="bulk">Kas Kazanımı (+300)</option>
                   </select>
                 </label>
               </div>
@@ -411,12 +575,161 @@ export default function FitnessTracker() {
           </div>
         )}
 
-        {/* ══ ANA LAYOUT: Kilo (dar, sol) + 3 eşit kutu ══ */}
+        {/* ══ HEDEF POPUP ══ */}
+        {editingGoal && (
+          <div className="ft-popup-overlay" onClick={() => setEditingGoal(false)}>
+            <div className="ft-popup" onClick={e => e.stopPropagation()} style={{ width: 520 }}>
+              <div className="ft-popup-header">
+                <span className="ft-popup-title">Hedef Belirle</span>
+                <button className="ft-popup-close" onClick={() => setEditingGoal(false)}>✕</button>
+              </div>
+
+              {/* Hedef tipi seçimi */}
+              <div className="ft-goal-type-row">
+                {[
+                  { key: 'cut',      label: 'Yağ Yak',      icon: '🔥', desc: 'Kalori açığı ile kilo ver' },
+                  { key: 'maintain', label: 'Koru',          icon: '⚖️', desc: 'Kilonu koru' },
+                  { key: 'bulk',     label: 'Kas Kazan',     icon: '💪', desc: 'Kalori fazlası ile kas kazan' },
+                ].map(t => (
+                  <div
+                    key={t.key}
+                    className={`ft-goal-type-card${goalDraft.type === t.key ? ' ft-goal-type-active' : ''}`}
+                    onClick={() => setGoalDraft(g => ({ ...g, type: t.key }))}
+                  >
+                    <span style={{ fontSize: 24 }}>{t.icon}</span>
+                    <span className="ft-goal-type-label">{t.label}</span>
+                    <span className="ft-goal-type-desc">{t.desc}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Yağ yakma detayları */}
+              {goalDraft.type === 'cut' && (
+                <div className="ft-goal-details">
+                  <div className="ft-profile-grid">
+                    <label className="ft-label">
+                      Hedef Kilo (kg)
+                      <input className="ft-input" type="number" step="0.5" placeholder="70"
+                        value={goalDraft.targetWeight}
+                        onChange={e => setGoalDraft(g => ({ ...g, targetWeight: e.target.value }))} />
+                    </label>
+                    <label className="ft-label">
+                      Süre (gün)
+                      <input className="ft-input" type="number" placeholder="90"
+                        value={goalDraft.days}
+                        onChange={e => setGoalDraft(g => ({ ...g, days: e.target.value }))} />
+                    </label>
+                  </div>
+
+                  {/* Hızlı süre seçimi */}
+                  <div className="ft-goal-quick-days">
+                    {[
+                      { label: '1 Hafta',  days: 7   },
+                      { label: '2 Hafta',  days: 14  },
+                      { label: '1 Ay',     days: 30  },
+                      { label: '2 Ay',     days: 60  },
+                      { label: '3 Ay',     days: 90  },
+                      { label: '6 Ay',     days: 180 },
+                    ].map(q => (
+                      <button
+                        key={q.days}
+                        className={`ft-goal-day-btn${parseInt(goalDraft.days) === q.days ? ' ft-goal-day-active' : ''}`}
+                        onClick={() => setGoalDraft(g => ({ ...g, days: String(q.days) }))}
+                      >{q.label}</button>
+                    ))}
+                  </div>
+
+                  {/* Canlı hesaplama önizlemesi */}
+                  {(() => {
+                    const curW = parseFloat(lastWeight || profile.weight);
+                    const tgtW = parseFloat(goalDraft.targetWeight);
+                    const days = parseInt(goalDraft.days);
+                    if (!curW || !tgtW || !days || !tdee || curW <= tgtW) return null;
+                    const kgToLose    = curW - tgtW;
+                    const kcalToLose  = kgToLose * 7700;
+                    const rawDeficit  = Math.round(kcalToLose / days);
+                    const safeDeficit = Math.min(rawDeficit, 1000);
+                    const daily       = Math.max(1200, tdee - safeDeficit);
+                    const weeklyLoss  = Math.round((safeDeficit * 7) / 7700 * 100) / 100;
+                    const realDays    = Math.round(kcalToLose / safeDeficit);
+                    const isCapped    = rawDeficit > 1000;
+                    return (
+                      <div className="ft-goal-preview">
+                        <div className="ft-goal-preview-row">
+                          <span>Verilecek kilo</span>
+                          <b style={{ color: '#f85149' }}>{kgToLose.toFixed(1)} kg</b>
+                        </div>
+                        <div className="ft-goal-preview-row">
+                          <span>Günlük kalori hedefi</span>
+                          <b style={{ color: '#5c7cfa' }}>{daily} kcal</b>
+                        </div>
+                        <div className="ft-goal-preview-row">
+                          <span>Günlük açık</span>
+                          <b style={{ color: '#d29922' }}>-{safeDeficit} kcal</b>
+                        </div>
+                        <div className="ft-goal-preview-row">
+                          <span>Haftalık tahmini kayıp</span>
+                          <b style={{ color: '#3fb950' }}>{weeklyLoss} kg/hafta</b>
+                        </div>
+                        {isCapped && (
+                          <div className="ft-goal-preview-row ft-goal-preview-warn">
+                            <span>⚠️ Süre çok kısa — güvenli limite ({realDays} gün) ayarlandı</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {goalDraft.type === 'bulk' && (
+                <div className="ft-goal-details">
+                  <div className="ft-goal-preview">
+                    <div className="ft-goal-preview-row">
+                      <span>TDEE</span>
+                      <b style={{ color: '#8b949e' }}>{tdee || '—'} kcal</b>
+                    </div>
+                    <div className="ft-goal-preview-row">
+                      <span>Günlük kalori hedefi</span>
+                      <b style={{ color: '#5c7cfa' }}>{tdee ? tdee + 300 : '—'} kcal</b>
+                    </div>
+                    <div className="ft-goal-preview-row">
+                      <span>Günlük fazla</span>
+                      <b style={{ color: '#3fb950' }}>+300 kcal</b>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {goalDraft.type === 'maintain' && (
+                <div className="ft-goal-details">
+                  <div className="ft-goal-preview">
+                    <div className="ft-goal-preview-row">
+                      <span>Günlük kalori hedefi</span>
+                      <b style={{ color: '#5c7cfa' }}>{tdee || '—'} kcal</b>
+                    </div>
+                    <div className="ft-goal-preview-row">
+                      <span>Strateji</span>
+                      <b style={{ color: '#8b949e' }}>TDEE = Tüketim</b>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="ft-popup-footer">
+                <button className="ft-btn-ghost" onClick={() => setEditingGoal(false)}>İptal</button>
+                <button className="ft-btn-accent" onClick={saveGoal}>Kaydet</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ══ ANA LAYOUT: 4 panel + 3 resize handle ══ */}
         <div className="ft-main-layout">
 
-          {/* ── Kilo Takibi (dar, sol) ── */}
-          <div className="ft-weight-col">
-            <div className="ft-card">
+          {/* ── Kilo Takibi ── */}
+          <div className="ft-resizable-col" style={{ width: w0 }}>
+            <div className="ft-card" style={{ height: '100%', boxSizing: 'border-box' }}>
               <div className="ft-card-header">
                 <div className="ft-card-label">Kilo Takibi</div>
                 {lastWeight && profile.targetWeight &&
@@ -460,55 +773,100 @@ export default function FitnessTracker() {
             </div>
           </div>
 
-          {/* ── 3 eşit kutu ── */}
-          <div className="ft-three-col">
+          {/* Handle 1: kilo | öğün */}
+          <div className="ft-resize-handle" onMouseDown={onDown0} />
 
-            {/* Kutu 1: Öğün Log */}
-            <div className="ft-card ft-fill-card">
+          {/* ── Menü ── */}
+          <div className="ft-resizable-col" style={{ width: w1 }}>
+            <div className="ft-card ft-log-card">
               <div className="ft-card-header">
-                <div className="ft-card-label">Öğün Geçmişi</div>
-                <input type="date" className="ft-input ft-date-sm" value={mealDate} onChange={e => setMealDate(e.target.value)} />
+                <div className="ft-card-label">Menü</div>
+                <input type="date" className="ft-input ft-date-sm" style={{ width: 130 }} value={mealDate} onChange={e => setMealDate(e.target.value)} />
               </div>
-              <div className="ft-log-summary">
-                <span className="ft-log-kcal" style={{ color: todayKcal > goalKcal && goalKcal ? '#f85149' : '#5c7cfa' }}>
-                  {todayKcal} kcal
-                </span>
-                <span className="ft-log-macros">
-                  P <b style={{ color: '#f85149' }}>{todayProtein}g</b>
-                  · K <b style={{ color: '#d29922' }}>{todayCarb}g</b>
-                  · Y <b style={{ color: '#3fb950' }}>{todayFat}g</b>
-                </span>
-              </div>
-              {MEAL_TYPES.map(type => {
-                const items = todayMeals.filter(m => m.type === type);
-                if (!items.length) return null;
-                return (
-                  <div key={type} className="ft-meal-group">
-                    <div className="ft-group-label">
-                      {type}
-                      <span style={{ color: '#5c7cfa' }}>{items.reduce((s, m) => s + m.kcal, 0)} kcal</span>
-                    </div>
-                    {items.map(m => (
-                      <div key={m.id} className="ft-list-row">
-                        <span className="ft-list-name">{m.name}</span>
-                        <span className="ft-list-sub">{m.qty}g</span>
-                        <span className="ft-list-val" style={{ color: '#5c7cfa', marginLeft: 'auto' }}>{m.kcal}</span>
-                        <button className="ft-del-btn" onClick={() => removeMealEntry(m.id)}>×</button>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })}
-              {todayMeals.length === 0 && <div className="ft-empty">Henüz öğün eklenmedi</div>}
-            </div>
 
-            {/* Kutu 2: Tabak */}
-            <div className="ft-card ft-fill-card ft-plate-card">
+              <div className="ft-log-body">
+                {/* Sol: kaydedilen tabaklar */}
+                <div className="ft-menu-sidebar" style={{ width: menuSideW, minWidth: menuSideW }}>
+                  {dayMenus.length === 0 && (
+                    <div className="ft-empty" style={{ fontSize: 11, padding: '8px 4px' }}>Tabak kaydet</div>
+                  )}
+                  {dayMenus.map(menu => {
+                    const checked = selectedMenuIds.includes(menu.id);
+                    return (
+                      <div
+                        key={menu.id}
+                        className={`ft-menu-item${checked ? ' ft-menu-selected' : ''}`}
+                        onClick={() => setSelectedMenuIds(prev =>
+                          prev.includes(menu.id) ? prev.filter(i => i !== menu.id) : [...prev, menu.id]
+                        )}
+                      >
+                        <div className={`ft-menu-check${checked ? ' ft-menu-check-on' : ''}`}>
+                          {checked && '✓'}
+                        </div>
+                        <div className="ft-menu-info">
+                          <span className="ft-menu-name">{menu.name}</span>
+                          <span className="ft-menu-kcal">{menu.kcal} kcal</span>
+                        </div>
+                        <button className="ft-del-btn" style={{ marginLeft: 'auto' }}
+                          onClick={e => { e.stopPropagation(); removeMenu(menu.id); }}>×</button>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Menü iç dikey çizgi — sürüklenebilir */}
+                <div className="ft-resize-handle ft-resize-handle-inner" onMouseDown={onMenuSideDown} />
+
+                {/* Sağ: seçili tabakların içeriği birleşik */}
+                <div className="ft-log-content">
+                  {(() => {
+                    const selMenus = dayMenus.filter(m => selectedMenuIds.includes(m.id));
+                    const allItems = selMenus.flatMap(m => m.items.map(i => ({ ...i, menuName: m.name })));
+                    const totalKcal = selMenus.reduce((s, m) => s + m.kcal, 0);
+                    const totalP    = selMenus.reduce((s, m) => s + m.p, 0);
+                    const totalC    = selMenus.reduce((s, m) => s + m.c, 0);
+                    const totalF    = selMenus.reduce((s, m) => s + m.f, 0);
+                    return (
+                      <>
+                        {selMenus.length === 0 && (
+                          <div className="ft-empty" style={{ marginTop: 24 }}>Soldan tabak seç</div>
+                        )}
+                        {selMenus.length > 0 && (
+                          <div className="ft-log-summary">
+                            <span className="ft-log-kcal" style={{ color: totalKcal > goalKcal && goalKcal ? '#f85149' : '#5c7cfa' }}>
+                              {totalKcal} kcal
+                            </span>
+                            <span className="ft-log-macros">
+                              P <b style={{ color: '#f85149' }}>{Math.round(totalP)}g</b>
+                              · K <b style={{ color: '#d29922' }}>{Math.round(totalC)}g</b>
+                              · Y <b style={{ color: '#3fb950' }}>{Math.round(totalF)}g</b>
+                            </span>
+                          </div>
+                        )}
+                        {allItems.map((item, idx) => (
+                          <div key={idx} className="ft-list-row">
+                            <span className="ft-menu-tag">{item.menuName}</span>
+                            <span className="ft-list-name">{item.name}</span>
+                            <span className="ft-list-sub">{item.qty}g</span>
+                            <span className="ft-list-val" style={{ color: '#5c7cfa', marginLeft: 'auto' }}>{item.kcal}</span>
+                          </div>
+                        ))}
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Handle 2: öğün | tabak */}
+          <div className="ft-resize-handle" onMouseDown={onDown1} />
+
+          {/* ── Tabak ── */}
+          <div className="ft-resizable-col" style={{ width: w2 }}>
+            <div className="ft-card ft-plate-card" style={{ height: '100%', boxSizing: 'border-box' }}>
               <div className="ft-card-header">
                 <div className="ft-card-label">Tabak</div>
-                <select className="ft-input" style={{ width: 110 }} value={plateMealType} onChange={e => setPlateMealType(e.target.value)}>
-                  {MEAL_TYPES.map(t => <option key={t}>{t}</option>)}
-                </select>
               </div>
 
               <div
@@ -527,7 +885,7 @@ export default function FitnessTracker() {
                     {plate.map(item => (
                       <div key={item.id} className="ft-plate-item">
                         <span className="ft-plate-name">{item.name}</span>
-                        <span className="ft-plate-qty">{item.qty}g</span>
+                        <span className="ft-plate-qty">{item.qty}{item.unit || 'g'}</span>
                         <span className="ft-plate-kcal">{item.kcal} kcal</span>
                         <button className="ft-del-btn" onClick={() => removeFromPlate(item.id)}>×</button>
                       </div>
@@ -544,29 +902,57 @@ export default function FitnessTracker() {
                     <span style={{ color: '#d29922' }}>K {plateCarb}g</span>
                     <span style={{ color: '#3fb950' }}>Y {plateFat}g</span>
                   </div>
-                  <button className="ft-btn-accent ft-plate-add-btn" onClick={addPlateToLog}>
-                    Öğüne Ekle →
-                  </button>
+                  <div className="ft-plate-save-row">
+                    <input
+                      className="ft-input"
+                      placeholder="Tabak adı..."
+                      value={plateName}
+                      onChange={e => setPlateName(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') savePlate(); }}
+                      style={{ flex: 1, fontSize: 13 }}
+                    />
+                    <button className="ft-btn-accent" onClick={savePlate} style={{ whiteSpace: 'nowrap' }}>
+                      Kaydet →
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
+          </div>
 
-            {/* Kutu 3: Yiyecek Arama */}
-            <div className="ft-card ft-fill-card ft-search-card">
+          {/* Handle 3: tabak | arama */}
+          <div className="ft-resize-handle" onMouseDown={onDown2} />
+
+          {/* ── Yiyecek Arama ── */}
+          <div className="ft-resizable-col" style={{ flex: 1, minWidth: 160 }}>
+            <div className="ft-card ft-search-card" style={{ height: '100%', boxSizing: 'border-box' }}>
               <div className="ft-card-header">
                 <div className="ft-card-label">Yiyecek Ara</div>
               </div>
               <input
                 className="ft-input"
-                placeholder="Yiyecek adı..."
+                style={{ fontSize: 15, padding: '9px 12px' }}
+                placeholder="Yiyecek ara..."
                 value={searchQ}
                 onChange={e => setSearchQ(e.target.value)}
-                autoFocus
               />
+              {searchQ.trim() === '' ? (
+                <div className="ft-food-empty-hint">
+                  <div style={{ fontSize: 36, opacity: 0.2 }}>🔍</div>
+                  <div>Aramak istediğin yiyeceği yaz</div>
+                </div>
+              ) : searchResults.length === 0 ? (
+                <div className="ft-food-empty-hint">
+                  <div style={{ fontSize: 36, opacity: 0.2 }}>🤷</div>
+                  <div>Sonuç bulunamadı</div>
+                </div>
+              ) : null}
               <div className="ft-food-list">
                 {searchResults.map((food, i) => {
-                  const qty = parseFloat(dragQty[food.name]) || 100;
-                  const ratio = qty / 100;
+                  const isAdet = food.unit === 'adet';
+                  const defaultQty = isAdet ? 1 : 100;
+                  const qty = parseFloat(dragQty[food.name]) || defaultQty;
+                  const ratio = isAdet ? qty : qty / 100;
                   return (
                     <div
                       key={i}
@@ -587,12 +973,13 @@ export default function FitnessTracker() {
                         <input
                           className="ft-input ft-qty-input"
                           type="number"
-                          value={dragQty[food.name] ?? '100'}
+                          min="0.5"
+                          step={isAdet ? 1 : 10}
+                          value={dragQty[food.name] ?? defaultQty}
                           onClick={e => e.stopPropagation()}
                           onChange={e => setDragQty(prev => ({ ...prev, [food.name]: e.target.value }))}
-                          title="gram"
                         />
-                        <span className="ft-food-unit">g</span>
+                        <span className="ft-food-unit">{isAdet ? 'adet' : 'g'}</span>
                         <button
                           className="ft-btn-sm"
                           onClick={() => addToPlate(food, qty)}
@@ -604,8 +991,8 @@ export default function FitnessTracker() {
                 })}
               </div>
             </div>
-
           </div>
+
         </div>
 
       </div>
