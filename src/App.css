@@ -9559,14 +9559,14 @@ body.light .search-no-results {
   right: 20%;
   top: 50%;
   transform: translateY(-50%);
-  height: 2px;
-  background: #30363d;
+  height: 1px;
+  background: #1a1a1a;
   border-radius: 2px;
   transition: background 0.15s;
 }
 
 .dash-right-resize-handle:hover::after {
-  background: #58a6ff;
+  background: #2e2e2e;
 }
 .dash-right-bottom {
   flex: 1;
@@ -9574,7 +9574,7 @@ body.light .search-no-results {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  background: #161b22;
+  background: #0d0d0d;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
 }
@@ -9592,7 +9592,7 @@ body.light .search-no-results {
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #e6edf3;
+  color: #444;
   margin-bottom: 10px;
 }
 
@@ -9610,7 +9610,7 @@ body.light .search-no-results {
   padding: 10px 12px;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
-  border-left: 3px solid #58a6ff;
+  border-left: 2px solid #2a2a2a;
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background 0.1s;
@@ -9625,13 +9625,13 @@ body.light .search-no-results {
 .ql-label {
   font-size: var(--todo-font-size, 12px);
   font-weight: 500;
-  color: #c9d1d9;
+  color: #666;
   line-height: 1;
 }
 
 .ql-desc {
   font-size: calc(var(--todo-font-size, 12px) - 2px);
-  color: #484f58;
+  color: #333;
   line-height: 1;
 }
 
