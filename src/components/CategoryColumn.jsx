@@ -4,7 +4,7 @@ import { playTypeSoundThrottled, playCompleteSound, playUncompleteSound, playDel
 
 const TODO_COLORS = ['#667eea', '#f093fb', '#4ade80', '#60a5fa', '#fb923c', '#f87171', '#facc15', '#9ca3af'];
 
-function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDeleteTodo, onUpdateTodo, currentFilter, onRename, onAddSubtask, onToggleSubtask, onDeleteSubtask, onUpdateSubtask, onReorder, onTodoDragStart, draggingTodo, dragOverCategory, dragOverTodoId }) {
+function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDeleteTodo, onUpdateTodo, currentFilter, onRename, onAddSubtask, onToggleSubtask, onDeleteSubtask, onUpdateSubtask, onReorder, onTodoDragStart }) {
   const [inputValue, setInputValue] = useState('');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editTitleValue, setEditTitleValue] = useState(title);
@@ -160,7 +160,7 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
     document.addEventListener('mouseup', onMouseUp);
   };
 
-  const isDragOver = draggingTodo && dragOverCategory === category && draggingTodo.todo.category !== category;
+  const isDragOver = false; // DOM class ile yönetiliyor (cc-drag-over)
 
   const sortedTodos = [...todos].sort((a, b) => {
     if (a.order !== undefined && b.order !== undefined) return a.order - b.order;
@@ -214,7 +214,7 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
           <div
             key={todo.id}
             data-todo-id={todo.id}
-            className={`cc-item ${todo.completed ? 'completed' : ''} ${completingIds.has(todo.id) ? 'completing' : ''} ${draggingTodo && draggingTodo.todo.id === todo.id ? 'dragging' : ''} ${dragOverTodoId && String(dragOverTodoId) === String(todo.id) ? 'drag-target' : ''}`}
+            className={`cc-item ${todo.completed ? 'completed' : ''} ${completingIds.has(todo.id) ? 'completing' : ''}`}
             style={{}}
           >
             {todo.color && <div className="cc-item-color-bar" style={{ background: todo.color }} />}

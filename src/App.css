@@ -7689,7 +7689,7 @@ body.light .view-title {
   border-right: 1px solid #21262d;
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100%;
   transition: width 0.2s ease, min-width 0.2s ease;
 }
 
@@ -7718,6 +7718,64 @@ body.light .view-title {
 .sidebar-icon {
   font-size: 18px;
 }
+
+.sidebar-profile-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #21262d;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.sidebar-profile-bar:hover { background: #161b22; }
+
+.sidebar-profile-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1f6feb, #388bfd);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sidebar-profile-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sidebar-profile-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #c9d1d9;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-profile-email {
+  font-size: 10px;
+  color: #6e7681;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-profile-gear {
+  font-size: 13px;
+  color: #484f58;
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+.sidebar-profile-bar:hover .sidebar-profile-gear { color: #8b949e; }
 
 .sidebar-user-bar {
   display: flex;
@@ -8625,6 +8683,13 @@ body.light .references-header {
   flex: 1;
   min-height: 0;
   overflow: hidden;
+}
+
+/* Todo drag-over highlight — DOM class, React state yok */
+.cc-item.cc-drag-over {
+  outline: 2px solid #58a6ff55;
+  outline-offset: -2px;
+  background: #1a2d44 !important;
 }
 
 /* Todo Drag Ghost - Notes style */

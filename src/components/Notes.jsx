@@ -3,6 +3,72 @@ import './Notes.css';
 import { playTypeSoundThrottled, playClickSound, playAddSound, playDeleteSound } from '../utils/sounds';
 import { pushKeyToSupabase } from '../supabase';
 
+function rgbToHex(rgb) {
+  const m = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
+  if (!m) return null;
+  return '#' + [m[1], m[2], m[3]].map(v => parseInt(v).toString(16).padStart(2, '0')).join('');
+}
+
+// ── Renk Paleti — tek yerden değiştir, her yere yansır ──
+const COLOR_PRESETS = [
+  { fg: '#c9d1d9', bg: null,      label: 'Default'   },
+  { fg: '#ff6b6b', bg: null,      label: 'Red'       },
+  { fg: '#74b9ff', bg: null,      label: 'Blue'      },
+  { fg: '#55efc4', bg: null,      label: 'Green'     },
+  { fg: '#a29bfe', bg: null,      label: 'Purple'    },
+  { fg: '#fdcb6e', bg: null,      label: 'Orange'    },
+  { fg: '#e2e8f0', bg: '#1e3a5f', label: 'Blue BG'   },
+  { fg: '#e2e8f0', bg: '#14432a', label: 'Green BG'  },
+  { fg: '#e2e8f0', bg: '#4a1515', label: 'Red BG'    },
+  { fg: '#e2e8f0', bg: '#5c4700', label: 'Yellow BG' },
+];
+
+// Eski notlardaki renkleri güncel palete migrate et
+function migrateNoteColors(notes) {
+  // Eski → Yeni renk eşleştirme (geçmişte kullanılan tüm değerler)
+  const FG_MAP = {
+    '#f85149': '#ff6b6b', '#FF7369': '#ff6b6b',
+    '#5c7cfa': '#74b9ff', '#529CCA': '#74b9ff',
+    '#7ee787': '#55efc4', '#4DAB9A': '#55efc4',
+    '#d2a8ff': '#a29bfe', '#9B8FD4': '#a29bfe',
+    '#f0883e': '#fdcb6e', '#C98A4B': '#fdcb6e',
+    '#ffffff': '#e2e8f0',
+    '#000000': '#e2e8f0',
+    '#c9d1d9': '#c9d1d9',
+  };
+  const BG_MAP = {
+    '#1f6feb': '#1e3a5f', '#364954': '#1e3a5f',
+    '#238636': '#14432a', '#354C4B': '#14432a',
+    '#da3633': '#4a1515', '#594141': '#4a1515',
+    '#e3b341': '#4a3800', '#59563B': '#4a3800',
+  };
+
+  const migrateHtml = html => {
+    if (!html) return html;
+    // fg: color style
+    let out = html.replace(/color:\s*(#[0-9a-fA-F]{6})/g, (m, c) => {
+      const key = c.toLowerCase();
+      const mapped = Object.entries(FG_MAP).find(([k]) => k.toLowerCase() === key);
+      return mapped ? `color: ${mapped[1]}` : m;
+    });
+    // bg: background-color style
+    out = out.replace(/background-color:\s*(#[0-9a-fA-F]{6})/g, (m, c) => {
+      const key = c.toLowerCase();
+      const mapped = Object.entries(BG_MAP).find(([k]) => k.toLowerCase() === key);
+      return mapped ? `background-color: ${mapped[1]}` : m;
+    });
+    return out;
+  };
+
+  return notes.map(note => ({
+    ...note,
+    pages: (note.pages || []).map(page => ({
+      ...page,
+      content: migrateHtml(page.content),
+    })),
+  }));
+}
+
 // Rich Text Editor Component
 const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, ref) => {
   const editorRef = useRef(null);
@@ -44,7 +110,11 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
 function Notes() {
   const [notes, setNotes] = useState(() => {
     const saved = localStorage.getItem('notes');
-    return saved ? JSON.parse(saved) : [];
+    const backup = localStorage.getItem('notes_local_backup');
+    const parse = s => { try { return s ? JSON.parse(s) : null; } catch { return null; } };
+    const a = parse(saved), b = parse(backup);
+    const raw = (a && b) ? (a.length >= b.length ? a : b) : (a || b || []);
+    return migrateNoteColors(raw);
   });
   const [currentNote, setCurrentNote] = useState(null);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
@@ -61,6 +131,12 @@ function Notes() {
   const [deleteConfirm, setDeleteConfirm] = useState({ show: false, type: null, id: null });
   const [activeFormats, setActiveFormats] = useState({});
   const [showColorPresets, setShowColorPresets] = useState(false);
+  const [showNotesMenu, setShowNotesMenu] = useState(false);
+  const [colorShortcuts, setColorShortcuts] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('notes_color_shortcuts') || '{}'); } catch { return {}; }
+  });
+  const [hoveredPresetIdx, setHoveredPresetIdx] = useState(null);
+  const [shortcutToast, setShortcutToast] = useState(null); // { key, label }
   const [lineSpacing, setLineSpacing] = useState(() => {
     const saved = localStorage.getItem('notesLineSpacing');
     const v = saved ? parseFloat(saved) : 1.7;
@@ -197,8 +273,11 @@ function Notes() {
   }, [sidebarWidth]);
 
   useEffect(() => {
+    if (notes.length === 0) return; // boş listeyle üstüne yazma
     const serialized = JSON.stringify(notes);
     localStorage.setItem('notes', serialized);
+    // Yerel yedek — Supabase sync bozulsa bile korunur
+    localStorage.setItem('notes_local_backup', serialized);
     pushKeyToSupabase('notes', serialized);
   }, [notes]);
 
@@ -321,6 +400,39 @@ function Notes() {
       page.id === pageId ? { ...page, ...updates } : page
     );
     updateNote(currentNote.id, { pages: updatedPages });
+  };
+
+  const exportAllNotes = async () => {
+    try {
+      const { save } = await import('@tauri-apps/plugin-dialog');
+      const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+      const date = new Date().toISOString().slice(0, 10);
+      const filePath = await save({
+        defaultPath: `notlar-${date}.json`,
+        filters: [{ name: 'JSON', extensions: ['json'] }],
+      });
+      if (filePath) await writeTextFile(filePath, JSON.stringify(notes, null, 2));
+    } catch (e) {
+      console.error('Export error:', e);
+    }
+  };
+
+  const importNotes = async () => {
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog');
+      const { readTextFile } = await import('@tauri-apps/plugin-fs');
+      const filePath = await open({
+        filters: [{ name: 'JSON', extensions: ['json'] }],
+      });
+      if (!filePath) return;
+      const text = await readTextFile(filePath);
+      const imported = JSON.parse(text);
+      if (!Array.isArray(imported)) { alert('Geçersiz dosya'); return; }
+      setNotes(imported);
+    } catch (e) {
+      console.error('Import error:', e);
+      alert('Dosya okunamadı');
+    }
   };
 
   const filteredNotes = notes.filter(note =>
@@ -450,8 +562,92 @@ function Notes() {
     '#fb923c', '#f87171', '#5c7cfa', '#9ca3af'
   ];
 
+  useEffect(() => {
+    if (!showNotesMenu) return;
+    const close = () => setShowNotesMenu(false);
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [showNotesMenu]);
+
+  const applyPreset = useCallback((preset, useRestore = false) => {
+    // useRestore=true: toolbar tıklaması (selection kaybolmuş), false: kısayol (selection hâlâ aktif)
+    if (useRestore) restoreSelection();
+
+    const sel = window.getSelection();
+    const node = sel?.anchorNode?.nodeType === 3 ? sel.anchorNode.parentElement : sel?.anchorNode;
+    const computed = node ? window.getComputedStyle(node) : null;
+    const curFg = computed?.color ? rgbToHex(computed.color) : null;
+    const curBg = computed?.backgroundColor ? rgbToHex(computed.backgroundColor) : null;
+    const sameFg = curFg && curFg.toLowerCase() === preset.fg.toLowerCase();
+    const sameBg = preset.bg
+      ? (curBg && curBg.toLowerCase() === preset.bg.toLowerCase())
+      : (!curBg || curBg === '#000000' || curBg === 'transparent');
+    const shouldClear = sameFg && sameBg;
+
+    if (shouldClear) {
+      document.execCommand('foreColor', false, '#c9d1d9');
+      document.execCommand('hiliteColor', false, 'transparent');
+    } else {
+      document.execCommand('foreColor', false, preset.fg);
+      document.execCommand('hiliteColor', false, preset.bg || 'transparent');
+    }
+    window.getSelection()?.removeAllRanges();
+    updateActiveFormats();
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (!e.altKey) return;
+      const num = parseInt(e.key);
+      if (isNaN(num) || num < 1 || num > 9) return;
+      e.preventDefault();
+
+      // Eğer dropdown açık ve bir preset üstünde hover varsa → kısayol ata
+      if (showColorPresets && hoveredPresetIdx !== null) {
+        const updated = { ...colorShortcuts, [num]: hoveredPresetIdx };
+        setColorShortcuts(updated);
+        localStorage.setItem('notes_color_shortcuts', JSON.stringify(updated));
+        const preset = COLOR_PRESETS[hoveredPresetIdx];
+        setShortcutToast({ key: num, label: preset.label });
+        setTimeout(() => setShortcutToast(null), 1500);
+        return;
+      }
+
+      // Dropdown kapalıysa → atanmış rengi uygula
+      const presetIdx = colorShortcuts[num];
+      if (presetIdx !== undefined && COLOR_PRESETS[presetIdx]) {
+        applyPreset(COLOR_PRESETS[presetIdx]);
+      }
+    };
+    const onKeyReset = (e) => {
+      if (!e.altKey) return;
+      if (e.key !== '"' && e.key !== "'") return;
+      e.preventDefault();
+      restoreSelection();
+      document.execCommand('foreColor', false, '#c9d1d9');
+      document.execCommand('hiliteColor', false, 'transparent');
+      updateActiveFormats();
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('keydown', onKeyReset);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('keydown', onKeyReset);
+    };
+  }, [showColorPresets, hoveredPresetIdx, colorShortcuts, applyPreset]);
+
   return (
     <div className="notes-container">
+      {shortcutToast && (
+        <div style={{
+          position: 'fixed', bottom: 32, left: '50%', transform: 'translateX(-50%)',
+          background: '#1c2128', border: '1px solid #444c56', borderRadius: 8,
+          padding: '8px 18px', fontSize: 13, color: '#e6edf3', zIndex: 9999,
+          boxShadow: '0 4px 16px #0008', pointerEvents: 'none',
+        }}>
+          Alt+{shortcutToast.key} → <b style={{ color: '#74b9ff' }}>{shortcutToast.label}</b>
+        </div>
+      )}
       {/* Floating Drag Ghost */}
       {draggedNote && (
         <div
@@ -506,6 +702,37 @@ function Notes() {
         <div className="notes-sidebar-header">
           {!sidebarCollapsed && <span className="notes-header-label">NOTES</span>}
           {!sidebarCollapsed && <button className="notes-new-btn" onClick={createNewNote}>+ ADD</button>}
+          {!sidebarCollapsed && (
+            <div style={{ position: 'relative', marginLeft: 'auto' }} onMouseDown={e => e.stopPropagation()}>
+              <button
+                className="notes-collapse-btn"
+                title="Settings"
+                onClick={() => setShowNotesMenu(v => !v)}
+              >⚙</button>
+              {showNotesMenu && (
+                <div style={{
+                  position: 'absolute', top: '100%', right: 0, zIndex: 100,
+                  background: '#161b22', border: '1px solid #30363d', borderRadius: 8,
+                  padding: '4px 0', minWidth: 150, boxShadow: '0 4px 16px #0008',
+                }}>
+                  <button
+                    onMouseDown={e => e.stopPropagation()}
+                    onClick={() => { setShowNotesMenu(false); exportAllNotes(); }}
+                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', background: 'none', border: 'none', color: '#c9d1d9', cursor: 'pointer', fontSize: 13 }}
+                    onMouseEnter={e => e.target.style.background = '#21262d'}
+                    onMouseLeave={e => e.target.style.background = 'none'}
+                  >↓ Export (JSON)</button>
+                  <button
+                    onMouseDown={e => e.stopPropagation()}
+                    onClick={() => { setShowNotesMenu(false); importNotes(); }}
+                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', background: 'none', border: 'none', color: '#c9d1d9', cursor: 'pointer', fontSize: 13 }}
+                    onMouseEnter={e => e.target.style.background = '#21262d'}
+                    onMouseLeave={e => e.target.style.background = 'none'}
+                  >↑ Import (JSON)</button>
+                </div>
+              )}
+            </div>
+          )}
           {!sidebarCollapsed && (
             <div
               className="notes-sidebar-resizer-handle"
@@ -785,47 +1012,42 @@ function Notes() {
                 </button>
                 {showColorPresets && (
                   <div className="color-presets-dropdown">
-                    {[
-                      { fg: '#c9d1d9', bg: null, label: 'Default' },
-                      { fg: '#f85149', bg: null, label: 'Red' },
-                      { fg: '#5c7cfa', bg: null, label: 'Blue' },
-                      { fg: '#7ee787', bg: null, label: 'Green' },
-                      { fg: '#d2a8ff', bg: null, label: 'Purple' },
-                      { fg: '#f0883e', bg: null, label: 'Orange' },
-                      { fg: '#ffffff', bg: '#1f6feb', label: 'Blue BG' },
-                      { fg: '#ffffff', bg: '#238636', label: 'Green BG' },
-                      { fg: '#ffffff', bg: '#da3633', label: 'Red BG' },
-                      { fg: '#000000', bg: '#e3b341', label: 'Yellow BG' },
-                    ].map((preset, i) => (
-                      <button
-                        key={i}
-                        className="toolbar-color-preset"
-                        title={preset.label}
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          restoreSelection();
-                          document.execCommand('foreColor', false, preset.fg);
-                          if (preset.bg) {
-                            document.execCommand('hiliteColor', false, preset.bg);
-                          } else {
-                            document.execCommand('hiliteColor', false, 'transparent');
-                          }
-                          updateActiveFormats();
-                          setShowColorPresets(false);
-                        }}
-                        style={{
-                          color: preset.fg,
-                          background: preset.bg || 'transparent',
-                          borderColor: preset.bg ? preset.bg : preset.fg,
-                        }}
-                      >
-                        A
-                      </button>
-                    ))}
+                    {COLOR_PRESETS.map((preset, i) => {
+                      const assignedKey = Object.entries(colorShortcuts).find(([, v]) => v === i)?.[0];
+                      return (
+                        <button
+                          key={i}
+                          className="toolbar-color-preset"
+                          title={`${preset.label}${assignedKey ? ` (Alt+${assignedKey})` : ' — hover + Alt+[1-9] to assign'}`}
+                          onMouseEnter={() => setHoveredPresetIdx(i)}
+                          onMouseLeave={() => setHoveredPresetIdx(null)}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            applyPreset(preset, true);
+                            setShowColorPresets(false);
+                          }}
+                          style={{
+                            color: preset.fg,
+                            background: preset.bg || 'transparent',
+                            borderColor: preset.bg ? preset.bg : preset.fg,
+                            position: 'relative',
+                          }}
+                        >
+                          A
+                          {assignedKey && (
+                            <span style={{
+                              position: 'absolute', bottom: 1, right: 2,
+                              fontSize: 8, color: '#8b949e', lineHeight: 1,
+                            }}>{assignedKey}</span>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
+
             </div>
 
             {/* Spread Navigation */}
