@@ -2,24 +2,24 @@
    DARK MODE DESIGN SYSTEM
    ============================================================ */
 :root {
-    --bg-base:       #0d1117;
-    --bg-surface:    #161b22;
-    --bg-card:       #1c2128;
-    --bg-elevated:   #21262d;
-    --bg-hover:      #262c34;
-    --bg-input:      #161b22;
+    --bg-base:       #080808;
+    --bg-surface:    #0d0d0d;
+    --bg-card:       #111111;
+    --bg-elevated:   #161616;
+    --bg-hover:      #1a1a1a;
+    --bg-input:      #0d0d0d;
 
-    --border:        #30363d;
-    --border-hover:  #484f58;
+    --border:        #1e1e1e;
+    --border-hover:  #2e2e2e;
 
-    --text-primary:  #e6edf3;
-    --text-secondary:#8b949e;
-    --text-muted:    #484f58;
+    --text-primary:  #b0b0b0;
+    --text-secondary:#555555;
+    --text-muted:    #333333;
 
-    --accent:        #58a6ff;
-    --accent-dim:    #388bfd;
-    --accent-glow:   rgba(88, 166, 255, 0.1);
-    --accent-hover:  #79c0ff;
+    --accent:        #666;
+    --accent-dim:    #444;
+    --accent-glow:   rgba(255, 255, 255, 0.04);
+    --accent-hover:  #888;
 
     --danger:        #f85149;
     --success:       #3fb950;
@@ -7685,8 +7685,8 @@ body.light .view-title {
 .notion-sidebar {
   width: 240px;
   min-width: 240px;
-  background: #0d1117;
-  border-right: 1px solid #21262d;
+  background: #060606;
+  border-right: 1px solid #141414;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -7703,7 +7703,7 @@ body.light .view-title {
   align-items: center;
   justify-content: space-between;
   padding: 12px 10px;
-  border-bottom: 1px solid #21262d;
+  border-bottom: 1px solid #141414;
 }
 
 .sidebar-title {
@@ -7712,7 +7712,7 @@ body.light .view-title {
   gap: 8px;
   font-weight: 600;
   font-size: 14px;
-  color: #c9d1d9;
+  color: #555;
 }
 
 .sidebar-icon {
@@ -7724,11 +7724,11 @@ body.light .view-title {
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  border-bottom: 1px solid #21262d;
+  border-bottom: 1px solid #141414;
   cursor: pointer;
   transition: background 0.15s;
 }
-.sidebar-profile-bar:hover { background: #161b22; }
+.sidebar-profile-bar:hover { background: #0f0f0f; }
 
 .sidebar-profile-avatar {
   width: 30px;
@@ -8290,7 +8290,7 @@ body.light .sidebar-settings-version {
   gap: 8px;
   padding: 6px 12px 6px 20px;
   cursor: pointer;
-  color: #484f58;
+  color: #333;
   font-size: 13px;
   border-radius: 4px;
   margin: 1px 8px;
@@ -8412,13 +8412,13 @@ body.light .sidebar-settings-version {
 }
 
 .sidebar-item:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: #c9d1d9;
+  background: rgba(255, 255, 255, 0.03);
+  color: #666;
 }
 
 .sidebar-item.active {
-  background: rgba(88, 166, 255, 0.2);
-  color: #5c7cfa;
+  background: rgba(255, 255, 255, 0.04);
+  color: #888;
 }
 
 .item-icon {
@@ -9069,13 +9069,13 @@ body.light .font-size-option:hover {
   left: 50%;
   top: 10%;
   transform: translateX(-50%);
-  width: 2px;
+  width: 1px;
   height: 80%;
-  background: var(--border);
+  background: #1a1a1a;
   border-radius: 2px;
   transition: background 0.15s;
 }
-.col-resize-handle:hover::after { background: var(--accent); }
+.col-resize-handle:hover::after { background: #2e2e2e; }
 
 .todo-columns .category-column,
 .todo-columns .category-column-v2 {
