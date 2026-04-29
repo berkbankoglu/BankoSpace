@@ -1,7 +1,7 @@
 /* CategoryColumn v2 - DailyChecklist Style */
 
 .category-column-v2 {
-  background: #161b22;
+  background: #0d0d0d;
   border-radius: 6px;
   padding: 16px;
   display: flex;
@@ -10,7 +10,7 @@
   min-width: 0;
   min-height: 0;
   height: 100%;
-  border: 1px solid #21262d;
+  border: 1px solid #1e1e1e;
   box-sizing: border-box;
 }
 
@@ -20,7 +20,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 8px 10px 8px 14px;
-  border-bottom: 1px solid #21262d;
+  border-bottom: 1px solid #1e1e1e;
   flex-shrink: 0;
   margin-bottom: 0;
 }
@@ -28,9 +28,9 @@
 .cc-title {
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #8b949e;
+  color: #555;
   margin: 0;
   cursor: pointer;
   transition: opacity 0.2s;
@@ -43,7 +43,7 @@
 .cc-title-input {
   font-size: 15px;
   font-weight: 600;
-  background: #0d1117;
+  background: #080808;
   border: 1px solid #5c7cfa;
   border-radius: 6px;
   padding: 4px 8px;
@@ -54,8 +54,8 @@
 }
 
 .cc-count {
-  background: #21262d;
-  color: #8b949e;
+  background: #1a1a1a;
+  color: #444;
   font-size: 11px;
   padding: 2px 7px;
   border-radius: 10px;
@@ -72,22 +72,22 @@
 
 .cc-progress-bar {
   flex: 1;
-  height: 4px;
-  background: #1c2128;
+  height: 3px;
+  background: #1a1a1a;
   border-radius: 2px;
   overflow: hidden;
 }
 
 .cc-progress-fill {
   height: 100%;
-  background: #e3b341;
+  background: #333;
   border-radius: 2px;
   transition: width 0.3s ease;
 }
 
 .cc-progress-text {
   font-size: 11px;
-  color: #484f58;
+  color: #333;
   min-width: 35px;
   text-align: right;
 }
@@ -112,12 +112,12 @@
 }
 
 .cc-items::-webkit-scrollbar-thumb {
-  background: #21262d;
+  background: #1e1e1e;
   border-radius: 2px;
 }
 
 .cc-items::-webkit-scrollbar-thumb:hover {
-  background: #30363d;
+  background: #2a2a2a;
 }
 
 @keyframes cc-complete {
@@ -128,10 +128,10 @@
 
 /* Item */
 .cc-item {
-  background: #1c2128;
+  background: #111;
   border-radius: 4px;
   padding: 8px 10px 8px 14px;
-  transition: border-color 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease;
   border: 1px solid transparent;
   cursor: default;
   user-select: none;
@@ -159,7 +159,8 @@
 }
 
 .cc-item:hover {
-  border-color: #30363d;
+  background: #161616;
+  border-color: #252525;
 }
 
 .cc-item.dragging {
@@ -178,7 +179,7 @@
 
 .cc-item.completed .cc-text {
   text-decoration: line-through;
-  color: #484f58;
+  color: #333;
 }
 
 .cc-item-top {
@@ -194,7 +195,7 @@
 
 /* Drag Handle */
 .cc-drag-handle {
-  color: #30363d;
+  color: #222;
   font-size: 14px;
   cursor: grab;
   user-select: none;
@@ -206,13 +207,13 @@
 }
 
 .cc-item:hover .cc-drag-handle {
-  color: #484f58;
+  color: #444;
 }
 
 /* Column drag-over state */
 .category-column-v2.drag-over {
-  border-color: #5c7cfa;
-  background: rgba(88, 166, 255, 0.05);
+  border-color: #333;
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .cc-inline-check {
@@ -237,7 +238,7 @@
 .cc-checkmark {
   width: 18px;
   height: 18px;
-  border: 2px solid #30363d;
+  border: 1.5px solid #2a2a2a;
   border-radius: 4px;
   flex-shrink: 0;
   position: relative;
@@ -252,8 +253,8 @@
 }
 
 .cc-checkbox:checked + .cc-checkmark {
-  background: #4f86f7;
-  border-color: transparent;
+  background: #2a2a2a;
+  border-color: #444;
 }
 
 .cc-checkbox:checked + .cc-checkmark::after {
@@ -278,8 +279,8 @@
 
 .cc-text {
   font-size: var(--todo-font-size, 13px);
-  color: #c9d1d9;
-  font-weight: 600;
+  color: #b0b0b0;
+  font-weight: 400;
   line-height: 1.4;
   white-space: normal;
   word-break: break-word;
@@ -288,9 +289,9 @@
 
 .cc-edit-input {
   font-size: 13px;
-  color: #c9d1d9;
-  background: #0d1117;
-  border: 1px solid #5c7cfa;
+  color: #b0b0b0;
+  background: #080808;
+  border: 1px solid #333;
   border-radius: 4px;
   padding: 2px 6px;
   outline: none;
@@ -307,7 +308,7 @@
 
 .cc-time {
   font-size: 11px;
-  color: #484f58;
+  color: #333;
 }
 
 /* Item Actions */
@@ -322,8 +323,8 @@
 
 .cc-subtask-badge {
   font-size: 10px;
-  background: rgba(88, 166, 255, 0.2);
-  color: #5c7cfa;
+  background: #1a1a1a;
+  color: #444;
   padding: 2px 6px;
   border-radius: 4px;
   margin-right: 4px;
@@ -333,7 +334,7 @@
 .cc-action-btn {
   background: none;
   border: none;
-  color: #484f58;
+  color: #2e2e2e;
   font-size: 16px;
   cursor: pointer;
   padding: 2px 6px;
@@ -343,8 +344,8 @@
 }
 
 .cc-action-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #c9d1d9;
+  background: rgba(255, 255, 255, 0.06);
+  color: #888;
 }
 
 .cc-action-btn.delete:hover {
@@ -363,12 +364,12 @@
   left: 0;
   display: flex;
   gap: 4px;
-  background: #161b22;
-  border: 1px solid #30363d;
+  background: #111;
+  border: 1px solid #222;
   border-radius: 6px;
   padding: 6px;
   z-index: 100;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.7);
 }
 
 .cc-color-swatch {
@@ -404,7 +405,7 @@
 
 .cc-subtask-count-hint {
   font-size: 11px;
-  color: #484f58;
+  color: #333;
   margin-left: 6px;
   flex-shrink: 0;
   opacity: 1 !important;
@@ -415,7 +416,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 4px 6px;
-  background: #161b22;
+  background: #0d0d0d;
   border-radius: 5px;
   gap: 6px;
   transition: background 0.15s, border-color 0.15s, transform 0.2s, opacity 0.2s;
@@ -466,7 +467,7 @@
 
 .cc-subtask.completed .cc-text {
   text-decoration: line-through;
-  color: #484f58;
+  color: #2e2e2e;
 }
 
 .cc-subtask .cc-label {
@@ -480,7 +481,7 @@
 
 .cc-subtask .cc-text {
   font-size: var(--subtask-font-size, 12px);
-  color: #c9d1d9;
+  color: #888;
   white-space: normal;
   word-break: break-word;
   min-width: 0;
@@ -492,44 +493,44 @@
 
 .cc-subtask-input {
   width: 100%;
-  background: #161b22;
-  border: 1px solid #21262d;
+  background: #0d0d0d;
+  border: 1px solid #1e1e1e;
   border-radius: 6px;
   padding: 6px 10px;
   font-size: 12px;
-  color: #c9d1d9;
+  color: #888;
   outline: none;
   transition: border-color 0.2s ease;
 }
 
 .cc-subtask-input:focus {
-  border-color: #5c7cfa;
+  border-color: #333;
 }
 
 .cc-subtask-input::placeholder {
-  color: #484f58;
+  color: #2e2e2e;
 }
 
 
 .cc-add-input {
   width: 100%;
-  background: #161b22;
-  border: 1px solid #21262d;
+  background: #0a0a0a;
+  border: 1px solid #1a1a1a;
   border-radius: 4px;
   padding: 10px 14px;
   font-size: 13px;
-  color: #c9d1d9;
+  color: #888;
   outline: none;
   transition: all 0.2s ease;
 }
 
 .cc-add-input:focus {
-  border-color: #5c7cfa;
-  background: #161b22;
+  border-color: #2e2e2e;
+  background: #0d0d0d;
 }
 
 .cc-add-input::placeholder {
-  color: #484f58;
+  color: #2e2e2e;
 }
 
 /* Empty State */
@@ -538,7 +539,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #484f58;
+  color: #222;
   font-size: 13px;
 }
 
@@ -546,7 +547,7 @@
 .cc-add-row {
   padding: 8px 0;
   margin-bottom: 12px;
-  border-bottom: 1px solid #21262d;
+  border-bottom: 1px solid #1a1a1a;
 }
 
 /* Date Picker */
@@ -562,19 +563,19 @@
 
 .cc-date-toggle-btn {
   background: none;
-  border: 1px solid #21262d;
+  border: 1px solid #1a1a1a;
   border-radius: 4px;
   padding: 6px 8px;
   cursor: pointer;
   font-size: 14px;
   transition: all 0.2s ease;
-  color: #484f58;
+  color: #2e2e2e;
   line-height: 1;
 }
 
 .cc-date-toggle-btn:hover {
-  border-color: #5c7cfa;
-  background: rgba(88, 166, 255, 0.1);
+  border-color: #333;
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .cc-date-picker-row {
@@ -585,11 +586,11 @@
 }
 
 .cc-date-input {
-  background: #0d1117;
-  border: 1px solid #30363d;
+  background: #080808;
+  border: 1px solid #1e1e1e;
   border-radius: 4px;
   padding: 6px 10px;
-  color: #c9d1d9;
+  color: #888;
   font-size: 12px;
   font-family: inherit;
   outline: none;
@@ -597,7 +598,7 @@
 }
 
 .cc-date-input:focus {
-  border-color: #5c7cfa;
+  border-color: #333;
 }
 
 .cc-date-clear {
@@ -618,7 +619,7 @@
 
 .cc-due-date {
   font-size: 11px;
-  color: #5c7cfa;
+  color: #444;
   margin-left: 8px;
 }
 
@@ -640,11 +641,11 @@
 }
 
 .cc-quick-date-btn {
-  background: #1c2128;
-  border: 1px solid #30363d;
+  background: #111;
+  border: 1px solid #1e1e1e;
   border-radius: 4px;
   padding: 4px 10px;
-  color: #c9d1d9;
+  color: #555;
   font-size: 11px;
   font-family: inherit;
   cursor: pointer;
@@ -652,15 +653,15 @@
 }
 
 .cc-quick-date-btn:hover {
-  border-color: #5c7cfa;
-  background: rgba(88, 166, 255, 0.1);
-  color: #5c7cfa;
+  border-color: #2e2e2e;
+  background: #161616;
+  color: #888;
 }
 
 .cc-quick-date-btn.active {
-  background: rgba(88, 166, 255, 0.2);
-  border-color: #5c7cfa;
-  color: #5c7cfa;
+  background: #1a1a1a;
+  border-color: #333;
+  color: #888;
 }
 
 .cc-date-custom-row {
@@ -670,8 +671,8 @@
 }
 
 .cc-date-toggle-btn.has-date {
-  border-color: #5c7cfa;
-  color: #5c7cfa;
+  border-color: #2e2e2e;
+  color: #555;
   font-size: 11px;
   padding: 4px 8px;
 }
