@@ -694,12 +694,8 @@ function App({ session, onLogout }) {
   };
 
 
-  const LONGTERM_COLORS = ['#667eea', '#f093fb', '#4ade80', '#60a5fa', '#fb923c', '#facc15', '#9ca3af', '#34d399', '#f472b6', '#a78bfa'];
   const addTodo = (category, text, dueDate = null) => {
     pushHistory(todos);
-    const autoColor = category === 'daily' ? '#f87171'
-      : category === 'longterm' ? LONGTERM_COLORS[Math.floor(Math.random() * LONGTERM_COLORS.length)]
-      : null;
     const newTodo = {
       id: Date.now(),
       text,
@@ -709,7 +705,7 @@ function App({ session, onLogout }) {
       dueDate,
       subtasks: [],
       order: -Date.now(),
-      color: autoColor
+      color: null
     };
     setTodos([newTodo, ...todos]);
     playAddSound();

@@ -2,8 +2,8 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #161b22;
-  border: 1px solid #30363d;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
   border-radius: 12px;
   overflow: hidden;
   font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -14,7 +14,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 8px 10px 8px 14px;
-  border-bottom: 1px solid #30363d;
+  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
 
@@ -23,7 +23,7 @@
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #8b949e;
+  color: var(--text-secondary);
 }
 
 /* ── Section headers inside list ── */
@@ -44,11 +44,11 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
-.sub-section-title--auto   { color: #58a6ff; }
-.sub-section-title--manual { color: #d29922; }
+.sub-section-title--auto   { color: var(--text-secondary); }
+.sub-section-title--manual { color: var(--text-muted); }
 .sub-section-title--once   { color: var(--text-muted); }
-.sub-section-title--cancel { color: #f85149; }
-.sub-cat-btn.active--cancel { border-color: #f85149; background: rgba(248,81,73,0.1); }
+.sub-section-title--cancel { color: var(--danger); }
+.sub-cat-btn.active--cancel { border-color: var(--danger); background: rgba(248,81,73,0.1); }
 
 .sub-section-total {
   font-size: 10px;
@@ -60,10 +60,10 @@
 }
 
 /* ── Category item tones ── */
-.sub-item--monthly-auto   { background: rgba(88, 166, 255, 0.04); }
-.sub-item--monthly-auto:hover { background: rgba(88, 166, 255, 0.09); }
-.sub-item--monthly-manual { background: rgba(210, 153, 34, 0.04); }
-.sub-item--monthly-manual:hover { background: rgba(210, 153, 34, 0.08); }
+.sub-item--monthly-auto   { background: var(--bg-elevated); }
+.sub-item--monthly-auto:hover { background: var(--bg-hover); }
+.sub-item--monthly-manual { background: var(--bg-elevated); }
+.sub-item--monthly-manual:hover { background: var(--bg-hover); }
 
 .sub-item-icon {
   font-size: 13px;
@@ -104,9 +104,9 @@
 }
 .sub-cat-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
 .sub-cat-btn.active { color: var(--text-primary); }
-.sub-cat-btn.active--monthly { border-color: #58a6ff; background: rgba(88,166,255,0.1); }
-.sub-cat-btn.active--auto    { border-color: #58a6ff; background: rgba(88,166,255,0.1); }
-.sub-cat-btn.active--manual  { border-color: #d29922; background: rgba(210,153,34,0.1); }
+.sub-cat-btn.active--monthly { border-color: var(--accent); background: var(--accent-glow); }
+.sub-cat-btn.active--auto    { border-color: var(--accent); background: var(--accent-glow); }
+.sub-cat-btn.active--manual  { border-color: var(--accent-dim); background: var(--accent-glow); }
 .sub-cat-btn.active--once    { border-color: var(--text-muted); background: var(--bg-hover); }
 
 /* ── Delete button in modal footer ── */
@@ -177,9 +177,9 @@
 }
 
 .sub-add-btn {
-  background: #21262d;
+  background: var(--bg-elevated);
   border: none;
-  color: #8b949e;
+  color: var(--text-secondary);
   border-radius: 10px;
   width: 22px;
   height: 22px;
@@ -191,7 +191,7 @@
   justify-content: center;
   transition: color 0.15s, background 0.15s;
 }
-.sub-add-btn:hover { background: #30363d; color: #e6edf3; }
+.sub-add-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
 
 /* ---- List ---- */
 .sub-list {
@@ -231,10 +231,10 @@
 .sub-item--urgent  { border-left-color: var(--danger); }
 .sub-item--soon    { border-left-color: var(--warning); }
 .sub-item--normal  { border-left-color: var(--border); }
-.sub-item--normal.sub-item--monthly-auto   { border-left-color: #58a6ff; }
-.sub-item--normal.sub-item--monthly-manual { border-left-color: #d29922; }
-.sub-item--normal.sub-item--once-payment   { border-left-color: #9ca3af; }
-.sub-item--normal.sub-item--once-cancel    { border-left-color: #f85149; }
+.sub-item--normal.sub-item--monthly-auto   { border-left-color: var(--border); }
+.sub-item--normal.sub-item--monthly-manual { border-left-color: var(--border); }
+.sub-item--normal.sub-item--once-payment   { border-left-color: var(--border); }
+.sub-item--normal.sub-item--once-cancel    { border-left-color: var(--danger); }
 .sub-item--overdue { border-left-color: #f85149; background: rgba(248,81,73,0.06); }
 .sub-item--done    { border-left-color: #3fb950; opacity: 0.5; }
 .sub-item--done .sub-item-name { text-decoration: line-through; color: var(--text-muted); }
@@ -257,11 +257,11 @@
 }
 .sub-complete-btn:hover { background: rgba(63,185,80,0.15); border-color: #3fb950; }
 
-/* Otomatik ödeme — farklı arka plan tonu */
+/* Auto payment — neutral tone */
 .sub-item--auto {
-  background: rgba(88, 166, 255, 0.04);
+  background: var(--bg-elevated);
 }
-.sub-item--auto:hover { background: rgba(88, 166, 255, 0.09); }
+.sub-item--auto:hover { background: var(--bg-hover); }
 
 .sub-item-dot {
   width: 6px;
@@ -439,8 +439,8 @@
   color: var(--text-primary);
 }
 .sub-kind-btn--auto.active {
-  border-color: var(--warning);
-  background: rgba(210, 153, 34, 0.12);
+  border-color: var(--accent);
+  background: var(--accent-glow);
 }
 .sub-kind-icon { font-size: 15px; }
 
@@ -575,8 +575,8 @@
 }
 
 .sub-toggle--auto.on {
-  background: #d29922;
-  border-color: #d29922;
+  background: var(--accent);
+  border-color: var(--accent);
 }
 
 
@@ -641,8 +641,8 @@
   color: var(--text-primary);
 }
 .sub-type-btn--auto.active {
-  border-color: var(--warning);
-  background: rgba(210, 153, 34, 0.12);
+  border-color: var(--accent);
+  background: var(--accent-glow);
 }
 
 /* ── Popup overlay ── */
@@ -661,8 +661,8 @@
   border-radius: 6px;
   overflow: hidden;
   box-shadow: 0 24px 48px rgba(0,0,0,0.7);
-  border: 1px solid #21262d;
-  background: #161b22;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
 }
 
 /* ---- Widget ---- */

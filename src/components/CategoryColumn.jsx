@@ -245,7 +245,7 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
                   className="cc-action-btn color-btn"
                   onClick={(e) => { e.stopPropagation(); setColorPickerTodoId(colorPickerTodoId === todo.id ? null : todo.id); }}
                   title="Renk"
-                  style={{ color: todo.color || '#8b949e' }}
+                  style={{ color: todo.color || '#333' }}
                 >●</button>
                 {colorPickerTodoId === todo.id && (
                   <div className="cc-color-picker" onClick={e => e.stopPropagation()}>
