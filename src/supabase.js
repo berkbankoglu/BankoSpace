@@ -39,6 +39,7 @@ export const SYNC_KEYS = [
   'ft_profile',
   'ft_goal',
   'ft_weight_log',
+  'ft_menu_templates',
   'ft_meals',
   'ft_workouts',
   'ft_measurements',
@@ -87,10 +88,24 @@ export async function pullFromSupabase() {
     if (error) throw error;
 
     if (data && data.length > 0) {
+      const pulledKeys = new Set(data.map(r => r.key));
       data.forEach(({ key, value }) => {
         if (value !== null && value !== undefined) {
+          const supaStr = typeof value === 'string' ? value : JSON.stringify(value);
+          const localStr = localStorage.getItem(key);
+          // Supabase'deki değer boş obje/array ise ve localStorage'da dolu bir değer varsa, localStorage'ı koru
+          if (localStr && localStr !== 'null') {
+            try {
+              const supaVal = typeof value === 'string' ? JSON.parse(value) : value;
+              const supaEmpty =
+                supaVal === null ||
+                (Array.isArray(supaVal) && supaVal.length === 0) ||
+                (typeof supaVal === 'object' && !Array.isArray(supaVal) && Object.keys(supaVal).length === 0);
+              if (supaEmpty) return; // localStorage'daki dolu veriyi koru
+            } catch { /* parse hatası, devam et */ }
+          }
           // String primitives (e.g. api key) must be stored raw, not double-stringified
-          localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
+          localStorage.setItem(key, supaStr);
         }
       });
       return true;

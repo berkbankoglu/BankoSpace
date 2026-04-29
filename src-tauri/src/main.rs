@@ -211,13 +211,16 @@ fn main() {
             set_child_webview_bounds,
         ])
         .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { .. } = event {
-                if window.label() == "main" {
-                    let app = window.app_handle();
-                    for (_, w) in app.webview_windows() {
-                        let _ = w.close();
+            match event {
+                tauri::WindowEvent::CloseRequested { .. } => {
+                    if window.label() == "main" {
+                        let app = window.app_handle();
+                        for (_, w) in app.webview_windows() {
+                            let _ = w.close();
+                        }
                     }
                 }
+                _ => {}
             }
         })
         .run(tauri::generate_context!())

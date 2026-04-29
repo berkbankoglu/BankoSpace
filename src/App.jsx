@@ -8,8 +8,8 @@ import Timer from './components/Timer';
 import FlashCards from './components/FlashCards';
 import DailyChecklist from './components/DailyChecklist';
 import IncomeTracker from './components/IncomeTracker';
-import SilkroadCalc from './components/SilkroadCalc';
 import Notes from './components/Notes';
+import FitnessTracker from './components/FitnessTracker';
 import Calendar from './components/Calendar';
 import JapaneseKana from './components/JapaneseKana';
 import ToolsChat from './components/ToolsChat';
@@ -182,6 +182,20 @@ function App({ session, onLogout }) {
   const [updateAvailable, setUpdateAvailable] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
+  // WebView2 donma önleme — pencere ön plana gelince force re-render
+  useEffect(() => {
+    const onVisible = () => {
+      // Küçük bir state değişikliği ile React'i uyandır
+      window.dispatchEvent(new Event('resize'));
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
+  }, []);
+
   // Supabase sync — active automatically if session exists (runs once, not reactive to session prop)
   useEffect(() => {
     let mounted = true;
@@ -199,13 +213,28 @@ function App({ session, onLogout }) {
       }
 
       const debounceTimers = {};
+      const pendingKeys = {};
+
       localStorage.setItem = function(key, value) {
         origSetItem(key, value);
         if (SYNC_KEYS.includes(key)) {
+          pendingKeys[key] = value;
           clearTimeout(debounceTimers[key]);
-          debounceTimers[key] = setTimeout(() => pushKeyToSupabase(key, value), 300000);
+          debounceTimers[key] = setTimeout(() => {
+            pushKeyToSupabase(key, value);
+            delete pendingKeys[key];
+          }, 500);
         }
       };
+
+      // Kapanmadan önce bekleyen tüm keyleri hemen gönder
+      const flushAll = () => {
+        Object.entries(pendingKeys).forEach(([key, value]) => {
+          clearTimeout(debounceTimers[key]);
+          pushKeyToSupabase(key, value);
+        });
+      };
+      window.addEventListener('beforeunload', flushAll);
 
       const origRemoveItem = localStorage.removeItem.bind(localStorage);
       localStorage.removeItem = function(key) {
@@ -213,6 +242,10 @@ function App({ session, onLogout }) {
         if (SYNC_KEYS.includes(key)) {
           pushKeyToSupabase(key, null);
         }
+      };
+
+      return () => {
+        window.removeEventListener('beforeunload', flushAll);
       };
     });
 
@@ -294,7 +327,7 @@ function App({ session, onLogout }) {
       { id: 'notes',      label: 'Notes',           view: 'notes',      hidden: false },
       { id: 'tools',        label: 'Tools',            view: 'tools',        hidden: true },
       { id: 'japanesekana', label: 'Japanese Kana',    view: 'japanesekana', hidden: false },
-      { id: 'silkroad',     label: 'Silkroad Calc',    view: 'silkroad',     hidden: false },
+      { id: 'fitness',      label: 'Fitness',           view: 'fitness',      hidden: false },
     ];
     const saved = localStorage.getItem('sidebarOrder');
     if (saved) {
@@ -853,164 +886,125 @@ function App({ session, onLogout }) {
     ));
   };
 
-  // Todo drag & drop state (swap-based)
-  const [draggingTodo, setDraggingTodo] = useState(null);
-  const [dragOverCategory, setDragOverCategory] = useState(null);
-  const [dragOverTodoId, setDragOverTodoId] = useState(null);
-  const todoDragOffsetRef = useRef({ x: 0, y: 0 });
-  const todoDragGhostRef = useRef(null);
+  // Todo drag & drop — fitness tarzı closure, sıfır React render
   const todoPositionsRef = useRef({});
-  const dragOverCategoryRef = useRef(null);
-  const dragOverTodoRef = useRef(null);
   const todoHoldTimerRef = useRef(null);
 
   const handleTodoDragStart = useCallback((e, todo) => {
     if (e.button !== 0) return;
-    if (!e.target.closest('.cc-drag-handle')) return; // Sadece drag handle'dan
-
+    if (!e.target.closest('.cc-drag-handle')) return;
     const itemEl = e.target.closest('.cc-item');
     if (!itemEl) return;
+    e.preventDefault();
 
     const rect = itemEl.getBoundingClientRect();
-    todoDragOffsetRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    const offX = e.clientX - rect.left;
+    const offY = e.clientY - rect.top;
     pushHistory(todos);
-    setDraggingTodo({ todo, width: rect.width, height: rect.height });
 
-    requestAnimationFrame(() => {
-      if (todoDragGhostRef.current) {
-        todoDragGhostRef.current.style.left = `${e.clientX - todoDragOffsetRef.current.x}px`;
-        todoDragGhostRef.current.style.top = `${e.clientY - todoDragOffsetRef.current.y}px`;
+    let ghost = null;
+    let dragOverEl = null;
+    let overCategory = null;
+    let overTodoId = null;
+
+    function onMove(ev) {
+      // Ghost oluştur (ilk harekette)
+      if (!ghost) {
+        ghost = document.createElement('div');
+        ghost.textContent = todo.text;
+        ghost.style.cssText = `
+          position:fixed;z-index:9999;pointer-events:none;
+          max-width:${rect.width}px;
+          white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+          background:#1a2d44;border:1.5px solid #58a6ff88;
+          color:#c9d1d9;font-size:13px;font-weight:500;
+          padding:6px 14px;border-radius:20px;
+          transform:rotate(-1deg);
+          box-shadow:0 4px 16px rgba(88,166,255,0.2);
+          font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+        `;
+        document.body.appendChild(ghost);
+        itemEl.style.opacity = '0.35';
+        itemEl.style.transform = 'scale(0.97)';
+        document.body.style.cursor = 'grabbing';
+        document.body.style.userSelect = 'none';
       }
-    });
-    e.preventDefault();
+
+      ghost.style.left = (ev.clientX - offX) + 'px';
+      ghost.style.top  = (ev.clientY - offY) + 'px';
+
+      // Kolon bul
+      let foundCategory = null;
+      document.querySelectorAll('.category-column-v2').forEach(col => {
+        const r = col.getBoundingClientRect();
+        if (ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom)
+          foundCategory = col.dataset.category;
+      });
+      overCategory = foundCategory;
+
+      // Todo highlight
+      let hoveredEl = null;
+      let hoveredId = null;
+      if (foundCategory) {
+        const col = document.querySelector(`.category-column-v2[data-category="${foundCategory}"]`);
+        if (col) {
+          for (const el of col.querySelectorAll('.cc-item[data-todo-id]')) {
+            const id = el.getAttribute('data-todo-id');
+            if (id === String(todo.id)) continue;
+            const r = el.getBoundingClientRect();
+            if (ev.clientY >= r.top && ev.clientY <= r.bottom) { hoveredEl = el; hoveredId = id; break; }
+          }
+        }
+      }
+      overTodoId = hoveredId;
+      if (hoveredEl !== dragOverEl) {
+        if (dragOverEl) dragOverEl.classList.remove('cc-drag-over');
+        if (hoveredEl) hoveredEl.classList.add('cc-drag-over');
+        dragOverEl = hoveredEl;
+      }
+    }
+
+    function onUp() {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      if (ghost) { ghost.remove(); ghost = null; }
+      if (dragOverEl) { dragOverEl.classList.remove('cc-drag-over'); dragOverEl = null; }
+      itemEl.style.opacity = '';
+      itemEl.style.transform = '';
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+
+      if (overTodoId) {
+        const allEls = document.querySelectorAll('.cc-item[data-todo-id]');
+        const oldPositions = {};
+        allEls.forEach(el => { const id = el.getAttribute('data-todo-id'); if (id) oldPositions[id] = el.getBoundingClientRect(); });
+        todoPositionsRef.current = oldPositions;
+        playClickSound();
+        setTodos(prev => {
+          const dragItem   = prev.find(t => String(t.id) === String(todo.id));
+          const targetItem = prev.find(t => String(t.id) === String(overTodoId));
+          if (!dragItem || !targetItem) return prev;
+          const category = targetItem.category;
+          const catTodos  = [...prev].filter(t => t.category === category).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+          const fromIdx = catTodos.findIndex(t => String(t.id) === String(todo.id));
+          const toIdx   = catTodos.findIndex(t => String(t.id) === String(overTodoId));
+          const reordered = [...catTodos];
+          const [moved] = reordered.splice(fromIdx !== -1 ? fromIdx : reordered.length, 1);
+          reordered.splice(toIdx, 0, moved || { ...dragItem });
+          const updated = reordered.map((t, i) => ({ ...t, order: i, category }));
+          const others  = prev.filter(t => t.category !== category && String(t.id) !== String(todo.id));
+          return [...updated, ...others];
+        });
+      } else if (overCategory && overCategory !== todo.category) {
+        playClickSound();
+        setTodos(prev => prev.map(t => t.id === todo.id ? { ...t, category: overCategory } : t));
+      }
+    }
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
   }, [todos]);
 
-  const handleTodoDragMove = useCallback((e) => {
-    if (!draggingTodo) return;
-
-    // Move ghost via ref
-    if (todoDragGhostRef.current) {
-      todoDragGhostRef.current.style.left = `${e.clientX - todoDragOffsetRef.current.x}px`;
-      todoDragGhostRef.current.style.top = `${e.clientY - todoDragOffsetRef.current.y}px`;
-    }
-
-    // Detect which column we're over
-    const columns = document.querySelectorAll('.category-column-v2');
-    let foundCategory = null;
-    columns.forEach(col => {
-      const rect = col.getBoundingClientRect();
-      if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
-        foundCategory = col.dataset.category;
-      }
-    });
-    dragOverCategoryRef.current = foundCategory;
-    setDragOverCategory(foundCategory);
-
-    // Find which todo the cursor is hovering over
-    if (!foundCategory) {
-      dragOverTodoRef.current = null;
-      setDragOverTodoId(null);
-      return;
-    }
-
-    const hoveredColumn = document.querySelector(`.category-column-v2[data-category="${foundCategory}"]`);
-    if (!hoveredColumn) return;
-
-    const todoElements = Array.from(hoveredColumn.querySelectorAll('.cc-item[data-todo-id]'));
-    const dragId = String(draggingTodo.todo.id);
-    let hoveredTodoId = null;
-
-    for (const el of todoElements) {
-      const id = el.getAttribute('data-todo-id');
-      if (id === dragId) continue;
-      const rect = el.getBoundingClientRect();
-      if (e.clientY >= rect.top && e.clientY <= rect.bottom) {
-        hoveredTodoId = id;
-        break;
-      }
-    }
-
-    dragOverTodoRef.current = hoveredTodoId;
-    setDragOverTodoId(hoveredTodoId);
-  }, [draggingTodo]);
-
-  const handleTodoDragEnd = useCallback(() => {
-    if (!draggingTodo) {
-      setDraggingTodo(null);
-      setDragOverCategory(null);
-      setDragOverTodoId(null);
-      dragOverCategoryRef.current = null;
-      dragOverTodoRef.current = null;
-      return;
-    }
-
-    const overTodoId = dragOverTodoRef.current;
-    const overCategory = dragOverCategoryRef.current;
-    const dragId = draggingTodo.todo.id;
-
-    if (overTodoId) {
-      // Capture old positions for FLIP animation
-      const allTodoElements = document.querySelectorAll('.cc-item[data-todo-id]');
-      const oldPositions = {};
-      allTodoElements.forEach(item => {
-        const id = item.getAttribute('data-todo-id');
-        if (id) oldPositions[id] = item.getBoundingClientRect();
-      });
-      todoPositionsRef.current = oldPositions;
-
-      // Reorder: insert dragged item at target position
-      playClickSound();
-      setTodos(prev => {
-        const dragItem = prev.find(t => String(t.id) === String(dragId));
-        const targetItem = prev.find(t => String(t.id) === String(overTodoId));
-        if (!dragItem || !targetItem) return prev;
-
-        const category = targetItem.category;
-        const categoryTodos = prev
-          .filter(t => t.category === category)
-          .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-
-        const fromIdx = categoryTodos.findIndex(t => String(t.id) === String(dragId));
-        const toIdx = categoryTodos.findIndex(t => String(t.id) === String(overTodoId));
-
-        const reordered = [...categoryTodos];
-        const [moved] = reordered.splice(fromIdx !== -1 ? fromIdx : reordered.length, 1);
-        const insertItem = moved || { ...dragItem };
-        reordered.splice(toIdx, 0, insertItem);
-
-        const updatedCategory = reordered.map((t, i) => ({ ...t, order: i, category }));
-        const others = prev.filter(t => t.category !== category && String(t.id) !== String(dragId));
-
-        return [...updatedCategory, ...others];
-      });
-    } else if (overCategory && overCategory !== draggingTodo.todo.category) {
-      // Dropped on empty area of a different column - move to that column
-      setTodos(prev => prev.map(t =>
-        t.id === dragId ? { ...t, category: overCategory } : t
-      ));
-    }
-
-    setDraggingTodo(null);
-    setDragOverCategory(null);
-    setDragOverTodoId(null);
-    dragOverCategoryRef.current = null;
-    dragOverTodoRef.current = null;
-  }, [draggingTodo]);
-
-  useEffect(() => {
-    if (draggingTodo) {
-      document.addEventListener('mousemove', handleTodoDragMove);
-      document.addEventListener('mouseup', handleTodoDragEnd);
-      document.body.style.cursor = 'grabbing';
-      document.body.style.userSelect = 'none';
-      return () => {
-        document.removeEventListener('mousemove', handleTodoDragMove);
-        document.removeEventListener('mouseup', handleTodoDragEnd);
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
-      };
-    }
-  }, [draggingTodo, handleTodoDragMove, handleTodoDragEnd]);
 
   // FLIP animation for todo reorder
   useEffect(() => {
@@ -1368,9 +1362,15 @@ function App({ session, onLogout }) {
             </div>
           </div>
           {!sidebarCollapsed && session?.user?.email && (
-            <div className="sidebar-user-bar">
-              <span className="sidebar-user-name">{session.user.email.split('@')[0]}</span>
-              <button className="sidebar-logout-btn" onClick={async () => { await supabase.auth.signOut(); if (onLogout) onLogout(); }}>Sign Out</button>
+            <div className="sidebar-profile-bar" onClick={() => { setShowSidebarSettings(true); setSettingsTab('account'); }}>
+              <div className="sidebar-profile-avatar">
+                {session.user.email[0].toUpperCase()}
+              </div>
+              <div className="sidebar-profile-info">
+                <span className="sidebar-profile-name">{session.user.email.split('@')[0]}</span>
+                <span className="sidebar-profile-email">{session.user.email}</span>
+              </div>
+              <span className="sidebar-profile-gear">⚙</span>
             </div>
           )}
 
@@ -1734,12 +1734,6 @@ function App({ session, onLogout }) {
             </div>
           )}
 
-          {/* Silkroad Calc */}
-          {activeView === 'silkroad' && (
-            <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-              <SilkroadCalc />
-            </div>
-          )}
 
           {/* Income Tracker Full Screen View */}
           {activeView === 'income' && (
@@ -1752,6 +1746,13 @@ function App({ session, onLogout }) {
           {activeView === 'notes' && (
             <div className="notes-fullscreen">
               <Notes />
+            </div>
+          )}
+
+          {/* Fitness Tracker */}
+          {activeView === 'fitness' && (
+            <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <FitnessTracker />
             </div>
           )}
 
@@ -1800,9 +1801,6 @@ function App({ session, onLogout }) {
                   onUpdateSubtask={updateSubtask}
                   onReorder={reorderTodos}
                   onTodoDragStart={handleTodoDragStart}
-                  draggingTodo={draggingTodo}
-                  dragOverCategory={dragOverCategory}
-                  dragOverTodoId={dragOverTodoId}
                 />
               </div>
               <div className="col-resize-handle" onMouseDown={e => startColResize(0, e)} onDoubleClick={() => { setColWidths(DEFAULT_COL_PX); localStorage.setItem('dashColWidths', JSON.stringify(DEFAULT_COL_PX)); }} />
@@ -1823,9 +1821,6 @@ function App({ session, onLogout }) {
                   onUpdateSubtask={updateSubtask}
                   onReorder={reorderTodos}
                   onTodoDragStart={handleTodoDragStart}
-                  draggingTodo={draggingTodo}
-                  dragOverCategory={dragOverCategory}
-                  dragOverTodoId={dragOverTodoId}
                 />
               </div>
               <div className="col-resize-handle" onMouseDown={e => startColResize(1, e)} onDoubleClick={() => { setColWidths(DEFAULT_COL_PX); localStorage.setItem('dashColWidths', JSON.stringify(DEFAULT_COL_PX)); }} />
@@ -1839,24 +1834,6 @@ function App({ session, onLogout }) {
       </div>
 
 
-      {/* Drag Ghost - Notes style */}
-      {draggingTodo && (
-        <div
-          ref={todoDragGhostRef}
-          className="todo-drag-ghost"
-          style={{ width: draggingTodo.width }}
-        >
-          <div className="cc-item">
-            <div className="cc-item-main">
-              <div className="cc-drag-handle">⠿</div>
-              <label className="cc-label">
-                <span className="cc-checkmark"></span>
-                <span className="cc-text">{draggingTodo.todo.text}</span>
-              </label>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Subscriptions & Payments Popup */}
       {showSubPopup && <SubscriptionPopup onClose={() => setShowSubPopup(false)} />}
