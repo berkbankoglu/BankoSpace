@@ -78,13 +78,13 @@ function DatePicker({ value, onChange, minDate }) {
         }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
             <button onClick={prevMonth} style={{ background:'none', border:'none', color:'#8b949e', cursor:'pointer', fontSize:16 }}>‹</button>
-            <span style={{ color:'#c9d1d9', fontWeight:600, fontSize:13 }}>{MONTHS[viewMonth]} {viewYear}</span>
+            <span style={{ color:'var(--text-primary)', fontWeight:600, fontSize:13 }}>{MONTHS[viewMonth]} {viewYear}</span>
             <button onClick={nextMonth} style={{ background:'none', border:'none', color:'#8b949e', cursor:'pointer', fontSize:16 }}>›</button>
           </div>
           {/* Day headers */}
           <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:2, marginBottom:4 }}>
             {DAYS.map(d => (
-              <div key={d} style={{ textAlign:'center', fontSize:11, color:'#484f58', fontWeight:600 }}>{d}</div>
+              <div key={d} style={{ textAlign:'center', fontSize:11, color:'var(--text-muted)', fontWeight:600 }}>{d}</div>
             ))}
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:2 }}>
@@ -101,8 +101,8 @@ function DatePicker({ value, onChange, minDate }) {
                   style={{
                     textAlign:'center', padding:'5px 2px', borderRadius:4, fontSize:12,
                     cursor: isDisabled ? 'not-allowed' : 'pointer',
-                    background: isSelected ? '#58a6ff' : 'transparent',
-                    color: isDisabled ? '#f85149' : isSelected ? '#fff' : isToday ? '#58a6ff' : '#c9d1d9',
+                    background: isSelected ? 'var(--accent)' : 'transparent',
+                    color: isDisabled ? '#f85149' : isSelected ? '#fff' : isToday ? 'var(--accent)' : 'var(--text-primary)',
                     fontWeight: isSelected || isToday ? 700 : 400,
                     opacity: isDisabled ? 0.7 : 1,
                     textDecoration: isDisabled ? 'line-through' : 'none',
@@ -158,7 +158,7 @@ function calcBMI(w, h) {
 
 function bmiInfo(bmi) {
   if (!bmi) return null;
-  if (bmi < 18.5) return { text: 'Underweight', color: '#58a6ff' };
+  if (bmi < 18.5) return { text: 'Underweight', color: 'var(--accent)' };
   if (bmi < 25)   return { text: 'Normal',      color: '#3fb950' };
   if (bmi < 30)   return { text: 'Overweight',  color: '#d29922' };
   return               { text: 'Obese',          color: '#f85149' };
@@ -1734,13 +1734,13 @@ Rules:
         <div className="ft-hero">
           <div className="ft-hero-stats">
             <div className="ft-hstat">
-              <div className="ft-hstat-val" style={{ color: '#58a6ff' }}>{lastWeight ?? '—'}</div>
+              <div className="ft-hstat-val" style={{ color: 'var(--accent)' }}>{lastWeight ?? '—'}</div>
               <div className="ft-hstat-unit">kg</div>
               <div className="ft-hstat-label">Current Weight</div>
             </div>
             <div className="ft-hstat-sep" />
             <div className="ft-hstat">
-              <div className="ft-hstat-val" style={{ color: bodyFat != null ? '#d29922' : '#484f58' }}>
+              <div className="ft-hstat-val" style={{ color: bodyFat != null ? '#d29922' : 'var(--text-muted)' }}>
                 {bodyFat != null ? `%${bodyFat}` : '—'}
               </div>
               <div className="ft-hstat-unit">fat</div>
@@ -1748,7 +1748,7 @@ Rules:
             </div>
             <div className="ft-hstat-sep" />
             <div className="ft-hstat">
-              <div className="ft-hstat-val" style={{ color: '#5c7cfa' }}>{hasProfile ? goalKcal : '—'}</div>
+              <div className="ft-hstat-val" style={{ color: 'var(--accent)' }}>{hasProfile ? goalKcal : '—'}</div>
               <div className="ft-hstat-unit">kcal</div>
               <div className="ft-hstat-label">Daily Target</div>
             </div>
@@ -1965,7 +1965,7 @@ Rules:
                         </div>
                         <div className="ft-goal-preview-row">
                           <span>Daily calorie target</span>
-                          <b style={{ color: '#5c7cfa' }}>{daily} kcal</b>
+                          <b style={{ color: 'var(--accent)' }}>{daily} kcal</b>
                         </div>
                         <div className="ft-goal-preview-row">
                           <span>Min. calories (muscle prot.)</span>
@@ -1995,7 +1995,7 @@ Rules:
                     </div>
                     <div className="ft-goal-preview-row">
                       <span>Daily calorie target</span>
-                      <b style={{ color: '#5c7cfa' }}>{tdee ? tdee + 300 : '—'} kcal</b>
+                      <b style={{ color: 'var(--accent)' }}>{tdee ? tdee + 300 : '—'} kcal</b>
                     </div>
                     <div className="ft-goal-preview-row">
                       <span>Daily surplus</span>
@@ -2010,7 +2010,7 @@ Rules:
                   <div className="ft-goal-preview">
                     <div className="ft-goal-preview-row">
                       <span>Daily calorie target</span>
-                      <b style={{ color: '#5c7cfa' }}>{tdee || '—'} kcal</b>
+                      <b style={{ color: 'var(--accent)' }}>{tdee || '—'} kcal</b>
                     </div>
                     <div className="ft-goal-preview-row">
                       <span>Strategy</span>
@@ -2023,7 +2023,7 @@ Rules:
               {/* Custom kalori */}
               <div className="ft-goal-custom-kcal">
                 <label className="ft-label" style={{ flex: 1 }}>
-                  <span>Custom calorie target <span style={{ color: '#484f58', fontWeight: 400 }}>(leave blank for automatic)</span></span>
+                  <span>Custom calorie target <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(leave blank for automatic)</span></span>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
                     <input
                       className="ft-input"
@@ -2146,9 +2146,9 @@ Rules:
                       <span className="ft-wlog-kg">{e.value} kg</span>
                       <span className="ft-wlog-fat">
                         {(() => {
-                          if (!e.waist || !e.neck || !profile.height) return <span style={{ color: '#484f58' }}>—</span>;
+                          if (!e.waist || !e.neck || !profile.height) return <span style={{ color: 'var(--text-muted)' }}>—</span>;
                           const bf = calcBodyFat({ ...profile, weight: e.value, waist: e.waist, neck: e.neck });
-                          return bf != null ? <span style={{ color: '#d29922' }}>%{bf}</span> : <span style={{ color: '#484f58' }}>—</span>;
+                          return bf != null ? <span style={{ color: '#d29922' }}>%{bf}</span> : <span style={{ color: 'var(--text-muted)' }}>—</span>;
                         })()}
                       </span>
                       <span className="ft-list-edit-hint">✎</span>
@@ -2269,7 +2269,7 @@ Rules:
                             setFoodPanelMode('template');
                             setExpandedTplId(isExpanded ? null : tpl.id);
                           }}>
-                          <div style={{ fontSize: 11, color: '#484f58', marginRight: 2 }}>{isExpanded ? '▾' : '▸'}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginRight: 2 }}>{isExpanded ? '▾' : '▸'}</div>
                           <div className="ft-menu-info">
                             {editingTplId === tpl.id ? (
                               <input className="ft-input" style={{ fontSize:12, padding:'2px 6px', width:'100%' }} autoFocus
@@ -2299,7 +2299,7 @@ Rules:
                               ? <div className="ft-empty" style={{ fontSize: 11 }}>No food yet</div>
                               : tpl.items.map(item => (
                                 <div key={item.id} style={{ display:'flex', alignItems:'center', gap:4, padding:'4px 0', borderBottom:'1px solid #21262d44', fontSize:12 }}>
-                                  <span style={{ flex:1, color:'#c9d1d9', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.name}</span>
+                                  <span style={{ flex:1, color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.name}</span>
                                   <input
                                     className="ft-input"
                                     type="number" min="0.5"
@@ -2370,7 +2370,7 @@ Rules:
                                   onClick={e => e.stopPropagation()}
                                 />
                                 <span className="ft-list-sub">{item.unit}</span>
-                                <span style={{ color: '#5c7cfa', fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap' }}>{item.kcal} kcal</span>
+                                <span style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap' }}>{item.kcal} kcal</span>
                                 <button className="ft-del-btn" onClick={e => { e.stopPropagation(); removeFoodFromMenu(menu.id, item.id); }}>×</button>
                               </div>
                               );
@@ -2391,7 +2391,7 @@ Rules:
                     if (selMenus.length < 2 && selMenus[0]?.items.length === 0) return null;
                     return (
                       <div className="ft-log-summary" style={{ marginTop: 8 }}>
-                        <span className="ft-log-kcal" style={{ color: totalKcal > goalKcal && goalKcal ? '#f85149' : '#5c7cfa' }}>
+                        <span className="ft-log-kcal" style={{ color: totalKcal > goalKcal && goalKcal ? '#f85149' : 'var(--accent)' }}>
                           {totalKcal} kcal
                         </span>
                         <span className="ft-log-macros">
@@ -2507,7 +2507,7 @@ Rules:
                 return (
                   <div style={{ padding:'0 8px 6px' }}>
                     <div className="ft-menu-section-header" style={{ marginBottom: 0 }}>
-                      <select style={{ background:'transparent', border:'none', color:'#c9d1d9', fontSize:13, fontWeight:700, fontFamily:'inherit', cursor:'pointer', flex:1, outline:'none', minWidth:0 }}
+                      <select style={{ background:'transparent', border:'none', color:'var(--text-primary)', fontSize:13, fontWeight:700, fontFamily:'inherit', cursor:'pointer', flex:1, outline:'none', minWidth:0 }}
                         value={targetTplId ?? ''}
                         onChange={e => setTargetTplId(Number(e.target.value) || null)}>
                         <option value="">-- Select template --</option>
@@ -2527,7 +2527,7 @@ Rules:
                                 onChange={e => updateTemplateItemQty(targetTplId, item.id, e.target.value)}
                               />
                               <span className="ft-list-sub">{item.unit}</span>
-                              <span style={{ color:'#5c7cfa', fontWeight:700, fontSize:13, whiteSpace:'nowrap' }}>{item.kcal} kcal</span>
+                              <span style={{ color:'var(--accent)', fontWeight:700, fontSize:13, whiteSpace:'nowrap' }}>{item.kcal} kcal</span>
                               <button className="ft-del-btn" onClick={() => removeFoodFromTemplate(targetTplId, item.id)}>×</button>
                             </div>
                           ))}

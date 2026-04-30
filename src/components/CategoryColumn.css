@@ -128,7 +128,7 @@
 
 /* Item */
 .cc-item {
-  background: #111;
+  background: var(--bg-card);
   border-radius: 4px;
   padding: 8px 10px 8px 14px;
   transition: background 0.15s ease, border-color 0.15s ease;
@@ -140,10 +140,22 @@
   flex-direction: column;
   gap: 5px;
   position: relative;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .cc-item-color-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 4px 0 0 4px;
   display: none;
+}
+
+.cc-item-color-bar[style*="background"] {
+  display: block;
 }
 
 .cc-item.completing {
@@ -153,9 +165,9 @@
 }
 
 .cc-item:hover {
-  background: #161616;
-  border-color: #252525;
+  border-color: var(--border-hover);
 }
+
 
 .cc-item.dragging {
   opacity: 0.3;
@@ -173,7 +185,7 @@
 
 .cc-item.completed .cc-text {
   text-decoration: line-through;
-  color: #333;
+  color: var(--text-muted);
 }
 
 .cc-item-top {
@@ -273,7 +285,7 @@
 
 .cc-text {
   font-size: var(--todo-font-size, 13px);
-  color: #b0b0b0;
+  color: var(--text-primary);
   font-weight: 400;
   line-height: 1.4;
   white-space: normal;
@@ -283,9 +295,9 @@
 
 .cc-edit-input {
   font-size: 13px;
-  color: #b0b0b0;
-  background: #080808;
-  border: 1px solid #333;
+  color: var(--text-primary);
+  background: var(--bg-base);
+  border: 1px solid var(--border-hover);
   border-radius: 4px;
   padding: 2px 6px;
   outline: none;
@@ -302,7 +314,7 @@
 
 .cc-time {
   font-size: 11px;
-  color: #333;
+  color: var(--text-muted);
 }
 
 /* Item Actions */
@@ -399,7 +411,7 @@
 
 .cc-subtask-count-hint {
   font-size: 11px;
-  color: #333;
+  color: var(--text-muted);
   margin-left: 6px;
   flex-shrink: 0;
   opacity: 1 !important;
@@ -410,7 +422,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 4px 6px;
-  background: #0d0d0d;
+  background: var(--bg-elevated);
   border-radius: 5px;
   gap: 6px;
   transition: background 0.15s, border-color 0.15s, transform 0.2s, opacity 0.2s;
@@ -461,7 +473,7 @@
 
 .cc-subtask.completed .cc-text {
   text-decoration: line-through;
-  color: #2e2e2e;
+  color: var(--text-muted);
 }
 
 .cc-subtask .cc-label {
@@ -475,7 +487,7 @@
 
 .cc-subtask .cc-text {
   font-size: var(--subtask-font-size, 12px);
-  color: #888;
+  color: var(--text-primary);
   white-space: normal;
   word-break: break-word;
   min-width: 0;
@@ -487,44 +499,44 @@
 
 .cc-subtask-input {
   width: 100%;
-  background: #0d0d0d;
-  border: 1px solid #1e1e1e;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 6px 10px;
   font-size: 12px;
-  color: #888;
+  color: var(--text-primary);
   outline: none;
   transition: border-color 0.2s ease;
 }
 
 .cc-subtask-input:focus {
-  border-color: #333;
+  border-color: var(--border-hover);
 }
 
 .cc-subtask-input::placeholder {
-  color: #2e2e2e;
+  color: var(--text-muted);
 }
 
 
 .cc-add-input {
   width: 100%;
-  background: #0a0a0a;
-  border: 1px solid #1a1a1a;
+  background: transparent;
+  border: 1px solid var(--border);
   border-radius: 4px;
   padding: 10px 14px;
   font-size: 13px;
-  color: #888;
+  color: var(--text-secondary);
   outline: none;
   transition: all 0.2s ease;
 }
 
 .cc-add-input:focus {
-  border-color: #2e2e2e;
-  background: #0d0d0d;
+  border-color: var(--border-hover);
+  background: transparent;
 }
 
 .cc-add-input::placeholder {
-  color: #2e2e2e;
+  color: var(--text-muted);
 }
 
 /* Empty State */
@@ -725,7 +737,7 @@ body.light .cc-text {
 body.light .cc-edit-input {
   color: #37352f;
   background: #ffffff;
-  border-color: #0969da;
+  border-color: var(--accent);
 }
 
 body.light .cc-item.completed .cc-text,
@@ -776,7 +788,7 @@ body.light .cc-date-toggle-btn {
 }
 
 body.light .cc-date-toggle-btn:hover {
-  border-color: #0969da;
+  border-color: var(--accent);
   background: rgba(9, 105, 218, 0.1);
 }
 
@@ -787,7 +799,7 @@ body.light .cc-date-input {
 }
 
 body.light .cc-date-input:focus {
-  border-color: #0969da;
+  border-color: var(--accent);
   background: #fff;
 }
 
@@ -802,7 +814,7 @@ body.light .cc-date-clear:hover {
 }
 
 body.light .cc-due-date {
-  color: #0969da;
+  color: var(--accent);
 }
 
 body.light .cc-due-date.overdue {
@@ -816,24 +828,24 @@ body.light .cc-quick-date-btn {
 }
 
 body.light .cc-quick-date-btn:hover {
-  border-color: #0969da;
+  border-color: var(--accent);
   background: rgba(9, 105, 218, 0.08);
-  color: #0969da;
+  color: var(--accent);
 }
 
 body.light .cc-quick-date-btn.active {
   background: rgba(9, 105, 218, 0.15);
-  border-color: #0969da;
-  color: #0969da;
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 body.light .cc-date-toggle-btn.has-date {
-  border-color: #0969da;
-  color: #0969da;
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 body.light .category-column-v2.drag-over {
-  border-color: #0969da;
+  border-color: var(--accent);
   background: rgba(9, 105, 218, 0.05);
 }
 
@@ -846,10 +858,10 @@ body.light .cc-item:hover .cc-drag-handle {
 }
 
 body.light .cc-item.dragging {
-  border-color: #0969da;
+  border-color: var(--accent);
 }
 
 body.light .cc-item.drag-target {
-  border: 2px solid #0969da;
+  border: 2px solid var(--accent);
   background: rgba(9, 105, 218, 0.06);
 }

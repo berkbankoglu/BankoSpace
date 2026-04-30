@@ -44,8 +44,8 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
-.sub-section-title--auto   { color: var(--text-secondary); }
-.sub-section-title--manual { color: var(--text-muted); }
+.sub-section-title--auto   { color: var(--accent); }
+.sub-section-title--manual { color: #d29922; }
 .sub-section-title--once   { color: var(--text-muted); }
 .sub-section-title--cancel { color: var(--danger); }
 .sub-cat-btn.active--cancel { border-color: var(--danger); background: rgba(248,81,73,0.1); }
@@ -231,9 +231,9 @@
 .sub-item--urgent  { border-left-color: var(--danger); }
 .sub-item--soon    { border-left-color: var(--warning); }
 .sub-item--normal  { border-left-color: var(--border); }
-.sub-item--normal.sub-item--monthly-auto   { border-left-color: var(--border); }
-.sub-item--normal.sub-item--monthly-manual { border-left-color: var(--border); }
-.sub-item--normal.sub-item--once-payment   { border-left-color: var(--border); }
+.sub-item--normal.sub-item--monthly-auto   { border-left-color: var(--accent); }
+.sub-item--normal.sub-item--monthly-manual { border-left-color: #d29922; }
+.sub-item--normal.sub-item--once-payment   { border-left-color: #9ca3af; }
 .sub-item--normal.sub-item--once-cancel    { border-left-color: var(--danger); }
 .sub-item--overdue { border-left-color: #f85149; background: rgba(248,81,73,0.06); }
 .sub-item--done    { border-left-color: #3fb950; opacity: 0.5; }

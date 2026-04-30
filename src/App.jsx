@@ -182,17 +182,33 @@ function App({ session, onLogout }) {
   const [updateAvailable, setUpdateAvailable] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  // WebView2 donma önleme — pencere ön plana gelince force re-render
+  // WebView2 freeze fix — Alt+Tab sonrası donmayı önle
   useEffect(() => {
-    const onVisible = () => {
-      // Küçük bir state değişikliği ile React'i uyandır
-      window.dispatchEvent(new Event('resize'));
+    let keepAliveId = null;
+
+    // WebView2'nin render pipeline'ını canlı tutan sürekli rAF loop
+    const keepAlive = () => {
+      keepAliveId = requestAnimationFrame(keepAlive);
     };
-    document.addEventListener('visibilitychange', onVisible);
-    window.addEventListener('focus', onVisible);
+    keepAliveId = requestAnimationFrame(keepAlive);
+
+    const forceRepaint = () => {
+      const el = document.documentElement;
+      el.style.transform = 'translateZ(0)';
+      requestAnimationFrame(() => {
+        el.style.transform = '';
+        window.dispatchEvent(new Event('resize'));
+      });
+    };
+
+    window.addEventListener('focus', forceRepaint);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') forceRepaint();
+    });
+
     return () => {
-      document.removeEventListener('visibilitychange', onVisible);
-      window.removeEventListener('focus', onVisible);
+      if (keepAliveId) cancelAnimationFrame(keepAliveId);
+      window.removeEventListener('focus', forceRepaint);
     };
   }, []);
 
@@ -396,6 +412,10 @@ function App({ session, onLogout }) {
   const [theme, setTheme] = useState(() => {
     const saved = localStorage.getItem('theme');
     return saved || 'dark';
+  });
+
+  const [colorTheme, setColorTheme] = useState(() => {
+    return localStorage.getItem('colorTheme') || 'noir';
   });
 
   // Collapse states for sections
@@ -608,11 +628,12 @@ function App({ session, onLogout }) {
     sidebarPositionsRef.current = {};
   }, [sidebarItems]);
 
-  // Save to localStorage and add class to body when theme changes
+  // Save to localStorage and add class to body when theme/colorTheme changes
   useEffect(() => {
     localStorage.setItem('theme', theme);
-    document.body.className = theme;
-  }, [theme]);
+    localStorage.setItem('colorTheme', colorTheme);
+    document.body.className = `${theme} color-${colorTheme}`;
+  }, [theme, colorTheme]);
 
   // Save collapse states to localStorage
 
@@ -696,6 +717,7 @@ function App({ session, onLogout }) {
 
   const addTodo = (category, text, dueDate = null) => {
     pushHistory(todos);
+    const TODO_COLORS = ['#667eea', '#f093fb', '#4ade80', '#60a5fa', '#fb923c', '#f87171', '#facc15', '#9ca3af'];
     const newTodo = {
       id: Date.now(),
       text,
@@ -705,7 +727,7 @@ function App({ session, onLogout }) {
       dueDate,
       subtasks: [],
       order: -Date.now(),
-      color: null
+      color: TODO_COLORS[Math.floor(Math.random() * TODO_COLORS.length)]
     };
     setTodos([newTodo, ...todos]);
     playAddSound();
@@ -1511,6 +1533,23 @@ function App({ session, onLogout }) {
                             className={`settings-theme-btn ${theme === 'dark' ? 'active' : ''}`}
                             onClick={() => { if (theme !== 'dark') toggleTheme(); }}
                           >Dark</button>
+                        </div>
+                      </div>
+
+                      <div className="settings-row-inline" style={{marginTop:'16px'}}>
+                        <div>
+                          <div className="settings-row-name">Color Theme</div>
+                          <div className="settings-row-sub">Accent color style</div>
+                        </div>
+                        <div className="settings-theme-toggle">
+                          <button
+                            className={`settings-theme-btn ${colorTheme === 'noir' ? 'active' : ''}`}
+                            onClick={() => setColorTheme('noir')}
+                          >Noir</button>
+                          <button
+                            className={`settings-theme-btn ${colorTheme === 'classic' ? 'active' : ''}`}
+                            onClick={() => setColorTheme('classic')}
+                          >Classic</button>
                         </div>
                       </div>
 

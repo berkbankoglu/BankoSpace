@@ -220,6 +220,17 @@ fn main() {
                         }
                     }
                 }
+                // WebView2 Alt+Tab freeze fix — pencere odağa gelince JS ile repaint tetikle
+                tauri::WindowEvent::Focused(true) => {
+                    if window.label() == "main" {
+                        let app = window.app_handle();
+                        if let Some(wv) = app.get_webview_window("main") {
+                            let _ = wv.eval(
+                                "document.body.style.transform='translateZ(0)';requestAnimationFrame(()=>{document.body.style.transform='';window.dispatchEvent(new Event('resize'));});"
+                            );
+                        }
+                    }
+                }
                 _ => {}
             }
         })
