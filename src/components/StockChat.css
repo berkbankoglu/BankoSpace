@@ -15,7 +15,7 @@
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  background: #0d1117;
+  background: var(--bg-base);
   overflow: hidden;
 }
 
@@ -28,7 +28,7 @@
   border-bottom: 1px solid #1e2631;
   flex-shrink: 0;
   min-height: 40px;
-  background: #161b22;
+  background: var(--bg-surface);
 }
 .schat-header-left {
   display: flex;
@@ -37,7 +37,7 @@
   overflow: hidden;
 }
 .schat-channel-hash {
-  color: #484f58;
+  color: var(--text-muted);
   font-size: 14px;
   font-weight: 600;
   flex-shrink: 0;
@@ -45,7 +45,7 @@
 .schat-title {
   font-size: 13px;
   font-weight: 600;
-  color: #c9d1d9;
+  color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -58,7 +58,7 @@
 }
 .schat-me {
   font-size: 10px;
-  color: #484f58;
+  color: var(--text-muted);
   max-width: 80px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -77,18 +77,18 @@
 }
 .schat-messages::-webkit-scrollbar { width: 3px; }
 .schat-messages::-webkit-scrollbar-track { background: transparent; }
-.schat-messages::-webkit-scrollbar-thumb { background: #21262d; border-radius: 2px; }
+.schat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
 .schat-loading,
 .schat-no-session {
-  color: #484f58;
+  color: var(--text-muted);
   font-size: 12px;
   text-align: center;
   padding: 20px 12px;
 }
 
 .schat-empty {
-  color: #484f58;
+  color: var(--text-muted);
   font-size: 12px;
   text-align: center;
   padding: 32px 12px 16px;
@@ -97,7 +97,7 @@
   gap: 6px;
 }
 .schat-empty-icon { font-size: 28px; margin-bottom: 4px; }
-.schat-empty-sub { font-size: 11px; color: #30363d; }
+.schat-empty-sub { font-size: 11px; color: var(--border-hover); }
 
 /* Message */
 .schat-msg {
@@ -128,17 +128,17 @@
 .schat-msg-user {
   font-size: 12px;
   font-weight: 600;
-  color: #c9d1d9;
+  color: var(--text-primary);
 }
 .schat-msg-time {
   font-size: 10px;
-  color: #484f58;
+  color: var(--text-muted);
   margin-left: 2px;
 }
 
 .schat-msg-body {
   font-size: 12px;
-  color: #8b949e;
+  color: var(--text-secondary);
   line-height: 1.5;
   word-break: break-word;
 }
@@ -154,27 +154,27 @@
   padding: 8px 10px;
   border-top: 1px solid #1e2631;
   flex-shrink: 0;
-  background: #0d1117;
+  background: var(--bg-base);
 }
 .schat-input {
   flex: 1;
-  background: #161b22;
-  border: 1px solid #21262d;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
   border-radius: 6px;
-  color: #c9d1d9;
+  color: var(--text-primary);
   font-size: 12px;
   padding: 6px 10px;
   outline: none;
   transition: border-color 0.15s;
   min-width: 0;
 }
-.schat-input:focus { border-color: #388bfd; }
-.schat-input::placeholder { color: #484f58; }
+.schat-input:focus { border-color: var(--accent); }
+.schat-input::placeholder { color: var(--text-muted); }
 
 .schat-send-btn {
   width: 28px;
   height: 28px;
-  background: #1f6feb;
+  background: var(--accent);
   border: none;
   border-radius: 6px;
   color: #fff;
@@ -186,8 +186,8 @@
   flex-shrink: 0;
   transition: background 0.15s;
 }
-.schat-send-btn:hover { background: #388bfd; }
-.schat-send-btn:disabled { background: #21262d; color: #484f58; cursor: default; }
+.schat-send-btn:hover { background: var(--accent); }
+.schat-send-btn:disabled { background: var(--border); color: var(--text-muted); cursor: default; }
 
 /* Username setup screen */
 .schat-username-setup {
@@ -201,30 +201,30 @@
 .schat-username-title {
   font-size: 13px;
   font-weight: 600;
-  color: #c9d1d9;
+  color: var(--text-primary);
   text-align: center;
 }
 .schat-username-sub {
   font-size: 11px;
-  color: #484f58;
+  color: var(--text-muted);
   text-align: center;
 }
 .schat-username-input {
   width: 100%;
-  background: #161b22;
-  border: 1px solid #21262d;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
   border-radius: 6px;
-  color: #c9d1d9;
+  color: var(--text-primary);
   font-size: 13px;
   padding: 8px 10px;
   outline: none;
   box-sizing: border-box;
   transition: border-color 0.15s;
 }
-.schat-username-input:focus { border-color: #388bfd; }
+.schat-username-input:focus { border-color: var(--accent); }
 .schat-username-btn {
   width: 100%;
-  background: #1f6feb;
+  background: var(--accent);
   border: none;
   border-radius: 6px;
   color: #fff;
@@ -234,4 +234,4 @@
   cursor: pointer;
   transition: background 0.15s;
 }
-.schat-username-btn:hover { background: #388bfd; }
+.schat-username-btn:hover { background: var(--accent); }

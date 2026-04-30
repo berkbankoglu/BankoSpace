@@ -10,8 +10,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 5px 10px 5px 10px;
-  border-bottom: 1px solid #30363d;
-  background: #161b22;
+  border-bottom: 1px solid var(--border-hover);
+  background: var(--bg-surface);
   flex-shrink: 0;
   gap: 8px;
   flex-wrap: wrap;
@@ -26,13 +26,13 @@
 
 .pf-sum-item {
   font-size: 11px;
-  color: #8b949e;
+  color: var(--text-secondary);
 }
-.pf-sum-item b { color: #c9d1d9; font-weight: 600; }
+.pf-sum-item b { color: var(--text-primary); font-weight: 600; }
 .pf-sum-item.pos b { color: #3fb950; }
 .pf-sum-item.neg b { color: #f85149; }
-.pf-sum-pct { font-size: 10px; color: #8b949e; }
-.pf-sum-sep { color: #484f58; font-size: 11px; }
+.pf-sum-pct { font-size: 10px; color: var(--text-secondary); }
+.pf-sum-sep { color: var(--text-muted); font-size: 11px; }
 
 .pf-toolbar-right {
   display: flex;
@@ -49,9 +49,9 @@
 /* Icon buttons (↻, +, ✕) */
 .pf-icon-btn {
   background: none;
-  border: 1px solid #30363d;
+  border: 1px solid var(--border-hover);
   border-radius: 5px;
-  color: #8b949e;
+  color: var(--text-secondary);
   font-size: 14px;
   width: 26px;
   height: 26px;
@@ -63,7 +63,7 @@
   padding: 0;
   line-height: 1;
 }
-.pf-icon-btn:hover { color: #c9d1d9; border-color: #8b949e; }
+.pf-icon-btn:hover { color: var(--text-primary); border-color: var(--text-secondary); }
 .pf-icon-btn.add { border-color: #238636; color: #3fb950; }
 .pf-icon-btn.add:hover { background: rgba(35,134,54,0.15); }
 .pf-icon-btn.spin { animation: pf-spin 0.8s linear infinite; }
@@ -71,9 +71,9 @@
 
 /* Inline form */
 .pf-inline-form {
-  border-bottom: 1px solid #30363d;
+  border-bottom: 1px solid var(--border-hover);
   padding: 6px 10px;
-  background: #0d1117;
+  background: var(--bg-base);
   flex-shrink: 0;
 }
 
@@ -91,10 +91,10 @@
 }
 
 .pf-input {
-  background: #161b22;
-  border: 1px solid #30363d;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-hover);
   border-radius: 4px;
-  color: #c9d1d9;
+  color: var(--text-primary);
   font-size: 11px;
   padding: 4px 7px;
   height: 26px;
@@ -103,26 +103,26 @@
   width: 80px;
   transition: border-color 0.15s;
 }
-.pf-input:focus { border-color: #58a6ff; }
+.pf-input:focus { border-color: var(--accent); }
 .pf-input[placeholder="SEMBOL"] { width: 70px; text-transform: uppercase; }
 .pf-input[placeholder="Şirket adı"] { width: 110px; }
 .pf-input[type="date"] { width: 110px; }
 
 .pf-sell-label {
   font-size: 11px;
-  color: #8b949e;
+  color: var(--text-secondary);
   white-space: nowrap;
 }
 
 .pf-form-tutar {
   font-size: 11px;
-  color: #8b949e;
+  color: var(--text-secondary);
   white-space: nowrap;
   padding: 0 2px;
 }
 
 .pf-input-loading {
-  border-color: #58a6ff !important;
+  border-color: var(--accent) !important;
   opacity: 0.7;
 }
 
@@ -149,7 +149,7 @@
   line-height: 1;
 }
 .pf-row-btn:hover { opacity: 0.75; }
-.pf-row-btn.sell { background: rgba(56,139,253,0.15); color: #58a6ff; }
+.pf-row-btn.sell { background: rgba(56,139,253,0.15); color: var(--accent); }
 .pf-row-btn.edit { background: rgba(187,128,0,0.15); color: #d29922; }
 .pf-row-btn.del  { background: rgba(218,54,51,0.15);  color: #f85149; }
 
@@ -164,7 +164,7 @@
 .pf-name {
   font-size: 9px;
   font-weight: 400;
-  color: #8b949e;
+  color: var(--text-secondary);
 }
 
 .pf-actions {
@@ -173,7 +173,7 @@
   align-items: center;
 }
 
-.stc-na { color: #484f58; }
+.stc-na { color: var(--text-muted); }
 
 /* light theme */
 body.light .pf-toolbar { background: #f6f8fa; border-color: #d0d7de; }

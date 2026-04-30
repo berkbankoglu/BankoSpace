@@ -3,8 +3,8 @@
   flex-direction: column;
   height: 100%;
   padding: 32px 40px;
-  background: #0d1117;
-  color: #c9d1d9;
+  background: var(--bg-base);
+  color: var(--text-primary);
   overflow-y: auto;
 }
 
@@ -15,13 +15,13 @@
 .sro-title {
   font-size: 22px;
   font-weight: 600;
-  color: #e6edf3;
+  color: var(--text-primary);
   margin: 0 0 4px;
 }
 
 .sro-sub {
   font-size: 13px;
-  color: #484f58;
+  color: var(--text-muted);
   margin: 0;
 }
 
@@ -34,8 +34,8 @@
 
 /* Input card */
 .sro-card {
-  background: #161b22;
-  border: 1px solid #21262d;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 20px 24px;
   min-width: 320px;
@@ -44,7 +44,7 @@
 .sro-card-title {
   font-size: 13px;
   font-weight: 600;
-  color: #8b949e;
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin: 0 0 18px;
@@ -59,7 +59,7 @@
 
 .sro-field label {
   font-size: 13px;
-  color: #8b949e;
+  color: var(--text-secondary);
 }
 
 .sro-input-row {
@@ -71,35 +71,35 @@
 .sro-input-row button {
   width: 32px;
   height: 32px;
-  background: #21262d;
-  border: 1px solid #30363d;
+  background: var(--border);
+  border: 1px solid var(--border-hover);
   border-radius: 5px;
-  color: #c9d1d9;
+  color: var(--text-primary);
   font-size: 16px;
   cursor: pointer;
   transition: background 0.15s;
 }
 
-.sro-input-row button:hover { background: #2d333b; }
+.sro-input-row button:hover { background: var(--border); }
 
 .sro-input-row input {
   width: 90px;
   height: 32px;
-  background: #0d1117;
-  border: 1px solid #30363d;
+  background: var(--bg-base);
+  border: 1px solid var(--border-hover);
   border-radius: 5px;
-  color: #e6edf3;
+  color: var(--text-primary);
   font-size: 14px;
   text-align: center;
   outline: none;
   padding: 0 8px;
 }
 
-.sro-input-row input:focus { border-color: #5c7cfa; }
+.sro-input-row input:focus { border-color: var(--accent); }
 
 .sro-hint {
   font-size: 11px;
-  color: #484f58;
+  color: var(--text-muted);
 }
 
 /* Preset buttons */
@@ -112,32 +112,32 @@
 
 .sro-preset {
   padding: 5px 12px;
-  background: #21262d;
-  border: 1px solid #30363d;
+  background: var(--border);
+  border: 1px solid var(--border-hover);
   border-radius: 5px;
-  color: #8b949e;
+  color: var(--text-secondary);
   font-size: 13px;
   cursor: pointer;
   transition: all 0.15s;
 }
 
-.sro-preset:hover { background: #2d333b; color: #c9d1d9; }
-.sro-preset.active { background: rgba(92,124,250,0.2); border-color: #5c7cfa; color: #5c7cfa; }
+.sro-preset:hover { background: var(--border); color: var(--text-primary); }
+.sro-preset.active { background: rgba(92,124,250,0.2); border-color: var(--accent); color: var(--accent); }
 
 .sro-custom-price {
   width: 80px;
   height: 32px;
-  background: #0d1117;
-  border: 1px solid #30363d;
+  background: var(--bg-base);
+  border: 1px solid var(--border-hover);
   border-radius: 5px;
-  color: #e6edf3;
+  color: var(--text-primary);
   font-size: 13px;
   text-align: center;
   outline: none;
   padding: 0 6px;
 }
 
-.sro-custom-price:focus, .sro-custom-price.active { border-color: #5c7cfa; }
+.sro-custom-price:focus, .sro-custom-price.active { border-color: var(--accent); }
 
 /* Result */
 .sro-result-area {
@@ -149,8 +149,8 @@
 }
 
 .sro-result-card {
-  background: #161b22;
-  border: 1px solid #21262d;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 20px 24px;
   display: flex;
@@ -177,26 +177,26 @@
   justify-content: space-between;
   align-items: center;
   font-size: 13px;
-  color: #8b949e;
+  color: var(--text-secondary);
 }
 
-.sro-result-row strong { color: #c9d1d9; font-size: 14px; }
+.sro-result-row strong { color: var(--text-primary); font-size: 14px; }
 .sro-result-row.big strong { font-size: 20px; }
-.sro-result-row.big { color: #c9d1d9; font-size: 14px; }
+.sro-result-row.big { color: var(--text-primary); font-size: 14px; }
 
 .sro-result-row .green { color: #3fb950; }
 .sro-result-row .red   { color: #f85149; }
 
 .sro-result-divider {
   height: 1px;
-  background: #21262d;
+  background: var(--border);
   margin: 4px 0;
 }
 
 /* Breakeven */
 .sro-breakeven-card {
-  background: #161b22;
-  border: 1px solid #21262d;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 16px 24px;
   display: flex;
@@ -210,7 +210,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #484f58;
+  color: var(--text-muted);
 }
 
 /* Verdict */
@@ -235,24 +235,24 @@
 
 .sro-convert-divider-v {
   width: 1px;
-  background: #21262d;
+  background: var(--border);
   margin: 0 16px;
 }
 
 .sro-convert-rate {
   font-size: 12px;
-  color: #484f58;
+  color: var(--text-muted);
   margin: 0 0 14px;
 }
 
-.sro-convert-rate strong { color: #8b949e; }
+.sro-convert-rate strong { color: var(--text-secondary); }
 
 .sro-convert-header {
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #484f58;
+  color: var(--text-muted);
   margin-bottom: 10px;
 }
 
@@ -262,25 +262,25 @@
   gap: 6px;
   padding: 4px 0;
   font-size: 13px;
-  border-bottom: 1px solid #21262d;
+  border-bottom: 1px solid var(--border);
 }
 
 .sro-convert-row:last-child { border-bottom: none; }
 
 .sro-convert-row span:first-child {
-  color: #8b949e;
+  color: var(--text-secondary);
   width: 52px;
   flex-shrink: 0;
 }
 
-.sro-convert-arrow { color: #30363d; font-size: 11px; }
+.sro-convert-arrow { color: var(--border-hover); font-size: 11px; }
 
-.sro-convert-row strong { color: #e6edf3; font-size: 13px; }
+.sro-convert-row strong { color: var(--text-primary); font-size: 13px; }
 
 /* Arena Coin Section */
 .sro-arena-section {
   margin-top: 32px;
-  border-top: 1px solid #21262d;
+  border-top: 1px solid var(--border);
   padding-top: 24px;
 }
 
@@ -291,14 +291,14 @@
   border: 1px solid rgba(92,124,250,0.3);
   border-radius: 6px;
   font-size: 13px;
-  color: #8b949e;
+  color: var(--text-secondary);
 }
 
-.sro-arena-rate strong { color: #5c7cfa; font-size: 15px; }
+.sro-arena-rate strong { color: var(--accent); font-size: 15px; }
 
 .sro-arena-title {
   font-size: 16px;
   font-weight: 600;
-  color: #e6edf3;
+  color: var(--text-primary);
   margin: 0 0 16px;
 }
