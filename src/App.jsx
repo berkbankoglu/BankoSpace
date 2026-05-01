@@ -3,12 +3,10 @@ import './App.css';
 import { supabase, pullFromSupabase, pushKeyToSupabase, pushAllToSupabase, SYNC_KEYS } from './supabase';
 import Login from './components/Login';
 import CategoryColumn from './components/CategoryColumn';
-import ReferencePanel from './components/ReferencePanel';
 import Timer from './components/Timer';
 import FlashCards from './components/FlashCards';
 import DailyChecklist from './components/DailyChecklist';
 import IncomeTracker from './components/IncomeTracker';
-import Notes from './components/Notes';
 import FitnessTracker from './components/FitnessTracker';
 import Calendar from './components/Calendar';
 import JapaneseKana from './components/JapaneseKana';
@@ -17,6 +15,8 @@ import SubscriptionTracker, { SubscriptionWidget, SubscriptionPopup } from './co
 import StockNews from './components/StockNews';
 import Translate from './components/Translate';
 import ProjectBid from './components/ProjectBid';
+import Planner from './components/Planner';
+import { onAction, registerActionTypes } from '@tauri-apps/plugin-notification';
 
 const QUICK_BUTTONS = [
   { id: 'translate',  label: 'Translate',   desc: 'T' },
@@ -60,8 +60,8 @@ function QuickLaunchPanel() {
       <div className="ql-panel">
         <div className="ql-title">Quick Launch</div>
         <div className="ql-grid">
-          {QUICK_BUTTONS.map(btn => (
-            <button key={btn.id} className="ql-btn" onClick={() => openPopup(btn.id)}>
+          {QUICK_BUTTONS.map((btn, idx) => (
+            <button key={btn.id} className="ql-btn" style={{ animationDelay: `${idx * 0.22}s` }} onClick={() => openPopup(btn.id)}>
               <span className="ql-label">{btn.label}</span>
               <span className="ql-desc">{btn.desc}</span>
             </button>
@@ -99,14 +99,6 @@ function App({ session, onLogout }) {
   const popupType = new URLSearchParams(window.location.search).get('popup');
 
   // If popup mode, show appropriate component
-  if (popupType === 'reference') {
-    return (
-      <div style={{ width: '100vw', height: '100vh', background: '#1a1a1a' }}>
-        <ReferencePanel />
-      </div>
-    );
-  }
-
   // Timer popup mode
   if (popupType === 'timer') {
     const isCompact = new URLSearchParams(window.location.search).get('compact') === '1';
@@ -210,6 +202,25 @@ function App({ session, onLogout }) {
       if (keepAliveId) cancelAnimationFrame(keepAliveId);
       window.removeEventListener('focus', forceRepaint);
     };
+  }, []);
+
+  // Planner notification tap → navigate to planner
+  useEffect(() => {
+    let unlisten;
+    (async () => {
+      try {
+        await registerActionTypes([{
+          id: 'planner-block',
+          actions: [{ id: 'open', title: 'Open Planner' }],
+        }]);
+        unlisten = await onAction((action) => {
+          if (action.actionTypeId === 'planner-block' || action.notification?.data?.type === 'planner') {
+            setActiveView('planner');
+          }
+        });
+      } catch {}
+    })();
+    return () => { if (unlisten) unlisten(); };
   }, []);
 
   // Supabase sync — active automatically if session exists (runs once, not reactive to session prop)
@@ -325,6 +336,12 @@ function App({ session, onLogout }) {
   }, []);
 
 
+  const [plannerToasts, setPlannerToasts] = useState([]);
+  const showPlannerToast = useCallback((title, body) => {
+    const id = Date.now();
+    setPlannerToasts(prev => [...prev, { id, title, body }]);
+    setTimeout(() => setPlannerToasts(prev => prev.filter(t => t.id !== id)), 8000);
+  }, []);
   const [showSettings, setShowSettings] = useState(false);
   const [showSubPopup, setShowSubPopup] = useState(false);
   const [showSidebarSettings, setShowSidebarSettings] = useState(false);
@@ -336,14 +353,13 @@ function App({ session, onLogout }) {
     const defaults = [
       { id: 'dashboard',  label: 'Dashboard',      view: 'dashboard',  hidden: false },
       { id: 'calendar',   label: 'Calendar',        view: 'calendar',   hidden: false },
-      { id: 'references', label: 'References',      view: 'references', hidden: false },
       { id: 'flashcards', label: 'Flash Cards',     view: 'flashcards', hidden: false },
       { id: 'checklists', label: 'Checklists',      view: 'checklists', hidden: false },
       { id: 'income',     label: 'Income Tracker',  view: 'income',     hidden: false },
-      { id: 'notes',      label: 'Notes',           view: 'notes',      hidden: false },
       { id: 'tools',        label: 'Tools',            view: 'tools',        hidden: true },
       { id: 'japanesekana', label: 'Japanese Kana',    view: 'japanesekana', hidden: false },
       { id: 'fitness',      label: 'Fitness',           view: 'fitness',      hidden: false },
+      { id: 'planner',      label: 'Planner',           view: 'planner',      hidden: false },
     ];
     const saved = localStorage.getItem('sidebarOrder');
     if (saved) {
@@ -419,10 +435,6 @@ function App({ session, onLogout }) {
   });
 
   // Collapse states for sections
-  const [referencesCollapsed, setReferencesCollapsed] = useState(() => {
-    const saved = localStorage.getItem('referencesCollapsed');
-    return saved === 'true';
-  });
   const [flashCardsCollapsed, setFlashCardsCollapsed] = useState(() => {
     const saved = localStorage.getItem('flashCardsCollapsed');
     return saved === 'true';
@@ -636,10 +648,6 @@ function App({ session, onLogout }) {
   }, [theme, colorTheme]);
 
   // Save collapse states to localStorage
-
-  useEffect(() => {
-    localStorage.setItem('referencesCollapsed', referencesCollapsed);
-  }, [referencesCollapsed]);
 
   useEffect(() => {
     localStorage.setItem('flashCardsCollapsed', flashCardsCollapsed);
@@ -1633,6 +1641,25 @@ function App({ session, onLogout }) {
                         onChange={e => { const v = parseFloat(e.target.value); setSoundVolume(v); setVolume(v); }}
                         onMouseUp={() => playClickSound()}
                       />
+                      <div className="settings-row-inline" style={{marginTop:'20px'}}>
+                        <div>
+                          <div className="settings-row-name">Planner Notification</div>
+                          <div className="settings-row-sub">Test block start/end notifications</div>
+                        </div>
+                        <button
+                          className="settings-size-btn"
+                          style={{ background: '#ef4444', color: '#fff', border: 'none', fontWeight: 700, padding: '6px 14px' }}
+                          onClick={async () => {
+                            showPlannerToast('Starting: Test Block', '09:00 — Click to open Planner');
+                            try {
+                              const { sendNotification, isPermissionGranted, requestPermission } = await import('@tauri-apps/plugin-notification');
+                              let ok = await isPermissionGranted();
+                              if (!ok) ok = (await requestPermission()) === 'granted';
+                              if (ok) await sendNotification({ title: 'Starting: Test Block', body: 'Click to open Planner', actionTypeId: 'planner-block', data: { type: 'planner' } });
+                            } catch {}
+                          }}
+                        >Test</button>
+                      </div>
                     </div>
                   )}
 
@@ -1734,13 +1761,6 @@ function App({ session, onLogout }) {
 
         {/* Main Content Area */}
         <div className="main-content-area">
-          {/* References Full Screen View */}
-          {activeView === 'references' && (
-            <div className="references-fullscreen">
-              <ReferencePanel />
-            </div>
-          )}
-
           {/* Flash Cards Full Screen View */}
           {activeView === 'flashcards' && (
             <div className="flashcards-fullscreen">
@@ -1777,13 +1797,6 @@ function App({ session, onLogout }) {
             </div>
           )}
 
-          {/* Notes Full Screen View */}
-          {activeView === 'notes' && (
-            <div className="notes-fullscreen">
-              <Notes />
-            </div>
-          )}
-
           {/* Fitness Tracker */}
           {activeView === 'fitness' && (
             <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
@@ -1791,6 +1804,13 @@ function App({ session, onLogout }) {
             </div>
           )}
 
+
+          {/* Planner */}
+          {activeView === 'planner' && (
+            <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <Planner onPlannerToast={showPlannerToast} onOpenPlanner={() => setActiveView('planner')} />
+            </div>
+          )}
 
           {/* Calendar Full Screen View */}
           {activeView === 'calendar' && (
@@ -1816,7 +1836,7 @@ function App({ session, onLogout }) {
 
           {/* Dashboard View */}
           {activeView === 'dashboard' && (
-          <div className="dashboard-container" style={{ '--todo-font-size': fontSizeMap[todoFontSize], '--subtask-font-size': subtaskFontSizeMap[subtaskFontSize] }}>
+          <div key="dashboard" className="dashboard-container" style={{ '--todo-font-size': fontSizeMap[todoFontSize], '--subtask-font-size': subtaskFontSizeMap[subtaskFontSize] }}>
             {/* Todo Columns - resizable */}
             <div className="todo-columns" ref={columnsRef}>
               <div className="todo-col-wrapper" style={colWidths[0] ? { flex: `1 1 ${colWidths[0]}px`, minWidth: 0 } : { flex: 1, minWidth: 0 }}>
@@ -1872,6 +1892,33 @@ function App({ session, onLogout }) {
 
       {/* Subscriptions & Payments Popup */}
       {showSubPopup && <SubscriptionPopup onClose={() => setShowSubPopup(false)} />}
+
+      {/* Planner Toast Notifications */}
+      {plannerToasts.length > 0 && (
+        <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 9999, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {plannerToasts.map(t => (
+            <div
+              key={t.id}
+              onClick={() => { setActiveView('planner'); setPlannerToasts(prev => prev.filter(x => x.id !== t.id)); }}
+              style={{
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border)',
+                borderLeft: '4px solid var(--accent)',
+                borderRadius: 8,
+                padding: '12px 16px',
+                minWidth: 240,
+                maxWidth: 320,
+                cursor: 'pointer',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+              }}
+            >
+              <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)', marginBottom: 2 }}>{t.title}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{t.body}</div>
+              <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 4 }}>Click to open Planner</div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Timer Widget Overlay */}
       {timerWidgetOpen && (

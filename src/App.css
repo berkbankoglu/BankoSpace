@@ -8663,20 +8663,6 @@ body {
    DASHBOARD LAYOUT
    ============================================ */
 
-/* References Full Screen */
-.references-fullscreen {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.references-header {
-  margin-bottom: 20px;
-  padding-bottom: 15px;
-  border-bottom: 1px solid var(--border);
-}
 
 .page-title {
   font-size: 28px;
@@ -8852,6 +8838,11 @@ body.light .todo-drag-ghost .cc-checkmark {
   min-height: 400px;
 }
 
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 .dashboard-container {
   padding: 12px 20px 20px;
   flex: 1;
@@ -8861,6 +8852,17 @@ body.light .todo-drag-ghost .cc-checkmark {
   flex-direction: column;
   box-sizing: border-box;
 }
+
+.dashboard-container > * {
+  animation: fadeSlideUp 0.35s ease both;
+}
+
+.dashboard-container > *:nth-child(1) { animation-delay: 0.00s; }
+.dashboard-container > *:nth-child(2) { animation-delay: 0.06s; }
+.dashboard-container > *:nth-child(3) { animation-delay: 0.12s; }
+.dashboard-container > *:nth-child(4) { animation-delay: 0.18s; }
+.dashboard-container > *:nth-child(5) { animation-delay: 0.24s; }
+.dashboard-container > *:nth-child(6) { animation-delay: 0.30s; }
 
 .dashboard-header {
   display: flex;
@@ -9688,6 +9690,7 @@ body.light .search-no-results {
   border: 1px solid var(--border);
   border-left: 2px solid #2a2a2a;
   border-radius: var(--radius-sm);
+  animation: fadeSlideUp 0.6s ease both;
   cursor: pointer;
   transition: background 0.1s;
   text-align: left;
