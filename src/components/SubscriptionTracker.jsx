@@ -156,7 +156,7 @@ function AddModal({ initial, onSave, onDelete, onClose }) {
   );
 }
 
-function Item({ item, onClick, onComplete }) {
+function Item({ item, onClick, onComplete, animIndex = 0 }) {
   const isMonthly = item.category === 'monthly-auto' || item.category === 'monthly-manual';
   const isOnce = item.category === 'once-payment' || item.category === 'once-cancel' || item.category === 'once';
   const dateForCalc = isMonthly ? getNextMonthly(item.date) : (item.date || item.cancelBy || '');
@@ -166,7 +166,11 @@ function Item({ item, onClick, onComplete }) {
   const cancelDays = item.cancelBy ? getDaysUntil(item.cancelBy) : null;
 
   return (
-    <div className={`sub-item sub-item--${urgency} sub-item--${item.category} ${item.done ? 'sub-item--done' : ''} ${isOverdue ? 'sub-item--overdue' : ''}`} onClick={onClick}>
+    <div
+      className={`sub-item sub-item--${urgency} sub-item--${item.category} ${item.done ? 'sub-item--done' : ''} ${isOverdue ? 'sub-item--overdue' : ''}`}
+      style={{ animationDelay: `${animIndex * 0.22}s` }}
+      onClick={onClick}
+    >
       <div className="sub-item-left">
         <div className="sub-item-name-row">
           <span className="sub-item-name">{item.name}</span>
@@ -244,7 +248,7 @@ export default function SubscriptionTracker() {
               <span className="sub-section-title sub-section-title--auto">Monthly · Auto</span>
               {totalAuto > 0 && <span className="sub-section-total">₺{totalAuto.toFixed(0)}/mo</span>}
             </div>
-            {autoItems.map(item => <Item key={item.id} item={item} onClick={() => setEditing(item)} />)}
+            {autoItems.map((item, i) => <Item key={item.id} item={item} onClick={() => setEditing(item)} animIndex={i} />)}
           </div>
         )}
 
@@ -254,7 +258,7 @@ export default function SubscriptionTracker() {
               <span className="sub-section-title sub-section-title--manual">Monthly · Manual</span>
               {totalManual > 0 && <span className="sub-section-total">₺{totalManual.toFixed(0)}/mo</span>}
             </div>
-            {manualItems.map(item => <Item key={item.id} item={item} onClick={() => setEditing(item)} />)}
+            {manualItems.map((item, i) => <Item key={item.id} item={item} onClick={() => setEditing(item)} animIndex={autoItems.length + i} />)}
           </div>
         )}
 
@@ -263,7 +267,7 @@ export default function SubscriptionTracker() {
             <div className="sub-section-header">
               <span className="sub-section-title sub-section-title--once">One-Time · Payment</span>
             </div>
-            {oncePayItems.map(item => <Item key={item.id} item={item} onClick={() => setEditing(item)} onComplete={complete} />)}
+            {oncePayItems.map((item, i) => <Item key={item.id} item={item} onClick={() => setEditing(item)} onComplete={complete} animIndex={autoItems.length + manualItems.length + i} />)}
           </div>
         )}
 
@@ -272,7 +276,7 @@ export default function SubscriptionTracker() {
             <div className="sub-section-header">
               <span className="sub-section-title sub-section-title--cancel">One-Time · Cancel</span>
             </div>
-            {onceCancelItems.map(item => <Item key={item.id} item={item} onClick={() => setEditing(item)} onComplete={complete} />)}
+            {onceCancelItems.map((item, i) => <Item key={item.id} item={item} onClick={() => setEditing(item)} onComplete={complete} animIndex={autoItems.length + manualItems.length + oncePayItems.length + i} />)}
           </div>
         )}
       </div>

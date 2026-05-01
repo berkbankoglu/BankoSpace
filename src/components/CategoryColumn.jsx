@@ -24,6 +24,7 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
   const [pressedSubtaskId, setPressedSubtaskId] = useState(null);
   const [completingIds, setCompletingIds] = useState(new Set());
   const [colorPickerTodoId, setColorPickerTodoId] = useState(null);
+  const [copiedSubtaskId, setCopiedSubtaskId] = useState(null);
   const inputRef = useRef(null);
   const editInputRef = useRef(null);
   const editSubtaskInputRef = useRef(null);
@@ -210,12 +211,12 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
 
       {/* Todo Items */}
       <div className="cc-items">
-        {sortedTodos.map((todo) => (
+        {sortedTodos.map((todo, idx) => (
           <div
             key={todo.id}
             data-todo-id={todo.id}
             className={`cc-item ${todo.completed ? 'completed' : ''} ${completingIds.has(todo.id) ? 'completing' : ''}`}
-            style={{}}
+            style={{ animationDelay: `${idx * 0.22}s` }}
           >
             {todo.color && <div className="cc-item-color-bar" style={{ background: todo.color }} />}
             {/* Top row: drag handle + checkbox + actions */}
@@ -361,6 +362,11 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
                       )}
                     </label>
                     <div className="cc-subtask-actions">
+                      <button
+                        className="cc-action-btn copy-btn small"
+                        onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(subtask.text); setCopiedSubtaskId(subtask.id); setTimeout(() => setCopiedSubtaskId(null), 1500); }}
+                        title="Copy"
+                      >{copiedSubtaskId === subtask.id ? '✓' : '❐'}</button>
                       <button
                         className="cc-action-btn edit-btn small"
                         onClick={(e) => { e.stopPropagation(); setEditingSubtaskId(subtask.id); setEditingSubtaskText(subtask.text); }}
