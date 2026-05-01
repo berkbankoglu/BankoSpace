@@ -160,7 +160,7 @@ function bmiInfo(bmi) {
   if (!bmi) return null;
   if (bmi < 18.5) return { text: 'Underweight', color: 'var(--accent)' };
   if (bmi < 25)   return { text: 'Normal',      color: '#3fb950' };
-  if (bmi < 30)   return { text: 'Overweight',  color: '#d29922' };
+  if (bmi < 30)   return { text: 'Overweight',  color: '#e8e8e8' };
   return               { text: 'Obese',          color: '#f85149' };
 }
 
@@ -470,7 +470,7 @@ function WeightChart({ entries, targetWeight, profile }) {
           const r2 = Math.round(110 - 53 * t);   // 110→57
           const g2 = Math.round(58  + 150 * t);   // 58→208
           const b2 = Math.round(158 + 82  * t);   // 158→240
-          const color = isLast ? '#f0c744' : `rgb(${r2},${g2},${b2})`;
+          const color = isLast ? '#e8e8e8' : `rgb(${r2},${g2},${b2})`;
           return (
             <circle key={i}
               cx={px(i)} cy={py(e.value)}
@@ -491,10 +491,10 @@ function WeightChart({ entries, targetWeight, profile }) {
           padding: '6px 14px', fontSize: 13, color: '#e6edf3', pointerEvents: 'none',
           whiteSpace: 'nowrap', zIndex: 10, boxShadow: '0 4px 12px #0006',
         }}>
-          <b style={{ color: '#f0c744' }}>{hovered.value} kg</b>
+          <b style={{ color: '#e8e8e8' }}>{hovered.value} kg</b>
           <span style={{ color: '#8b949e', marginLeft: 8 }}>{hovered.date}</span>
           {hovered.waist && hovered.neck && profile?.height && (
-            <span style={{ color: '#d29922', marginLeft: 8 }}>
+            <span style={{ color: '#e8e8e8', marginLeft: 8 }}>
               %{calcBodyFat({ ...profile, weight: hovered.value, waist: hovered.waist, neck: hovered.neck }) ?? '?'} fat
             </span>
           )}
@@ -1734,13 +1734,13 @@ Rules:
         <div className="ft-hero">
           <div className="ft-hero-stats">
             <div className="ft-hstat">
-              <div className="ft-hstat-val" style={{ color: 'var(--accent)' }}>{lastWeight ?? '—'}</div>
+              <div className="ft-hstat-val" style={{ color: lastWeight && goal.targetWeight ? (lastWeight > goal.targetWeight ? '#e8e8e8' : '#3fb950') : '#e8e8e8' }}>{lastWeight ?? '—'}</div>
               <div className="ft-hstat-unit">kg</div>
               <div className="ft-hstat-label">Current Weight</div>
             </div>
             <div className="ft-hstat-sep" />
             <div className="ft-hstat">
-              <div className="ft-hstat-val" style={{ color: bodyFat != null ? '#d29922' : 'var(--text-muted)' }}>
+              <div className="ft-hstat-val" style={{ color: bodyFat == null ? 'var(--text-muted)' : bodyFat > 25 ? '#e8e8e8' : bodyFat > 15 ? '#e8a838' : '#3fb950' }}>
                 {bodyFat != null ? `%${bodyFat}` : '—'}
               </div>
               <div className="ft-hstat-unit">fat</div>
@@ -1748,7 +1748,7 @@ Rules:
             </div>
             <div className="ft-hstat-sep" />
             <div className="ft-hstat">
-              <div className="ft-hstat-val" style={{ color: 'var(--accent)' }}>{hasProfile ? goalKcal : '—'}</div>
+              <div className="ft-hstat-val" style={{ color: '#e8e8e8' }}>{hasProfile ? goalKcal : '—'}</div>
               <div className="ft-hstat-unit">kcal</div>
               <div className="ft-hstat-label">Daily Target</div>
             </div>
@@ -1771,7 +1771,7 @@ Rules:
             {hasProfile && <>
               <div className="ft-hstat-sep" />
               <div className="ft-hstat">
-                <div className="ft-hstat-val" style={{ color: '#8b949e' }}>{tdee}</div>
+                <div className="ft-hstat-val" style={{ color: '#e8e8e8' }}>{tdee}</div>
                 <div className="ft-hstat-unit">kcal</div>
                 <div className="ft-hstat-label">TDEE</div>
               </div>
@@ -1973,7 +1973,7 @@ Rules:
                         </div>
                         <div className="ft-goal-preview-row">
                           <span>Daily deficit</span>
-                          <b style={{ color: '#d29922' }}>-{actualDeficit} kcal</b>
+                          <b style={{ color: '#e8e8e8' }}>-{actualDeficit} kcal</b>
                         </div>
                         <div className="ft-goal-preview-row">
                           <span>Weekly estimated loss</span>
@@ -2148,7 +2148,7 @@ Rules:
                         {(() => {
                           if (!e.waist || !e.neck || !profile.height) return <span style={{ color: 'var(--text-muted)' }}>—</span>;
                           const bf = calcBodyFat({ ...profile, weight: e.value, waist: e.waist, neck: e.neck });
-                          return bf != null ? <span style={{ color: '#d29922' }}>%{bf}</span> : <span style={{ color: 'var(--text-muted)' }}>—</span>;
+                          return bf != null ? <span style={{ color: '#e8e8e8' }}>%{bf}</span> : <span style={{ color: 'var(--text-muted)' }}>—</span>;
                         })()}
                       </span>
                       <span className="ft-list-edit-hint">✎</span>
@@ -2370,7 +2370,7 @@ Rules:
                                   onClick={e => e.stopPropagation()}
                                 />
                                 <span className="ft-list-sub">{item.unit}</span>
-                                <span style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap' }}>{item.kcal} kcal</span>
+                                <span style={{ color: '#e8e8e8', fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap' }}>{item.kcal} kcal</span>
                                 <button className="ft-del-btn" onClick={e => { e.stopPropagation(); removeFoodFromMenu(menu.id, item.id); }}>×</button>
                               </div>
                               );
@@ -2391,12 +2391,12 @@ Rules:
                     if (selMenus.length < 2 && selMenus[0]?.items.length === 0) return null;
                     return (
                       <div className="ft-log-summary" style={{ marginTop: 8 }}>
-                        <span className="ft-log-kcal" style={{ color: totalKcal > goalKcal && goalKcal ? '#f85149' : 'var(--accent)' }}>
+                        <span className="ft-log-kcal" style={{ color: '#e8e8e8' }}>
                           {totalKcal} kcal
                         </span>
                         <span className="ft-log-macros">
                           P <b style={{ color: '#f85149' }}>{Math.round(totalP)}g</b>
-                          · C <b style={{ color: '#d29922' }}>{Math.round(totalC)}g</b>
+                          · C <b style={{ color: '#e8e8e8' }}>{Math.round(totalC)}g</b>
                           · F <b style={{ color: '#3fb950' }}>{Math.round(totalF)}g</b>
                         </span>
                       </div>
@@ -2527,7 +2527,7 @@ Rules:
                                 onChange={e => updateTemplateItemQty(targetTplId, item.id, e.target.value)}
                               />
                               <span className="ft-list-sub">{item.unit}</span>
-                              <span style={{ color:'var(--accent)', fontWeight:700, fontSize:13, whiteSpace:'nowrap' }}>{item.kcal} kcal</span>
+                              <span style={{ color:'#e8e8e8', fontWeight:700, fontSize:13, whiteSpace:'nowrap' }}>{item.kcal} kcal</span>
                               <button className="ft-del-btn" onClick={() => removeFoodFromTemplate(targetTplId, item.id)}>×</button>
                             </div>
                           ))}
@@ -2592,7 +2592,7 @@ Rules:
                       </div>
                       <div className="ft-food-macros">
                         <span style={{ color:'#f85149' }}>P {Math.round(food.p * ratio * 10)/10}g</span>
-                        <span style={{ color:'#d29922' }}>C {Math.round(food.c * ratio * 10)/10}g</span>
+                        <span style={{ color:'#e8e8e8' }}>C {Math.round(food.c * ratio * 10)/10}g</span>
                         <span style={{ color:'#3fb950' }}>F {Math.round(food.f * ratio * 10)/10}g</span>
                       </div>
                       <div className="ft-food-actions">

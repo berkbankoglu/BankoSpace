@@ -279,7 +279,7 @@
 
 .ft-wlog-date { color: var(--text-muted); font-size: 13px; }
 .ft-wlog-kg   { color: var(--text-primary); font-weight: 700; text-align: center; font-size: 14px; }
-.ft-wlog-fat  { text-align: center; font-weight: 600; font-size: 14px; }
+.ft-wlog-fat  { text-align: center; font-weight: 600; font-size: 14px; color: #e8e8e8; }
 
 .ft-weight-list { display: flex; flex-direction: column; }
 
@@ -393,7 +393,7 @@
   overflow: hidden;
 }
 .ft-menu-name { font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ft-menu-kcal { font-size: 11px; color: var(--accent); }
+.ft-menu-kcal { font-size: 11px; color: #e8e8e8; }
 
 .ft-menu-tag {
   font-size: 10px;
@@ -421,7 +421,7 @@
   padding-bottom: 10px;
   border-bottom: 1px solid var(--border);
 }
-.ft-log-kcal   { font-size: 22px; font-weight: 800; line-height: 1; }
+.ft-log-kcal   { font-size: 22px; font-weight: 800; line-height: 1; color: #e8e8e8; }
 .ft-log-macros { font-size: 13px; color: var(--text-muted); }
 
 .ft-meal-group { margin-bottom: 4px; }
@@ -506,7 +506,7 @@
 }
 .ft-plate-name { flex: 1; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .ft-plate-qty  { color: var(--text-muted); white-space: nowrap; font-size: 12px; }
-.ft-plate-kcal { font-weight: 700; white-space: nowrap; color: var(--accent); font-size: 13px; }
+.ft-plate-kcal { font-weight: 700; white-space: nowrap; color: #e8e8e8; font-size: 13px; }
 
 .ft-plate-totals {
   border-top: 1px solid var(--border);
@@ -520,7 +520,7 @@
 .ft-plate-total-kcal {
   font-size: 28px;
   font-weight: 800;
-  color: var(--accent);
+  color: #e8e8e8;
   line-height: 1;
 }
 
@@ -581,7 +581,7 @@
 
 .ft-food-info { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .ft-food-name { font-size: 15px; color: var(--text-primary); font-weight: 600; }
-.ft-food-kcal { font-size: 15px; color: var(--accent); font-weight: 800; white-space: nowrap; flex-shrink: 0; }
+.ft-food-kcal { font-size: 15px; color: #e8e8e8; font-weight: 800; white-space: nowrap; flex-shrink: 0; }
 
 .ft-food-macros {
   display: flex;

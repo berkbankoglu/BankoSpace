@@ -16,10 +16,10 @@
     --text-secondary:#a0a0a0;
     --text-muted:    #606060;
 
-    --accent:        #d4a017;
-    --accent-dim:    #a07810;
-    --accent-glow:   rgba(212, 160, 23, 0.08);
-    --accent-hover:  #e8b820;
+    --accent:        #888888;
+    --accent-dim:    #555555;
+    --accent-glow:   rgba(136, 136, 136, 0.08);
+    --accent-hover:  #aaaaaa;
 
     --danger:        #f85149;
     --success:       #3fb950;
@@ -49,10 +49,10 @@ body.color-noir {
     --text-secondary:#a0a0a0;
     --text-muted:    #606060;
 
-    --accent:        #d4a017;
-    --accent-dim:    #a07810;
-    --accent-glow:   rgba(212, 160, 23, 0.08);
-    --accent-hover:  #e8b820;
+    --accent:        #888888;
+    --accent-dim:    #555555;
+    --accent-glow:   rgba(136, 136, 136, 0.08);
+    --accent-hover:  #aaaaaa;
 }
 
 /* Classic (GitHub Dark) color theme */
@@ -325,6 +325,7 @@ html, body, #root {
     padding: 0;
     overflow: hidden;
 }
+
 
 .container {
     height: 100%;
@@ -7806,6 +7807,15 @@ body.light .view-title {
 }
 .sidebar-profile-bar:hover { background: #0f0f0f; }
 
+.sidebar-profile-bar-bottom {
+  border-bottom: none;
+  border-top: 1px solid #1a1a1a;
+  margin: 8px;
+  border-radius: 8px;
+  background: #111111;
+  margin-top: auto;
+}
+
 .sidebar-profile-avatar {
   width: 30px;
   height: 30px;
@@ -11285,3 +11295,4 @@ input::placeholder, textarea::placeholder { color: var(--text-muted) !important;
   font-size: 13px;
   padding: 24px 0;
 }
+

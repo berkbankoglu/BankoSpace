@@ -1260,69 +1260,15 @@ function App({ session, onLogout }) {
     }
   };
 
+  const appZoom = window.screen.width <= 1600 ? 0.9 : 1;
+
   return (
-    <div className="container">
+    <div className="container" style={{ zoom: appZoom }}>
       {/* Custom Title Bar */}
       <div
         className="custom-titlebar"
       >
-        <div className="titlebar-left">
-          <button className="titlebar-nav-btn" onClick={() => { playClickSound(); setShowSidebarSettings(s => !s); setSettingsTab('appearance'); }} title="Settings">
-            ⚙
-          </button>
-        </div>
-        {activeView === 'dashboard' && (
-          <div className="titlebar-filters">
-            <div className="titlebar-filters-left">
-              <div className="font-size-control" style={{ position: 'relative' }}>
-                <button
-                  className="dashboard-timer-toggle-btn font-size-trigger"
-                  onClick={() => setFontSizeOpen(o => !o)}
-                  title="Font size"
-                >Font</button>
-                {fontSizeOpen && (
-                  <div className="font-size-dropdown">
-                    <div style={{fontSize:'10px',color:'#7d8590',padding:'4px 8px 2px',borderBottom:'1px solid #30363d',marginBottom:'2px'}}>Title</div>
-                    {['S', 'M', 'L', 'XL'].map(s => (
-                      <button
-                        key={s}
-                        className={`font-size-option ${todoFontSize === s ? 'active' : ''}`}
-                        onClick={() => { setTodoFontSize(s); localStorage.setItem('todoFontSize', s); setFontSizeOpen(false); }}
-                      >{s}</button>
-                    ))}
-                    <div style={{fontSize:'10px',color:'#7d8590',padding:'6px 8px 2px',borderTop:'1px solid #30363d',borderBottom:'1px solid #30363d',margin:'2px 0'}}>Subtask</div>
-                    {['S', 'M', 'L', 'XL'].map(s => (
-                      <button
-                        key={'sub-'+s}
-                        className={`font-size-option ${subtaskFontSize === s ? 'active' : ''}`}
-                        onClick={() => { setSubtaskFontSize(s); localStorage.setItem('subtaskFontSize', s); setFontSizeOpen(false); }}
-                      >{s}</button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <button
-                ref={timerBtnRef}
-                className="dashboard-timer-toggle-btn"
-                onClick={async () => {
-                  playClickSound();
-                  const { invoke } = await import('@tauri-apps/api/core');
-                  await invoke('toggle_timer_window');
-                }}
-                title="Timer"
-              >
-                Timer
-              </button>
-              <button
-                className="dashboard-timer-toggle-btn"
-                onClick={() => { playClickSound(); setShowSubPopup(s => !s); }}
-                title="Subscriptions & Payments"
-              >
-                Payments
-              </button>
-            </div>
-          </div>
-        )}
+        <div className="titlebar-left" />
         <div className="titlebar-drag-region" data-tauri-drag-region onDoubleClick={maximizeWindow} />
         <div className="titlebar-controls">
           <button className="titlebar-btn minimize" onClick={minimizeWindow}>─</button>
@@ -1387,18 +1333,6 @@ function App({ session, onLogout }) {
               </button>
             </div>
           </div>
-          {!sidebarCollapsed && session?.user?.email && (
-            <div className="sidebar-profile-bar" onClick={() => { setShowSidebarSettings(true); setSettingsTab('account'); }}>
-              <div className="sidebar-profile-avatar">
-                {session.user.email[0].toUpperCase()}
-              </div>
-              <div className="sidebar-profile-info">
-                <span className="sidebar-profile-name">{session.user.email.split('@')[0]}</span>
-                <span className="sidebar-profile-email">{session.user.email}</span>
-              </div>
-              <span className="sidebar-profile-gear">⚙</span>
-            </div>
-          )}
 
           {/* Settings Modal - Notion Style */}
           {showSidebarSettings && (
@@ -1605,6 +1539,12 @@ function App({ session, onLogout }) {
                           <div className="settings-toggle-knob" />
                         </div>
                       </div>
+
+                      <div className="settings-section-title" style={{marginTop:'20px'}}>Quick Actions</div>
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                        <button className="settings-action-btn" onClick={async () => { const { invoke } = await import('@tauri-apps/api/core'); await invoke('toggle_timer_window'); }}>Timer</button>
+                        <button className="settings-action-btn" onClick={() => { setShowSubPopup(s => !s); closeSidebarSettings(); }}>Payments</button>
+                      </div>
                     </div>
                   )}
 
@@ -1755,6 +1695,20 @@ function App({ session, onLogout }) {
               )}
 
               {/* Settings moved to gear icon in header */}
+            </div>
+          )}
+
+          {/* Profile bar at bottom */}
+          {!sidebarCollapsed && session?.user?.email && (
+            <div className="sidebar-profile-bar sidebar-profile-bar-bottom" onClick={() => { setShowSidebarSettings(true); setSettingsTab('account'); }}>
+              <div className="sidebar-profile-avatar">
+                {session.user.email[0].toUpperCase()}
+              </div>
+              <div className="sidebar-profile-info">
+                <span className="sidebar-profile-name">{session.user.email.split('@')[0]}</span>
+                <span className="sidebar-profile-email">{session.user.email}</span>
+              </div>
+              <span className="sidebar-profile-gear">⚙</span>
             </div>
           )}
         </div>
