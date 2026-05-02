@@ -38,8 +38,9 @@ function IncomeTracker() {
     date: new Date().toISOString().split('T')[0],
     client: '',
     description: '',
-    amountUSD: '',
-    amountTRY: '',
+    amount: '',
+    currency: 'USD',
+    exchangeRate: '1',
     invoiceNo: ''
   });
 
@@ -361,144 +362,108 @@ function IncomeTracker() {
       country = '-';
     }
 
-    // USD Amount - extended patterns
-    let amountUSD = 0;
-    const usdPatterns = [
-      // e-SMM specific formats - GIB format
-      /Vergiler Dahil Toplam[:\s]*([\d.,\s]+)\s*USD/i,
-      /Ödenecek Tutar[:\s]*([\d.,\s]+)\s*USD/i,
-      /Net Alınan(?:\s+Toplam)?[:\s]*([\d.,\s]+)\s*USD/i,
-      /Toplam(?:\s+Tutar)?[:\s]*([\d.,\s]+)\s*USD/i,
-      /Mal Hizmet Toplam Tutarı[:\s]*([\d.,\s]+)\s*USD/i,
-      /Hizmet Bedeli[:\s]*([\d.,\s]+)\s*USD/i,
-      /Brüt Ücret[:\s]*([\d.,\s]+)\s*USD/i,
-      /Makbuz Tutarı[:\s]*([\d.,\s]+)\s*USD/i,
-      /Alınan Ücret[:\s]*([\d.,\s]+)\s*USD/i,
-      /Ücret[:\s]*([\d.,\s]+)\s*USD/i,
-      /Bedel[:\s]*([\d.,\s]+)\s*USD/i,
-      /Tutar[:\s]*([\d.,\s]+)\s*USD/i,
-      /Miktar[:\s]*([\d.,\s]+)\s*USD/i,
-      // Upwork / Freelancer spesifik
-      /(?:Amount|Total|Fee|Payment|Invoice Total|Grand Total)[:\s]*([\d.,\s]+)\s*USD/i,
-      /(?:Net|Gross)[:\s]*([\d.,\s]+)\s*USD/i,
-      // Formats where USD comes first
-      /USD[:\s]*([\d.,\s]+)/i,
-      /\$[:\s]*([\d.,\s]+)/,
-      // USD sonra gelen formatlar (daha esnek)
-      /([\d]+[\s.,]*[\d]*)\s*USD/i,
-      /([\d.,]+)\s*USD/i,
-      /([\d.,]+)\s*\$/,
-    ];
-
     // Helper function for parsing numbers
     const parseNumber = (str) => {
       if (!str) return 0;
-      // Remove spaces
       let numStr = str.replace(/\s/g, '');
-      // If dot is the thousands separator (1.234,56)
       if (numStr.includes(',') && numStr.indexOf('.') < numStr.indexOf(',')) {
         numStr = numStr.replace(/\./g, '').replace(',', '.');
-      }
-      // If comma is the thousands separator (1,234.56)
-      else if (numStr.includes('.') && numStr.indexOf(',') < numStr.indexOf('.')) {
+      } else if (numStr.includes('.') && numStr.indexOf(',') < numStr.indexOf('.')) {
         numStr = numStr.replace(/,/g, '');
-      }
-      // Only comma present (548,33)
-      else if (numStr.includes(',') && !numStr.includes('.')) {
+      } else if (numStr.includes(',') && !numStr.includes('.')) {
         numStr = numStr.replace(',', '.');
       }
       return parseFloat(numStr) || 0;
     };
 
-    for (const pattern of usdPatterns) {
-      const match = text.match(pattern);
-      if (match) {
-        const parsed = parseNumber(match[1]);
-        if (parsed > 0 && parsed < 100000) {
-          amountUSD = parsed;
-          break;
-        }
-      }
-    }
+    // Detect which currency is used (priority order)
+    const supportedCurrencies = ['USD', 'CAD', 'EUR', 'GBP', 'AUD', 'CHF', 'JPY', 'NOK', 'SEK', 'DKK', 'SGD', 'NZD'];
+    let detectedCurrency = null;
 
-    // If USD still not found, locate "USD" in text and grab the nearest number
-    if (amountUSD === 0) {
-      const usdIndex = text.toUpperCase().indexOf('USD');
-      if (usdIndex !== -1) {
-        // Look 100 chars before and after USD (wider search)
-        const searchRange = text.substring(Math.max(0, usdIndex - 100), usdIndex + 100);
-        const numbersInRange = searchRange.match(/[\d.,]+/g);
-        if (numbersInRange) {
-          for (const numStr of numbersInRange) {
-            // Search for numbers with at least 1 digit
-            if (numStr.length >= 1) {
-              let cleaned = numStr;
-              if (cleaned.includes(',') && cleaned.indexOf('.') < cleaned.indexOf(',')) {
-                cleaned = cleaned.replace(/\./g, '').replace(',', '.');
-              } else if (cleaned.includes('.') && cleaned.indexOf(',') < cleaned.indexOf('.')) {
-                cleaned = cleaned.replace(/,/g, '');
-              } else if (cleaned.includes(',') && !cleaned.includes('.')) {
-                cleaned = cleaned.replace(',', '.');
-              }
-              const parsed = parseFloat(cleaned);
-              if (!isNaN(parsed) && parsed > 0 && parsed < 100000) {
-                amountUSD = parsed;
-                break;
-              }
-            }
-          }
-        }
-      }
-    }
-
-    // Last resort: scan all numbers in the text and find a reasonable USD amount
-    if (amountUSD === 0) {
-      // Find all decimal numbers
-      const allNumbers = text.match(/(\d+[.,]\d{2})/g);
-      if (allNumbers) {
-        for (const numStr of allNumbers) {
-          let cleaned = numStr.replace(',', '.');
-          const parsed = parseFloat(cleaned);
-          // Reasonable USD range: 1-50000
-          if (!isNaN(parsed) && parsed >= 1 && parsed <= 50000) {
-            amountUSD = parsed;
-            break;
-          }
-        }
-      }
-    }
-
-    if (amountUSD === 0) {
-      errors.push('USD amount not found');
-    }
-
-    // TRY Tutar
-    let amountTRY = 0;
-    const tryPatterns = [
-      /Net Alınan(?:\s+Toplam)?[:\s]*([\d.,]+)\s*(?:TL|TRY|₺)/i,
-      /Toplam(?:\s+Tutar)?[:\s]*([\d.,]+)\s*(?:TL|TRY|₺)/i,
-      /([\d]+[.,][\d]{2})\s*(?:TL|TRY|₺)/,
-      /([\d.,]+)\s*(?:TL|TRY|₺)/,
+    // Look for labeled amounts like "Total: 123.45 CAD"
+    const labeledAmountPatterns = [
+      /(?:Vergiler Dahil Toplam|Ödenecek Tutar|Net Alınan(?:\s+Toplam)?|Toplam(?:\s+Tutar)?|Mal Hizmet Toplam Tutarı|Hizmet Bedeli|Brüt Ücret|Makbuz Tutarı|Alınan Ücret|Ücret|Bedel|Tutar|Miktar|Amount|Total|Fee|Payment|Invoice Total|Grand Total|Net|Gross)[:\s]*([\d.,\s]+)\s*(USD|CAD|EUR|GBP|AUD|CHF|JPY|NOK|SEK|DKK|SGD|NZD)/gi,
+      // currency first: "CAD 123.45"
+      /(USD|CAD|EUR|GBP|AUD|CHF|JPY|NOK|SEK|DKK|SGD|NZD)[:\s]*([\d.,\s]+)/gi,
+      // symbol: "$123.45"
+      /\$\s*([\d.,]+)/g,
     ];
 
-    for (const pattern of tryPatterns) {
-      const match = text.match(pattern);
-      if (match) {
-        let numStr = match[1];
-        if (numStr.includes(',') && numStr.indexOf('.') < numStr.indexOf(',')) {
-          numStr = numStr.replace(/\./g, '').replace(',', '.');
-        } else if (numStr.includes('.') && numStr.indexOf(',') < numStr.indexOf('.')) {
-          numStr = numStr.replace(/,/g, '');
-        } else if (numStr.includes(',') && !numStr.includes('.')) {
-          numStr = numStr.replace(',', '.');
-        }
+    let detectedAmount = 0;
 
-        const parsed = parseFloat(numStr);
-        if (!isNaN(parsed) && parsed > 0) {
-          amountTRY = parsed;
+    // Try labeled patterns first
+    const labeledRe = /(?:Vergiler Dahil Toplam|Ödenecek Tutar|Net Alınan(?:\s+Toplam)?|Toplam(?:\s+Tutar)?|Mal Hizmet Toplam Tutarı|Hizmet Bedeli|Brüt Ücret|Makbuz Tutarı|Alınan Ücret|Ücret|Bedel|Tutar|Miktar|Amount|Total|Fee|Payment|Invoice Total|Grand Total|Net|Gross)[:\s]*([\d.,\s]+)\s*(USD|CAD|EUR|GBP|AUD|CHF|JPY|NOK|SEK|DKK|SGD|NZD)/gi;
+    let m;
+    while ((m = labeledRe.exec(text)) !== null) {
+      const parsed = parseNumber(m[1]);
+      if (parsed > 0 && parsed < 500000) {
+        detectedAmount = parsed;
+        detectedCurrency = m[2].toUpperCase();
+        break;
+      }
+    }
+
+    // currency-first pattern
+    if (!detectedCurrency) {
+      const currFirstRe = /(USD|CAD|EUR|GBP|AUD|CHF|NOK|SEK|DKK|SGD|NZD)\s*([\d.,]+)/gi;
+      while ((m = currFirstRe.exec(text)) !== null) {
+        const parsed = parseNumber(m[2]);
+        if (parsed > 0 && parsed < 500000) {
+          detectedAmount = parsed;
+          detectedCurrency = m[1].toUpperCase();
           break;
         }
       }
+    }
+
+    // amount-then-currency (no label)
+    if (!detectedCurrency) {
+      const amtCurrRe = /([\d.,]+)\s*(USD|CAD|EUR|GBP|AUD|CHF|NOK|SEK|DKK|SGD|NZD)/gi;
+      while ((m = amtCurrRe.exec(text)) !== null) {
+        const parsed = parseNumber(m[1]);
+        if (parsed > 0 && parsed < 500000) {
+          detectedAmount = parsed;
+          detectedCurrency = m[2].toUpperCase();
+          break;
+        }
+      }
+    }
+
+    // $ symbol fallback
+    if (!detectedCurrency) {
+      const dollarRe = /\$\s*([\d.,]+)/g;
+      while ((m = dollarRe.exec(text)) !== null) {
+        const parsed = parseNumber(m[1]);
+        if (parsed > 0 && parsed < 500000) {
+          detectedAmount = parsed;
+          detectedCurrency = 'USD';
+          break;
+        }
+      }
+    }
+
+    // If still nothing, try TRY — but mark as TRY not USD
+    let amountTRY = 0;
+    if (!detectedCurrency) {
+      const tryPatterns = [
+        /(?:Net Alınan(?:\s+Toplam)?|Toplam(?:\s+Tutar)?)[:\s]*([\d.,]+)\s*(?:TL|TRY|₺)/i,
+        /([\d]+[.,][\d]{2})\s*(?:TL|TRY|₺)/,
+        /([\d.,]+)\s*(?:TL|TRY|₺)/,
+      ];
+      for (const pattern of tryPatterns) {
+        const match = text.match(pattern);
+        if (match) {
+          const parsed = parseNumber(match[1]);
+          if (parsed > 0) { amountTRY = parsed; break; }
+        }
+      }
+    }
+
+    const amountUSD = detectedCurrency ? detectedAmount : 0;
+    const currency = detectedCurrency || (amountTRY > 0 ? 'TRY' : 'USD');
+
+    if (amountUSD === 0 && amountTRY === 0) {
+      errors.push('Amount not found');
     }
 
     // Description / Service
@@ -526,6 +491,7 @@ function IncomeTracker() {
       country,
       amountUSD,
       amountTRY,
+      currency,
       errors
     };
   };
@@ -697,17 +663,24 @@ function IncomeTracker() {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
 
+      const origCurrency = parsedData?.currency || 'USD';
+      const origAmount = parsedData?.amountUSD || parsedData?.amountTRY || 0;
+      // amountUSD stores the original amount; currency tells what it is.
+      // User must set exchangeRate manually for non-USD currencies to get USD equivalent.
       const newInvoice = {
         id: file.invoiceNo + '_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
         invoiceNo: file.invoiceNo,
         date: parsedData?.date || defaultDate,
         client: parsedData?.client || 'Unknown',
         country: parsedData?.country || '-',
-        amountUSD: parsedData?.amountUSD || 0,
+        amountOriginal: origAmount,
+        currency: origCurrency,
+        exchangeRate: origCurrency === 'USD' ? 1 : null, // null = needs manual input
+        amountUSD: origCurrency === 'USD' ? origAmount : 0, // 0 until rate is set
         fileName: file.name,
         filePath: file.path,
         type: isGelir ? 'income' : 'unknown',
-        needsEdit: !readSuccess
+        needsEdit: !readSuccess || (origCurrency !== 'USD' && origAmount > 0)
       };
 
       newInvoices.push(newInvoice);
@@ -744,7 +717,12 @@ function IncomeTracker() {
 
   // Add manual entry
   const addManualEntry = () => {
-    if (!manualEntry.client || !manualEntry.amountUSD) return;
+    if (!manualEntry.client || !manualEntry.amount) return;
+
+    const orig = parseFloat(manualEntry.amount) || 0;
+    const currency = manualEntry.currency || 'USD';
+    const rate = currency === 'USD' ? 1 : (parseFloat(manualEntry.exchangeRate) || 1);
+    const amountUSD = currency === 'USD' ? orig : orig * rate;
 
     const newInvoice = {
       id: 'manual_' + Date.now(),
@@ -752,8 +730,10 @@ function IncomeTracker() {
       date: manualEntry.date,
       client: manualEntry.client,
       description: manualEntry.description || 'Freelance Service',
-      amountUSD: parseFloat(manualEntry.amountUSD),
-      amountTRY: parseFloat(manualEntry.amountTRY) || 0,
+      amountOriginal: orig,
+      currency,
+      exchangeRate: rate,
+      amountUSD,
       type: 'income',
       manual: true
     };
@@ -763,8 +743,9 @@ function IncomeTracker() {
       date: new Date().toISOString().split('T')[0],
       client: '',
       description: '',
-      amountUSD: '',
-      amountTRY: '',
+      amount: '',
+      currency: 'USD',
+      exchangeRate: '1',
       invoiceNo: ''
     });
     setView('list');
@@ -779,17 +760,26 @@ function IncomeTracker() {
     setEditForm({
       client: invoice.client,
       country: invoice.country || '',
-      amountUSD: invoice.amountUSD.toString()
+      amountOriginal: (invoice.amountOriginal ?? invoice.amountUSD).toString(),
+      currency: invoice.currency || 'USD',
+      exchangeRate: (invoice.exchangeRate ?? '').toString(),
     });
   };
 
   const saveEdit = (id) => {
+    const orig = parseFloat(editForm.amountOriginal) || 0;
+    const rate = parseFloat(editForm.exchangeRate) || 1;
+    const currency = editForm.currency || 'USD';
+    const amountUSD = currency === 'USD' ? orig : orig * rate;
     setInvoices(prev => prev.map(inv =>
       inv.id === id ? {
         ...inv,
         client: editForm.client,
         country: editForm.country,
-        amountUSD: parseFloat(editForm.amountUSD) || 0,
+        amountOriginal: orig,
+        currency,
+        exchangeRate: rate,
+        amountUSD,
         needsEdit: false
       } : inv
     ));
@@ -1484,13 +1474,35 @@ function IncomeTracker() {
                       onChange={(e) => setEditForm({...editForm, country: e.target.value})}
                       placeholder="Country"
                     />
-                    <input
-                      className="it-edit-input small"
-                      type="number"
-                      value={editForm.amountUSD}
-                      onChange={(e) => setEditForm({...editForm, amountUSD: e.target.value})}
-                      placeholder="USD"
-                    />
+                    <div className="it-edit-amount-group">
+                      <input
+                        className="it-edit-input small"
+                        type="number"
+                        value={editForm.amountOriginal}
+                        onChange={(e) => setEditForm({...editForm, amountOriginal: e.target.value})}
+                        placeholder="Amount"
+                      />
+                      <select
+                        className="it-edit-currency"
+                        value={editForm.currency}
+                        onChange={(e) => setEditForm({...editForm, currency: e.target.value, exchangeRate: e.target.value === 'USD' ? '1' : editForm.exchangeRate})}
+                      >
+                        {['USD','CAD','EUR','GBP','AUD','CHF','NOK','SEK','DKK','SGD','NZD','TRY'].map(c => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                      {editForm.currency !== 'USD' && (
+                        <input
+                          className="it-edit-input small"
+                          type="number"
+                          step="0.0001"
+                          value={editForm.exchangeRate}
+                          onChange={(e) => setEditForm({...editForm, exchangeRate: e.target.value})}
+                          placeholder="Rate to USD"
+                          title="1 unit of this currency = ? USD"
+                        />
+                      )}
+                    </div>
                     <div className="it-edit-actions">
                       <button className="it-save-edit" onClick={() => saveEdit(invoice.id)}>✓</button>
                       <button className="it-cancel-edit" onClick={cancelEdit}>×</button>
@@ -1501,7 +1513,12 @@ function IncomeTracker() {
                     <span className="it-date">{formatDate(invoice.date)}</span>
                     <span className="it-client">{invoice.client}</span>
                     <span className="it-country">{invoice.country || '-'}</span>
-                    <span className="it-amount">{formatCurrency(invoice.amountUSD)}</span>
+                    <span className="it-amount">
+                      {invoice.currency && invoice.currency !== 'USD'
+                        ? <>{invoice.amountOriginal?.toFixed(2)} <span className="it-currency-tag">{invoice.currency}</span> {invoice.amountUSD > 0 ? `= ${formatCurrency(invoice.amountUSD)}` : <span className="it-needs-rate" title="Set exchange rate by clicking edit">rate needed</span>}</>
+                        : formatCurrency(invoice.amountUSD)
+                      }
+                    </span>
                     <div className="it-row-actions">
                       <button
                         className="it-edit-btn"
@@ -1637,25 +1654,43 @@ function IncomeTracker() {
               />
             </div>
             <div className="it-form-group">
-              <label>Amount (USD) *</label>
-              <input
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                value={manualEntry.amountUSD}
-                onChange={(e) => setManualEntry({...manualEntry, amountUSD: e.target.value})}
-              />
+              <label>Currency *</label>
+              <select
+                value={manualEntry.currency}
+                onChange={(e) => setManualEntry({...manualEntry, currency: e.target.value, exchangeRate: e.target.value === 'USD' ? '1' : manualEntry.exchangeRate})}
+              >
+                {['USD','CAD','EUR','GBP','AUD','CHF','NOK','SEK','DKK','SGD','NZD','TRY'].map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
             </div>
             <div className="it-form-group">
-              <label>Amount (TRY)</label>
+              <label>Amount ({manualEntry.currency}) *</label>
               <input
                 type="number"
                 step="0.01"
                 placeholder="0.00"
-                value={manualEntry.amountTRY}
-                onChange={(e) => setManualEntry({...manualEntry, amountTRY: e.target.value})}
+                value={manualEntry.amount}
+                onChange={(e) => setManualEntry({...manualEntry, amount: e.target.value})}
               />
             </div>
+            {manualEntry.currency !== 'USD' && (
+              <div className="it-form-group">
+                <label>Exchange Rate (1 {manualEntry.currency} = ? USD)</label>
+                <input
+                  type="number"
+                  step="0.0001"
+                  placeholder="e.g. 0.74 for CAD"
+                  value={manualEntry.exchangeRate}
+                  onChange={(e) => setManualEntry({...manualEntry, exchangeRate: e.target.value})}
+                />
+                {manualEntry.amount && manualEntry.exchangeRate && (
+                  <span className="it-usd-preview">
+                    ≈ {formatCurrency((parseFloat(manualEntry.amount) || 0) * (parseFloat(manualEntry.exchangeRate) || 1))}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
           <div className="it-form-actions">
             <button className="it-save-btn" onClick={addManualEntry}>

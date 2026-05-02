@@ -32,6 +32,8 @@ export const SYNC_KEYS = [
   'analyze_rules',
   'kana_learned_words',
   'kana_selected_rows',
+  'kana_custom_words',
+  'kana_selected_vocab',
   'kana_stats',
   'kana_prefs',
   'kana_best_score',
@@ -58,6 +60,8 @@ export const SYNC_KEYS = [
   'notesSidebarWidth',
   'notesLineSpacing',
   'chat_username',
+  'planner_blocks',
+  'planner_qtasks',
 ];
 
 // Cache userId to avoid network call on every push

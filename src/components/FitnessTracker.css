@@ -25,7 +25,7 @@
 
 /* ── HERO ── */
 .ft-hero {
-  background: linear-gradient(160deg, var(--bg-card) 0%, var(--bg-elevated) 100%);
+  background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 20px 24px 18px;
@@ -39,7 +39,6 @@
 .ft-hero-stats { display: flex; align-items: center; flex-wrap: wrap; gap: 0; }
 
 .ft-hstat { display: flex; flex-direction: column; align-items: flex-start; padding: 0 24px; gap: 2px; }
-.ft-hstat:first-child { padding-left: 0; }
 
 .ft-hstat-val  { font-size: 36px; font-weight: 800; line-height: 1; letter-spacing: -1px; }
 .ft-hstat-unit { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; }
