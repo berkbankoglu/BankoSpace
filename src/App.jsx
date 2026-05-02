@@ -178,29 +178,27 @@ function App({ session, onLogout }) {
   useEffect(() => {
     let keepAliveId = null;
 
-    // WebView2'nin render pipeline'ını canlı tutan sürekli rAF loop
+    // Sürekli rAF döngüsü — WebView2 GPU pipeline'ını canlı tutar
     const keepAlive = () => {
       keepAliveId = requestAnimationFrame(keepAlive);
     };
     keepAliveId = requestAnimationFrame(keepAlive);
 
     const forceRepaint = () => {
-      const el = document.documentElement;
-      el.style.transform = 'translateZ(0)';
-      requestAnimationFrame(() => {
-        el.style.transform = '';
-        window.dispatchEvent(new Event('resize'));
-      });
+      window.dispatchEvent(new Event('resize'));
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') forceRepaint();
     };
 
     window.addEventListener('focus', forceRepaint);
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') forceRepaint();
-    });
+    document.addEventListener('visibilitychange', onVisibility);
 
     return () => {
       if (keepAliveId) cancelAnimationFrame(keepAliveId);
       window.removeEventListener('focus', forceRepaint);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
   }, []);
 

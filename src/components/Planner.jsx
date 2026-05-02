@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
+import { pushKeyToSupabase } from '../supabase';
 import './Planner.css';
 
 const STORAGE_KEY = 'planner_blocks';
@@ -108,8 +109,17 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
     return () => window.removeEventListener('resize', update);
   }, []);
 
-  useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(blocks)); }, [blocks]);
-  useEffect(() => { localStorage.setItem(QTASKS_KEY,  JSON.stringify(qTasks));  }, [qTasks]);
+  useEffect(() => {
+    const val = JSON.stringify(blocks);
+    localStorage.setItem(STORAGE_KEY, val);
+    pushKeyToSupabase(STORAGE_KEY, val);
+  }, [blocks]);
+
+  useEffect(() => {
+    const val = JSON.stringify(qTasks);
+    localStorage.setItem(QTASKS_KEY, val);
+    pushKeyToSupabase(QTASKS_KEY, val);
+  }, [qTasks]);
 
   // Notifications
   useEffect(() => {
@@ -350,7 +360,8 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
     startDrag({ type:'qtask', qtask, originX:e.clientX, originY:e.clientY });
   };
 
-  const handleTimelineClick = () => {}; // clicking timeline does nothing, use + Add Block button
+  const handleTimelineClick = () => {};
+
 
   // Helper: pixel position of a block
   const posStyle = (block) => {
@@ -510,7 +521,7 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
                     left: ghost.left, width: ghost.width,
                     top:6, bottom:6,
                     borderTopColor: ghost.colorHex,
-                    background: ghost.colorHex + '33',
+                    background: ghost.colorHex + '55',
                     pointerEvents: 'none',
                   }}>
                     <span className="pl-block-title">{ghost.title}</span>
@@ -526,7 +537,7 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
                     <div
                       key={block.id}
                       className={`pl-block${isGhosted?' pl-block-hidden':''}`}
-                      style={{ left, width, top:6, bottom:6, borderTopColor:color, background:color+'22' }}
+                      style={{ left, width, top:6, bottom:6, borderTopColor:color, background:color+'55' }}
                       onMouseDown={(e) => { if (!e.target.classList.contains('pl-resize-handle') && !e.target.classList.contains('pl-block-edit-btn')) handleBlockMove(e, block); }}
                       onClick={(e) => e.stopPropagation()}
                     >
@@ -585,6 +596,7 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
           </div>
         </div>
       )}
+
 
       {/* ── Block Modal ── */}
       {modal && (

@@ -183,6 +183,12 @@ async fn fetch_post(url: String, headers: std::collections::HashMap<String, Stri
 }
 
 fn main() {
+    // WebView2 Alt+Tab freeze fix — arka planda renderer'ı yavaşlatma
+    std::env::set_var(
+        "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
+        "--disable-renderer-backgrounding --disable-backgrounding-occluded-windows --disable-background-timer-throttling",
+    );
+
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
@@ -220,14 +226,25 @@ fn main() {
                         }
                     }
                 }
-                // WebView2 Alt+Tab freeze fix — pencere odağa gelince JS ile repaint tetikle
+                // WebView2 freeze fix: odak gelince agresif repaint + child webview restore
                 tauri::WindowEvent::Focused(true) => {
                     if window.label() == "main" {
                         let app = window.app_handle();
+                        // Child webview'i tekrar göster (arka planda hide edilmişse)
+                        if let Some(child) = app.get_webview("tradingview-child") {
+                            let _ = child.show();
+                        }
                         if let Some(wv) = app.get_webview_window("main") {
-                            let _ = wv.eval(
-                                "document.body.style.transform='translateZ(0)';requestAnimationFrame(()=>{document.body.style.transform='';window.dispatchEvent(new Event('resize'));});"
-                            );
+                            let _ = wv.eval("window.dispatchEvent(new Event('resize')); window.dispatchEvent(new Event('focus'));");
+                        }
+                    }
+                }
+                // Arka plana geçince child webview'i hide et — GPU kaynak çakışmasını önle
+                tauri::WindowEvent::Focused(false) => {
+                    if window.label() == "main" {
+                        let app = window.app_handle();
+                        if let Some(child) = app.get_webview("tradingview-child") {
+                            let _ = child.hide();
                         }
                     }
                 }

@@ -937,6 +937,43 @@
   border-color: var(--accent);
 }
 
+.it-edit-amount-group {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.it-edit-currency {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-hover);
+  border-radius: 4px;
+  padding: 6px 4px;
+  color: var(--text-primary);
+  font-size: 12px;
+  outline: none;
+  width: 60px;
+}
+
+.it-currency-tag {
+  font-size: 11px;
+  color: var(--accent);
+  font-weight: 600;
+  margin: 0 2px;
+}
+
+.it-needs-rate {
+  font-size: 11px;
+  color: #f59e0b;
+  font-style: italic;
+}
+
+.it-usd-preview {
+  display: block;
+  font-size: 12px;
+  color: var(--accent);
+  margin-top: 4px;
+}
+
 .it-edit-actions {
   display: flex;
   gap: 4px;
