@@ -8757,6 +8757,13 @@ body.light .references-header {
   overflow: hidden;
 }
 
+/* Kolon drop glow — sürükleme sırasında imlecin altındaki kolon */
+.category-column-v2.col-drop-glow {
+  outline: 2px solid rgba(200,200,200,0.4) !important;
+  outline-offset: -2px;
+  background: rgba(255,255,255,0.03) !important;
+}
+
 /* Todo drag-over highlight — DOM class, React state yok */
 .cc-item.cc-drag-over {
   outline: 2px solid var(--accent)55;

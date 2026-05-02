@@ -932,7 +932,6 @@ function App({ session, onLogout }) {
     let overTodoId = null;
 
     function onMove(ev) {
-      // Ghost oluştur (ilk harekette)
       if (!ghost) {
         ghost = document.createElement('div');
         ghost.textContent = todo.text;
@@ -957,30 +956,24 @@ function App({ session, onLogout }) {
       ghost.style.left = (ev.clientX - offX) + 'px';
       ghost.style.top  = (ev.clientY - offY) + 'px';
 
-      // Kolon bul
-      let foundCategory = null;
-      document.querySelectorAll('.category-column-v2').forEach(col => {
-        const r = col.getBoundingClientRect();
-        if (ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom)
-          foundCategory = col.dataset.category;
-      });
+      const el = document.elementFromPoint(ev.clientX, ev.clientY);
+      const col = el?.closest('.category-column-v2');
+      const foundCategory = col?.dataset?.category || null;
       overCategory = foundCategory;
 
-      // Todo highlight
-      let hoveredEl = null;
-      let hoveredId = null;
-      if (foundCategory) {
-        const col = document.querySelector(`.category-column-v2[data-category="${foundCategory}"]`);
-        if (col) {
-          for (const el of col.querySelectorAll('.cc-item[data-todo-id]')) {
-            const id = el.getAttribute('data-todo-id');
-            if (id === String(todo.id)) continue;
-            const r = el.getBoundingClientRect();
-            if (ev.clientY >= r.top && ev.clientY <= r.bottom) { hoveredEl = el; hoveredId = id; break; }
-          }
+      const itemUnder = el?.closest('.cc-item[data-todo-id]');
+      const hoveredId = itemUnder ? itemUnder.getAttribute('data-todo-id') : null;
+      const hoveredEl = (hoveredId && hoveredId !== String(todo.id)) ? itemUnder : null;
+
+      document.querySelectorAll('.category-column-v2').forEach(c => {
+        if (foundCategory && c.dataset.category === foundCategory && !hoveredEl) {
+          c.classList.add('col-drop-glow');
+        } else {
+          c.classList.remove('col-drop-glow');
         }
-      }
-      overTodoId = hoveredId;
+      });
+
+      overTodoId = hoveredEl ? hoveredId : null;
       if (hoveredEl !== dragOverEl) {
         if (dragOverEl) dragOverEl.classList.remove('cc-drag-over');
         if (hoveredEl) hoveredEl.classList.add('cc-drag-over');
@@ -993,35 +986,52 @@ function App({ session, onLogout }) {
       window.removeEventListener('mouseup', onUp);
       if (ghost) { ghost.remove(); ghost = null; }
       if (dragOverEl) { dragOverEl.classList.remove('cc-drag-over'); dragOverEl = null; }
+      document.querySelectorAll('.col-drop-glow').forEach(el => el.classList.remove('col-drop-glow'));
       itemEl.style.opacity = '';
       itemEl.style.transform = '';
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
 
       if (overTodoId) {
+        const savedOverTodoId = overTodoId;
+        const savedTodoId = String(todo.id);
+
+        // FLIP: pozisyonları bırakmadan önce kaydet
         const allEls = document.querySelectorAll('.cc-item[data-todo-id]');
         const oldPositions = {};
         allEls.forEach(el => { const id = el.getAttribute('data-todo-id'); if (id) oldPositions[id] = el.getBoundingClientRect(); });
         todoPositionsRef.current = oldPositions;
+
         playClickSound();
         setTodos(prev => {
-          const dragItem   = prev.find(t => String(t.id) === String(todo.id));
-          const targetItem = prev.find(t => String(t.id) === String(overTodoId));
+          const dragItem   = prev.find(t => String(t.id) === savedTodoId);
+          const targetItem = prev.find(t => String(t.id) === savedOverTodoId);
           if (!dragItem || !targetItem) return prev;
-          const category = targetItem.category;
-          const catTodos  = [...prev].filter(t => t.category === category).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-          const fromIdx = catTodos.findIndex(t => String(t.id) === String(todo.id));
-          const toIdx   = catTodos.findIndex(t => String(t.id) === String(overTodoId));
-          const reordered = [...catTodos];
-          const [moved] = reordered.splice(fromIdx !== -1 ? fromIdx : reordered.length, 1);
-          reordered.splice(toIdx, 0, moved || { ...dragItem });
-          const updated = reordered.map((t, i) => ({ ...t, order: i, category }));
-          const others  = prev.filter(t => t.category !== category && String(t.id) !== String(todo.id));
-          return [...updated, ...others];
+
+          if (dragItem.category === targetItem.category) {
+            // Aynı kolon — sıra değiştir
+            const cat = dragItem.category;
+            const catTodos = prev.filter(t => t.category === cat).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+            const fromIdx = catTodos.findIndex(t => String(t.id) === savedTodoId);
+            const toIdx   = catTodos.findIndex(t => String(t.id) === savedOverTodoId);
+            const reordered = [...catTodos];
+            const [moved] = reordered.splice(fromIdx, 1);
+            reordered.splice(toIdx, 0, moved);
+            const updated = reordered.map((t, i) => ({ ...t, order: i }));
+            return [...prev.filter(t => t.category !== cat), ...updated];
+          } else {
+            // Farklı kolon — swap
+            return prev.map(t => {
+              if (String(t.id) === savedTodoId)     return { ...t, category: targetItem.category, order: targetItem.order };
+              if (String(t.id) === savedOverTodoId) return { ...t, category: dragItem.category,   order: dragItem.order };
+              return t;
+            });
+          }
         });
       } else if (overCategory && overCategory !== todo.category) {
+        const savedCategory = overCategory;
         playClickSound();
-        setTodos(prev => prev.map(t => t.id === todo.id ? { ...t, category: overCategory } : t));
+        setTodos(prev => prev.map(t => String(t.id) === String(todo.id) ? { ...t, category: savedCategory } : t));
       }
     }
 
@@ -1047,7 +1057,7 @@ function App({ session, onLogout }) {
         el.style.transition = 'none';
         el.offsetHeight; // Force reflow
         el.style.transform = '';
-        el.style.transition = 'transform 0.18s cubic-bezier(0.25, 0.1, 0.25, 1)';
+        el.style.transition = 'transform 0.45s cubic-bezier(0.4, 0, 0.2, 1)';
       }
     });
     todoPositionsRef.current = {};
