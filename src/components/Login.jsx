@@ -35,7 +35,9 @@ export default function Login({ onLogin }) {
       }
     } catch (err) {
       const msg = err.message || '';
-      if (msg.includes('Invalid login credentials') || msg.includes('invalid_credentials')) {
+      if (msg.includes('fetch') || msg.includes('network') || msg.includes('Network')) {
+        setError('Connection failed. Check your internet connection.');
+      } else if (msg.includes('Invalid login credentials') || msg.includes('invalid_credentials')) {
         setError('Invalid email or password');
       } else if (msg.includes('Email not confirmed')) {
         setError('Please verify your email first');
