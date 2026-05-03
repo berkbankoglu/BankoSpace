@@ -1,9 +1,38 @@
 import { createClient } from '@supabase/supabase-js';
+import { invoke } from '@tauri-apps/api/core';
 
 const SUPABASE_URL = 'https://fzbjqztfdsquinnpgzir.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ6YmpxenRmZHNxdWlubnBnemlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzNTIzMTgsImV4cCI6MjA4ODkyODMxOH0.qRTQqN1PHY7coRaN_bfuJfTB584X4U1hIC5oKsAmlAo';
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+// Rust backend üzerinden fetch — WebView2 CSP/network kısıtlamalarını aşar
+async function tauriFetch(input, init) {
+  const url = typeof input === 'string' ? input : input.url;
+  const method = (init?.method || 'GET').toUpperCase();
+  const headers = {};
+  if (init?.headers) {
+    const h = init.headers;
+    if (h instanceof Headers) {
+      h.forEach((v, k) => { headers[k] = v; });
+    } else {
+      Object.assign(headers, h);
+    }
+  }
+  const body = init?.body ? String(init.body) : '';
+
+  let text;
+  if (method === 'GET' || method === 'HEAD') {
+    text = await invoke('fetch_get', { url, headers });
+  } else {
+    text = await invoke('fetch_post', { url, headers, body });
+  }
+
+  return new Response(text, { status: 200, headers: { 'content-type': 'application/json' } });
+}
+
+export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+  global: { fetch: tauriFetch },
+  auth: { persistSession: true, autoRefreshToken: true },
+});
 
 // All localStorage keys to sync
 export const SYNC_KEYS = [

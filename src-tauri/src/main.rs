@@ -182,6 +182,23 @@ async fn fetch_post(url: String, headers: std::collections::HashMap<String, Stri
     Ok(text)
 }
 
+#[tauri::command]
+async fn fetch_get(url: String, headers: std::collections::HashMap<String, String>) -> Result<String, String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(60))
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let mut req = client.get(&url);
+    for (k, v) in &headers {
+        req = req.header(k.as_str(), v.as_str());
+    }
+
+    let response = req.send().await.map_err(|e| e.to_string())?;
+    let text = response.text().await.map_err(|e| e.to_string())?;
+    Ok(text)
+}
+
 fn main() {
     // WebView2 Alt+Tab freeze fix — arka planda renderer'ı yavaşlatma
     std::env::set_var(
@@ -208,6 +225,7 @@ fn main() {
             toggle_kana_window,
             fetch_rss,
             fetch_post,
+            fetch_get,
             fetch_tts,
             create_child_webview,
             navigate_child_webview,
