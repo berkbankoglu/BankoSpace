@@ -174,29 +174,17 @@ function App({ session, onLogout }) {
   const [updateAvailable, setUpdateAvailable] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  // WebView2 freeze fix — Alt+Tab sonrası donmayı önle
+  // WebView2 freeze fix — focus/visibility sonrası repaint zorla
   useEffect(() => {
-    let keepAliveId = null;
-
-    // Sürekli rAF döngüsü — WebView2 GPU pipeline'ını canlı tutar
-    const keepAlive = () => {
-      keepAliveId = requestAnimationFrame(keepAlive);
-    };
-    keepAliveId = requestAnimationFrame(keepAlive);
-
     const forceRepaint = () => {
       window.dispatchEvent(new Event('resize'));
     };
-
     const onVisibility = () => {
       if (document.visibilityState === 'visible') forceRepaint();
     };
-
     window.addEventListener('focus', forceRepaint);
     document.addEventListener('visibilitychange', onVisibility);
-
     return () => {
-      if (keepAliveId) cancelAnimationFrame(keepAliveId);
       window.removeEventListener('focus', forceRepaint);
       document.removeEventListener('visibilitychange', onVisibility);
     };
@@ -1031,7 +1019,11 @@ function App({ session, onLogout }) {
       } else if (overCategory && overCategory !== todo.category) {
         const savedCategory = overCategory;
         playClickSound();
-        setTodos(prev => prev.map(t => String(t.id) === String(todo.id) ? { ...t, category: savedCategory } : t));
+        setTodos(prev => prev.map(t => {
+          if (String(t.id) === String(todo.id)) return { ...t, category: savedCategory, order: -1 };
+          if (t.category === savedCategory) return { ...t, order: (t.order ?? 0) + 1 };
+          return t;
+        }));
       }
     }
 

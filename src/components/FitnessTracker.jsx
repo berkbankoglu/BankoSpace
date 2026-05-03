@@ -848,6 +848,8 @@ export default function FitnessTracker() {
   const [menuSideW, onMenuSideDown] = useResize(160, 70, 320, 'ft_panel_menu_side_v3');
   // Menü ↕ Antrenman dikey resize
   const [menuH, onMenuVDown] = useResizeV(460, 120, 900, 'ft_panel_menu_h_v3');
+  // Weight ↕ AI dikey resize
+  const [weightH, onWeightVDown] = useResizeV(320, 100, 700, 'ft_panel_weight_h_v1');
 
   // ── AI Fitness Assistant state ──
   const [aiMessages, setAiMessages] = useState([]);
@@ -2058,8 +2060,8 @@ Rules:
         <div className="ft-main-layout">
 
           {/* ── Sol Kolon: Kilo Takibi + AI ── */}
-          <div className="ft-resizable-col" style={{ width: w0, gap: 8 }}>
-            <div className="ft-card" style={{ flexShrink: 0, boxSizing: 'border-box', overflow: 'auto' }}>
+          <div className="ft-resizable-col" style={{ width: w0, gap: 0 }}>
+            <div className="ft-card" style={{ height: weightH, flexShrink: 0, boxSizing: 'border-box', overflow: 'auto' }}>
               <div className="ft-card-header">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <div className="ft-card-label">Weight Tracking</div>
@@ -2157,6 +2159,9 @@ Rules:
                 ))}
               </div>
             </div>
+
+            {/* Weight ↕ AI dikey resize handle */}
+            <div className="ft-resize-handle-v" onMouseDown={onWeightVDown} />
 
             {/* ── AI Fitness Assistant ── */}
             <div className="ft-card ft-ai-box" style={{ flex: 1, minHeight: 0 }}>

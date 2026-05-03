@@ -186,7 +186,7 @@ fn main() {
     // WebView2 Alt+Tab freeze fix — arka planda renderer'ı yavaşlatma
     std::env::set_var(
         "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
-        "--disable-renderer-backgrounding --disable-backgrounding-occluded-windows --disable-background-timer-throttling",
+        "--disable-renderer-backgrounding --disable-backgrounding-occluded-windows --disable-background-timer-throttling --disable-hang-monitor --disable-features=CalculateNativeWinOcclusion",
     );
 
     tauri::Builder::default()

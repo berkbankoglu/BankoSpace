@@ -96,6 +96,7 @@
 .cc-items {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -142,7 +143,6 @@
   gap: 5px;
   position: relative;
   box-sizing: border-box;
-  overflow: hidden;
 }
 
 .cc-item-color-bar {
