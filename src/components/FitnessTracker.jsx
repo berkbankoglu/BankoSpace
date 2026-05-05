@@ -1435,91 +1435,99 @@ export default function FitnessTracker() {
       exercises: d.exercises.map(e => ({ id: e.id, name: e.name, sets: e.sets, reps: e.isMax ? 'MAX' : e.reps })),
     }));
 
-    const system = `You are a fitness coach with direct write access to the user's app. Today: ${today()}.
-
+    // Görsel sayısına göre system prompt hazırla — her seferinde güncel snapshot al
+    function buildSystem() {
+      const snap = workoutsRef.current.map(d => ({
+        id: d.id, name: d.name,
+        exercises: d.exercises.map(e => ({ id: e.id, name: e.name, sets: e.sets, reps: e.isMax ? 'MAX' : e.reps })),
+      }));
+      return `You are a fitness coach with direct write access to the user's app. Today: ${today()}.
 USER: gender=${profile.gender||'?'}, age=${profile.age||'?'}, weight=${profile.weight||'?'}kg, height=${profile.height||'?'}cm, BMR=${bmr||'?'}, TDEE=${tdee||'?'}, goal=${goal.type||'maintain'}${goal.targetWeight?` →${goal.targetWeight}kg`:''}
 
-CURRENT WORKOUT PLAN (use these IDs for tool calls):
-${workoutSnap.length ? JSON.stringify(workoutSnap) : 'No workout days yet.'}
+CURRENT WORKOUT PLAN (use these IDs):
+${snap.length ? JSON.stringify(snap) : 'No workout days yet.'}
 
 WORKOUT DATA STRUCTURE: Each exercise: {id, name, sets:number, reps:number, isMax:boolean}.
 
 TOOL RULES — FOLLOW EXACTLY:
-1. add_exercise: ALWAYS include sets, reps, is_max in the SAME call. Never add first then update. Example: add_exercise({day_id:123, name:"Bench Press", sets:4, reps:8, is_max:false})
-2. update_exercise: use exercise_id from the plan listed above. If exercise is missing from the plan, it was just added — call get_fitness_data with ["workouts"] to get fresh IDs.
-3. When image shows a workout list: add ALL exercises in one agentic loop, each with correct sets/reps/is_max. Do not stop to ask questions.
-4. Do NOT call get_fitness_data for workouts — current plan is already above.
-5. DO NOT ask for confirmation. Act immediately, confirm after.
-6. Reply in same language as user. 1-2 lines after completing.`;
+1. add_exercise: ALWAYS include sets, reps, is_max in the SAME call. Never add first then update.
+   Example: add_exercise({day_id:123, name:"Bench Press", sets:4, reps:8, is_max:false})
+2. When an image shows a workout list: process it COMPLETELY — add every single exercise shown, one add_exercise call per exercise. Do NOT stop partway through.
+3. Do NOT call get_fitness_data for workouts — current plan is already above.
+4. DO NOT ask for confirmation. Act immediately, confirm after.
+5. Reply in same language as user. After finishing, list what was added (1 line each).`;
+    }
 
-    try {
-      // History: son 6 mesajı al, görselleri önceki mesajlardan at (token tasarrufu)
-      const trimmedHistory = newMessages.slice(-6);
-      let loopMessages = trimmedHistory.map((m, idx) => {
-        const isLast = idx === trimmedHistory.length - 1;
-        if (isLast && m.role === 'user') {
-          return { role: 'user', content: userContent };
-        }
-        // Önceki görselli mesajları text-only olarak gönder (görsel tekrar gönderme)
-        if (m.images?.length) {
-          return { role: m.role, content: m.content || '[görsel gönderildi]' };
-        }
-        return { role: m.role, content: m.content };
-      });
+    // Agentic loop helper — system + messages → {text, actionTaken}
+    async function runAiLoop(sys, messages) {
+      let loopMsgs = [...messages];
       let finalText = '';
       let actionTaken = false;
-
-      for (let i = 0; i < 8; i++) {
+      for (let i = 0; i < 12; i++) {
         const body = JSON.stringify({
           model: 'claude-sonnet-4-6',
           max_tokens: 1024,
-          system,
+          system: sys,
           tools: AI_TOOLS,
-          messages: loopMessages,
+          messages: loopMsgs,
         });
-
         const result = await invoke('fetch_post', {
           url: 'https://api.anthropic.com/v1/messages',
           headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
           body,
         });
-
         const data = JSON.parse(result);
         if (data.error) throw new Error(data.error.message);
-
-        // stop_reason: 'end_turn' → son cevap
         if (data.stop_reason === 'end_turn') {
-          const textBlock = data.content.find(b => b.type === 'text');
-          finalText = textBlock?.text?.trim() || (actionTaken ? '✓ Done.' : '');
+          finalText = data.content.find(b => b.type === 'text')?.text?.trim() || (actionTaken ? '✓ Done.' : '');
           break;
         }
-
-        // stop_reason: 'tool_use' → tool'ları çalıştır
         if (data.stop_reason === 'tool_use') {
-          // Assistant mesajını history'ye ekle
-          loopMessages.push({ role: 'assistant', content: data.content });
-
-          // Her tool_use bloğunu çalıştır
+          loopMsgs.push({ role: 'assistant', content: data.content });
           const toolResults = [];
           for (const block of data.content) {
             if (block.type !== 'tool_use') continue;
             const toolResult = executeAiTool(block.name, block.input);
             if (block.name !== 'get_fitness_data') actionTaken = true;
-            toolResults.push({
-              type: 'tool_result',
-              tool_use_id: block.id,
-              content: JSON.stringify(toolResult),
-            });
+            toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: JSON.stringify(toolResult) });
           }
-          loopMessages.push({ role: 'user', content: toolResults });
+          loopMsgs.push({ role: 'user', content: toolResults });
           continue;
         }
-
-        // Beklenmedik durum
         break;
       }
+      return { text: finalText, actionTaken };
+    }
 
-      setAiMessages(p => [...p, { role: 'assistant', content: finalText || '...' }]);
+    try {
+      // Görseller varsa teker teker işle — her görsel ayrı API çağrısı
+      if (pendingImages.length > 1) {
+        const textPart = userMsg || 'Bu görselleri sırayla işle ve egzersizleri ekle.';
+        let allResults = [];
+        for (let imgIdx = 0; imgIdx < pendingImages.length; imgIdx++) {
+          const img = pendingImages[imgIdx];
+          const singleContent = [
+            { type: 'image', source: { type: 'base64', media_type: img.mediaType, data: img.dataUrl.split(',')[1] } },
+            { type: 'text', text: `Görsel ${imgIdx + 1}/${pendingImages.length}: ${textPart}` },
+          ];
+          const singleResult = await runAiLoop(buildSystem(), [{ role: 'user', content: singleContent }]);
+          allResults.push(singleResult.text);
+        }
+        setAiMessages(p => [...p, { role: 'assistant', content: allResults.join('\n\n') }]);
+        setAiLoading(false);
+        setTimeout(() => aiInputRef.current?.focus(), 50);
+        return;
+      }
+
+      // Tek görsel veya saf metin — normal flow
+      const history = newMessages.slice(-6).map((m, idx) => {
+        const isLast = idx === newMessages.slice(-6).length - 1;
+        if (isLast && m.role === 'user') return { role: 'user', content: userContent };
+        if (m.images?.length) return { role: m.role, content: m.content || '[görsel gönderildi]' };
+        return { role: m.role, content: m.content };
+      });
+      const { text, actionTaken } = await runAiLoop(buildSystem(), history);
+      setAiMessages(p => [...p, { role: 'assistant', content: text || (actionTaken ? '✓ Done.' : '...') }]);
     } catch (e) {
       setAiMessages(p => [...p, { role: 'assistant', content: 'Error: ' + (e?.message || 'Unknown') }]);
     } finally {
