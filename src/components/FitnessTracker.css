@@ -1086,19 +1086,37 @@
 }
 
 .ft-workout-tab-name {
-  background: transparent;
-  border: none;
-  outline: none;
   font-size: 12px;
   font-weight: 600;
   color: var(--text-muted);
   font-family: inherit;
-  cursor: pointer;
-  min-width: 30px;
   max-width: 120px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* input reset when used as input */
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 0;
 }
 .ft-workout-tab--active .ft-workout-tab-name { color: var(--text-primary); }
-.ft-workout-tab-name:focus { cursor: text; }
+
+.ft-workout-tab-edit {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.1s;
+  flex-shrink: 0;
+}
+.ft-workout-tab:hover .ft-workout-tab-edit,
+.ft-workout-tab--active .ft-workout-tab-edit { opacity: 1; }
+.ft-workout-tab-edit:hover { color: var(--accent); }
 
 .ft-workout-tab-del {
   background: none;
@@ -1110,10 +1128,18 @@
   line-height: 1;
   opacity: 0;
   transition: opacity 0.1s;
+  flex-shrink: 0;
 }
 .ft-workout-tab:hover .ft-workout-tab-del,
 .ft-workout-tab--active .ft-workout-tab-del { opacity: 1; }
 .ft-workout-tab-del:hover { color: #f85149; }
+
+.ft-workout-tab-name--editing {
+  border-bottom: 1px solid var(--accent) !important;
+  color: var(--text-primary) !important;
+  cursor: text !important;
+  min-width: 60px;
+}
 
 .ft-workout-tab-add {
   background: none;
