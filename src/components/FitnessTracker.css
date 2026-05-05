@@ -1094,7 +1094,9 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  /* input reset when used as input */
+  user-select: none;
+  cursor: pointer;
+  /* input reset when used as input (.ft-workout-tab-name--editing) */
   background: transparent;
   border: none;
   outline: none;
