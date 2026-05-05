@@ -10,7 +10,7 @@
   min-width: 0;
   min-height: 0;
   height: 100%;
-  border: 1px solid #1e1e1e;
+  border: 1px solid #141414;
   box-sizing: border-box;
 }
 
@@ -20,7 +20,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 8px 10px 8px 14px;
-  border-bottom: 1px solid #1e1e1e;
+  border-bottom: 1px solid #141414;
   flex-shrink: 0;
   margin-bottom: 0;
 }
@@ -54,7 +54,7 @@
 }
 
 .cc-count {
-  background: #1a1a1a;
+  background: #111111;
   color: #444;
   font-size: 11px;
   padding: 2px 7px;
@@ -73,7 +73,7 @@
 .cc-progress-bar {
   flex: 1;
   height: 3px;
-  background: #1a1a1a;
+  background: #111111;
   border-radius: 2px;
   overflow: hidden;
 }
@@ -113,7 +113,7 @@
 }
 
 .cc-items::-webkit-scrollbar-thumb {
-  background: #1e1e1e;
+  background: #141414;
   border-radius: 2px;
 }
 
@@ -330,7 +330,7 @@
 
 .cc-subtask-badge {
   font-size: 10px;
-  background: #1a1a1a;
+  background: #111111;
   color: #444;
   padding: 2px 6px;
   border-radius: 4px;
@@ -559,7 +559,7 @@
 .cc-add-row {
   padding: 8px 0;
   margin-bottom: 12px;
-  border-bottom: 1px solid #1a1a1a;
+  border-bottom: 1px solid #111111;
 }
 
 /* Date Picker */
@@ -575,7 +575,7 @@
 
 .cc-date-toggle-btn {
   background: none;
-  border: 1px solid #1a1a1a;
+  border: 1px solid #111111;
   border-radius: 4px;
   padding: 6px 8px;
   cursor: pointer;
@@ -599,7 +599,7 @@
 
 .cc-date-input {
   background: #080808;
-  border: 1px solid #1e1e1e;
+  border: 1px solid #141414;
   border-radius: 4px;
   padding: 6px 10px;
   color: #888;
@@ -654,7 +654,7 @@
 
 .cc-quick-date-btn {
   background: #111;
-  border: 1px solid #1e1e1e;
+  border: 1px solid #141414;
   border-radius: 4px;
   padding: 4px 10px;
   color: #555;
@@ -671,7 +671,7 @@
 }
 
 .cc-quick-date-btn.active {
-  background: #1a1a1a;
+  background: #111111;
   border-color: #333;
   color: #888;
 }

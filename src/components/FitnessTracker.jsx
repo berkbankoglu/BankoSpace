@@ -738,30 +738,31 @@ function useResizeV(initialPx, min, max, storageKey) {
 }
 
 // Resize handle hook
-function useResize(initialPx, min, max, storageKey) {
+function useResize(initialPx, min, max, storageKey, inverted = false) {
   const stored = storageKey ? (() => { try { const v = localStorage.getItem(storageKey); return v ? Math.min(max, Math.max(min, Number(v))) : initialPx; } catch { return initialPx; } })() : initialPx;
   const [size, setSize] = useState(stored);
-  const dragging = useRef(false);
-  const startX = useRef(0);
-  const startSize = useRef(stored);
+  const state = useRef({ dragging: false, startX: 0, startSize: stored, inverted });
+  state.current.inverted = inverted;
 
   const onMouseDown = (e) => {
-    dragging.current = true;
-    startX.current = e.clientX;
-    startSize.current = size;
+    state.current.dragging = true;
+    state.current.startX = e.clientX;
+    state.current.startSize = size;
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
   };
 
   useEffect(() => {
     const onMove = (e) => {
-      if (!dragging.current) return;
-      const next = Math.min(max, Math.max(min, startSize.current + (e.clientX - startX.current)));
+      if (!state.current.dragging) return;
+      const raw = e.clientX - state.current.startX;
+      const delta = state.current.inverted ? -raw : raw;
+      const next = Math.min(max, Math.max(min, state.current.startSize + delta));
       setSize(next);
     };
     const onUp = () => {
-      if (!dragging.current) return;
-      dragging.current = false;
+      if (!state.current.dragging) return;
+      state.current.dragging = false;
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
       if (storageKey) {
@@ -875,9 +876,11 @@ export default function FitnessTracker() {
 
   // Resize handles: panel dividers
   const [w0, onDown0] = useResize(500, 140, 500, 'ft_panel_w0_v5');
-  const [w1, onDown1] = useResize(280, 160, 800, 'ft_panel_w1_v4');
+  const [w1, onDown1] = useResize(280, 160, 800, 'ft_panel_w1_v4', true);
   // Menü sidebar iç resize
   const [menuSideW, onMenuSideDown] = useResize(160, 70, 320, 'ft_panel_menu_side_v3');
+  // Antrenman tab sidebar iç resize
+  const [workoutSideW, onWorkoutSideDown] = useResize(170, 100, 320, 'ft_panel_workout_side_v1');
   // Menü ↕ Antrenman dikey resize
   const [menuH, onMenuVDown] = useResizeV(460, 120, 900, 'ft_panel_menu_h_v3');
   // Weight ↕ AI dikey resize
@@ -1499,27 +1502,83 @@ TOOL RULES — FOLLOW EXACTLY:
       return { text: finalText, actionTaken };
     }
 
+    // Görsel varsa: Aşama 1 — parse (JSON), Aşama 2 — gün gün ekle
+    async function parseWorkoutImages(images) {
+      const imageBlocks = images.map(img => ({
+        type: 'image',
+        source: { type: 'base64', media_type: img.mediaType, data: img.dataUrl.split(',')[1] },
+      }));
+      const parsePrompt = `Bu görsellerde antrenman planı var. Tüm günleri ve egzersizleri tam olarak çıkar.
+
+SADECE şu JSON formatında yanıt ver, başka hiçbir şey yazma:
+{
+  "days": [
+    {
+      "name": "gün adı (ör: SIRA 1, Push Day, Göğüs Günü...)",
+      "exercises": [
+        { "name": "egzersiz adı", "sets": 3, "reps": 10, "is_max": false }
+      ]
+    }
+  ]
+}
+
+Kurallar:
+- is_max: egzersiz "max" veya "AMRAP" veya tekrar sayısı belirsizse true, yoksa false
+- sets ve reps her zaman sayı olsun
+- Görseldeki TÜM günleri ve TÜM egzersizleri ekle, hiçbirini atlama`;
+
+      const body = JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 2048,
+        messages: [{ role: 'user', content: [...imageBlocks, { type: 'text', text: parsePrompt }] }],
+      });
+      const result = await invoke('fetch_post', {
+        url: 'https://api.anthropic.com/v1/messages',
+        headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+        body,
+      });
+      const data = JSON.parse(result);
+      if (data.error) throw new Error(data.error.message);
+      const raw = data.content.find(b => b.type === 'text')?.text || '';
+      // JSON bloğunu çıkar
+      const match = raw.match(/\{[\s\S]*\}/);
+      if (!match) throw new Error('Görsel parse edilemedi: ' + raw.slice(0, 200));
+      return JSON.parse(match[0]);
+    }
+
     try {
-      // Görseller varsa teker teker işle — her görsel ayrı API çağrısı
-      if (pendingImages.length > 1) {
-        const textPart = userMsg || 'Bu görselleri sırayla işle ve egzersizleri ekle.';
-        let allResults = [];
-        for (let imgIdx = 0; imgIdx < pendingImages.length; imgIdx++) {
-          const img = pendingImages[imgIdx];
-          const singleContent = [
-            { type: 'image', source: { type: 'base64', media_type: img.mediaType, data: img.dataUrl.split(',')[1] } },
-            { type: 'text', text: `Görsel ${imgIdx + 1}/${pendingImages.length}: ${textPart}` },
-          ];
-          const singleResult = await runAiLoop(buildSystem(), [{ role: 'user', content: singleContent }]);
-          allResults.push(singleResult.text);
-        }
-        setAiMessages(p => [...p, { role: 'assistant', content: allResults.join('\n\n') }]);
+      if (pendingImages.length > 0) {
+        // Aşama 1: Görselleri parse et
+        const parsed = await parseWorkoutImages(pendingImages);
+        const days = parsed.days || [];
+        if (days.length === 0) throw new Error('Görselde antrenman planı bulunamadı.');
+
+        // Aşama 2: Tüm günleri tek seferde state'e ekle (setWorkouts batching sorunundan kaçın)
+        const newDays = days.map(day => {
+          const dayId = Date.now() + Math.floor(Math.random() * 1e6);
+          const exercises = (day.exercises || []).map(ex => ({
+            id: Date.now() + Math.floor(Math.random() * 1e6),
+            name: (ex.name || 'Exercise').trim(),
+            label: '',
+            sets: Number(ex.sets) || 3,
+            reps: Number(ex.reps) || 10,
+            isMax: ex.is_max === true,
+          }));
+          return { id: dayId, name: (day.name || 'Gün').trim(), exercises };
+        });
+        setWorkouts(prev => [...prev, ...newDays]);
+        if (newDays.length > 0) setExpandedDay(newDays[newDays.length - 1].id);
+        playAddSound();
+        const results = newDays.map(d =>
+          `**${d.name}**: ${d.exercises.map(e => `${e.name} ${e.sets}×${e.isMax ? 'MAX' : e.reps}`).join(', ')}`
+        );
+        setAiMessages(p => [...p, { role: 'assistant', content: results.join('\n') }]);
         setAiLoading(false);
         setTimeout(() => aiInputRef.current?.focus(), 50);
         return;
       }
 
-      // Tek görsel veya saf metin — normal flow
+      // Saf metin — normal agentic flow
       const history = newMessages.slice(-6).map((m, idx) => {
         const isLast = idx === newMessages.slice(-6).length - 1;
         if (isLast && m.role === 'user') return { role: 'user', content: userContent };
@@ -1529,7 +1588,7 @@ TOOL RULES — FOLLOW EXACTLY:
       const { text, actionTaken } = await runAiLoop(buildSystem(), history);
       setAiMessages(p => [...p, { role: 'assistant', content: text || (actionTaken ? '✓ Done.' : '...') }]);
     } catch (e) {
-      setAiMessages(p => [...p, { role: 'assistant', content: 'Error: ' + (e?.message || 'Unknown') }]);
+      setAiMessages(p => [...p, { role: 'assistant', content: 'Hata: ' + (e?.message || 'Unknown') }]);
     } finally {
       setAiLoading(false);
       setTimeout(() => aiInputRef.current?.focus(), 50);
@@ -2563,7 +2622,7 @@ TOOL RULES — FOLLOW EXACTLY:
               return (
                 <div className="ft-card ft-workout-card">
                   {/* Tab bar */}
-                  <div className="ft-workout-tabs">
+                  <div className="ft-workout-tabs" style={{ width: workoutSideW, minWidth: workoutSideW }}>
                     {workouts.map(day => {
                       const isActive = activeDay?.id === day.id;
                       const isRenaming = renamingDay === day.id;
@@ -2603,6 +2662,9 @@ TOOL RULES — FOLLOW EXACTLY:
                     })}
                     <button className="ft-workout-tab-add" onClick={() => addDay(`Gün ${workouts.length + 1}`)} title="Gün ekle">+</button>
                   </div>
+
+                  {/* Resize handle */}
+                  <div className="ft-resize-handle ft-resize-handle-inner" onMouseDown={onWorkoutSideDown} />
 
                   {/* İçerik */}
                   <div className="ft-workout-content">
