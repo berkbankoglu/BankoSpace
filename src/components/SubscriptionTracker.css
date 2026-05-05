@@ -53,16 +53,16 @@
 .sub-section-total {
   font-size: 10px;
   color: var(--text-muted);
-  background: var(--bg-elevated);
+  background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: 1px 6px;
 }
 
 /* ── Category item tones ── */
-.sub-item--monthly-auto   { background: var(--bg-elevated); }
+.sub-item--monthly-auto   { background: var(--bg-card); }
 .sub-item--monthly-auto:hover { background: var(--bg-hover); }
-.sub-item--monthly-manual { background: var(--bg-elevated); }
+.sub-item--monthly-manual { background: var(--bg-card); }
 .sub-item--monthly-manual:hover { background: var(--bg-hover); }
 
 .sub-item-icon {
@@ -84,7 +84,7 @@
 }
 
 .sub-cat-btn {
-  background: var(--bg-elevated);
+  background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
@@ -147,7 +147,7 @@
   font-size: 11px;
   color: var(--text-muted);
   border-bottom: 1px solid var(--border);
-  background: var(--bg-elevated);
+  background: var(--bg-card);
 }
 .sub-total-amount {
   font-weight: 600;
@@ -170,14 +170,14 @@
 .sub-monthly-total {
   font-size: 10px;
   color: var(--text-muted);
-  background: var(--bg-elevated);
+  background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: 1px 6px;
 }
 
 .sub-add-btn {
-  background: var(--bg-elevated);
+  background: var(--bg-card);
   border: none;
   color: var(--text-secondary);
   border-radius: 10px;
@@ -219,7 +219,7 @@
   gap: 10px;
   padding: 10px 12px;
   margin: 0 8px 6px;
-  background: var(--bg-elevated);
+  background: var(--bg-card);
   border: 1px solid var(--border);
   animation: fadeSlideUp 0.6s ease both;
   border-left: 3px solid transparent;
@@ -260,7 +260,7 @@
 
 /* Auto payment — neutral tone */
 .sub-item--auto {
-  background: var(--bg-elevated);
+  background: var(--bg-card);
 }
 .sub-item--auto:hover { background: var(--bg-hover); }
 
@@ -420,7 +420,7 @@
 }
 .sub-kind-btn {
   flex: 1;
-  background: var(--bg-elevated);
+  background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
@@ -549,7 +549,7 @@
   width: 36px;
   height: 20px;
   border-radius: 10px;
-  background: var(--bg-elevated);
+  background: var(--bg-card);
   border: 1px solid var(--border);
   position: relative;
   transition: background 0.2s, border-color 0.2s;
@@ -598,7 +598,7 @@
 
 .sub-cancel-btn {
   flex: 1;
-  background: var(--bg-elevated);
+  background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
@@ -622,7 +622,7 @@
 }
 .sub-type-btn {
   flex: 1;
-  background: var(--bg-elevated);
+  background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
