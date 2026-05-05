@@ -826,17 +826,23 @@ export default function FitnessTracker() {
   const mealsRef = useRef(meals);                     // always-current meals for AI tools
   const mealDateRef = useRef(mealDate);
 
-  // Antrenman planı: statik liste [ { id, name, label, sets:[{id,reps,isMax}] } ]
+  // Antrenman planı: günler [ { id, name, exercises:[{id,name,label,sets:[{id,reps,isMax}]}] } ]
   const [workouts, setWorkouts] = useState(() => {
     const saved = load('ft_workouts', null);
-    // Eski format ({ [date]: [...] }) → yeni format ([...])
+    // Eski flat array [ {id,name,sets,...} ] → günlere taşı
+    if (saved && Array.isArray(saved) && saved.length > 0 && !saved[0]?.exercises) {
+      return [{ id: Date.now(), name: 'Gün 1', exercises: saved }];
+    }
+    // Eski {date:[...]} format
     if (saved && !Array.isArray(saved)) {
       const allExs = Object.values(saved).flat();
-      return allExs.length > 0 ? allExs : [];
+      return allExs.length > 0 ? [{ id: Date.now(), name: 'Gün 1', exercises: allExs }] : [];
     }
     return saved || [];
   });
+  const [expandedDay, setExpandedDay] = useState(null);
   const [newExName, setNewExName] = useState('');
+  const [newDayName, setNewDayName] = useState('');
 
   // Arama
   const [searchQ, setSearchQ] = useState('');
@@ -1230,7 +1236,7 @@ export default function FitnessTracker() {
         }
         if (inc.includes('workouts')) {
           const snap = JSON.parse(localStorage.getItem('ft_workouts') || '[]');
-          result.workouts = { exercises: Array.isArray(snap) ? snap : [] };
+          result.workouts = { days: Array.isArray(snap) ? snap : [] };
         }
         return result;
       }
@@ -1306,26 +1312,33 @@ export default function FitnessTracker() {
       }
       case 'get_workout_data': {
         const snapshot = JSON.parse(localStorage.getItem('ft_workouts') || '[]');
-        return { exercises: Array.isArray(snapshot) ? snapshot : [] };
+        return { days: Array.isArray(snapshot) ? snapshot : [] };
       }
       case 'add_exercise': {
-        const ex = { id: Date.now(), name: (input.name || 'Exercise').trim(), label: '', sets: [] };
+        const dayId = input.day_id || workouts[0]?.id;
+        if (!dayId) return { success: false, message: 'No workout day found. Create a day first.' };
+        const exId = addExercise(dayId, input.name || 'Exercise');
         if (input.sets?.length) {
-          ex.sets = input.sets.map((s, i) => ({ id: Date.now() + i + Math.random(), reps: Number(s.reps) || 0, isMax: false }));
+          input.sets.forEach((s, i) => { setTimeout(() => addSet(dayId, exId, s.reps), i * 5); });
         }
-        setWorkouts(prev => [...prev, ex]);
-        return { success: true, exercise_id: ex.id, message: `Added exercise "${ex.name}" with ${ex.sets.length} sets.` };
+        return { success: true, exercise_id: exId, message: `Added exercise "${input.name}".` };
       }
       case 'add_set': {
-        addSet(input.exercise_id, input.reps);
+        const dayId = input.day_id || workouts[0]?.id;
+        if (!dayId) return { success: false, message: 'No workout day found.' };
+        addSet(dayId, input.exercise_id, input.reps);
         return { success: true, message: `Added set: ${input.reps} reps` };
       }
       case 'remove_exercise': {
-        removeExercise(input.exercise_id);
+        const dayId = input.day_id || workouts.find(d => d.exercises?.some(e => e.id === input.exercise_id))?.id;
+        if (!dayId) return { success: false, message: 'Exercise not found.' };
+        removeExercise(dayId, input.exercise_id);
         return { success: true, message: 'Exercise removed.' };
       }
       case 'update_set': {
-        updateSet(input.exercise_id, input.set_id, input.reps, false);
+        const dayId = input.day_id || workouts.find(d => d.exercises?.some(e => e.id === input.exercise_id))?.id;
+        if (!dayId) return { success: false, message: 'Exercise not found.' };
+        updateSet(dayId, input.exercise_id, input.set_id, input.reps, false);
         return { success: true, message: `Set updated: ${input.reps} reps` };
       }
       default:
@@ -1635,37 +1648,65 @@ Rules:
   }
 
   // ── Antrenman CRUD ──
-  function addExercise(name) {
+  function addDay(name) {
+    playAddSound();
+    const day = { id: Date.now(), name: name.trim() || `Gün ${workouts.length + 1}`, exercises: [] };
+    setWorkouts(prev => [...prev, day]);
+    setExpandedDay(day.id);
+    return day.id;
+  }
+
+  function removeDay(dayId) {
+    playDeleteSound();
+    setWorkouts(prev => prev.filter(d => d.id !== dayId));
+    setExpandedDay(prev => prev === dayId ? null : prev);
+  }
+
+  function renamDay(dayId, name) {
+    setWorkouts(prev => prev.map(d => d.id === dayId ? { ...d, name } : d));
+  }
+
+  function addExercise(dayId, name) {
     playAddSound();
     const ex = { id: Date.now(), name: name.trim() || 'Exercise', label: '', sets: [] };
-    setWorkouts(prev => [...prev, ex]);
+    setWorkouts(prev => prev.map(d => d.id === dayId ? { ...d, exercises: [...d.exercises, ex] } : d));
     return ex.id;
   }
 
-  function removeExercise(exId) {
+  function removeExercise(dayId, exId) {
     playDeleteSound();
-    setWorkouts(prev => prev.filter(e => e.id !== exId));
+    setWorkouts(prev => prev.map(d => d.id === dayId ? { ...d, exercises: d.exercises.filter(e => e.id !== exId) } : d));
   }
 
-  function addSet(exId, reps) {
+  function addSet(dayId, exId, reps) {
     playClickSound();
     const setEntry = { id: Date.now() + Math.random(), reps: Number(reps) || 10, isMax: false };
-    setWorkouts(prev => prev.map(e => e.id === exId ? { ...e, sets: [...e.sets, setEntry] } : e));
+    setWorkouts(prev => prev.map(d => d.id === dayId
+      ? { ...d, exercises: d.exercises.map(e => e.id === exId ? { ...e, sets: [...e.sets, setEntry] } : e) }
+      : d));
   }
 
-  function removeSet(exId, setId) {
+  function removeSet(dayId, exId, setId) {
     playDeleteSound();
-    setWorkouts(prev => prev.map(e => e.id === exId ? { ...e, sets: e.sets.filter(s => s.id !== setId) } : e));
+    setWorkouts(prev => prev.map(d => d.id === dayId
+      ? { ...d, exercises: d.exercises.map(e => e.id === exId ? { ...e, sets: e.sets.filter(s => s.id !== setId) } : e) }
+      : d));
   }
 
-  function updateSet(exId, setId, reps, isMax) {
-    setWorkouts(prev => prev.map(e => e.id === exId
-      ? { ...e, sets: e.sets.map(s => s.id === setId ? { ...s, reps: isMax !== undefined ? s.reps : Number(reps), isMax: isMax !== undefined ? isMax : s.isMax } : s) }
-      : e));
+  function updateSet(dayId, exId, setId, reps, isMax) {
+    setWorkouts(prev => prev.map(d => d.id === dayId
+      ? { ...d, exercises: d.exercises.map(e => e.id === exId
+          ? { ...e, sets: e.sets.map(s => s.id === setId
+              ? { ...s, reps: isMax !== undefined ? s.reps : Number(reps), isMax: isMax !== undefined ? isMax : s.isMax }
+              : s) }
+          : e) }
+      : d));
   }
 
-  function updateExerciseLabel(exId, label) {
-    setWorkouts(prev => prev.map(e => e.id === exId ? { ...e, label } : e));
+  function updateExerciseLabel(dayId, exId, label) {
+    setWorkouts(prev => prev.map(d => d.id === dayId
+      ? { ...d, exercises: d.exercises.map(e => e.id === exId ? { ...e, label } : e) }
+      : d));
   }
 
   function saveProfile() {
@@ -2404,7 +2445,7 @@ Rules:
             {/* Dikey resize handle: menü ↕ antrenman */}
             <div className="ft-resize-handle-v" onMouseDown={onMenuVDown} />
 
-            {/* ── Antrenman Planı (statik) ── */}
+            {/* ── Antrenman Planı (günler) ── */}
             <div className="ft-card ft-workout-card">
               <div className="ft-card-header">
                 <div className="ft-card-label">Workout</div>
@@ -2414,58 +2455,100 @@ Rules:
                 <input
                   className="ft-input"
                   style={{ flex: 1, fontSize: 12, padding: '5px 8px' }}
-                  placeholder="Egzersiz adı..."
-                  value={newExName}
-                  onChange={e => setNewExName(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && newExName.trim()) { addExercise(newExName); setNewExName(''); } }}
+                  placeholder="Gün adı (ör. Göğüs Günü, Push Day...)"
+                  value={newDayName}
+                  onChange={e => setNewDayName(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { addDay(newDayName || `Gün ${workouts.length + 1}`); setNewDayName(''); } }}
                 />
-                <button className="ft-btn-sm" style={{ padding: '5px 10px' }} onClick={() => { if (newExName.trim()) { addExercise(newExName); setNewExName(''); } }}>+</button>
+                <button className="ft-btn-sm" style={{ padding: '5px 10px' }} onClick={() => { addDay(newDayName || `Gün ${workouts.length + 1}`); setNewDayName(''); }}>+</button>
               </div>
 
-              {workouts.length === 0 && <div className="ft-empty">Egzersiz ekle veya AI'dan iste</div>}
+              {workouts.length === 0 && <div className="ft-empty">Gün ekle veya AI'dan iste</div>}
 
               <div className="ft-workout-list">
-                {workouts.map(ex => (
-                  <div key={ex.id} className="ft-workout-ex">
-                    <input
-                      className="ft-workout-label-input"
-                      placeholder="Başlık (ör. Antrenman 1, Göğüs Günü...)"
-                      value={ex.label || ''}
-                      onChange={e => updateExerciseLabel(ex.id, e.target.value)}
-                    />
-                    <div className="ft-workout-ex-header">
-                      <span className="ft-workout-ex-name">{ex.name}</span>
-                      <span className="ft-workout-ex-vol">{ex.sets.length > 0 && `${ex.sets.length} set`}</span>
-                      <button className="ft-del-btn" onClick={() => removeExercise(ex.id)}>×</button>
-                    </div>
-                    <div className="ft-workout-sets">
-                      {ex.sets.map((s, si) => (
-                        <div key={s.id} className="ft-workout-set-row">
-                          <span className="ft-workout-set-num">{si + 1}</span>
-                          {s.isMax ? (
-                            <span className="ft-workout-max-badge">MAX</span>
-                          ) : (
+                {workouts.map(day => {
+                  const isOpen = expandedDay === day.id;
+                  const totalSets = day.exercises.reduce((s, e) => s + e.sets.length, 0);
+                  return (
+                    <div key={day.id} className={`ft-workout-day${isOpen ? ' ft-workout-day--open' : ''}`}>
+                      {/* Gün header — tıklanınca expand */}
+                      <div className="ft-workout-day-header" onClick={() => setExpandedDay(isOpen ? null : day.id)}>
+                        <span className="ft-workout-day-arrow">{isOpen ? '▾' : '▸'}</span>
+                        <input
+                          className="ft-workout-day-name"
+                          value={day.name}
+                          onClick={e => e.stopPropagation()}
+                          onChange={e => renamDay(day.id, e.target.value)}
+                        />
+                        <span className="ft-workout-day-meta">
+                          {day.exercises.length > 0 && `${day.exercises.length} egz · ${totalSets} set`}
+                        </span>
+                        <button className="ft-del-btn" onClick={e => { e.stopPropagation(); removeDay(day.id); }}>×</button>
+                      </div>
+
+                      {/* Expand — egzersizler */}
+                      {isOpen && (
+                        <div className="ft-workout-day-body">
+                          <div className="ft-workout-ex-add-row">
                             <input
-                              className="ft-input ft-qty-input"
-                              type="number" min="1" placeholder="tekrar"
-                              value={s.reps}
-                              onChange={e => updateSet(ex.id, s.id, e.target.value, undefined)}
+                              className="ft-input"
+                              style={{ flex: 1, fontSize: 11, padding: '4px 7px' }}
+                              placeholder="Egzersiz ekle..."
+                              value={newExName}
+                              onChange={e => setNewExName(e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Enter' && newExName.trim()) { addExercise(day.id, newExName); setNewExName(''); } }}
                             />
-                          )}
-                          <button
-                            className={`ft-workout-max-btn${s.isMax ? ' active' : ''}`}
-                            onClick={() => updateSet(ex.id, s.id, s.reps, !s.isMax)}
-                          >max</button>
-                          <button className="ft-del-btn" onClick={() => removeSet(ex.id, s.id)}>×</button>
+                            <button className="ft-btn-sm" style={{ padding: '4px 9px', fontSize: 13 }} onClick={() => { if (newExName.trim()) { addExercise(day.id, newExName); setNewExName(''); } }}>+</button>
+                          </div>
+                          {day.exercises.length === 0 && <div className="ft-empty" style={{ fontSize: 11, padding: '6px 0' }}>Egzersiz yok</div>}
+                          <div className="ft-workout-list">
+                            {day.exercises.map(ex => (
+                              <div key={ex.id} className="ft-workout-ex">
+                                <input
+                                  className="ft-workout-label-input"
+                                  placeholder="Başlık..."
+                                  value={ex.label || ''}
+                                  onChange={e => updateExerciseLabel(day.id, ex.id, e.target.value)}
+                                />
+                                <div className="ft-workout-ex-header">
+                                  <span className="ft-workout-ex-name">{ex.name}</span>
+                                  <span className="ft-workout-ex-vol">{ex.sets.length > 0 && `${ex.sets.length} set`}</span>
+                                  <button className="ft-del-btn" onClick={() => removeExercise(day.id, ex.id)}>×</button>
+                                </div>
+                                <div className="ft-workout-sets">
+                                  {ex.sets.map((s, si) => (
+                                    <div key={s.id} className="ft-workout-set-row">
+                                      <span className="ft-workout-set-num">{si + 1}</span>
+                                      {s.isMax ? (
+                                        <span className="ft-workout-max-badge">MAX</span>
+                                      ) : (
+                                        <input
+                                          className="ft-input ft-qty-input"
+                                          type="number" min="1" placeholder="tekrar"
+                                          value={s.reps}
+                                          onChange={e => updateSet(day.id, ex.id, s.id, e.target.value, undefined)}
+                                        />
+                                      )}
+                                      <button
+                                        className={`ft-workout-max-btn${s.isMax ? ' active' : ''}`}
+                                        onClick={() => updateSet(day.id, ex.id, s.id, s.reps, !s.isMax)}
+                                      >max</button>
+                                      <button className="ft-del-btn" onClick={() => removeSet(day.id, ex.id, s.id)}>×</button>
+                                    </div>
+                                  ))}
+                                  <button
+                                    className="ft-btn-ghost ft-workout-add-set"
+                                    onClick={() => { const last = ex.sets[ex.sets.length - 1]; addSet(day.id, ex.id, last?.reps || 10); }}
+                                  >+ Set ekle</button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      ))}
-                      <button
-                        className="ft-btn-ghost ft-workout-add-set"
-                        onClick={() => { const last = ex.sets[ex.sets.length - 1]; addSet(ex.id, last?.reps || 10); }}
-                      >+ Set ekle</button>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>

@@ -980,106 +980,188 @@
   gap: 6px;
   padding: 0 0 8px;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
+/* Gün listesi: grid */
 .ft-workout-list {
   flex: 1;
   overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+  align-content: start;
 }
 
+/* Açık gün için liste tam genişlik */
+.ft-workout-day--open > .ft-workout-day-body .ft-workout-list {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+
+/* Gün kartı */
+.ft-workout-day {
+  background: #2d333b;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+.ft-workout-day--open {
+  grid-column: 1 / -1;
+  border-color: var(--accent);
+}
+
+.ft-workout-day-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  cursor: pointer;
+  user-select: none;
+}
+.ft-workout-day-header:hover { background: rgba(255,255,255,0.03); }
+
+.ft-workout-day-arrow {
+  font-size: 10px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  width: 10px;
+}
+
+.ft-workout-day-name {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: inherit;
+  cursor: pointer;
+  min-width: 0;
+}
+.ft-workout-day-name:focus {
+  cursor: text;
+  border-bottom: 1px solid var(--border-hover);
+}
+
+.ft-workout-day-meta {
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ft-workout-day-body {
+  padding: 0 10px 10px;
+  border-top: 1px solid var(--border);
+}
+
+.ft-workout-ex-add-row {
+  display: flex;
+  gap: 6px;
+  padding: 8px 0 8px;
+}
+
+/* Egzersiz kartı */
 .ft-workout-ex {
-  background: var(--bg-base);
+  background: #22272e;
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
 }
 
 .ft-workout-label-input {
   width: 100%;
   background: transparent;
   border: none;
-  border-bottom: 1px dashed var(--border);
+  border-bottom: 1px dashed transparent;
   color: var(--accent);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   font-family: inherit;
-  padding: 2px 0 4px;
-  margin-bottom: 6px;
+  padding: 0 0 2px;
+  margin-bottom: 4px;
   outline: none;
   box-sizing: border-box;
   letter-spacing: 0.5px;
 }
 .ft-workout-label-input::placeholder { color: var(--border-hover); font-weight: 400; }
 .ft-workout-label-input:focus { border-bottom-color: var(--accent); }
-.ft-workout-label-input:placeholder-shown { border-bottom-color: transparent; }
-.ft-workout-label-input:focus:placeholder-shown { border-bottom-color: var(--border); }
+.ft-workout-label-input:not(:placeholder-shown) { border-bottom-color: transparent; }
 
 .ft-workout-ex-header {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   margin-bottom: 6px;
 }
 
 .ft-workout-ex-name {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--text-primary);
   flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .ft-workout-ex-vol {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--accent);
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .ft-workout-sets {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
+  flex: 1;
 }
 
 .ft-workout-set-row {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
 }
 
 .ft-workout-set-num {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-muted);
-  width: 14px;
+  width: 12px;
   text-align: right;
   flex-shrink: 0;
 }
 
 .ft-workout-set-row .ft-qty-input {
-  width: 56px !important;
+  flex: 1;
+  min-width: 0;
   text-align: center;
+  font-size: 12px !important;
+  padding: 3px 4px !important;
 }
 
 .ft-workout-max-badge {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   color: #f85149;
   background: rgba(248,81,73,0.15);
   border: 1px solid #f85149;
   border-radius: 4px;
-  padding: 1px 8px;
-  min-width: 56px;
+  padding: 2px 0;
+  flex: 1;
   text-align: center;
 }
 
 .ft-workout-max-btn {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 600;
   font-family: inherit;
-  padding: 2px 6px;
+  padding: 2px 5px;
   border-radius: 4px;
   border: 1px solid var(--border-hover);
   background: transparent;
@@ -1092,10 +1174,11 @@
 .ft-workout-max-btn.active { background: rgba(248,81,73,0.15); border-color: #f85149; color: #f85149; }
 
 .ft-workout-add-set {
-  margin-top: 4px;
+  margin-top: 5px;
   font-size: 11px;
-  padding: 3px 8px;
-  align-self: flex-start;
+  padding: 3px 0;
+  align-self: stretch;
+  text-align: center;
   color: var(--text-muted);
 }
 
