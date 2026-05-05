@@ -824,6 +824,7 @@ export default function FitnessTracker() {
   const [copiedMenu, setCopiedMenu] = useState(null); // kopyalanan menü
   const mealsHistory = useRef([]);                    // undo stack
   const mealsRef = useRef(meals);                     // always-current meals for AI tools
+  const workoutsRef = useRef(workouts);               // always-current workouts for AI tools
   const mealDateRef = useRef(mealDate);
 
   // Antrenman planı: günler [ { id, name, exercises:[{id,name,label,sets,reps,isMax}] } ]
@@ -908,7 +909,7 @@ export default function FitnessTracker() {
       return added.length > 0 ? [...prev, ...added] : prev;
     });
   }, [meals, mealDate]);
-  useEffect(() => { if (Array.isArray(workouts)) save('ft_workouts', workouts); }, [workouts]);
+  useEffect(() => { if (Array.isArray(workouts)) { workoutsRef.current = workouts; save('ft_workouts', workouts); } }, [workouts]);
 
   // meals'i history'ye kaydederek güncelle
   function updateMeals(updater) {
@@ -1328,18 +1329,26 @@ export default function FitnessTracker() {
         if (input.reps != null) patch.reps = Number(input.reps);
         if (input.is_max != null) patch.isMax = input.is_max;
         if (Object.keys(patch).length) updateExercise(dayId, exId, patch);
-        return { success: true, exercise_id: exId, message: `Added "${input.name}" to day ${dayId} — ${input.sets || 3}×${input.is_max ? 'MAX' : (input.reps || 10)}.` };
+        // Return updated day so AI knows the new exercise_id for any follow-up update
+        const updatedDay = workouts.find(d => d.id === dayId);
+        return {
+          success: true,
+          exercise_id: exId,
+          message: `Added "${input.name}" — ${input.sets || 3}×${input.is_max ? 'MAX' : (input.reps || 10)}.`,
+          day_exercises: updatedDay?.exercises.map(e => ({ id: e.id, name: e.name })) || [],
+        };
       }
       case 'update_exercise': {
-        const dayId = input.day_id || workouts.find(d => d.exercises?.some(e => e.id === input.exercise_id))?.id;
-        if (!dayId) return { success: false, message: 'Exercise not found. Call get_fitness_data with workouts first.' };
+        const currentWorkouts = workoutsRef.current;
+        const dayId = input.day_id || currentWorkouts.find(d => d.exercises?.some(e => e.id === input.exercise_id))?.id;
+        if (!dayId) return { success: false, message: `Exercise ${input.exercise_id} not found. Current IDs: ${JSON.stringify(currentWorkouts.map(d => ({ day_id: d.id, day: d.name, exercises: d.exercises.map(e => ({ id: e.id, name: e.name })) })))}` };
         const patch = {};
         if (input.name != null) patch.name = input.name;
         if (input.sets != null) patch.sets = Number(input.sets);
         if (input.reps != null) patch.reps = Number(input.reps);
         if (input.is_max != null) patch.isMax = input.is_max;
         updateExercise(dayId, input.exercise_id, patch);
-        return { success: true, message: `Updated exercise ${input.exercise_id}.` };
+        return { success: true, message: `Updated "${input.name || input.exercise_id}": ${input.sets}×${input.is_max ? 'MAX' : input.reps}.` };
       }
       case 'remove_exercise': {
         const dayId = input.day_id || workouts.find(d => d.exercises?.some(e => e.id === input.exercise_id))?.id;
@@ -1433,19 +1442,15 @@ USER: gender=${profile.gender||'?'}, age=${profile.age||'?'}, weight=${profile.w
 CURRENT WORKOUT PLAN (use these IDs for tool calls):
 ${workoutSnap.length ? JSON.stringify(workoutSnap) : 'No workout days yet.'}
 
-WORKOUT DATA STRUCTURE: Each exercise has {id, name, sets:number, reps:number, isMax:boolean}.
-- add_exercise: requires day_id from the plan above, plus name/sets/reps/is_max
-- update_exercise: requires exercise_id (from plan above) and fields to change
-- remove_exercise: requires exercise_id
-- add_workout_day: creates a new day with a name
+WORKOUT DATA STRUCTURE: Each exercise: {id, name, sets:number, reps:number, isMax:boolean}.
 
-RULES:
-- Workout data is already in the system prompt — do NOT call get_fitness_data for workouts unless you need meals/weight data.
-- When user sends an image of a workout plan/list, parse ALL exercises from it and add them all using tools in one loop.
-- DO NOT ask for confirmation. DO the action immediately.
-- For each exercise in an image: call add_exercise once per exercise with correct sets/reps.
-- Reply in same language as user. After acting, confirm in 1-2 lines what was done.
-- No filler, no disclaimers.`;
+TOOL RULES — FOLLOW EXACTLY:
+1. add_exercise: ALWAYS include sets, reps, is_max in the SAME call. Never add first then update. Example: add_exercise({day_id:123, name:"Bench Press", sets:4, reps:8, is_max:false})
+2. update_exercise: use exercise_id from the plan listed above. If exercise is missing from the plan, it was just added — call get_fitness_data with ["workouts"] to get fresh IDs.
+3. When image shows a workout list: add ALL exercises in one agentic loop, each with correct sets/reps/is_max. Do not stop to ask questions.
+4. Do NOT call get_fitness_data for workouts — current plan is already above.
+5. DO NOT ask for confirmation. Act immediately, confirm after.
+6. Reply in same language as user. 1-2 lines after completing.`;
 
     try {
       // History: son 6 mesajı al, görselleri önceki mesajlardan at (token tasarrufu)
@@ -1756,7 +1761,7 @@ RULES:
   function addExercise(dayId, name) {
     playAddSound();
     // ex: { id, name, label, sets: number, reps: number, isMax: boolean }
-    const ex = { id: Date.now(), name: name.trim() || 'Exercise', label: '', sets: 3, reps: 10, isMax: false };
+    const ex = { id: Date.now() + Math.floor(Math.random() * 1e6), name: name.trim() || 'Exercise', label: '', sets: 3, reps: 10, isMax: false };
     setWorkouts(prev => prev.map(d => d.id === dayId ? { ...d, exercises: [...d.exercises, ex] } : d));
     return ex.id;
   }
