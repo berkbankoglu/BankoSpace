@@ -1136,85 +1136,65 @@
 }
 
 /* Egzersiz kartı */
-.ft-workout-ex {
-  background: #22272e;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 10px;
-  display: flex;
-  flex-direction: column;
+/* Tablo */
+.ft-workout-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-top: 4px;
 }
 
-.ft-workout-label-input {
-  width: 100%;
-  background: transparent;
-  border: none;
-  border-bottom: 1px dashed transparent;
-  color: var(--accent);
+.ft-workout-table thead tr {
+  border-bottom: 1px solid var(--border);
+}
+
+.ft-workout-table th {
   font-size: 10px;
   font-weight: 600;
-  font-family: inherit;
-  padding: 0 0 2px;
-  margin-bottom: 4px;
-  outline: none;
-  box-sizing: border-box;
-  letter-spacing: 0.5px;
-}
-.ft-workout-label-input::placeholder { color: var(--border-hover); font-weight: 400; }
-.ft-workout-label-input:focus { border-bottom-color: var(--accent); }
-.ft-workout-label-input:not(:placeholder-shown) { border-bottom-color: transparent; }
-
-.ft-workout-ex-header {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 6px;
-}
-
-.ft-workout-ex-name {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text-primary);
-  flex: 1;
+  color: var(--text-muted);
+  text-align: left;
+  padding: 3px 6px 5px;
   white-space: nowrap;
+}
+
+.ft-workout-table th:nth-child(2),
+.ft-workout-table th:nth-child(3),
+.ft-workout-table th:nth-child(4) { text-align: center; }
+
+.ft-workout-tr { border-bottom: 1px solid var(--border); }
+.ft-workout-tr:last-child { border-bottom: none; }
+.ft-workout-tr:hover { background: rgba(255,255,255,0.02); }
+
+.ft-workout-tr td { padding: 5px 6px; vertical-align: middle; }
+
+.ft-workout-td-name {
+  color: var(--text-primary);
+  font-weight: 500;
+  max-width: 160px;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.ft-workout-ex-vol {
-  font-size: 10px;
-  color: var(--accent);
   white-space: nowrap;
-  flex-shrink: 0;
 }
 
-.ft-workout-sets {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  flex: 1;
+.ft-workout-num-input {
+  width: 44px !important;
+  text-align: center !important;
+  font-size: 12px !important;
+  padding: 3px 4px !important;
 }
 
-.ft-workout-set-row {
+.ft-workout-td-x {
+  color: var(--text-muted);
+  font-size: 11px;
+  text-align: center;
+  padding: 0 2px !important;
+}
+
+.ft-workout-td-actions {
   display: flex;
   align-items: center;
   gap: 4px;
-}
-
-.ft-workout-set-num {
-  font-size: 10px;
-  color: var(--text-muted);
-  width: 12px;
-  text-align: right;
-  flex-shrink: 0;
-}
-
-.ft-workout-set-row .ft-qty-input {
-  flex: 1;
-  min-width: 0;
-  text-align: center;
-  font-size: 12px !important;
-  padding: 3px 4px !important;
+  justify-content: flex-end;
 }
 
 .ft-workout-max-badge {
@@ -1224,9 +1204,11 @@
   background: rgba(248,81,73,0.15);
   border: 1px solid #f85149;
   border-radius: 4px;
-  padding: 2px 0;
-  flex: 1;
+  padding: 2px 6px;
+  display: inline-block;
+  width: 44px;
   text-align: center;
+  box-sizing: border-box;
 }
 
 .ft-workout-max-btn {
@@ -1244,15 +1226,6 @@
 }
 .ft-workout-max-btn:hover { border-color: #f85149; color: #f85149; }
 .ft-workout-max-btn.active { background: rgba(248,81,73,0.15); border-color: #f85149; color: #f85149; }
-
-.ft-workout-add-set {
-  margin-top: 5px;
-  font-size: 11px;
-  padding: 3px 0;
-  align-self: stretch;
-  text-align: center;
-  color: var(--text-muted);
-}
 
 /* ── SIDEBAR SECTION LABEL ── */
 .ft-sidebar-section-label {
