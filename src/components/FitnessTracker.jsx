@@ -868,8 +868,10 @@ export default function FitnessTracker() {
   const [aiMessages, setAiMessages] = useState([]);
   const [aiInput, setAiInput] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
+  const [aiImages, setAiImages] = useState([]); // [{dataUrl, mediaType}]
   const aiBottomRef = useRef(null);
   const aiInputRef = useRef(null);
+  const aiFileRef = useRef(null);
 
   useEffect(() => { aiBottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [aiMessages]);
 
@@ -1346,16 +1348,63 @@ export default function FitnessTracker() {
     }
   };
 
+  // ── görsel → base64 ──
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result); // data:image/...;base64,...
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function handleAiImageFiles(files) {
+    const imgs = [];
+    for (const f of files) {
+      if (!f.type.startsWith('image/')) continue;
+      const dataUrl = await fileToBase64(f);
+      imgs.push({ dataUrl, mediaType: f.type });
+    }
+    if (imgs.length) setAiImages(prev => [...prev, ...imgs]);
+  }
+
+  function handleAiPaste(e) {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const imageItems = [...items].filter(it => it.type.startsWith('image/'));
+    if (!imageItems.length) return;
+    e.preventDefault();
+    const files = imageItems.map(it => it.getAsFile()).filter(Boolean);
+    handleAiImageFiles(files);
+  }
+
   // ── AI sendAiMessage — bmr/tdee tanımlandıktan sonra ──
   const sendAiMessage = async (text) => {
     const userMsg = (typeof text === 'string' ? text : aiInput).trim();
-    if (!userMsg || aiLoading) return;
+    if ((!userMsg && aiImages.length === 0) || aiLoading) return;
     const key = localStorage.getItem('anthropic_api_key');
     if (!key) { setAiMessages(p => [...p, { role: 'assistant', content: 'API key required — Settings → AI.' }]); return; }
 
-    const newMessages = [...aiMessages, { role: 'user', content: userMsg }];
+    // Görsel varsa multipart content block oluştur
+    const pendingImages = [...aiImages];
+    let userContent;
+    if (pendingImages.length > 0) {
+      userContent = [
+        ...pendingImages.map(img => ({
+          type: 'image',
+          source: { type: 'base64', media_type: img.mediaType, data: img.dataUrl.split(',')[1] },
+        })),
+        ...(userMsg ? [{ type: 'text', text: userMsg }] : [{ type: 'text', text: 'Bu görseli analiz et.' }]),
+      ];
+    } else {
+      userContent = userMsg;
+    }
+
+    const displayMsg = { role: 'user', content: userMsg || '📷 Görsel gönderildi', images: pendingImages };
+    const newMessages = [...aiMessages, displayMsg];
     setAiMessages(newMessages);
     setAiInput('');
+    setAiImages([]);
     setAiLoading(true);
 
     const system = `You are a fitness assistant with full access to the user's fitness app data. You can read their weight log, meals, macros, profile and goals — and you can make changes: add/remove foods, create menus, log weight, update goals.
@@ -1373,7 +1422,26 @@ Rules:
 
     try {
       // Agentic loop — tool use destekli
-      let loopMessages = newMessages.map(m => ({ role: m.role, content: m.content }));
+      // Son mesaj için userContent (multipart veya string) kullan, öncekiler plain string
+      let loopMessages = newMessages.map((m, idx) => {
+        if (idx === newMessages.length - 1 && m.role === 'user') {
+          return { role: 'user', content: userContent };
+        }
+        // Önceki görselli mesajları da düzgün gönder
+        if (m.images?.length) {
+          return {
+            role: 'user',
+            content: [
+              ...m.images.map(img => ({
+                type: 'image',
+                source: { type: 'base64', media_type: img.mediaType, data: img.dataUrl.split(',')[1] },
+              })),
+              { type: 'text', text: m.content || 'Bu görseli analiz et.' },
+            ],
+          };
+        }
+        return { role: m.role, content: m.content };
+      });
       let finalText = '';
       let actionTaken = false;
 
@@ -2220,7 +2288,16 @@ Rules:
                 {aiMessages.map((m, i) => (
                   <div key={i} className={`ft-ai-msg ft-ai-msg--${m.role}`}>
                     <span className="ft-ai-msg-label">{m.role === 'user' ? 'You' : 'AI'}</span>
-                    <span className="ft-ai-msg-text" style={{ whiteSpace: 'pre-wrap' }}>{m.content}</span>
+                    <div className="ft-ai-msg-body">
+                      {m.images?.length > 0 && (
+                        <div className="ft-ai-msg-images">
+                          {m.images.map((img, ii) => (
+                            <img key={ii} src={img.dataUrl} className="ft-ai-msg-img" alt="" />
+                          ))}
+                        </div>
+                      )}
+                      <span className="ft-ai-msg-text" style={{ whiteSpace: 'pre-wrap' }}>{m.content}</span>
+                    </div>
                   </div>
                 ))}
                 {aiLoading && (
@@ -2232,18 +2309,41 @@ Rules:
                 <div ref={aiBottomRef} />
               </div>
 
+              {/* Görsel önizleme */}
+              {aiImages.length > 0 && (
+                <div className="ft-ai-image-preview">
+                  {aiImages.map((img, i) => (
+                    <div key={i} className="ft-ai-image-thumb">
+                      <img src={img.dataUrl} alt="" />
+                      <button className="ft-ai-image-remove" onClick={() => setAiImages(prev => prev.filter((_, idx) => idx !== i))}>×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div className="ft-ai-input-row">
+                <input
+                  type="file" accept="image/*" multiple ref={aiFileRef} style={{ display: 'none' }}
+                  onChange={e => { handleAiImageFiles([...e.target.files]); e.target.value = ''; }}
+                />
+                <button
+                  className="ft-ai-attach-btn"
+                  onClick={() => aiFileRef.current?.click()}
+                  title="Görsel ekle"
+                  disabled={aiLoading}
+                >📎</button>
                 <input
                   ref={aiInputRef}
                   className="ft-input"
                   style={{ flex: 1, fontSize: 13 }}
-                  placeholder="Ask about fitness, diet, bodybuilding..."
+                  placeholder="Soru sor veya görsel yapıştır (Ctrl+V)..."
                   value={aiInput}
                   onChange={e => setAiInput(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendAiMessage(); } }}
+                  onPaste={handleAiPaste}
                   disabled={aiLoading}
                 />
-                <button className="ft-btn-accent" onClick={() => sendAiMessage()} disabled={aiLoading || !aiInput.trim()}>
+                <button className="ft-btn-accent" onClick={() => sendAiMessage()} disabled={aiLoading || (!aiInput.trim() && aiImages.length === 0)}>
                   Send
                 </button>
               </div>
