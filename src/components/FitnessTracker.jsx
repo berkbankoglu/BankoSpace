@@ -824,7 +824,6 @@ export default function FitnessTracker() {
   const [copiedMenu, setCopiedMenu] = useState(null); // kopyalanan menü
   const mealsHistory = useRef([]);                    // undo stack
   const mealsRef = useRef(meals);                     // always-current meals for AI tools
-  const workoutsRef = useRef(workouts);               // always-current workouts for AI tools
   const mealDateRef = useRef(mealDate);
 
   // Antrenman planı: günler [ { id, name, exercises:[{id,name,label,sets,reps,isMax}] } ]
@@ -858,8 +857,9 @@ export default function FitnessTracker() {
     }
     return [];
   });
+  const workoutsRef = useRef(workouts);               // always-current workouts for AI tools
   const [expandedDay, setExpandedDay] = useState(null);
-  const [renamingDay, setRenamingDay] = useState(null); // dayId being renamed
+  const [renamingDay, setRenamingDay] = useState(null);
   const [newExName, setNewExName] = useState('');
   const [newDayName, setNewDayName] = useState('');
 
