@@ -2583,7 +2583,7 @@ RULES:
                           <button
                             className="ft-workout-tab-del"
                             title="Günü sil"
-                            onClick={e => { e.stopPropagation(); removeDay(day.id); }}
+                            onMouseDown={e => { e.stopPropagation(); e.preventDefault(); removeDay(day.id); }}
                           >×</button>
                         </div>
                       );
