@@ -1140,7 +1140,8 @@
   border-bottom: 1px solid var(--accent) !important;
   color: var(--text-primary) !important;
   cursor: text !important;
-  min-width: 60px;
+  width: 80px;
+  min-width: unset;
 }
 
 .ft-workout-tab-add {
