@@ -1052,14 +1052,14 @@ export default function FitnessTracker() {
   const AI_TOOLS = [
     {
       name: 'get_fitness_data',
-      description: 'Read the user\'s fitness data: weight log, today\'s meals, profile, goal, and macro summary for any date.',
+      description: 'Read the user\'s fitness data. Always call this first before answering questions about their data. Can return multiple sections at once.',
       input_schema: {
         type: 'object',
         properties: {
           include: {
             type: 'array',
             items: { type: 'string', enum: ['profile', 'goal', 'weight_log', 'meals', 'today_macros', 'food_database', 'workouts'] },
-            description: 'Which data sections to return.',
+            description: 'Which data sections to return. Request all relevant sections in one call.',
           },
           meal_date: { type: 'string', description: 'Date for meals in YYYY-MM-DD format. Defaults to today.' },
         },
@@ -1068,158 +1068,147 @@ export default function FitnessTracker() {
     },
     {
       name: 'add_weight_entry',
-      description: 'Add a weight measurement to the log.',
+      description: 'Log a new weight measurement.',
       input_schema: {
         type: 'object',
         properties: {
-          date: { type: 'string', description: 'Date in YYYY-MM-DD format.' },
-          weight_kg: { type: 'number', description: 'Weight in kilograms.' },
-          waist_cm: { type: 'number', description: 'Waist circumference in cm (optional).' },
-          neck_cm: { type: 'number', description: 'Neck circumference in cm (optional).' },
+          date: { type: 'string', description: 'Date YYYY-MM-DD.' },
+          weight_kg: { type: 'number' },
+          waist_cm: { type: 'number' },
+          neck_cm: { type: 'number' },
         },
         required: ['date', 'weight_kg'],
       },
     },
     {
       name: 'create_menu',
-      description: 'Create a new meal/menu for a given date.',
+      description: 'Create a new meal (e.g. Breakfast, Lunch, Dinner) for a date.',
       input_schema: {
         type: 'object',
         properties: {
-          name: { type: 'string', description: 'Menu name, e.g. "Breakfast", "Lunch".' },
-          date: { type: 'string', description: 'Date in YYYY-MM-DD format. Defaults to today.' },
+          name: { type: 'string' },
+          date: { type: 'string', description: 'YYYY-MM-DD. Defaults to today.' },
         },
         required: ['name'],
       },
     },
     {
       name: 'add_food_to_menu',
-      description: 'Add a food item from the database to an existing menu. Use get_fitness_data with food_database to find available foods and get menu IDs.',
+      description: 'Add food to an existing menu. First call get_fitness_data with food_database and meals to get menu IDs and available foods.',
       input_schema: {
         type: 'object',
         properties: {
-          menu_id: { type: 'number', description: 'The numeric ID of the menu to add food to.' },
-          food_name: { type: 'string', description: 'Exact food name from the database.' },
-          quantity: { type: 'number', description: 'Amount in grams or pieces depending on the food unit.' },
-          date: { type: 'string', description: 'Date the menu belongs to, YYYY-MM-DD. Defaults to today.' },
+          menu_id: { type: 'number' },
+          food_name: { type: 'string', description: 'Exact name from food_database.' },
+          quantity: { type: 'number', description: 'Grams or pieces.' },
+          date: { type: 'string' },
         },
         required: ['menu_id', 'food_name', 'quantity'],
       },
     },
     {
       name: 'remove_food_from_menu',
-      description: 'Remove a food item from a menu.',
+      description: 'Remove a specific food item from a menu.',
       input_schema: {
         type: 'object',
         properties: {
-          menu_id: { type: 'number', description: 'The numeric ID of the menu.' },
-          item_id: { type: 'number', description: 'The numeric ID of the food item to remove.' },
-          date: { type: 'string', description: 'Date the menu belongs to, YYYY-MM-DD. Defaults to today.' },
+          menu_id: { type: 'number' },
+          item_id: { type: 'number' },
+          date: { type: 'string' },
         },
         required: ['menu_id', 'item_id'],
       },
     },
     {
       name: 'remove_menu',
-      description: 'Delete an entire menu/meal for a date.',
+      description: 'Delete an entire meal/menu.',
       input_schema: {
         type: 'object',
         properties: {
-          menu_id: { type: 'number', description: 'The numeric ID of the menu to delete.' },
-          date: { type: 'string', description: 'Date the menu belongs to, YYYY-MM-DD. Defaults to today.' },
+          menu_id: { type: 'number' },
+          date: { type: 'string' },
         },
         required: ['menu_id'],
       },
     },
     {
       name: 'update_goal',
-      description: 'Update the user\'s fitness goal (cut/bulk/maintain, target weight, dates).',
+      description: 'Update fitness goal settings.',
       input_schema: {
         type: 'object',
         properties: {
-          type: { type: 'string', enum: ['cut', 'bulk', 'maintain'], description: 'Goal type.' },
-          target_weight_kg: { type: 'number', description: 'Target weight in kg.' },
-          start_date: { type: 'string', description: 'Start date YYYY-MM-DD.' },
-          end_date: { type: 'string', description: 'End date YYYY-MM-DD.' },
-          daily_kcal: { type: 'number', description: 'Daily calorie target.' },
-        },
-        required: [],
-      },
-    },
-    {
-      name: 'get_workout_data',
-      description: 'Read workout/exercise data for a given date.',
-      input_schema: {
-        type: 'object',
-        properties: {
-          date: { type: 'string', description: 'Date in YYYY-MM-DD format. Defaults to today.' },
+          type: { type: 'string', enum: ['cut', 'bulk', 'maintain'] },
+          target_weight_kg: { type: 'number' },
+          start_date: { type: 'string' },
+          end_date: { type: 'string' },
+          daily_kcal: { type: 'number' },
         },
         required: [],
       },
     },
     {
       name: 'add_exercise',
-      description: 'Add a new exercise to the workout log for a date.',
+      description: 'Add a new exercise to a workout day. Each exercise has a set count, rep count, and optional isMax flag. Use get_fitness_data with workouts first to see existing days and their IDs.',
       input_schema: {
         type: 'object',
         properties: {
-          name: { type: 'string', description: 'Exercise name, e.g. "Bench Press", "Squat", "Deadlift".' },
-          date: { type: 'string', description: 'Date YYYY-MM-DD. Defaults to today.' },
-          sets: {
-            type: 'array',
-            description: 'Optional sets to add immediately.',
-            items: {
-              type: 'object',
-              properties: {
-                reps: { type: 'number' },
-                weight: { type: 'number', description: 'Weight in kg. 0 for bodyweight.' },
-              },
-              required: ['reps', 'weight'],
-            },
-          },
+          day_id: { type: 'number', description: 'ID of the workout day to add to. Get from get_fitness_data workouts.' },
+          name: { type: 'string', description: 'Exercise name.' },
+          sets: { type: 'number', description: 'Number of sets, e.g. 3.' },
+          reps: { type: 'number', description: 'Reps per set, e.g. 10.' },
+          is_max: { type: 'boolean', description: 'True if this is a max-rep exercise (no fixed rep count).' },
         },
         required: ['name'],
       },
     },
     {
-      name: 'add_set',
-      description: 'Add a set to an existing exercise.',
+      name: 'update_exercise',
+      description: 'Update an existing exercise (change sets, reps, name, or isMax). Use get_fitness_data with workouts to get exercise IDs.',
       input_schema: {
         type: 'object',
         properties: {
-          exercise_id: { type: 'number', description: 'The numeric ID of the exercise.' },
+          day_id: { type: 'number', description: 'ID of the workout day.' },
+          exercise_id: { type: 'number', description: 'ID of the exercise to update.' },
+          name: { type: 'string' },
+          sets: { type: 'number' },
           reps: { type: 'number' },
-          weight: { type: 'number', description: 'Weight in kg.' },
-          date: { type: 'string', description: 'Date YYYY-MM-DD. Defaults to today.' },
-        },
-        required: ['exercise_id', 'reps', 'weight'],
-      },
-    },
-    {
-      name: 'remove_exercise',
-      description: 'Remove an exercise from the workout log.',
-      input_schema: {
-        type: 'object',
-        properties: {
-          exercise_id: { type: 'number', description: 'The numeric ID of the exercise to remove.' },
-          date: { type: 'string', description: 'Date YYYY-MM-DD. Defaults to today.' },
+          is_max: { type: 'boolean' },
         },
         required: ['exercise_id'],
       },
     },
     {
-      name: 'update_set',
-      description: 'Update reps or weight of a specific set.',
+      name: 'remove_exercise',
+      description: 'Remove an exercise from a workout day.',
       input_schema: {
         type: 'object',
         properties: {
-          exercise_id: { type: 'number' },
-          set_id: { type: 'number' },
-          reps: { type: 'number' },
-          weight: { type: 'number' },
-          date: { type: 'string' },
+          exercise_id: { type: 'number', description: 'ID of the exercise to remove.' },
+          day_id: { type: 'number', description: 'ID of the workout day (optional, auto-detected).' },
         },
-        required: ['exercise_id', 'set_id', 'reps', 'weight'],
+        required: ['exercise_id'],
+      },
+    },
+    {
+      name: 'add_workout_day',
+      description: 'Create a new workout day (e.g. "Push Day", "Göğüs Günü", "Leg Day").',
+      input_schema: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Name of the workout day.' },
+        },
+        required: ['name'],
+      },
+    },
+    {
+      name: 'remove_workout_day',
+      description: 'Delete an entire workout day and all its exercises.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          day_id: { type: 'number', description: 'ID of the day to remove.' },
+        },
+        required: ['day_id'],
       },
     },
   ];
@@ -1329,24 +1318,27 @@ export default function FitnessTracker() {
         }));
         return { success: true, message: 'Goal updated.' };
       }
-      case 'get_workout_data': {
-        const snapshot = JSON.parse(localStorage.getItem('ft_workouts') || '[]');
-        return { days: Array.isArray(snapshot) ? snapshot : [] };
-      }
       case 'add_exercise': {
         const dayId = input.day_id || workouts[0]?.id;
-        if (!dayId) return { success: false, message: 'No workout day found. Create a day first.' };
+        if (!dayId) return { success: false, message: 'No workout day. Use add_workout_day first.' };
         const exId = addExercise(dayId, input.name || 'Exercise');
-        if (input.sets?.length) {
-          input.sets.forEach((s, i) => { setTimeout(() => addSet(dayId, exId, s.reps), i * 5); });
-        }
-        return { success: true, exercise_id: exId, message: `Added exercise "${input.name}".` };
+        const patch = {};
+        if (input.sets != null) patch.sets = Number(input.sets);
+        if (input.reps != null) patch.reps = Number(input.reps);
+        if (input.is_max != null) patch.isMax = input.is_max;
+        if (Object.keys(patch).length) updateExercise(dayId, exId, patch);
+        return { success: true, exercise_id: exId, message: `Added "${input.name}" to day ${dayId} — ${input.sets || 3}×${input.is_max ? 'MAX' : (input.reps || 10)}.` };
       }
-      case 'add_set': {
-        const dayId = input.day_id || workouts[0]?.id;
-        if (!dayId) return { success: false, message: 'No workout day found.' };
-        addSet(dayId, input.exercise_id, input.reps);
-        return { success: true, message: `Added set: ${input.reps} reps` };
+      case 'update_exercise': {
+        const dayId = input.day_id || workouts.find(d => d.exercises?.some(e => e.id === input.exercise_id))?.id;
+        if (!dayId) return { success: false, message: 'Exercise not found. Call get_fitness_data with workouts first.' };
+        const patch = {};
+        if (input.name != null) patch.name = input.name;
+        if (input.sets != null) patch.sets = Number(input.sets);
+        if (input.reps != null) patch.reps = Number(input.reps);
+        if (input.is_max != null) patch.isMax = input.is_max;
+        updateExercise(dayId, input.exercise_id, patch);
+        return { success: true, message: `Updated exercise ${input.exercise_id}.` };
       }
       case 'remove_exercise': {
         const dayId = input.day_id || workouts.find(d => d.exercises?.some(e => e.id === input.exercise_id))?.id;
@@ -1354,11 +1346,13 @@ export default function FitnessTracker() {
         removeExercise(dayId, input.exercise_id);
         return { success: true, message: 'Exercise removed.' };
       }
-      case 'update_set': {
-        const dayId = input.day_id || workouts.find(d => d.exercises?.some(e => e.id === input.exercise_id))?.id;
-        if (!dayId) return { success: false, message: 'Exercise not found.' };
-        updateSet(dayId, input.exercise_id, input.set_id, input.reps, false);
-        return { success: true, message: `Set updated: ${input.reps} reps` };
+      case 'add_workout_day': {
+        const dayId = addDay(input.name);
+        return { success: true, day_id: dayId, message: `Created workout day "${input.name}".` };
+      }
+      case 'remove_workout_day': {
+        removeDay(input.day_id);
+        return { success: true, message: `Removed workout day ${input.day_id}.` };
       }
       default:
         return { success: false, message: `Unknown tool: ${toolName}` };
@@ -1424,18 +1418,30 @@ export default function FitnessTracker() {
     setAiImages([]);
     setAiLoading(true);
 
-    const system = `You are a fitness assistant with full access to the user's fitness app data. You can read their weight log, meals, macros, profile and goals — and you can make changes: add/remove foods, create menus, log weight, update goals.
+    const system = `You are an expert fitness coach and nutritionist with direct access to the user's fitness app. You can READ and MODIFY all their data: workouts, meals, weight log, goals, and profile.
 
-User stats: gender=${profile.gender}, age=${profile.age || '?'}, weight=${profile.weight || '?'}kg, height=${profile.height || '?'}cm, activity=${profile.activity || '?'}, BMR=${bmr || '?'}kcal, TDEE=${tdee || '?'}kcal, goal=${goal.type || 'maintain'}${goal.targetWeight ? ` target ${goal.targetWeight}kg` : ''}, today=${today()}.
+## User Profile (current)
+- Gender: ${profile.gender || '?'}, Age: ${profile.age || '?'}, Weight: ${profile.weight || '?'}kg, Height: ${profile.height || '?'}cm
+- Activity: ${profile.activity || '?'}
+- BMR: ${bmr || '?'} kcal/day, TDEE: ${tdee || '?'} kcal/day
+- Goal: ${goal.type || 'maintain'}${goal.targetWeight ? ` → ${goal.targetWeight}kg` : ''}${goal.dailyKcal ? `, ${goal.dailyKcal} kcal/day target` : ''}
+- Today: ${today()}
 
-Rules:
-- Use tools to read data before answering questions about meals or weight history.
-- When the user asks to add/remove food or create a meal plan, use the tools to actually do it — don't just describe it.
-- Answer ONLY what is asked. No extra advice, no bullet lists of tips unless asked.
-- Keep answers under 3 sentences unless a list is truly necessary.
-- No motivational filler, no disclaimers, no "consult a professional".
-- Same language as the user.
-- After taking actions, briefly confirm what was done.`;
+## Workout Data Structure
+The app stores workouts as DAYS (e.g. "Push Day", "Gün 1"). Each day has exercises. Each exercise has:
+- id (number), name (string), sets (number of sets), reps (number of reps per set), isMax (boolean — true means max reps, no fixed count)
+- Example: { id: 123, name: "Bench Press", sets: 4, reps: 8, isMax: false }
+
+IMPORTANT: Always call get_fitness_data with ["workouts"] BEFORE trying to add/update/remove exercises, so you know the day IDs and exercise IDs.
+
+## Rules
+- ALWAYS use tools to read actual data before answering questions about the user's meals, weight, or workouts. Never guess or make up data.
+- When user asks to add/remove/change something, actually DO it with tools — don't just describe what to do.
+- When analyzing images (food photos, body photos, workout form), give specific, actionable feedback.
+- Be direct and specific. No filler, no disclaimers, no "consult a doctor".
+- Respond in the same language the user writes in (Turkish or English).
+- After taking actions, confirm briefly: what was done, what the result is.
+- When building workout plans, use the add_workout_day + add_exercise tools to actually create them in the app.`;
 
     try {
       // Agentic loop — tool use destekli
@@ -1464,8 +1470,8 @@ Rules:
 
       for (let i = 0; i < 8; i++) {
         const body = JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 2048,
+          model: 'claude-sonnet-4-6',
+          max_tokens: 4096,
           system,
           tools: AI_TOOLS,
           messages: loopMessages,
