@@ -1419,50 +1419,45 @@ export default function FitnessTracker() {
     setAiImages([]);
     setAiLoading(true);
 
-    const system = `You are an expert fitness coach and nutritionist with direct access to the user's fitness app. You can READ and MODIFY all their data: workouts, meals, weight log, goals, and profile.
+    // Workout snapshot — system prompt'a enjekte et, AI tool çağırmadan bilsin
+    const workoutSnap = workouts.map(d => ({
+      id: d.id,
+      name: d.name,
+      exercises: d.exercises.map(e => ({ id: e.id, name: e.name, sets: e.sets, reps: e.isMax ? 'MAX' : e.reps })),
+    }));
 
-## User Profile (current)
-- Gender: ${profile.gender || '?'}, Age: ${profile.age || '?'}, Weight: ${profile.weight || '?'}kg, Height: ${profile.height || '?'}cm
-- Activity: ${profile.activity || '?'}
-- BMR: ${bmr || '?'} kcal/day, TDEE: ${tdee || '?'} kcal/day
-- Goal: ${goal.type || 'maintain'}${goal.targetWeight ? ` → ${goal.targetWeight}kg` : ''}${goal.dailyKcal ? `, ${goal.dailyKcal} kcal/day target` : ''}
-- Today: ${today()}
+    const system = `You are a fitness coach with direct write access to the user's app. Today: ${today()}.
 
-## Workout Data Structure
-The app stores workouts as DAYS (e.g. "Push Day", "Gün 1"). Each day has exercises. Each exercise has:
-- id (number), name (string), sets (number of sets), reps (number of reps per set), isMax (boolean — true means max reps, no fixed count)
-- Example: { id: 123, name: "Bench Press", sets: 4, reps: 8, isMax: false }
+USER: gender=${profile.gender||'?'}, age=${profile.age||'?'}, weight=${profile.weight||'?'}kg, height=${profile.height||'?'}cm, BMR=${bmr||'?'}, TDEE=${tdee||'?'}, goal=${goal.type||'maintain'}${goal.targetWeight?` →${goal.targetWeight}kg`:''}
 
-IMPORTANT: Always call get_fitness_data with ["workouts"] BEFORE trying to add/update/remove exercises, so you know the day IDs and exercise IDs.
+CURRENT WORKOUT PLAN (use these IDs for tool calls):
+${workoutSnap.length ? JSON.stringify(workoutSnap) : 'No workout days yet.'}
 
-## Rules
-- ALWAYS use tools to read actual data before answering questions about the user's meals, weight, or workouts. Never guess or make up data.
-- When user asks to add/remove/change something, actually DO it with tools — don't just describe what to do.
-- When analyzing images (food photos, body photos, workout form), give specific, actionable feedback.
-- Be direct and specific. No filler, no disclaimers, no "consult a doctor".
-- Respond in the same language the user writes in (Turkish or English).
-- After taking actions, confirm briefly: what was done, what the result is.
-- When building workout plans, use the add_workout_day + add_exercise tools to actually create them in the app.`;
+WORKOUT DATA STRUCTURE: Each exercise has {id, name, sets:number, reps:number, isMax:boolean}.
+- add_exercise: requires day_id from the plan above, plus name/sets/reps/is_max
+- update_exercise: requires exercise_id (from plan above) and fields to change
+- remove_exercise: requires exercise_id
+- add_workout_day: creates a new day with a name
+
+RULES:
+- Workout data is already in the system prompt — do NOT call get_fitness_data for workouts unless you need meals/weight data.
+- When user sends an image of a workout plan/list, parse ALL exercises from it and add them all using tools in one loop.
+- DO NOT ask for confirmation. DO the action immediately.
+- For each exercise in an image: call add_exercise once per exercise with correct sets/reps.
+- Reply in same language as user. After acting, confirm in 1-2 lines what was done.
+- No filler, no disclaimers.`;
 
     try {
-      // Agentic loop — tool use destekli
-      // Son mesaj için userContent (multipart veya string) kullan, öncekiler plain string
-      let loopMessages = newMessages.map((m, idx) => {
-        if (idx === newMessages.length - 1 && m.role === 'user') {
+      // History: son 6 mesajı al, görselleri önceki mesajlardan at (token tasarrufu)
+      const trimmedHistory = newMessages.slice(-6);
+      let loopMessages = trimmedHistory.map((m, idx) => {
+        const isLast = idx === trimmedHistory.length - 1;
+        if (isLast && m.role === 'user') {
           return { role: 'user', content: userContent };
         }
-        // Önceki görselli mesajları da düzgün gönder
+        // Önceki görselli mesajları text-only olarak gönder (görsel tekrar gönderme)
         if (m.images?.length) {
-          return {
-            role: 'user',
-            content: [
-              ...m.images.map(img => ({
-                type: 'image',
-                source: { type: 'base64', media_type: img.mediaType, data: img.dataUrl.split(',')[1] },
-              })),
-              { type: 'text', text: m.content || 'Bu görseli analiz et.' },
-            ],
-          };
+          return { role: m.role, content: m.content || '[görsel gönderildi]' };
         }
         return { role: m.role, content: m.content };
       });
@@ -1472,7 +1467,7 @@ IMPORTANT: Always call get_fitness_data with ["workouts"] BEFORE trying to add/u
       for (let i = 0; i < 8; i++) {
         const body = JSON.stringify({
           model: 'claude-sonnet-4-6',
-          max_tokens: 4096,
+          max_tokens: 1024,
           system,
           tools: AI_TOOLS,
           messages: loopMessages,
