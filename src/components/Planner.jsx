@@ -348,18 +348,21 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
     document.body.style.cursor = 'grabbing';
     document.body.style.userSelect = 'none';
 
+    // Son geçerli pozisyonu sakla — bırakma anında mouse dışarı çıkmış olsa bile kullan
+    let lastPos = null;
+
     const getDropPos = (ev) => {
       const wrapEl = timelineRef.current;
       if (!wrapEl) return null;
       const wrapRect = wrapEl.getBoundingClientRect();
-      // Sadece X sınırı kontrol et (Y'ye göre kısıtlama yok)
-      if (ev.clientX < wrapRect.left || ev.clientX > wrapRect.right) return null;
       const ppm = hourWidthRef.current / 60;
-      const x = ev.clientX - wrapRect.left + wrapEl.scrollLeft;
+      // X: timeline içindeyse hesapla, değilse son geçerli pozisyonu koru
+      const clientX = clamp(ev.clientX, wrapRect.left, wrapRect.right);
+      const x = clientX - wrapRect.left + wrapEl.scrollLeft;
       const start = clamp(snapTo(x / ppm), 0, 23*60);
       const dur = qtask.defaultDuration || 60;
       const end = clamp(start + dur, SNAP, 24*60);
-      // Y: wrapRect'e göre + dikey scroll
+      // Y: wrapRect'e göre + dikey scroll, sınır yok
       const yInArea = ev.clientY - wrapRect.top + wrapEl.scrollTop - LABEL_H;
       const row = Math.max(0, Math.floor((yInArea - 6) / (BLOCK_H + BLOCK_GAP)));
       const top = 6 + row * (BLOCK_H + BLOCK_GAP);
@@ -369,7 +372,8 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
     const onMove = (ev) => {
       const pos = getDropPos(ev);
       if (pos) {
-        setGhost({ left: pos.start * pos.ppm, width: (pos.end - pos.start) * pos.ppm, colorHex: colorHex(qtask.color), title: qtask.title, startTime: minutesToTime(pos.start), endTime: minutesToTime(pos.end) });
+        lastPos = pos;
+        setGhost({ left: pos.start * pos.ppm, width: (pos.end - pos.start) * pos.ppm, top: pos.top, colorHex: colorHex(qtask.color), title: qtask.title, startTime: minutesToTime(pos.start), endTime: minutesToTime(pos.end) });
       } else {
         setGhost(null);
       }
@@ -380,7 +384,7 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
       setGhost(null);
-      const pos = getDropPos(ev);
+      const pos = getDropPos(ev) || lastPos;
       if (pos) {
         setBlocks(prev => [...prev, { id: Date.now(), date: selectedDateStr, title: qtask.title, startTime: minutesToTime(pos.start), endTime: minutesToTime(pos.end), color: qtask.color, recur: 'none', note: qtask.note || '', row: pos.row }]);
       }
