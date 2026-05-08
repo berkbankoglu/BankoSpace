@@ -412,10 +412,26 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
     setSelBox({ x1: startX, y1: startY, x2: startX, y2: startY });
     setSelectedIds(new Set());
 
+    const updateHit = (x2, y2) => {
+      const rx1 = Math.min(startX, x2), rx2 = Math.max(startX, x2);
+      const ry1 = Math.min(startY, y2), ry2 = Math.max(startY, y2);
+      const ppm = hourWidthRef.current / 60;
+      const hit = new Set();
+      blocksList.forEach(b => {
+        const l = layoutMap.get(b.id);
+        if (!l) return;
+        const bL = timeToMinutes(b.startTime) * ppm;
+        const bR = timeToMinutes(b.endTime)   * ppm;
+        if (bR > rx1 && bL < rx2 && l.top + l.height > ry1 && l.top < ry2) hit.add(b.id);
+      });
+      setSelectedIds(hit);
+    };
+
     const onMove = (ev) => {
-      setSelBox({ x1: startX, y1: startY,
-        x2: ev.clientX - areaRect.left + wrapEl.scrollLeft,
-        y2: ev.clientY - areaRect.top  + wrapEl.scrollTop });
+      const x2 = ev.clientX - areaRect.left + wrapEl.scrollLeft;
+      const y2 = ev.clientY - areaRect.top  + wrapEl.scrollTop;
+      setSelBox({ x1: startX, y1: startY, x2, y2 });
+      updateHit(x2, y2);
     };
 
     const onUp = (ev) => {
@@ -423,23 +439,8 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
       window.removeEventListener('mouseup', onUp);
       const x2 = ev.clientX - areaRect.left + wrapEl.scrollLeft;
       const y2 = ev.clientY - areaRect.top  + wrapEl.scrollTop;
-      const rx1 = Math.min(startX, x2), rx2 = Math.max(startX, x2);
-      const ry1 = Math.min(startY, y2), ry2 = Math.max(startY, y2);
       setSelBox(null);
-      if (rx2 - rx1 > 4 || ry2 - ry1 > 4) {
-        const ppm = hourWidthRef.current / 60;
-        const hit = new Set();
-        blocksList.forEach(b => {
-          const l = layoutMap.get(b.id);
-          if (!l) return;
-          const bL = timeToMinutes(b.startTime) * ppm;
-          const bR = timeToMinutes(b.endTime)   * ppm;
-          const bT = l.top;
-          const bB = l.top + l.height;
-          if (bR > rx1 && bL < rx2 && bB > ry1 && bT < ry2) hit.add(b.id);
-        });
-        setSelectedIds(hit);
-      }
+      updateHit(x2, y2);
     };
 
     window.addEventListener('mousemove', onMove);
