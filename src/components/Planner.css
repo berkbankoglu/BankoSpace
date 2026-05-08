@@ -432,6 +432,17 @@
   pointer-events: none;
 }
 
+.pl-hline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.025);
+  pointer-events: none;
+  border-bottom: 1px solid var(--border);
+  box-sizing: border-box;
+}
+
 /* Current time vertical line */
 .pl-now-line {
   position: absolute;
