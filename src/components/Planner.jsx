@@ -270,15 +270,25 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
     const duration  = timeToMinutes(block.endTime) - origStart;
     const clickOffsetPx = getTlX(e.clientX) - origStart * ppm;
 
-    setGhost({ left: origStart * ppm, width: duration * ppm, colorHex: colorHex(block.color), title: dragIds.length > 1 ? `${dragIds.length} blok` : block.title, startTime: block.startTime, endTime: block.endTime });
+    setGhost({ left: origStart * ppm, width: duration * ppm, top: 6 + (block.row ?? 0) * (BLOCK_H + BLOCK_GAP), colorHex: colorHex(block.color), title: dragIds.length > 1 ? `${dragIds.length} blok` : block.title, startTime: block.startTime, endTime: block.endTime });
     document.body.style.cursor = 'grabbing';
     document.body.style.userSelect = 'none';
 
+    const getRow = (ev) => {
+      const areaEl = blocksAreaRef.current;
+      const wrapEl = timelineRef.current;
+      if (!areaEl || !wrapEl) return block.row ?? 0;
+      const areaRect = areaEl.getBoundingClientRect();
+      const yInArea = ev.clientY - areaRect.top + (wrapEl.scrollTop || 0);
+      return Math.max(0, Math.floor((yInArea - 6) / (BLOCK_H + BLOCK_GAP)));
+    };
     const onMove = (ev) => {
       const ppm2 = hourWidthRef.current / 60;
       const rawPx = getTlX(ev.clientX) - clickOffsetPx;
       const start = clamp(snapTo(rawPx / ppm2), 0, 24*60 - duration);
-      setGhost({ left: start * ppm2, width: duration * ppm2, colorHex: colorHex(block.color), title: dragIds.length > 1 ? `${dragIds.length} blok` : block.title, startTime: minutesToTime(start), endTime: minutesToTime(start + duration) });
+      const row = getRow(ev);
+      const top = 6 + row * (BLOCK_H + BLOCK_GAP);
+      setGhost({ left: start * ppm2, width: duration * ppm2, top, colorHex: colorHex(block.color), title: dragIds.length > 1 ? `${dragIds.length} blok` : block.title, startTime: minutesToTime(start), endTime: minutesToTime(start + duration) });
     };
     const onUp = (ev) => {
       window.removeEventListener('mousemove', onMove);
@@ -290,14 +300,13 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
       const rawPx = getTlX(ev.clientX) - clickOffsetPx;
       const newStart = clamp(snapTo(rawPx / ppm2), 0, 24*60 - duration);
       const delta = newStart - origStart;
-      if (delta !== 0) {
-        setBlocks(prev => prev.map(b => {
-          if (!dragIds.includes(b.id)) return b;
-          const s = clamp(timeToMinutes(b.startTime) + delta, 0, 24*60 - 1);
-          const d = timeToMinutes(b.endTime) - timeToMinutes(b.startTime);
-          return { ...b, startTime: minutesToTime(s), endTime: minutesToTime(clamp(s + d, 1, 24*60)) };
-        }));
-      }
+      const newRow = getRow(ev);
+      setBlocks(prev => prev.map(b => {
+        if (!dragIds.includes(b.id)) return b;
+        const s = clamp(timeToMinutes(b.startTime) + delta, 0, 24*60 - 1);
+        const d = timeToMinutes(b.endTime) - timeToMinutes(b.startTime);
+        return { ...b, startTime: minutesToTime(s), endTime: minutesToTime(clamp(s + d, 1, 24*60)), row: newRow };
+      }));
     };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
@@ -378,7 +387,7 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
       setGhost(null);
       const pos = getDropPos(ev);
       if (pos) {
-        setBlocks(prev => [...prev, { id: Date.now(), date: selectedDateStr, title: qtask.title, startTime: minutesToTime(pos.start), endTime: minutesToTime(pos.end), color: qtask.color, recur: 'none', note: qtask.note || '' }]);
+        setBlocks(prev => [...prev, { id: Date.now(), date: selectedDateStr, title: qtask.title, startTime: minutesToTime(pos.start), endTime: minutesToTime(pos.end), color: qtask.color, recur: 'none', note: qtask.note || '', row: pos.row }]);
       }
     };
     window.addEventListener('mousemove', onMove);
@@ -403,23 +412,25 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
   const BLOCK_H = 90; // blok yüksekliği sabit
   const BLOCK_GAP = 4;
   const computeLayout = (blockList) => {
-    const sorted = [...blockList].sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
-    const cols = [];
+    // Her blok kendi row'unu taşır. Çakışma varsa bir sonraki boş row'a atılır.
+    const sorted = [...blockList].sort((a, b) => (a.row ?? 0) - (b.row ?? 0) || timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
+    // rowOccupied[row] = bu satırda en erken biten bloğun bitiş dakikası
+    const rowOccupied = {};
     const assignments = new Map();
 
     sorted.forEach(b => {
       const start = timeToMinutes(b.startTime);
       const end   = timeToMinutes(b.endTime);
-      let col = cols.findIndex(endMin => endMin <= start);
-      if (col === -1) { col = cols.length; cols.push(end); }
-      else cols[col] = end;
-      assignments.set(b.id, { col });
+      let row = b.row ?? 0;
+      // İstediği satır doluysa bir sonraki boş satırı bul
+      while ((rowOccupied[row] ?? 0) > start) row++;
+      rowOccupied[row] = end;
+      assignments.set(b.id, row);
     });
 
     return sorted.map(b => {
-      const { col } = assignments.get(b.id);
-      const top = 6 + col * (BLOCK_H + BLOCK_GAP);
-      return { id: b.id, top, height: BLOCK_H };
+      const row = assignments.get(b.id);
+      return { id: b.id, top: 6 + row * (BLOCK_H + BLOCK_GAP), height: BLOCK_H };
     });
   };
 
