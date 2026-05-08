@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
 import { pushKeyToSupabase } from '../supabase';
 import './Planner.css';
@@ -25,8 +25,10 @@ const RECUR_OPTIONS = [
   { value: 'monthly', label: 'Every month' },
 ];
 
-const HOUR_WIDTH  = 80;
-const TOTAL_WIDTH = 24 * HOUR_WIDTH; // fallback, overridden by container width
+const HOUR_WIDTH_DEFAULT = 80;
+const MIN_HOUR_WIDTH = 60;
+const MAX_HOUR_WIDTH = 300;
+const TOTAL_WIDTH = 24 * HOUR_WIDTH_DEFAULT; // fallback, overridden by container width
 const LABEL_H     = 28;
 const BLOCKS_H    = 110;
 const SNAP        = 15; // minutes
@@ -81,33 +83,13 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
   const [qtForm,   setQtForm]  = useState({});
   const [notifOk,  setNotifOk] = useState(false);
 
-  // Pointer-based drag state — stored in refs so mousemove never causes re-renders
-  // ghost state only triggers renders for visual feedback
   const [ghost, setGhost] = useState(null); // { left, width, colorHex, title, startTime, endTime } | null
-  const dragRef = useRef(null);
-  /* dragRef.current shape:
-     type: 'move'   — moving an existing block
-       blockId, origStart, duration, originX, scrollOrigin
-     type: 'resize' — resizing right edge of existing block
-       blockId, fixedStart, originX, scrollOrigin
-     type: 'qtask'  — dragging a quick-task from the panel
-       qtask, originX, originY, scrollOrigin, placed (bool)
-  */
 
   const timelineRef = useRef(null);
   const notifTimers = useRef([]);
-  const [hourWidth, setHourWidth] = useState(HOUR_WIDTH);
-
-  useEffect(() => {
-    const update = () => {
-      if (timelineRef.current) {
-        setHourWidth(timelineRef.current.clientWidth / 24);
-      }
-    };
-    update();
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
-  }, []);
+  const [hourWidth, setHourWidth] = useState(HOUR_WIDTH_DEFAULT);
+  const hourWidthRef = useRef(HOUR_WIDTH_DEFAULT); // her zaman güncel hourWidth
+  const scaleRef = useRef(null);
 
   useEffect(() => {
     const val = JSON.stringify(blocks);
@@ -160,7 +142,7 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
   const monthDays = getMonthDays(currentDate.year, currentDate.month);
   const isToday   = selectedDateStr === todayStr();
   const nowMins   = new Date().getHours() * 60 + new Date().getMinutes();
-  const nowLeft   = `${(nowMins / 1440) * 100}%`;
+  const nowLeft   = nowMins * (hourWidth / 60); // px
   const totalWidth = 24 * hourWidth;
 
   // Navigation
@@ -214,162 +196,162 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
   };
   const deleteQTask = (id) => { setQTasks(prev => prev.filter(t => t.id !== id)); setQtModal(null); };
 
-  // ── Unified pointer drag system ───────────────────────────
-  const getTimelineX = (clientX) => {
-    const wrapEl = timelineRef.current;
-    if (!wrapEl) return 0;
-    const rect = wrapEl.getBoundingClientRect();
-    return clientX - rect.left + wrapEl.scrollLeft;
+  // ── Timeline scale (cetvel sürükleme) ─────────────────────
+  const handleScaleMouseDown = (e) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startHW = hourWidthRef.current;
+    const onMove = (ev) => {
+      const dx = ev.clientX - startX;
+      const next = Math.min(MAX_HOUR_WIDTH, Math.max(MIN_HOUR_WIDTH, startHW + dx * 0.5));
+      hourWidthRef.current = next;
+      setHourWidth(next);
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    document.body.style.cursor = 'ew-resize';
+    document.body.style.userSelect = 'none';
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
   };
 
-  // Called on every mousemove while any drag is active
-  const onGlobalMouseMove = useCallback((e) => {
-    const dr = dragRef.current;
-    if (!dr) return;
-
-    if (dr.type === 'move') {
-      const dx   = e.clientX - dr.originX;
-      const dMins = snapTo((dx / hourWidth) * 60);
-      const start = clamp(dr.origStart + dMins, 0, 24*60 - dr.duration);
-      const end   = start + dr.duration;
-      setGhost(g => g ? {...g, left:`${(start/1440)*100}%`, startTime:minutesToTime(start), endTime:minutesToTime(end)} : g);
-    }
-
-    if (dr.type === 'resize') {
-      const x    = getTimelineX(e.clientX);
-      const end  = clamp(snapTo((x / totalWidth) * 1440), dr.fixedStart + SNAP, 24*60);
-      setGhost(g => g ? {...g, width:`${((end-dr.fixedStart)/1440)*100}%`, endTime:minutesToTime(end)} : g);
-    }
-
-    if (dr.type === 'qtask') {
-      // show ghost near cursor when over timeline area
-      const wrapEl = timelineRef.current;
-      if (!wrapEl) return;
-      const rect = wrapEl.getBoundingClientRect();
-      if (e.clientY >= rect.top && e.clientY <= rect.bottom) {
-        const x     = e.clientX - rect.left + wrapEl.scrollLeft;
-        const start = clamp(snapTo((x / totalWidth) * 1440), 0, 23*60);
-        const dur   = dr.qtask.defaultDuration || 60;
-        const end   = clamp(start + dur, SNAP, 24*60);
-        setGhost({ left:`${(start/1440)*100}%`, width:`${((end-start)/1440)*100}%`, colorHex:colorHex(dr.qtask.color), title:dr.qtask.title, startTime:minutesToTime(start), endTime:minutesToTime(end) });
-      } else {
-        setGhost(null);
-      }
-    }
-  }, []);
-
-  // Called on mouseup — finalise the drag
-  const onGlobalMouseUp = useCallback((e) => {
-    const dr = dragRef.current;
-    if (!dr) return;
-    dragRef.current = null;
-    document.body.style.cursor = '';
-    document.body.style.userSelect = '';
-
-    if (dr.type === 'move') {
-      const dx    = e.clientX - dr.originX;
-      const dMins = snapTo((dx / hourWidth) * 60);
-      if (Math.abs(dMins) >= SNAP) {
-        const start = clamp(dr.origStart + dMins, 0, 24*60 - dr.duration);
-        const end   = start + dr.duration;
-        setBlocks(prev => prev.map(b => b.id === dr.blockId
-          ? {...b, startTime:minutesToTime(start), endTime:minutesToTime(end)}
-          : b));
-        dr.wasDragged = true;
-      }
-    }
-
-    if (dr.type === 'resize') {
-      const x   = getTimelineX(e.clientX);
-      const end = clamp(snapTo((x / totalWidth) * 1440), dr.fixedStart + SNAP, 24*60);
-      setBlocks(prev => prev.map(b => b.id === dr.blockId
-        ? {...b, endTime:minutesToTime(end)}
-        : b));
-    }
-
-    if (dr.type === 'qtask') {
-      const wrapEl = timelineRef.current;
-      if (wrapEl) {
-        const rect = wrapEl.getBoundingClientRect();
-        if (e.clientY >= rect.top && e.clientY <= rect.bottom) {
-          const x     = e.clientX - rect.left + wrapEl.scrollLeft;
-          const start = clamp(snapTo((x / totalWidth) * 1440), 0, 23*60);
-          const dur   = dr.qtask.defaultDuration || 60;
-          const end   = clamp(start + dur, SNAP, 24*60);
-          setBlocks(prev => [...prev, {
-            id: Date.now(),
-            date: selectedDateStr,
-            title: dr.qtask.title,
-            startTime: minutesToTime(start),
-            endTime: minutesToTime(end),
-            color: dr.qtask.color,
-            recur: 'none',
-            note: dr.qtask.note || '',
-          }]);
-        }
-      }
-    }
-
-    setGhost(null);
-    window.removeEventListener('mousemove', onGlobalMouseMove);
-    window.removeEventListener('mouseup',   onGlobalMouseUp);
-  }, [selectedDateStr, onGlobalMouseMove]);
-
-  const startDrag = (drState) => {
-    dragRef.current = drState;
-    document.body.style.cursor     = drState.type === 'resize' ? 'ew-resize' : 'grabbing';
-    document.body.style.userSelect = 'none';
-    window.addEventListener('mousemove', onGlobalMouseMove);
-    window.addEventListener('mouseup',   onGlobalMouseUp);
+  // ── Drag helpers ──────────────────────────────────────────
+  const getTlX = (clientX) => {
+    const el = timelineRef.current;
+    if (!el) return 0;
+    return clientX - el.getBoundingClientRect().left + el.scrollLeft;
   };
 
   // Move existing block
   const handleBlockMove = (e, block) => {
     e.preventDefault();
     e.stopPropagation();
-    const { left, width, color } = posStyle(block);
-    setGhost({ left, width, colorHex:colorHex(block.color), title:block.title, startTime:block.startTime, endTime:block.endTime });
-    startDrag({
-      type: 'move',
-      blockId: block.id,
-      origStart: timeToMinutes(block.startTime),
-      duration: timeToMinutes(block.endTime) - timeToMinutes(block.startTime),
-      originX: e.clientX,
-      wasDragged: false,
-    });
+    const hw      = hourWidthRef.current;
+    const ppm     = hw / 60;
+    const origStart = timeToMinutes(block.startTime);
+    const duration  = timeToMinutes(block.endTime) - origStart;
+    // İmlecin block sol kenarından kaç px içeride olduğu — sabit kalacak
+    const clickOffsetPx = getTlX(e.clientX) - origStart * ppm;
+
+    setGhost({ left: origStart * ppm, width: duration * ppm, colorHex: colorHex(block.color), title: block.title, startTime: block.startTime, endTime: block.endTime });
+    document.body.style.cursor = 'grabbing';
+    document.body.style.userSelect = 'none';
+
+    const onMove = (ev) => {
+      const hw2  = hourWidthRef.current;
+      const ppm2 = hw2 / 60;
+      const rawPx = getTlX(ev.clientX) - clickOffsetPx;
+      const start = clamp(snapTo(rawPx / ppm2), 0, 24*60 - duration);
+      setGhost({ left: start * ppm2, width: duration * ppm2, colorHex: colorHex(block.color), title: block.title, startTime: minutesToTime(start), endTime: minutesToTime(start + duration) });
+    };
+    const onUp = (ev) => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      setGhost(null);
+      const hw2  = hourWidthRef.current;
+      const ppm2 = hw2 / 60;
+      const rawPx = getTlX(ev.clientX) - clickOffsetPx;
+      const start = clamp(snapTo(rawPx / ppm2), 0, 24*60 - duration);
+      if (start !== origStart) {
+        setBlocks(prev => prev.map(b => b.id === block.id
+          ? { ...b, startTime: minutesToTime(start), endTime: minutesToTime(start + duration) }
+          : b));
+      }
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
   };
 
   // Resize (right edge)
   const handleBlockResize = (e, block) => {
     e.preventDefault();
     e.stopPropagation();
-    const { left, width, color } = posStyle(block);
-    setGhost({ left, width, colorHex:colorHex(block.color), title:block.title, startTime:block.startTime, endTime:block.endTime });
-    startDrag({
-      type: 'resize',
-      blockId: block.id,
-      fixedStart: timeToMinutes(block.startTime),
-      originX: e.clientX,
-    });
+    const fixedStart = timeToMinutes(block.startTime);
+    const origEnd    = timeToMinutes(block.endTime);
+    const hw = hourWidthRef.current;
+    setGhost({ left: fixedStart * (hw/60), width: (origEnd - fixedStart) * (hw/60), colorHex: colorHex(block.color), title: block.title, startTime: block.startTime, endTime: block.endTime });
+    document.body.style.cursor = 'ew-resize';
+    document.body.style.userSelect = 'none';
+
+    const onMove = (ev) => {
+      const ppm = hourWidthRef.current / 60;
+      const end = clamp(snapTo(getTlX(ev.clientX) / ppm), fixedStart + SNAP, 24*60);
+      setGhost(g => g ? { ...g, width: (end - fixedStart) * ppm, endTime: minutesToTime(end) } : g);
+    };
+    const onUp = (ev) => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      setGhost(null);
+      const ppm = hourWidthRef.current / 60;
+      const end = clamp(snapTo(getTlX(ev.clientX) / ppm), fixedStart + SNAP, 24*60);
+      setBlocks(prev => prev.map(b => b.id === block.id ? { ...b, endTime: minutesToTime(end) } : b));
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
   };
 
-  // Quick-task drag start
+  // Quick-task drag onto timeline
   const handleQtaskMouseDown = (e, qtask) => {
     e.preventDefault();
     setGhost(null);
-    startDrag({ type:'qtask', qtask, originX:e.clientX, originY:e.clientY });
+    document.body.style.cursor = 'grabbing';
+    document.body.style.userSelect = 'none';
+
+    const onMove = (ev) => {
+      const wrapEl = timelineRef.current;
+      if (!wrapEl) return;
+      const rect = wrapEl.getBoundingClientRect();
+      if (ev.clientY >= rect.top && ev.clientY <= rect.bottom) {
+        const ppm   = hourWidthRef.current / 60;
+        const x     = ev.clientX - rect.left + wrapEl.scrollLeft;
+        const start = clamp(snapTo(x / ppm), 0, 23*60);
+        const dur   = qtask.defaultDuration || 60;
+        const end   = clamp(start + dur, SNAP, 24*60);
+        setGhost({ left: start * ppm, width: (end - start) * ppm, colorHex: colorHex(qtask.color), title: qtask.title, startTime: minutesToTime(start), endTime: minutesToTime(end) });
+      } else {
+        setGhost(null);
+      }
+    };
+    const onUp = (ev) => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      setGhost(null);
+      const wrapEl = timelineRef.current;
+      if (!wrapEl) return;
+      const rect = wrapEl.getBoundingClientRect();
+      if (ev.clientY >= rect.top && ev.clientY <= rect.bottom) {
+        const ppm   = hourWidthRef.current / 60;
+        const x     = ev.clientX - rect.left + wrapEl.scrollLeft;
+        const start = clamp(snapTo(x / ppm), 0, 23*60);
+        const dur   = qtask.defaultDuration || 60;
+        const end   = clamp(start + dur, SNAP, 24*60);
+        setBlocks(prev => [...prev, { id: Date.now(), date: selectedDateStr, title: qtask.title, startTime: minutesToTime(start), endTime: minutesToTime(end), color: qtask.color, recur: 'none', note: qtask.note || '' }]);
+      }
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
   };
 
-  const handleTimelineClick = () => {};
 
 
   // Helper: pixel position of a block
   const posStyle = (block) => {
     const start = timeToMinutes(block.startTime);
     const end   = timeToMinutes(block.endTime);
+    const pxPerMin = hourWidth / 60;
     return {
-      left:  `${(start / 1440) * 100}%`,
-      width: `${Math.max((end - start) / 1440 * 100, 1)}%`,
+      left:  start * pxPerMin,
+      width: Math.max((end - start) * pxPerMin, 4),
       color: colorHex(block.color),
     };
   };
@@ -482,12 +464,17 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
 
           {/* Horizontal Timeline */}
           <div className="pl-timeline-wrapper" ref={timelineRef}>
-            <div className="pl-timeline" style={{ width: '100%' }}>
+            <div className="pl-timeline" style={{ width: totalWidth }}>
 
-              {/* Hour labels */}
-              <div className="pl-hour-labels-row" style={{ height: LABEL_H }}>
+              {/* Hour labels + scale drag */}
+              <div
+                className="pl-hour-labels-row"
+                style={{ height: LABEL_H, cursor: 'ew-resize' }}
+                onMouseDown={handleScaleMouseDown}
+                title="Drag to zoom timeline"
+              >
                 {Array.from({length:24}, (_,h) => (
-                  <div key={h} className="pl-hour-label-col" style={{ left:`${(h/24)*100}%`, width:`${(1/24)*100}%` }}>
+                  <div key={h} className="pl-hour-label-col" style={{ left: h * hourWidth, width: hourWidth }}>
                     <span className="pl-hour-label">{pad(h)}:00</span>
                   </div>
                 ))}
@@ -497,20 +484,19 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
               <div
                 className="pl-blocks-area"
                 style={{ height: BLOCKS_H }}
-                onClick={handleTimelineClick}
               >
                 {/* Vertical hour lines */}
                 {Array.from({length:25}, (_,h) => (
-                  <div key={h} className="pl-vline" style={{ left:`${(h/24)*100}%` }} />
+                  <div key={h} className="pl-vline" style={{ left: h * hourWidth }} />
                 ))}
                 {/* Half-hour lines */}
                 {Array.from({length:24}, (_,h) => (
-                  <div key={`h${h}`} className="pl-vline-half" style={{ left:`${((h+0.5)/24)*100}%` }} />
+                  <div key={`h${h}`} className="pl-vline-half" style={{ left: (h + 0.5) * hourWidth }} />
                 ))}
 
                 {/* Now line */}
                 {isToday && (
-                  <div className="pl-now-line" style={{ left:nowLeft }}>
+                  <div className="pl-now-line" style={{ left: nowLeft }}>
                     <span className="pl-now-dot" />
                   </div>
                 )}
@@ -532,7 +518,8 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
                 {/* Actual blocks */}
                 {dayBlocks.map(block => {
                   const { left, width, color } = posStyle(block);
-                  const isGhosted = ghost && dragRef.current?.blockId === block.id;
+                  // left/width are px numbers from posStyle
+                  const isGhosted = !!ghost;
                   return (
                     <div
                       key={block.id}

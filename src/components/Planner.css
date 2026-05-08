@@ -356,13 +356,14 @@
 /* Horizontal timeline wrapper */
 .pl-timeline-wrapper {
   flex-shrink: 0;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   border-bottom: 1px solid var(--border);
   background: var(--bg-surface);
 }
 
 .pl-timeline-wrapper .pl-timeline {
-  width: 100% !important;
+  /* width set by JS */
 }
 
 .pl-timeline {
@@ -370,11 +371,25 @@
   min-height: 160px;
 }
 
-/* Hour labels row */
+/* Hour labels row — drag to scale */
 .pl-hour-labels-row {
   position: relative;
   border-bottom: 1px solid var(--border);
   background: var(--bg-elevated);
+  user-select: none;
+}
+.pl-hour-labels-row:hover {
+  background: #1a1a1a;
+}
+.pl-hour-labels-row::after {
+  content: '↔';
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  color: #555;
+  pointer-events: none;
 }
 
 .pl-hour-label-col {
