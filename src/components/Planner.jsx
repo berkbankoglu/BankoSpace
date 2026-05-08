@@ -571,7 +571,7 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
                 {ghost && (
                   <div className="pl-block pl-block-ghost" style={{
                     left: ghost.left, width: ghost.width,
-                    top:6, bottom:6,
+                    top: 6, height: BLOCK_H,
                     borderTopColor: ghost.colorHex,
                     background: ghost.colorHex + '55',
                     pointerEvents: 'none',
