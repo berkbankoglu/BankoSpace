@@ -410,7 +410,6 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
     const startY = e.clientY - areaRect.top  + wrapEl.scrollTop;
 
     setSelBox({ x1: startX, y1: startY, x2: startX, y2: startY });
-    setSelectedIds(new Set());
 
     const updateHit = (x2, y2) => {
       const rx1 = Math.min(startX, x2), rx2 = Math.max(startX, x2);
@@ -440,7 +439,9 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
       const x2 = ev.clientX - areaRect.left + wrapEl.scrollLeft;
       const y2 = ev.clientY - areaRect.top  + wrapEl.scrollTop;
       setSelBox(null);
-      updateHit(x2, y2);
+      const moved = Math.abs(x2 - startX) > 4 || Math.abs(y2 - startY) > 4;
+      if (moved) updateHit(x2, y2);
+      else setSelectedIds(new Set()); // boş alana tek tıklama = seçimi temizle
     };
 
     window.addEventListener('mousemove', onMove);
@@ -627,7 +628,6 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
                 className="pl-blocks-area"
                 ref={blocksAreaRef}
                 style={{ height: areaH }}
-                onClick={(e) => { if (!e.target.closest('.pl-block')) setSelectedIds(new Set()); }}
                 onMouseDown={(e) => handleAreaMouseDown(e, dayBlocks, layoutMap)}
               >
                 {/* Yatay satır çizgileri (swimlanes) */}
