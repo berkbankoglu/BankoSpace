@@ -392,11 +392,12 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
   };
 
   // Çakışan blokları yan yana dizen layout algoritması
-  const computeLayout = (blockList, blocksAreaH = 200) => {
-    // Her bloğu bir "column" a ata, çakışmıyorsa 0. column
+  const BLOCK_H = 90; // blok yüksekliği sabit
+  const BLOCK_GAP = 4;
+  const computeLayout = (blockList) => {
     const sorted = [...blockList].sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
-    const cols = []; // cols[i] = son biten dakika
-    const assignments = new Map(); // blockId -> { col, totalCols }
+    const cols = [];
+    const assignments = new Map();
 
     sorted.forEach(b => {
       const start = timeToMinutes(b.startTime);
@@ -407,14 +408,10 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
       assignments.set(b.id, { col });
     });
 
-    const totalCols = cols.length;
-    const trackH = (blocksAreaH - 12) / Math.max(totalCols, 1);
-
     return sorted.map(b => {
       const { col } = assignments.get(b.id);
-      const top    = 6 + col * trackH;
-      const height = trackH - 2;
-      return { id: b.id, top, height };
+      const top = 6 + col * (BLOCK_H + BLOCK_GAP);
+      return { id: b.id, top, height: BLOCK_H };
     });
   };
 
@@ -586,8 +583,7 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
 
                 {/* Actual blocks */}
                 {(() => {
-                  const areaH = blocksAreaRef.current?.clientHeight || 200;
-                  const layout = computeLayout(dayBlocks, areaH);
+                  const layout = computeLayout(dayBlocks);
                   const layoutMap = new Map(layout.map(l => [l.id, l]));
                   return dayBlocks.map(block => {
                   const { left, width, color } = posStyle(block);
