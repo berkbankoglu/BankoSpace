@@ -360,6 +360,7 @@
   overflow-y: hidden;
   border-bottom: 1px solid var(--border);
   background: var(--bg-surface);
+  user-select: none;
 }
 
 .pl-timeline-wrapper .pl-timeline {
