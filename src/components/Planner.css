@@ -419,8 +419,8 @@
 .pl-blocks-area {
   position: relative;
   cursor: crosshair;
-  flex: 1;
-  min-height: 0;
+  height: 110px;
+  flex-shrink: 0;
 }
 
 .pl-vline {
@@ -472,8 +472,6 @@
 /* Blocks */
 .pl-block {
   position: absolute;
-  top: 6px;
-  bottom: 6px;
   border-top: 3px solid;
   border-radius: 4px;
   padding: 4px 6px 4px;
