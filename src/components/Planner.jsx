@@ -275,11 +275,10 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
     document.body.style.userSelect = 'none';
 
     const getRow = (ev) => {
-      const areaEl = blocksAreaRef.current;
       const wrapEl = timelineRef.current;
-      if (!areaEl || !wrapEl) return block.row ?? 0;
-      const areaRect = areaEl.getBoundingClientRect();
-      const yInArea = ev.clientY - areaRect.top + (wrapEl.scrollTop || 0);
+      if (!wrapEl) return block.row ?? 0;
+      const wrapRect = wrapEl.getBoundingClientRect();
+      const yInArea = ev.clientY - wrapRect.top + wrapEl.scrollTop - LABEL_H;
       return Math.max(0, Math.floor((yInArea - 6) / (BLOCK_H + BLOCK_GAP)));
     };
     const onMove = (ev) => {
@@ -351,24 +350,20 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
 
     const getDropPos = (ev) => {
       const wrapEl = timelineRef.current;
-      const areaEl = blocksAreaRef.current;
-      if (!wrapEl || !areaEl) return null;
+      if (!wrapEl) return null;
       const wrapRect = wrapEl.getBoundingClientRect();
-      const areaRect = areaEl.getBoundingClientRect();
-      // X: timeline scroll dahil
+      // Sadece X sınırı kontrol et (Y'ye göre kısıtlama yok)
       if (ev.clientX < wrapRect.left || ev.clientX > wrapRect.right) return null;
-      // Y: blocksArea içinde mi — scroll yapılmış olsa da areaRect günceli
-      if (ev.clientY < areaRect.top || ev.clientY > areaRect.bottom) return null;
       const ppm = hourWidthRef.current / 60;
       const x = ev.clientX - wrapRect.left + wrapEl.scrollLeft;
       const start = clamp(snapTo(x / ppm), 0, 23*60);
       const dur = qtask.defaultDuration || 60;
       const end = clamp(start + dur, SNAP, 24*60);
-      // Y: mouse'un blocksArea içindeki satırını hesapla
-      const yInArea = ev.clientY - areaRect.top + (wrapEl.scrollTop || 0);
+      // Y: wrapRect'e göre + dikey scroll
+      const yInArea = ev.clientY - wrapRect.top + wrapEl.scrollTop - LABEL_H;
       const row = Math.max(0, Math.floor((yInArea - 6) / (BLOCK_H + BLOCK_GAP)));
       const top = 6 + row * (BLOCK_H + BLOCK_GAP);
-      return { start, end, ppm, top };
+      return { start, end, ppm, top, row };
     };
 
     const onMove = (ev) => {
