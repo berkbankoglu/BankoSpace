@@ -202,11 +202,12 @@
   flex: 1;
   display: grid;
   grid-template-columns: 220px 1fr 220px;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto auto;
   grid-template-areas:
     "nav nav nav"
     "schedule center qtasks";
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   gap: 0;
 }
 
@@ -215,6 +216,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-height: 160px;
   border-left: 1px solid var(--border);
   border-right: 1px solid var(--border);
 }
@@ -661,6 +663,7 @@
   flex-direction: column;
   overflow: hidden;
   background: var(--bg-surface);
+  min-height: 160px;
 }
 
 .pl-panel-header {
@@ -743,6 +746,7 @@
   flex-direction: column;
   overflow: hidden;
   background: var(--bg-surface);
+  min-height: 160px;
 }
 
 .pl-qt-add-btn {
