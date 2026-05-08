@@ -546,11 +546,23 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
               </div>
 
               {/* Blocks area */}
+              {(() => {
+                const layout = computeLayout(dayBlocks);
+                const layoutMap = new Map(layout.map(l => [l.id, l]));
+                const maxCol = layout.length > 0 ? Math.max(...layout.map(l => Math.floor((l.top - 6) / (BLOCK_H + BLOCK_GAP)))) : 0;
+                const numRows = Math.max(maxCol + 1, 5);
+                const areaH = numRows * (BLOCK_H + BLOCK_GAP) + 6;
+                return (
               <div
                 className="pl-blocks-area"
                 ref={blocksAreaRef}
+                style={{ height: areaH }}
                 onClick={() => setSelectedIds(new Set())}
               >
+                {/* Yatay satır çizgileri (swimlanes) */}
+                {Array.from({length: numRows}, (_, r) => (
+                  <div key={`row${r}`} className="pl-hline" style={{ top: 6 + r * (BLOCK_H + BLOCK_GAP), height: BLOCK_H }} />
+                ))}
                 {/* Vertical hour lines */}
                 {Array.from({length:25}, (_,h) => (
                   <div key={h} className="pl-vline" style={{ left: h * hourWidth }} />
@@ -582,12 +594,9 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
                 )}
 
                 {/* Actual blocks */}
-                {(() => {
-                  const layout = computeLayout(dayBlocks);
-                  const layoutMap = new Map(layout.map(l => [l.id, l]));
-                  return dayBlocks.map(block => {
+                {dayBlocks.map(block => {
                   const { left, width, color } = posStyle(block);
-                  const { top, height } = layoutMap.get(block.id) || { top: 6, height: BLOCKS_H - 12 };
+                  const { top, height } = layoutMap.get(block.id) || { top: 6, height: BLOCK_H };
                   const isGhosted = !!ghost;
                   const isSelected = selectedIds.has(block.id);
                   return (
@@ -605,21 +614,17 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
                       </div>
                       <span className="pl-block-time">{block.startTime}–{block.endTime}</span>
                       {block.note && width > 130 && <span className="pl-block-note">{block.note}</span>}
-                      {/* Action buttons */}
                       <div className="pl-block-actions" onMouseDown={(e) => e.stopPropagation()}>
                         <button className="pl-block-edit-btn" onClick={(e) => { e.stopPropagation(); openEdit(block); }} title="Edit">✎</button>
                         <button className="pl-block-del-btn"  onClick={(e) => { e.stopPropagation(); deleteBlock(block.id); }} title="Delete">×</button>
                       </div>
-                      {/* Resize handle */}
-                      <div
-                        className="pl-resize-handle"
-                        onMouseDown={(e) => handleBlockResize(e, block)}
-                      />
+                      <div className="pl-resize-handle" onMouseDown={(e) => handleBlockResize(e, block)} />
                     </div>
                   );
-                  });
-                })()}
+                })}
               </div>
+                );
+              })()}
 
             </div>
           </div>
