@@ -340,17 +340,28 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
     document.body.style.cursor = 'grabbing';
     document.body.style.userSelect = 'none';
 
-    const onMove = (ev) => {
+    const getDropPos = (ev) => {
       const wrapEl = timelineRef.current;
-      if (!wrapEl) return;
-      const rect = wrapEl.getBoundingClientRect();
-      if (ev.clientY >= rect.top && ev.clientY <= rect.bottom) {
-        const ppm   = hourWidthRef.current / 60;
-        const x     = ev.clientX - rect.left + wrapEl.scrollLeft;
-        const start = clamp(snapTo(x / ppm), 0, 23*60);
-        const dur   = qtask.defaultDuration || 60;
-        const end   = clamp(start + dur, SNAP, 24*60);
-        setGhost({ left: start * ppm, width: (end - start) * ppm, colorHex: colorHex(qtask.color), title: qtask.title, startTime: minutesToTime(start), endTime: minutesToTime(end) });
+      const areaEl = blocksAreaRef.current;
+      if (!wrapEl || !areaEl) return null;
+      const wrapRect = wrapEl.getBoundingClientRect();
+      const areaRect = areaEl.getBoundingClientRect();
+      // X: timeline scroll dahil
+      if (ev.clientX < wrapRect.left || ev.clientX > wrapRect.right) return null;
+      // Y: blocksArea içinde mi — scroll yapılmış olsa da areaRect günceli
+      if (ev.clientY < areaRect.top || ev.clientY > areaRect.bottom) return null;
+      const ppm = hourWidthRef.current / 60;
+      const x = ev.clientX - wrapRect.left + wrapEl.scrollLeft;
+      const start = clamp(snapTo(x / ppm), 0, 23*60);
+      const dur = qtask.defaultDuration || 60;
+      const end = clamp(start + dur, SNAP, 24*60);
+      return { start, end, ppm };
+    };
+
+    const onMove = (ev) => {
+      const pos = getDropPos(ev);
+      if (pos) {
+        setGhost({ left: pos.start * pos.ppm, width: (pos.end - pos.start) * pos.ppm, colorHex: colorHex(qtask.color), title: qtask.title, startTime: minutesToTime(pos.start), endTime: minutesToTime(pos.end) });
       } else {
         setGhost(null);
       }
@@ -361,16 +372,9 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
       setGhost(null);
-      const wrapEl = timelineRef.current;
-      if (!wrapEl) return;
-      const rect = wrapEl.getBoundingClientRect();
-      if (ev.clientY >= rect.top && ev.clientY <= rect.bottom) {
-        const ppm   = hourWidthRef.current / 60;
-        const x     = ev.clientX - rect.left + wrapEl.scrollLeft;
-        const start = clamp(snapTo(x / ppm), 0, 23*60);
-        const dur   = qtask.defaultDuration || 60;
-        const end   = clamp(start + dur, SNAP, 24*60);
-        setBlocks(prev => [...prev, { id: Date.now(), date: selectedDateStr, title: qtask.title, startTime: minutesToTime(start), endTime: minutesToTime(end), color: qtask.color, recur: 'none', note: qtask.note || '' }]);
+      const pos = getDropPos(ev);
+      if (pos) {
+        setBlocks(prev => [...prev, { id: Date.now(), date: selectedDateStr, title: qtask.title, startTime: minutesToTime(pos.start), endTime: minutesToTime(pos.end), color: qtask.color, recur: 'none', note: qtask.note || '' }]);
       }
     };
     window.addEventListener('mousemove', onMove);
