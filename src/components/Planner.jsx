@@ -87,6 +87,7 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
   const [selectedIds, setSelectedIds] = useState(new Set());
 
   const timelineRef = useRef(null);
+  const blocksAreaRef = useRef(null);
   const notifTimers = useRef([]);
   const [hourWidth, setHourWidth] = useState(HOUR_WIDTH_DEFAULT);
   const hourWidthRef = useRef(HOUR_WIDTH_DEFAULT); // her zaman güncel hourWidth
@@ -391,7 +392,7 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
   };
 
   // Çakışan blokları yan yana dizen layout algoritması
-  const computeLayout = (blockList, blocksAreaH) => {
+  const computeLayout = (blockList, blocksAreaH = 200) => {
     // Her bloğu bir "column" a ata, çakışmıyorsa 0. column
     const sorted = [...blockList].sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
     const cols = []; // cols[i] = son biten dakika
@@ -550,7 +551,7 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
               {/* Blocks area */}
               <div
                 className="pl-blocks-area"
-                style={{ height: BLOCKS_H }}
+                ref={blocksAreaRef}
                 onClick={() => setSelectedIds(new Set())}
               >
                 {/* Vertical hour lines */}
@@ -585,7 +586,8 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
 
                 {/* Actual blocks */}
                 {(() => {
-                  const layout = computeLayout(dayBlocks, BLOCKS_H);
+                  const areaH = blocksAreaRef.current?.clientHeight || 200;
+                  const layout = computeLayout(dayBlocks, areaH);
                   const layoutMap = new Map(layout.map(l => [l.id, l]));
                   return dayBlocks.map(block => {
                   const { left, width, color } = posStyle(block);
