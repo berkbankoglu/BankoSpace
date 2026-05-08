@@ -84,6 +84,7 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
   const [notifOk,  setNotifOk] = useState(false);
 
   const [ghost, setGhost] = useState(null); // { left, width, colorHex, title, startTime, endTime } | null
+  const [selectedIds, setSelectedIds] = useState(new Set());
 
   const timelineRef = useRef(null);
   const notifTimers = useRef([]);
@@ -135,6 +136,21 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
     const iv = setInterval(() => scheduleNotifications(blocks), 60000);
     return () => { clearInterval(iv); notifTimers.current.forEach(clearTimeout); };
   }, [blocks, scheduleNotifications]);
+
+  // Delete tuşu ile seçili blokları sil
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIds.size > 0) {
+        const active = document.activeElement;
+        if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) return;
+        setBlocks(prev => prev.filter(b => !selectedIds.has(b.id)));
+        setSelectedIds(new Set());
+      }
+      if (e.key === 'Escape') setSelectedIds(new Set());
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectedIds]);
 
   // ── Derived ───────────────────────────────────────────────
   const selectedDateStr = `${currentDate.year}-${pad(currentDate.month+1)}-${pad(currentDate.day)}`;
@@ -226,27 +242,42 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
     return clientX - el.getBoundingClientRect().left + el.scrollLeft;
   };
 
-  // Move existing block
+  // Move existing block (multi-select destekli)
   const handleBlockMove = (e, block) => {
     e.preventDefault();
     e.stopPropagation();
+
+    // Shift tıklama — seçime ekle/çıkar, drag başlatma
+    if (e.shiftKey) {
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        if (next.has(block.id)) next.delete(block.id);
+        else next.add(block.id);
+        return next;
+      });
+      return;
+    }
+
+    // Seçili değilse tek seç, seçiliyse multi-drag
+    const isSelected = selectedIds.has(block.id);
+    if (!isSelected) setSelectedIds(new Set([block.id]));
+    const dragIds = isSelected && selectedIds.size > 1 ? [...selectedIds] : [block.id];
+
     const hw      = hourWidthRef.current;
     const ppm     = hw / 60;
     const origStart = timeToMinutes(block.startTime);
     const duration  = timeToMinutes(block.endTime) - origStart;
-    // İmlecin block sol kenarından kaç px içeride olduğu — sabit kalacak
     const clickOffsetPx = getTlX(e.clientX) - origStart * ppm;
 
-    setGhost({ left: origStart * ppm, width: duration * ppm, colorHex: colorHex(block.color), title: block.title, startTime: block.startTime, endTime: block.endTime });
+    setGhost({ left: origStart * ppm, width: duration * ppm, colorHex: colorHex(block.color), title: dragIds.length > 1 ? `${dragIds.length} blok` : block.title, startTime: block.startTime, endTime: block.endTime });
     document.body.style.cursor = 'grabbing';
     document.body.style.userSelect = 'none';
 
     const onMove = (ev) => {
-      const hw2  = hourWidthRef.current;
-      const ppm2 = hw2 / 60;
+      const ppm2 = hourWidthRef.current / 60;
       const rawPx = getTlX(ev.clientX) - clickOffsetPx;
       const start = clamp(snapTo(rawPx / ppm2), 0, 24*60 - duration);
-      setGhost({ left: start * ppm2, width: duration * ppm2, colorHex: colorHex(block.color), title: block.title, startTime: minutesToTime(start), endTime: minutesToTime(start + duration) });
+      setGhost({ left: start * ppm2, width: duration * ppm2, colorHex: colorHex(block.color), title: dragIds.length > 1 ? `${dragIds.length} blok` : block.title, startTime: minutesToTime(start), endTime: minutesToTime(start + duration) });
     };
     const onUp = (ev) => {
       window.removeEventListener('mousemove', onMove);
@@ -254,14 +285,17 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
       setGhost(null);
-      const hw2  = hourWidthRef.current;
-      const ppm2 = hw2 / 60;
+      const ppm2 = hourWidthRef.current / 60;
       const rawPx = getTlX(ev.clientX) - clickOffsetPx;
-      const start = clamp(snapTo(rawPx / ppm2), 0, 24*60 - duration);
-      if (start !== origStart) {
-        setBlocks(prev => prev.map(b => b.id === block.id
-          ? { ...b, startTime: minutesToTime(start), endTime: minutesToTime(start + duration) }
-          : b));
+      const newStart = clamp(snapTo(rawPx / ppm2), 0, 24*60 - duration);
+      const delta = newStart - origStart;
+      if (delta !== 0) {
+        setBlocks(prev => prev.map(b => {
+          if (!dragIds.includes(b.id)) return b;
+          const s = clamp(timeToMinutes(b.startTime) + delta, 0, 24*60 - 1);
+          const d = timeToMinutes(b.endTime) - timeToMinutes(b.startTime);
+          return { ...b, startTime: minutesToTime(s), endTime: minutesToTime(clamp(s + d, 1, 24*60)) };
+        }));
       }
     };
     window.addEventListener('mousemove', onMove);
@@ -385,6 +419,12 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
           {viewMode === 'day' && (
             <button className="pl-add-btn" onClick={() => openAdd(selectedDateStr)}>+ Add Block</button>
           )}
+          {selectedIds.size > 0 && (
+            <button className="pl-add-btn" style={{ background:'#f85149', borderColor:'#f85149' }}
+              onClick={() => { setBlocks(prev => prev.filter(b => !selectedIds.has(b.id))); setSelectedIds(new Set()); }}>
+              Delete {selectedIds.size}
+            </button>
+          )}
         </div>
       </div>
 
@@ -484,6 +524,7 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
               <div
                 className="pl-blocks-area"
                 style={{ height: BLOCKS_H }}
+                onClick={() => setSelectedIds(new Set())}
               >
                 {/* Vertical hour lines */}
                 {Array.from({length:25}, (_,h) => (
@@ -518,15 +559,15 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
                 {/* Actual blocks */}
                 {dayBlocks.map(block => {
                   const { left, width, color } = posStyle(block);
-                  // left/width are px numbers from posStyle
                   const isGhosted = !!ghost;
+                  const isSelected = selectedIds.has(block.id);
                   return (
                     <div
                       key={block.id}
-                      className={`pl-block${isGhosted?' pl-block-hidden':''}`}
-                      style={{ left, width, top:6, bottom:6, borderTopColor:color, background:color+'55' }}
+                      className={`pl-block${isGhosted?' pl-block-hidden':''}${isSelected?' pl-block-selected':''}`}
+                      style={{ left, width, top:6, bottom:6, borderTopColor:color, background:color+'55', outline: isSelected ? `2px solid ${color}` : 'none', outlineOffset: 2 }}
                       onMouseDown={(e) => { if (!e.target.classList.contains('pl-resize-handle') && !e.target.classList.contains('pl-block-edit-btn')) handleBlockMove(e, block); }}
-                      onClick={(e) => e.stopPropagation()}
+                      onClick={(e) => { e.stopPropagation(); if (!e.shiftKey) { if (selectedIds.size <= 1 && selectedIds.has(block.id)) openEdit(block); else setSelectedIds(new Set([block.id])); } }}
                     >
                       <div className="pl-block-header">
                         <span className="pl-block-title">{block.title}</span>
