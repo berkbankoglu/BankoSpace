@@ -85,6 +85,7 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
 
   const [ghost, setGhost] = useState(null); // { left, width, colorHex, title, startTime, endTime } | null
   const [selectedIds, setSelectedIds] = useState(new Set());
+  const [selBox, setSelBox] = useState(null); // { x1,y1,x2,y2 } canvas coords relative to blocksArea
 
   const timelineRef = useRef(null);
   const blocksAreaRef = useRef(null);
@@ -395,6 +396,56 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
 
 
 
+  // Selection box drag on empty area
+  const handleAreaMouseDown = useCallback((e, blocksList, layoutMap) => {
+    if (e.button !== 0) return;
+    if (e.target.closest('.pl-block')) return;
+    e.preventDefault();
+    const areaEl = blocksAreaRef.current;
+    const wrapEl = timelineRef.current;
+    if (!areaEl || !wrapEl) return;
+
+    const areaRect = areaEl.getBoundingClientRect();
+    const startX = e.clientX - areaRect.left + wrapEl.scrollLeft;
+    const startY = e.clientY - areaRect.top  + wrapEl.scrollTop;
+
+    setSelBox({ x1: startX, y1: startY, x2: startX, y2: startY });
+    setSelectedIds(new Set());
+
+    const onMove = (ev) => {
+      setSelBox({ x1: startX, y1: startY,
+        x2: ev.clientX - areaRect.left + wrapEl.scrollLeft,
+        y2: ev.clientY - areaRect.top  + wrapEl.scrollTop });
+    };
+
+    const onUp = (ev) => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      const x2 = ev.clientX - areaRect.left + wrapEl.scrollLeft;
+      const y2 = ev.clientY - areaRect.top  + wrapEl.scrollTop;
+      const rx1 = Math.min(startX, x2), rx2 = Math.max(startX, x2);
+      const ry1 = Math.min(startY, y2), ry2 = Math.max(startY, y2);
+      setSelBox(null);
+      if (rx2 - rx1 > 4 || ry2 - ry1 > 4) {
+        const ppm = hourWidthRef.current / 60;
+        const hit = new Set();
+        blocksList.forEach(b => {
+          const l = layoutMap.get(b.id);
+          if (!l) return;
+          const bL = timeToMinutes(b.startTime) * ppm;
+          const bR = timeToMinutes(b.endTime)   * ppm;
+          const bT = l.top;
+          const bB = l.top + l.height;
+          if (bR > rx1 && bL < rx2 && bB > ry1 && bT < ry2) hit.add(b.id);
+        });
+        setSelectedIds(hit);
+      }
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, []);
+
   // Helper: pixel position of a block
   const posStyle = (block) => {
     const start = timeToMinutes(block.startTime);
@@ -575,7 +626,8 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
                 className="pl-blocks-area"
                 ref={blocksAreaRef}
                 style={{ height: areaH }}
-                onClick={() => setSelectedIds(new Set())}
+                onClick={(e) => { if (!e.target.closest('.pl-block')) setSelectedIds(new Set()); }}
+                onMouseDown={(e) => handleAreaMouseDown(e, dayBlocks, layoutMap)}
               >
                 {/* Yatay satır çizgileri (swimlanes) */}
                 {Array.from({length: numRows}, (_, r) => (
@@ -595,6 +647,22 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
                   <div className="pl-now-line" style={{ left: nowLeft }}>
                     <span className="pl-now-dot" />
                   </div>
+                )}
+
+                {/* Selection box */}
+                {selBox && (
+                  <div style={{
+                    position: 'absolute',
+                    left:   Math.min(selBox.x1, selBox.x2),
+                    top:    Math.min(selBox.y1, selBox.y2),
+                    width:  Math.abs(selBox.x2 - selBox.x1),
+                    height: Math.abs(selBox.y2 - selBox.y1),
+                    border: '1.5px solid rgba(255,255,255,0.5)',
+                    background: 'rgba(255,255,255,0.06)',
+                    borderRadius: 4,
+                    pointerEvents: 'none',
+                    zIndex: 20,
+                  }} />
                 )}
 
                 {/* Ghost preview */}
