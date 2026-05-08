@@ -355,7 +355,11 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
       const start = clamp(snapTo(x / ppm), 0, 23*60);
       const dur = qtask.defaultDuration || 60;
       const end = clamp(start + dur, SNAP, 24*60);
-      return { start, end, ppm };
+      // Y: mouse'un blocksArea içindeki satırını hesapla
+      const yInArea = ev.clientY - areaRect.top + (wrapEl.scrollTop || 0);
+      const row = Math.max(0, Math.floor((yInArea - 6) / (BLOCK_H + BLOCK_GAP)));
+      const top = 6 + row * (BLOCK_H + BLOCK_GAP);
+      return { start, end, ppm, top };
     };
 
     const onMove = (ev) => {
@@ -587,7 +591,7 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
                 {ghost && (
                   <div className="pl-block pl-block-ghost" style={{
                     left: ghost.left, width: ghost.width,
-                    top: 6, height: BLOCK_H,
+                    top: ghost.top ?? 6, height: BLOCK_H,
                     borderTopColor: ghost.colorHex,
                     background: ghost.colorHex + '55',
                     pointerEvents: 'none',
