@@ -567,7 +567,8 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
                       className={`pl-block${isGhosted?' pl-block-hidden':''}${isSelected?' pl-block-selected':''}`}
                       style={{ left, width, top:6, bottom:6, borderTopColor:color, background:color+'55', outline: isSelected ? `2px solid ${color}` : 'none', outlineOffset: 2 }}
                       onMouseDown={(e) => { if (!e.target.classList.contains('pl-resize-handle') && !e.target.classList.contains('pl-block-edit-btn')) handleBlockMove(e, block); }}
-                      onClick={(e) => { e.stopPropagation(); if (!e.shiftKey) { if (selectedIds.size <= 1 && selectedIds.has(block.id)) openEdit(block); else setSelectedIds(new Set([block.id])); } }}
+                      onClick={(e) => { e.stopPropagation(); if (e.shiftKey) { setSelectedIds(prev => { const next = new Set(prev); if (next.has(block.id)) next.delete(block.id); else next.add(block.id); return next; }); } else { setSelectedIds(new Set([block.id])); } }}
+                      onDoubleClick={(e) => { e.stopPropagation(); openEdit(block); }}
                     >
                       <div className="pl-block-header">
                         <span className="pl-block-title">{block.title}</span>
