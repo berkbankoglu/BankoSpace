@@ -390,6 +390,33 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
     };
   };
 
+  // Çakışan blokları yan yana dizen layout algoritması
+  const computeLayout = (blockList, blocksAreaH) => {
+    // Her bloğu bir "column" a ata, çakışmıyorsa 0. column
+    const sorted = [...blockList].sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
+    const cols = []; // cols[i] = son biten dakika
+    const assignments = new Map(); // blockId -> { col, totalCols }
+
+    sorted.forEach(b => {
+      const start = timeToMinutes(b.startTime);
+      const end   = timeToMinutes(b.endTime);
+      let col = cols.findIndex(endMin => endMin <= start);
+      if (col === -1) { col = cols.length; cols.push(end); }
+      else cols[col] = end;
+      assignments.set(b.id, { col });
+    });
+
+    const totalCols = cols.length;
+    const trackH = (blocksAreaH - 12) / Math.max(totalCols, 1);
+
+    return sorted.map(b => {
+      const { col } = assignments.get(b.id);
+      const top    = 6 + col * trackH;
+      const height = trackH - 2;
+      return { id: b.id, top, height };
+    });
+  };
+
   const getBlocksForDay = (day) => {
     if (!day) return [];
     return blocks.filter(b => blockMatchesDate(b, `${currentDate.year}-${pad(currentDate.month+1)}-${pad(day)}`));
@@ -557,15 +584,19 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
                 )}
 
                 {/* Actual blocks */}
-                {dayBlocks.map(block => {
+                {(() => {
+                  const layout = computeLayout(dayBlocks, BLOCKS_H);
+                  const layoutMap = new Map(layout.map(l => [l.id, l]));
+                  return dayBlocks.map(block => {
                   const { left, width, color } = posStyle(block);
+                  const { top, height } = layoutMap.get(block.id) || { top: 6, height: BLOCKS_H - 12 };
                   const isGhosted = !!ghost;
                   const isSelected = selectedIds.has(block.id);
                   return (
                     <div
                       key={block.id}
                       className={`pl-block${isGhosted?' pl-block-hidden':''}${isSelected?' pl-block-selected':''}`}
-                      style={{ left, width, top:6, bottom:6, borderTopColor:color, background:color+'55', outline: isSelected ? `2px solid ${color}` : 'none', outlineOffset: 2 }}
+                      style={{ left, width, top, height, borderTopColor:color, background:color+'55', outline: isSelected ? `2px solid ${color}` : 'none', outlineOffset: 2 }}
                       onMouseDown={(e) => { if (!e.target.classList.contains('pl-resize-handle') && !e.target.classList.contains('pl-block-edit-btn')) handleBlockMove(e, block); }}
                       onClick={(e) => { e.stopPropagation(); if (e.shiftKey) { setSelectedIds(prev => { const next = new Set(prev); if (next.has(block.id)) next.delete(block.id); else next.add(block.id); return next; }); } else { setSelectedIds(new Set([block.id])); } }}
                       onDoubleClick={(e) => { e.stopPropagation(); openEdit(block); }}
@@ -588,7 +619,8 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
                       />
                     </div>
                   );
-                })}
+                  });
+                })()}
               </div>
 
             </div>
