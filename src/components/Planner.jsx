@@ -83,6 +83,7 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
   const [qtForm,   setQtForm]  = useState({});
   const [notifOk,  setNotifOk] = useState(false);
 
+  const [nowMinsState, setNowMinsState] = useState(() => new Date().getHours() * 60 + new Date().getMinutes());
   const [ghost, setGhost] = useState(null); // { left, width, colorHex, title, startTime, endTime } | null
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [selBox, setSelBox] = useState(null); // { x1,y1,x2,y2 } canvas coords relative to blocksArea
@@ -159,8 +160,7 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
   const dayBlocks = blocks.filter(b => blockMatchesDate(b, selectedDateStr)).sort((a,b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
   const monthDays = getMonthDays(currentDate.year, currentDate.month);
   const isToday   = selectedDateStr === todayStr();
-  const nowMins   = new Date().getHours() * 60 + new Date().getMinutes();
-  const nowLeft   = nowMins * (hourWidth / 60); // px
+  const nowLeft   = nowMinsState * (hourWidth / 60); // px
   const totalWidth = 24 * hourWidth;
 
   // Navigation
@@ -169,6 +169,15 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
   const goToday   = () => { const d = new Date(); setCurrentDate({ year:d.getFullYear(), month:d.getMonth(), day:d.getDate() }); };
   const prevDay   = () => { const d = new Date(selectedDateStr+'T00:00:00'); d.setDate(d.getDate()-1); setCurrentDate({ year:d.getFullYear(), month:d.getMonth(), day:d.getDate() }); };
   const nextDay   = () => { const d = new Date(selectedDateStr+'T00:00:00'); d.setDate(d.getDate()+1); setCurrentDate({ year:d.getFullYear(), month:d.getMonth(), day:d.getDate() }); };
+
+  // Now line auto-advance
+  useEffect(() => {
+    const tick = () => setNowMinsState(new Date().getHours() * 60 + new Date().getMinutes());
+    // Bir sonraki tam dakikaya kadar bekle, sonra her 60s'de güncelle
+    const msToNextMin = (60 - new Date().getSeconds()) * 1000 - new Date().getMilliseconds();
+    const t = setTimeout(() => { tick(); const id = setInterval(tick, 60000); return () => clearInterval(id); }, msToNextMin);
+    return () => clearTimeout(t);
+  }, []);
 
   // Scroll to now on day view open
   useEffect(() => {
