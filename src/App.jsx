@@ -1019,6 +1019,10 @@ function App({ session, onLogout }) {
         });
       } else if (overCategory && overCategory !== todo.category) {
         const savedCategory = overCategory;
+        const allEls2 = document.querySelectorAll('.cc-item[data-todo-id]');
+        const oldPositions2 = {};
+        allEls2.forEach(el => { const id = el.getAttribute('data-todo-id'); if (id) oldPositions2[id] = el.getBoundingClientRect(); });
+        todoPositionsRef.current = oldPositions2;
         playClickSound();
         setTodos(prev => prev.map(t => {
           if (String(t.id) === String(todo.id)) return { ...t, category: savedCategory, order: -1 };
@@ -1046,11 +1050,13 @@ function App({ session, onLogout }) {
       const deltaY = oldPositions[id].top - newRect.top;
       const deltaX = oldPositions[id].left - newRect.left;
       if (Math.abs(deltaY) > 1 || Math.abs(deltaX) > 1) {
-        el.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
         el.style.transition = 'none';
-        el.offsetHeight; // Force reflow
+        el.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+        el.offsetHeight;
+        el.style.transition = 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1)';
         el.style.transform = '';
-        el.style.transition = 'transform 0.45s cubic-bezier(0.4, 0, 0.2, 1)';
+        const cleanup = () => { el.style.transition = ''; el.removeEventListener('transitionend', cleanup); };
+        el.addEventListener('transitionend', cleanup);
       }
     });
     todoPositionsRef.current = {};
