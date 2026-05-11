@@ -19,11 +19,15 @@
 }
 
 .login-logo {
-  font-size: 22px;
-  font-weight: 700;
-  color: #e6edf3;
-  text-align: center;
-  letter-spacing: -0.5px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.login-logo-img {
+  height: 48px;
+  width: auto;
+  object-fit: contain;
 }
 
 .login-subtitle {

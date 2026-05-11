@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '../supabase';
+import logo from '../assets/logo.svg';
 import './Login.css';
 
 const closeApp = async () => { try { const { getCurrentWindow } = await import('@tauri-apps/api/window'); await getCurrentWindow().close(); } catch {} };
@@ -86,7 +87,9 @@ export default function Login({ onLogin }) {
         <button className="login-close-btn" onClick={closeApp}>×</button>
       </div>
       <div className="login-box">
-        <div className="login-logo">BankoSpace</div>
+        <div className="login-logo">
+          <img src={logo} alt="BankoSpace" className="login-logo-img" />
+        </div>
         <div className="login-subtitle">Your personal workspace</div>
 
         <form onSubmit={handleSubmit} className="login-form">
