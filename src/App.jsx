@@ -1269,7 +1269,9 @@ function App({ session, onLogout }) {
       <div
         className="custom-titlebar"
       >
-        <div className="titlebar-left" />
+        <div className="titlebar-left">
+          <img src={logo} alt="BankoSpace" className="titlebar-logo" />
+        </div>
         <div className="titlebar-drag-region" data-tauri-drag-region onDoubleClick={maximizeWindow} />
         <div className="titlebar-controls">
           <button className="titlebar-btn minimize" onClick={minimizeWindow}>─</button>
