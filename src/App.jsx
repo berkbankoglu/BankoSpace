@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { flushSync } from 'react-dom';
 import logo from './assets/logo.svg';
 import './App.css';
 import { supabase, pullFromSupabase, pushKeyToSupabase, pushAllToSupabase, SYNC_KEYS } from './supabase';
@@ -900,7 +901,6 @@ function App({ session, onLogout }) {
   };
 
   // Todo drag & drop — fitness tarzı closure, sıfır React render
-  const todoPositionsRef = useRef({});
   const todoHoldTimerRef = useRef(null);
 
   const handleTodoDragStart = useCallback((e, todo) => {
@@ -981,24 +981,46 @@ function App({ session, onLogout }) {
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
 
+      const flipAnimate = (updateFn) => {
+        // F: snapshot before
+        const before = {};
+        document.querySelectorAll('.cc-item[data-todo-id]').forEach(el => {
+          before[el.getAttribute('data-todo-id')] = el.getBoundingClientRect();
+        });
+        // L: apply state change synchronously so DOM updates immediately
+        flushSync(() => { setTodos(updateFn); });
+        // I: measure new positions and invert
+        document.querySelectorAll('.cc-item[data-todo-id]').forEach(el => {
+          const id = el.getAttribute('data-todo-id');
+          if (!before[id]) return;
+          const after = el.getBoundingClientRect();
+          const dy = before[id].top - after.top;
+          const dx = before[id].left - after.left;
+          if (Math.abs(dy) < 1 && Math.abs(dx) < 1) return;
+          el.style.transition = 'none';
+          el.style.transform = `translate(${dx}px, ${dy}px)`;
+        });
+        // P: play — next frame animate to final position
+        requestAnimationFrame(() => {
+          document.querySelectorAll('.cc-item[data-todo-id]').forEach(el => {
+            if (!el.style.transform) return;
+            el.style.transition = 'transform 0.32s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+            el.style.transform = '';
+            const done = () => { el.style.transition = ''; el.style.transform = ''; el.removeEventListener('transitionend', done); };
+            el.addEventListener('transitionend', done);
+          });
+        });
+      };
+
       if (overTodoId) {
         const savedOverTodoId = overTodoId;
         const savedTodoId = String(todo.id);
-
-        // FLIP: pozisyonları bırakmadan önce kaydet
-        const allEls = document.querySelectorAll('.cc-item[data-todo-id]');
-        const oldPositions = {};
-        allEls.forEach(el => { const id = el.getAttribute('data-todo-id'); if (id) oldPositions[id] = el.getBoundingClientRect(); });
-        todoPositionsRef.current = oldPositions;
-
         playClickSound();
-        setTodos(prev => {
+        flipAnimate(prev => {
           const dragItem   = prev.find(t => String(t.id) === savedTodoId);
           const targetItem = prev.find(t => String(t.id) === savedOverTodoId);
           if (!dragItem || !targetItem) return prev;
-
           if (dragItem.category === targetItem.category) {
-            // Aynı kolon — sıra değiştir
             const cat = dragItem.category;
             const catTodos = prev.filter(t => t.category === cat).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
             const fromIdx = catTodos.findIndex(t => String(t.id) === savedTodoId);
@@ -1009,7 +1031,6 @@ function App({ session, onLogout }) {
             const updated = reordered.map((t, i) => ({ ...t, order: i }));
             return [...prev.filter(t => t.category !== cat), ...updated];
           } else {
-            // Farklı kolon — swap
             return prev.map(t => {
               if (String(t.id) === savedTodoId)     return { ...t, category: targetItem.category, order: targetItem.order };
               if (String(t.id) === savedOverTodoId) return { ...t, category: dragItem.category,   order: dragItem.order };
@@ -1019,12 +1040,8 @@ function App({ session, onLogout }) {
         });
       } else if (overCategory && overCategory !== todo.category) {
         const savedCategory = overCategory;
-        const allEls2 = document.querySelectorAll('.cc-item[data-todo-id]');
-        const oldPositions2 = {};
-        allEls2.forEach(el => { const id = el.getAttribute('data-todo-id'); if (id) oldPositions2[id] = el.getBoundingClientRect(); });
-        todoPositionsRef.current = oldPositions2;
         playClickSound();
-        setTodos(prev => prev.map(t => {
+        flipAnimate(prev => prev.map(t => {
           if (String(t.id) === String(todo.id)) return { ...t, category: savedCategory, order: -1 };
           if (t.category === savedCategory) return { ...t, order: (t.order ?? 0) + 1 };
           return t;
@@ -1037,30 +1054,6 @@ function App({ session, onLogout }) {
   }, [todos]);
 
 
-  // FLIP animation for todo reorder
-  useEffect(() => {
-    const oldPositions = todoPositionsRef.current;
-    if (Object.keys(oldPositions).length === 0) return;
-
-    const todoElements = document.querySelectorAll('.cc-item[data-todo-id]');
-    todoElements.forEach(el => {
-      const id = el.getAttribute('data-todo-id');
-      if (!id || !oldPositions[id]) return;
-      const newRect = el.getBoundingClientRect();
-      const deltaY = oldPositions[id].top - newRect.top;
-      const deltaX = oldPositions[id].left - newRect.left;
-      if (Math.abs(deltaY) > 1 || Math.abs(deltaX) > 1) {
-        el.style.transition = 'none';
-        el.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
-        el.offsetHeight;
-        el.style.transition = 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1)';
-        el.style.transform = '';
-        const cleanup = () => { el.style.transition = ''; el.removeEventListener('transitionend', cleanup); };
-        el.addEventListener('transitionend', cleanup);
-      }
-    });
-    todoPositionsRef.current = {};
-  }, [todos]);
 
   const renameCategory = (category, newName) => {
     setCategoryNames(prev => {
