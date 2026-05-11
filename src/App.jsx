@@ -1325,7 +1325,6 @@ function App({ session, onLogout }) {
           {/* Sidebar Header */}
           <div className="sidebar-header">
             <div className="sidebar-title">
-              {!sidebarCollapsed && <img src={logo} alt="BankoSpace" className="sidebar-logo" />}
             </div>
             <div className="sidebar-header-actions">
               <button
