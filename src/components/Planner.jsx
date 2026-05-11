@@ -84,9 +84,10 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
   const [notifOk,  setNotifOk] = useState(false);
 
   const [nowMinsState, setNowMinsState] = useState(() => new Date().getHours() * 60 + new Date().getMinutes());
-  const [ghost, setGhost] = useState(null); // { left, width, colorHex, title, startTime, endTime } | null
+  const [ghost, setGhost] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
-  const [selBox, setSelBox] = useState(null); // { x1,y1,x2,y2 } canvas coords relative to blocksArea
+  const [selBox, setSelBox] = useState(null);
+  const [draggingQtaskId, setDraggingQtaskId] = useState(null);
 
   const timelineRef = useRef(null);
   const blocksAreaRef = useRef(null);
@@ -173,10 +174,16 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
   // Now line auto-advance
   useEffect(() => {
     const tick = () => setNowMinsState(new Date().getHours() * 60 + new Date().getMinutes());
-    // Bir sonraki tam dakikaya kadar bekle, sonra her 60s'de güncelle
+    let intervalId = null;
     const msToNextMin = (60 - new Date().getSeconds()) * 1000 - new Date().getMilliseconds();
-    const t = setTimeout(() => { tick(); const id = setInterval(tick, 60000); return () => clearInterval(id); }, msToNextMin);
-    return () => clearTimeout(t);
+    const timeoutId = setTimeout(() => {
+      tick();
+      intervalId = setInterval(tick, 60000);
+    }, msToNextMin);
+    return () => {
+      clearTimeout(timeoutId);
+      if (intervalId) clearInterval(intervalId);
+    };
   }, []);
 
   // Scroll to now on day view open
@@ -355,6 +362,7 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
   const handleQtaskMouseDown = (e, qtask) => {
     e.preventDefault();
     setGhost(null);
+    setDraggingQtaskId(qtask.id);
     document.body.style.cursor = 'grabbing';
     document.body.style.userSelect = 'none';
 
@@ -394,6 +402,7 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
       setGhost(null);
+      setDraggingQtaskId(null);
       const pos = getDropPos(ev) || lastPos;
       if (pos) {
         setBlocks(prev => [...prev, { id: Date.now(), date: selectedDateStr, title: qtask.title, startTime: minutesToTime(pos.start), endTime: minutesToTime(pos.end), color: qtask.color, recur: 'none', note: qtask.note || '', row: pos.row }]);
@@ -742,7 +751,7 @@ export default function Planner({ onPlannerToast, onOpenPlanner }) {
                 return (
                   <div
                     key={task.id}
-                    className="pl-qtask-item"
+                    className={`pl-qtask-item${draggingQtaskId === task.id ? ' pl-qtask-dragging' : ''}`}
                     onMouseDown={(e) => handleQtaskMouseDown(e, task)}
                     onClick={() => openQtEdit(task)}
                   >

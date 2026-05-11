@@ -807,6 +807,11 @@
 }
 .pl-qtask-item:hover { border-color: var(--border-hover); box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
 .pl-qtask-item:active { cursor: grabbing; opacity: 0.7; }
+.pl-qtask-item.pl-qtask-dragging {
+  border-color: rgba(200,200,200,0.6);
+  box-shadow: 0 0 0 2px rgba(200,200,200,0.3), 0 4px 16px rgba(0,0,0,0.3);
+  opacity: 0.85;
+}
 
 .pl-qtask-bar {
   width: 3px;

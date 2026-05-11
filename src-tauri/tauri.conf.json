@@ -35,6 +35,7 @@
         "minWidth": 1200,
         "minHeight": 600,
         "resizable": true,
+        "maximized": true,
         "fullscreen": false,
         "decorations": false,
         "url": "index.html"
