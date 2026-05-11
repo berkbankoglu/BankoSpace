@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import logo from './assets/logo.svg';
 import './App.css';
 import { supabase, pullFromSupabase, pushKeyToSupabase, pushAllToSupabase, SYNC_KEYS } from './supabase';
 import Login from './components/Login';
@@ -1322,7 +1323,7 @@ function App({ session, onLogout }) {
           {/* Sidebar Header */}
           <div className="sidebar-header">
             <div className="sidebar-title">
-              {!sidebarCollapsed && <span>BankoSpace</span>}
+              {!sidebarCollapsed && <img src={logo} alt="BankoSpace" className="sidebar-logo" />}
             </div>
             <div className="sidebar-header-actions">
               <button

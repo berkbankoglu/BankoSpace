@@ -7792,6 +7792,13 @@ body.light .view-title {
   color: #555;
 }
 
+.sidebar-logo {
+  height: 22px;
+  width: auto;
+  object-fit: contain;
+  opacity: 0.85;
+}
+
 .sidebar-icon {
   font-size: 18px;
 }
