@@ -212,8 +212,16 @@ body {
 .titlebar-left {
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: 8px;
     -webkit-app-region: no-drag;
+}
+
+.titlebar-logo {
+    height: 20px;
+    width: auto;
+    object-fit: contain;
+    opacity: 0.8;
+    pointer-events: none;
 }
 
 .titlebar-nav-btn {
