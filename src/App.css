@@ -2,24 +2,24 @@
    DARK MODE DESIGN SYSTEM
    ============================================================ */
 :root {
-    --bg-base:       #090909;
-    --bg-surface:    #111111;
-    --bg-card:       #141414;
-    --bg-elevated:   #222222;
-    --bg-hover:      #282828;
-    --bg-input:      #111111;
+    --bg-base:       #141414;
+    --bg-surface:    #1a1a1a;
+    --bg-card:       #1e1e1e;
+    --bg-elevated:   #2a2a2a;
+    --bg-hover:      #313131;
+    --bg-input:      #1a1a1a;
 
-    --border:        #2a2a2a;
-    --border-hover:  #3a3a3a;
+    --border:        #333333;
+    --border-hover:  #444444;
 
-    --text-primary:  #e8e8e8;
-    --text-secondary:#a0a0a0;
-    --text-muted:    #606060;
+    --text-primary:  #ececec;
+    --text-secondary:#aaaaaa;
+    --text-muted:    #686868;
 
-    --accent:        #888888;
-    --accent-dim:    #555555;
-    --accent-glow:   rgba(136, 136, 136, 0.08);
-    --accent-hover:  #aaaaaa;
+    --accent:        #909090;
+    --accent-dim:    #5c5c5c;
+    --accent-glow:   rgba(144, 144, 144, 0.1);
+    --accent-hover:  #b0b0b0;
 
     --danger:        #f85149;
     --success:       #3fb950;
@@ -29,30 +29,30 @@
     --radius-md:  8px;
     --radius-lg:  12px;
 
-    --shadow-sm:  0 1px 3px rgba(0,0,0,0.4);
-    --shadow-md:  0 4px 16px rgba(0,0,0,0.5);
+    --shadow-sm:  0 1px 3px rgba(0,0,0,0.35);
+    --shadow-md:  0 4px 16px rgba(0,0,0,0.45);
 }
 
 /* Noir color theme (default dark) */
 body.color-noir {
-    --bg-base:       #090909;
-    --bg-surface:    #111111;
-    --bg-card:       #141414;
-    --bg-elevated:   #222222;
-    --bg-hover:      #282828;
-    --bg-input:      #111111;
+    --bg-base:       #141414;
+    --bg-surface:    #1a1a1a;
+    --bg-card:       #1e1e1e;
+    --bg-elevated:   #2a2a2a;
+    --bg-hover:      #313131;
+    --bg-input:      #1a1a1a;
 
-    --border:        #2a2a2a;
-    --border-hover:  #3a3a3a;
+    --border:        #333333;
+    --border-hover:  #444444;
 
-    --text-primary:  #e8e8e8;
-    --text-secondary:#a0a0a0;
-    --text-muted:    #606060;
+    --text-primary:  #ececec;
+    --text-secondary:#aaaaaa;
+    --text-muted:    #686868;
 
-    --accent:        #888888;
-    --accent-dim:    #555555;
-    --accent-glow:   rgba(136, 136, 136, 0.08);
-    --accent-hover:  #aaaaaa;
+    --accent:        #909090;
+    --accent-dim:    #5c5c5c;
+    --accent-glow:   rgba(144, 144, 144, 0.1);
+    --accent-hover:  #b0b0b0;
 }
 
 /* Classic (GitHub Dark) color theme */
