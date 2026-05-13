@@ -2050,13 +2050,15 @@ function AppWrapper() {
   const [initialSession, setInitialSession] = useState(null);
 
   useEffect(() => {
+    try { getCurrentWindow().maximize(); } catch {}
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setInitialSession(session);
       setLoggedIn(!!session);
       try {
         const win = getCurrentWindow();
         win.setDecorations(!!session);
-        if (session) win.maximize();
+        win.maximize();
       } catch {}
     });
 
