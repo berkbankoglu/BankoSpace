@@ -1269,7 +1269,6 @@ function App({ session, onLogout }) {
         className="custom-titlebar"
       >
         <div className="titlebar-left">
-          <img src={logo} alt="BankoSpace" className="titlebar-logo" />
         </div>
         <div className="titlebar-drag-region" data-tauri-drag-region onDoubleClick={maximizeWindow} />
         <div className="titlebar-controls">
@@ -1324,6 +1323,7 @@ function App({ session, onLogout }) {
           {/* Sidebar Header */}
           <div className="sidebar-header">
             <div className="sidebar-title">
+              {!sidebarCollapsed && <img src={logo} alt="BankoSpace" className="sidebar-logo" />}
             </div>
             <div className="sidebar-header-actions">
               <button
