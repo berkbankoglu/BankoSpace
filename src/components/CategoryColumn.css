@@ -1,8 +1,8 @@
 /* CategoryColumn v2 - DailyChecklist Style */
 
 .category-column-v2 {
-  background: #0d0d0d;
-  border-radius: 6px;
+  background: #111111;
+  border-radius: var(--radius-lg);
   padding: 16px;
   display: flex;
   flex-direction: column;
@@ -10,7 +10,7 @@
   min-width: 0;
   min-height: 0;
   height: 100%;
-  border: 1px solid #141414;
+  border: 1px solid var(--border);
   box-sizing: border-box;
 }
 
@@ -20,9 +20,37 @@
   align-items: center;
   justify-content: space-between;
   padding: 8px 10px 8px 14px;
-  border-bottom: 1px solid #141414;
+  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
   margin-bottom: 0;
+}
+
+.cc-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cc-priority-badge {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.cc-priority-badge--daily {
+  background: #f85149;
+  box-shadow: 0 0 6px rgba(248, 81, 73, 0.6);
+}
+
+.cc-priority-badge--weekly {
+  background: #fb923c;
+  box-shadow: 0 0 6px rgba(251, 146, 60, 0.6);
+}
+
+.cc-priority-badge--longterm {
+  background: #3fb950;
+  box-shadow: 0 0 6px rgba(63, 185, 80, 0.6);
 }
 
 .cc-title {
@@ -129,7 +157,7 @@
 
 /* Item */
 .cc-item {
-  background: var(--bg-card);
+  background: #222222;
   border-radius: 4px;
   padding: 8px 10px 8px 14px;
   transition: background 0.15s, border-color 0.15s;
