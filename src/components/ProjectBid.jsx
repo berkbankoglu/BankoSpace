@@ -145,7 +145,7 @@ export default function ProjectBid() {
 
         <div className="pb-right">
           <div className="pb-result-header">
-            <span className="pb-result-title">{resultType === 'analyze' ? 'Project Analysis' : 'Generated Bid'}</span>
+            <span className="pb-result-title">{resultType === 'analyze' ? 'Project Analysis' : resultType === 'bid' ? 'Generated Bid' : ''}</span>
             {result && <button className="pb-copy-btn" onClick={() => { navigator.clipboard.writeText(result); setCopied(true); setTimeout(() => setCopied(false), 1500); }}>{copied ? '✓ Copied' : 'Copy'}</button>}
           </div>
           {loading ? (
