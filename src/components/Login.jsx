@@ -3,7 +3,8 @@ import { supabase } from '../supabase';
 import logo from '../assets/logo.svg';
 import './Login.css';
 
-const closeApp = async () => { try { const { getCurrentWindow } = await import('@tauri-apps/api/window'); await getCurrentWindow().close(); } catch {} };
+const closeApp    = async () => { try { const { getCurrentWindow } = await import('@tauri-apps/api/window'); await getCurrentWindow().close(); } catch {} };
+const minimizeApp = async () => { try { const { getCurrentWindow } = await import('@tauri-apps/api/window'); await getCurrentWindow().minimize(); } catch {} };
 
 // step: 'form' | 'otp'
 export default function Login({ onLogin }) {
@@ -84,6 +85,7 @@ export default function Login({ onLogin }) {
     <div className="login-wrapper">
       {/* Minimal titlebar — sadece kapat, sürükle */}
       <div className="login-titlebar" data-tauri-drag-region>
+        <button className="login-minimize-btn" onClick={minimizeApp}>─</button>
         <button className="login-close-btn" onClick={closeApp}>×</button>
       </div>
       <div className="login-box">
