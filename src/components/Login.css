@@ -201,7 +201,8 @@
   z-index: 9999;
   -webkit-app-region: drag;
 }
-.login-close-btn {
+.login-close-btn,
+.login-minimize-btn {
   -webkit-app-region: no-drag;
   background: none;
   border: none;
@@ -216,4 +217,5 @@
   border-radius: 4px;
   line-height: 1;
 }
+.login-minimize-btn:hover { background: #1a1a2e; color: #aaa; }
 .login-close-btn:hover { background: #3a1a1a; color: #e05d4b; }
