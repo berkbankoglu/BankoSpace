@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import './SubscriptionTracker.css';
-import { pushKeyToSupabase } from '../supabase';
 
 const STORAGE_KEY = 'payments_v2';
 
@@ -30,9 +29,10 @@ function useLocalStorage(key, def) {
   const [val, setVal] = useState(() => {
     try { return JSON.parse(localStorage.getItem(key)) || def; } catch { return def; }
   });
+  const mounted = useRef(false);
   useEffect(() => {
+    if (!mounted.current) { mounted.current = true; return; }
     localStorage.setItem(key, JSON.stringify(val));
-    pushKeyToSupabase(key, val);
   }, [key, val]);
   return [val, setVal];
 }
