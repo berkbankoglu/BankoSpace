@@ -186,9 +186,12 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
             autoFocus
           />
         ) : (
-          <h3 className="cc-title" onDoubleClick={handleTitleDoubleClick}>
-            {title}
-          </h3>
+          <div className="cc-title-wrapper">
+            <span className={`cc-priority-badge cc-priority-badge--${category}`}></span>
+            <h3 className="cc-title" onDoubleClick={handleTitleDoubleClick}>
+              {title}
+            </h3>
+          </div>
         )}
         <span className="cc-count">{activeCount}</span>
       </div>

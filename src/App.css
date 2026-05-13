@@ -2,7 +2,7 @@
    DARK MODE DESIGN SYSTEM
    ============================================================ */
 :root {
-    --bg-base:       #141414;
+    --bg-base:       #111111;
     --bg-surface:    #1a1a1a;
     --bg-card:       #1e1e1e;
     --bg-elevated:   #2a2a2a;
@@ -35,7 +35,7 @@
 
 /* Noir color theme (default dark) */
 body.color-noir {
-    --bg-base:       #141414;
+    --bg-base:       #111111;
     --bg-surface:    #1a1a1a;
     --bg-card:       #1e1e1e;
     --bg-elevated:   #2a2a2a;
@@ -181,17 +181,20 @@ body {
 .update-dismiss-btn:hover { color: var(--text-primary); }
 
 .custom-titlebar {
-    position: relative;
+    position: fixed;
+    top: 0;
+    right: 0;
     height: 32px;
-    flex-shrink: 0;
-    background: var(--bg-surface);
-    border-bottom: 1px solid var(--border);
+    width: auto;
+    background: transparent;
+    border: none;
     display: flex;
     align-items: center;
-    padding: 0 8px;
+    padding: 0;
     z-index: 9999;
     user-select: none;
     cursor: default;
+    pointer-events: none;
 }
 
 .titlebar-title {
@@ -253,9 +256,11 @@ body {
 }
 
 .titlebar-drag-region {
-    flex: 1;
-    height: 100%;
-    cursor: default;
+    display: none;
+}
+
+.titlebar-left {
+    display: none !important;
 }
 
 .titlebar-filters-left {
@@ -299,26 +304,29 @@ body {
 .titlebar-controls {
     display: flex;
     -webkit-app-region: no-drag;
-    margin-left: auto;
+    pointer-events: all;
 }
 
 .titlebar-btn {
-    width: 46px;
-    height: 32px;
+    width: 36px;
+    height: 28px;
     border: none;
     background: transparent;
     color: var(--text-muted);
-    font-size: 14px;
+    font-size: 13px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: background 0.15s, color 0.15s;
+    border-radius: 4px;
+    opacity: 0.5;
 }
 
 .titlebar-btn:hover {
     background: var(--bg-hover);
     color: var(--text-primary);
+    opacity: 1;
 }
 
 .titlebar-btn.close:hover {
@@ -340,6 +348,7 @@ html, body, #root {
     display: flex;
     flex-direction: column;
     box-sizing: border-box;
+    padding-top: 0;
 }
 
 /* ============================================================
@@ -5691,7 +5700,7 @@ body.light .reset-btn:hover {
     margin-bottom: 20px;
     border-radius: 6px;
     background: var(--bg-surface);
-    border: 2px solid var(--border-hover);
+    border: 1px solid var(--border);
     overflow: hidden;
 }
 
@@ -5700,7 +5709,7 @@ body.light .reset-btn:hover {
     justify-content: space-between;
     align-items: center;
     padding: 14px 18px;
-    background: var(--bg-card);
+    background: #111111;
     cursor: pointer;
     transition: all 0.2s ease;
     user-select: none;
@@ -8669,7 +8678,8 @@ body.light .sidebar-bottom {
 .main-content-area {
   flex: 1;
   overflow: hidden;
-  background: var(--bg-base);
+  background: #111111 !important;
+  padding-top: 30px;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -8883,6 +8893,7 @@ body.light .todo-drag-ghost .cc-checkmark {
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+  background: #111111 !important;
 }
 
 .dashboard-container > * {
@@ -9485,6 +9496,8 @@ body.light .search-no-results {
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
+  background: #111111 !important;
+  border: none !important;
 }
 
 .dashboard-left .app-section.section-collapsed {
@@ -9636,8 +9649,16 @@ body.light .search-no-results {
 .sidebar-volume-slider::-webkit-slider-thumb { background: var(--accent) !important; border-color: var(--bg-base) !important; }
 
 /* --- Content areas --- */
-.content-wrapper { background: var(--bg-base) !important; }
-.main-content, .dashboard-content { background: var(--bg-base) !important; }
+.content-wrapper { background: #111111 !important; }
+.main-content, .dashboard-content { background: #111111 !important; }
+.main-content-area { background: #111111 !important; }
+.dashboard-container { background: #111111 !important; }
+.dashboard-left { background: #111111 !important; }
+.dashboard-left .app-section { background: #111111 !important; border: none !important; }
+.section-content { background: #111111 !important; }
+.todo-columns { background: #111111 !important; }
+.todo-col-wrapper { background: #111111 !important; }
+.category-column-v2 { background: #111111 !important; }
 
 /* --- Right column split --- */
 .dash-right-col {
@@ -9684,7 +9705,7 @@ body.light .search-no-results {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  background: var(--bg-surface);
+  background: #111111;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
 }
@@ -9837,7 +9858,7 @@ body.light .search-no-results {
 }
 
 /* --- Category columns --- */
-.category-column-v2, .category-column, .sub-tracker { background: var(--bg-surface) !important; border-color: var(--border) !important; border-radius: var(--radius-lg) !important; }
+.category-column-v2, .category-column, .sub-tracker { background: #111111 !important; border-color: var(--border) !important; border-radius: var(--radius-lg) !important; }
 .cc-header { border-bottom: 1px solid var(--border) !important; background: transparent !important; }
 .cc-title, .sub-header-title { color: var(--text-secondary) !important; font-weight: 600 !important; }
 .cc-count { background: var(--bg-elevated) !important; color: var(--text-muted) !important; border-radius: 20px !important; }
