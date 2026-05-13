@@ -2053,8 +2053,11 @@ function AppWrapper() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setInitialSession(session);
       setLoggedIn(!!session);
-      // Login ekranında native decoration'ı gizle, giriş yapınca göster
-      try { getCurrentWindow().setDecorations(!!session); } catch {}
+      try {
+        const win = getCurrentWindow();
+        win.setDecorations(!!session);
+        if (session) win.maximize();
+      } catch {}
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -2064,7 +2067,7 @@ function AppWrapper() {
       } else if (event === 'SIGNED_IN' && session) {
         setInitialSession(session);
         setLoggedIn(true);
-        try { getCurrentWindow().setDecorations(true); } catch {}
+        try { const win = getCurrentWindow(); win.setDecorations(true); win.maximize(); } catch {}
       }
       // TOKEN_REFRESHED, USER_UPDATED, INITIAL_SESSION etc. are intentionally ignored
       // to prevent re-renders that break the layout
