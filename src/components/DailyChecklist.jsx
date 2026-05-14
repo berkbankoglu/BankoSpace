@@ -201,6 +201,28 @@ function DailyChecklist({ storageKey = 'dailyChecklist', title, onTitleChange })
         </div>
       )}
 
+      {/* Bulk actions */}
+      {items.length > 0 && (
+        <div className="checklist-bulk-row">
+          <button
+            className="checklist-bulk-btn"
+            onClick={() => {
+              const allDone = items.every(i => i.completed);
+              if (!allDone) playCompleteSound();
+              setItems(items.map(i => ({ ...i, completed: !allDone })));
+            }}
+          >
+            {items.every(i => i.completed) ? 'Deselect All' : 'Select All'}
+          </button>
+          <button
+            className="checklist-bulk-btn danger"
+            onClick={() => { playDeleteSound(); setItems(items.map(i => ({ ...i, completed: false }))); }}
+          >
+            Clear All
+          </button>
+        </div>
+      )}
+
       {/* Items List or Empty State */}
       <div className="checklist-items">
         {items.length === 0 ? (
