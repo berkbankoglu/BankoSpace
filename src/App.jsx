@@ -1065,114 +1065,114 @@ function App({ session, onLogout }) {
 
 
   // Export: Download all data as a JSON file
-  const exportData = async () => {
-    try {
-      const get = (key, fallback) => localStorage.getItem(key) || fallback;
-      const data = {
-        version: '5.0',
-        exportDate: new Date().toISOString(),
-        // Core data
-        todos: todos,
-        notes: get('notes', '[]'),
-        flashCards: get('flashCards', '[]'),
-        flashCardGroups: get('flashCardGroups', '[]'),
-        goals: get('goals', '[]'),
-        invoices: get('invoices', '[]'),
-        quickNotes: get('quickNotes', '[]'),
-        // Checklists
-        dailyChecklistItems: get('dailyChecklistItems', '[]'),
-        dailyChecklistLastReset: get('dailyChecklistLastReset', ''),
-        dailyChecklistColor: get('dailyChecklistColor', ''),
-        longtermChecklistItems: get('longtermChecklistItems', '[]'),
-        longtermChecklistLastReset: get('longtermChecklistLastReset', ''),
-        longtermChecklistColor: get('longtermChecklistColor', ''),
-        // References
-        refImages: get('refImages', '[]'),
-        refTexts: get('refTexts', '[]'),
-        // User data
-        streakData: get('streakData', '{}'),
-        studyReminders: get('studyReminders', '[]'),
-        loginHeatmap: get('loginHeatmap', '{}'),
-        // Settings
-        categoryNames: get('categoryNames', '{}'),
-        checklistNames: get('checklistNames', '{}'),
-        sidebarOrder: get('sidebarOrder', '[]'),
-        theme: get('theme', 'dark'),
-      };
+  // Section definitions for import/export
+  const DATA_SECTIONS = [
+    {
+      id: 'todos',
+      label: 'Todos',
+      keys: ['todos', 'categoryNames'],
+    },
+    {
+      id: 'checklists',
+      label: 'Checklists',
+      keys: ['dailyChecklistItems', 'dailyChecklistLastReset', 'dailyChecklistColor', 'longtermChecklistItems', 'longtermChecklistLastReset', 'longtermChecklistColor', 'checklistNames'],
+    },
+    {
+      id: 'payments',
+      label: 'Payments',
+      keys: ['payments_v2'],
+    },
+    {
+      id: 'notes',
+      label: 'Notes',
+      keys: ['notes', 'freeformTabs', 'quickNotes'],
+    },
+    {
+      id: 'flashcards',
+      label: 'Flash Cards',
+      keys: ['flashCards', 'flashCardGroups'],
+    },
+    {
+      id: 'fitness',
+      label: 'Fitness',
+      keys: ['ft_profile', 'ft_goal', 'ft_weight_log', 'ft_menu_templates', 'ft_meals', 'ft_workouts', 'ft_measurements'],
+    },
+    {
+      id: 'finance',
+      label: 'Finance',
+      keys: ['portfolio_positions', 'portfolio_closed', 'price_groups', 'price_tickers', 'stock_tickers', 'invoices', 'goals'],
+    },
+    {
+      id: 'japanese',
+      label: 'Japanese',
+      keys: ['kana_learned_words', 'kana_selected_rows', 'kana_custom_words', 'kana_selected_vocab', 'kana_stats', 'kana_prefs', 'kana_best_score', 'kana_cell_colors'],
+    },
+    {
+      id: 'settings',
+      label: 'Settings',
+      keys: ['theme', 'sidebarOrder', 'soundVolume', 'todoFontSize', 'subtaskFontSize'],
+    },
+  ];
 
-      const dataStr = JSON.stringify(data, null, 2);
+  const exportSection = async (sectionId) => {
+    try {
       const { save } = await import('@tauri-apps/plugin-dialog');
       const { writeTextFile } = await import('@tauri-apps/plugin-fs');
-
+      const section = sectionId === 'all' ? null : DATA_SECTIONS.find(s => s.id === sectionId);
+      const keys = section ? section.keys : DATA_SECTIONS.flatMap(s => s.keys);
+      const data = { _bankospace: true, _section: sectionId, _date: new Date().toISOString() };
+      keys.forEach(key => {
+        const val = localStorage.getItem(key);
+        if (val !== null) {
+          try { data[key] = JSON.parse(val); } catch { data[key] = val; }
+        }
+      });
+      if (sectionId === 'todos') data['todos'] = todos;
       const date = new Date().toISOString().split('T')[0];
+      const label = section ? section.label.toLowerCase().replace(' ', '-') : 'all';
       const filePath = await save({
-        defaultPath: `bankospace-backup-${date}.json`,
+        defaultPath: `bankospace-${label}-${date}.json`,
         filters: [{ name: 'JSON', extensions: ['json'] }]
       });
-
       if (filePath) {
-        await writeTextFile(filePath, dataStr);
-        alert('Data successfully exported!');
+        await writeTextFile(filePath, JSON.stringify(data, null, 2));
+        alert(`${section?.label || 'All data'} exported successfully!`);
       }
-    } catch (error) {
-      console.error('Export error:', error);
-      alert('An error occurred during export.');
+    } catch (e) {
+      console.error('Export error:', e);
+      alert('Export failed.');
     }
   };
 
-  // Import: Load data from a JSON file
-  const importData = async () => {
+  const importSection = async () => {
     try {
       const { open } = await import('@tauri-apps/plugin-dialog');
       const { readTextFile } = await import('@tauri-apps/plugin-fs');
-
-      const filePath = await open({
-        multiple: false,
-        filters: [{ name: 'JSON', extensions: ['json'] }]
-      });
-
+      const filePath = await open({ multiple: false, filters: [{ name: 'JSON', extensions: ['json'] }] });
       if (!filePath) return;
-
-      const fileContent = await readTextFile(filePath);
-      const data = JSON.parse(fileContent);
-
-      // Core data
-      if (data.todos) {
-        setTodos(data.todos);
-        localStorage.setItem('todos', JSON.stringify(data.todos));
-      }
-      const setRaw = (key, val) => { if (val !== undefined && val !== null) localStorage.setItem(key, val); };
-      const setJSON = (key, val) => { if (val !== undefined && val !== null) localStorage.setItem(key, typeof val === 'string' ? val : JSON.stringify(val)); };
-
-      setJSON('notes', data.notes);
-      setJSON('flashCards', data.flashCards);
-      setJSON('flashCardGroups', data.flashCardGroups);
-      setJSON('goals', data.goals);
-      setJSON('invoices', data.invoices);
-      setJSON('quickNotes', data.quickNotes);
-      setJSON('dailyChecklistItems', data.dailyChecklistItems);
-      setRaw('dailyChecklistLastReset', data.dailyChecklistLastReset);
-      setRaw('dailyChecklistColor', data.dailyChecklistColor);
-      setJSON('longtermChecklistItems', data.longtermChecklistItems);
-      setRaw('longtermChecklistLastReset', data.longtermChecklistLastReset);
-      setRaw('longtermChecklistColor', data.longtermChecklistColor);
-      setJSON('refImages', data.refImages);
-      setJSON('refTexts', data.refTexts);
-      setJSON('streakData', data.streakData);
-      setJSON('studyReminders', data.studyReminders);
-      setJSON('loginHeatmap', data.loginHeatmap);
-      setJSON('categoryNames', data.categoryNames);
-      setJSON('checklistNames', data.checklistNames);
-      setJSON('sidebarOrder', data.sidebarOrder);
-      if (data.theme) setRaw('theme', data.theme);
-
-      alert('Data successfully imported! Page will reload.');
+      const data = JSON.parse(await readTextFile(filePath));
+      if (!data._bankospace) { alert('Invalid file. Please select a BankoSpace export file.'); return; }
+      const sectionId = data._section;
+      const section = sectionId === 'all' ? null : DATA_SECTIONS.find(s => s.id === sectionId);
+      const keys = section ? section.keys : DATA_SECTIONS.flatMap(s => s.keys);
+      keys.forEach(key => {
+        if (data[key] !== undefined) {
+          const val = typeof data[key] === 'string' ? data[key] : JSON.stringify(data[key]);
+          localStorage.setItem(key, val);
+        }
+      });
+      if (data.todos) { setTodos(data.todos); localStorage.setItem('todos', JSON.stringify(data.todos)); }
+      alert(`${section?.label || 'All data'} imported successfully! Page will reload.`);
       window.location.reload();
-    } catch (error) {
-      console.error('Import error:', error);
-      alert('File could not be read. Please select a valid backup file.');
+    } catch (e) {
+      console.error('Import error:', e);
+      alert('Import failed. Please select a valid BankoSpace export file.');
     }
   };
+
+  // Legacy wrappers
+  const exportData = () => exportSection('all');
+  const importData = () => importSection();
 
   // Reset: Delete all data
   const resetAllData = () => {
@@ -1624,20 +1624,33 @@ function App({ session, onLogout }) {
                   {settingsTab === 'data' && (
                     <div className="settings-modal-section">
                       <h2 className="settings-modal-title">Veri</h2>
+
+                      <div className="settings-section-title">Export</div>
                       <div className="settings-data-row">
                         <div>
-                          <div className="settings-row-name">Export Data</div>
-                          <div className="settings-row-sub">Download all your data as a JSON file</div>
+                          <div className="settings-row-name">Export All</div>
+                          <div className="settings-row-sub">Download all sections as a single JSON file</div>
                         </div>
-                        <button className="settings-action-btn" onClick={() => { exportData(); closeSidebarSettings(); }}>Export</button>
+                        <button className="settings-action-btn" onClick={() => exportSection('all')}>Export All</button>
                       </div>
+                      <div className="settings-export-grid">
+                        {DATA_SECTIONS.map(s => (
+                          <button key={s.id} className="settings-export-section-btn" onClick={() => exportSection(s.id)}>
+                            {s.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="settings-section-title" style={{marginTop:'20px'}}>Import</div>
                       <div className="settings-data-row">
                         <div>
                           <div className="settings-row-name">Import Data</div>
-                          <div className="settings-row-sub">Load your data from a JSON file</div>
+                          <div className="settings-row-sub">Restore from any BankoSpace export file (auto-detects section)</div>
                         </div>
                         <button className="settings-action-btn" onClick={() => { importData(); closeSidebarSettings(); }}>Import</button>
                       </div>
+
+                      <div className="settings-section-title" style={{marginTop:'20px'}}>Danger Zone</div>
                       <div className="settings-data-row danger-row">
                         <div>
                           <div className="settings-row-name" style={{color:'#f85149'}}>Reset All Data</div>
