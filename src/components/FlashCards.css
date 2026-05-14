@@ -24,6 +24,7 @@
   height: 100%;
   background: var(--bg-base);
   border-right: 1px solid var(--border);
+  border-top: 1px solid var(--border);
   display: flex;
   flex-direction: row;
   overflow: hidden;
