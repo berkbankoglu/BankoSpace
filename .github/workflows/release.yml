@@ -69,7 +69,7 @@ jobs:
           fi
 
           echo "Signing: $EXE"
-          npx tauri signer sign "$EXE"
+          npx tauri signer sign -k "$TAURI_SIGNING_PRIVATE_KEY" -p "" "$EXE"
 
           SIG=$(cat "${EXE}.sig" | tr -d '\n')
           VERSION=$(echo $TAG | sed 's/^v//')
