@@ -334,6 +334,7 @@ function App({ session, onLogout }) {
   const [showSubPopup, setShowSubPopup] = useState(false);
   const [showSidebarSettings, setShowSidebarSettings] = useState(false);
   const [settingsTab, setSettingsTab] = useState('account');
+  const [selectedExportSections, setSelectedExportSections] = useState([]);
   const [soundVolume, setSoundVolume] = useState(() => getVolume());
   const [activeView, setActiveView] = useState('dashboard');
 
@@ -1114,29 +1115,31 @@ function App({ session, onLogout }) {
     },
   ];
 
-  const exportSection = async (sectionId) => {
+  const exportSection = async (sectionIdOrIds) => {
     try {
       const { save } = await import('@tauri-apps/plugin-dialog');
       const { writeTextFile } = await import('@tauri-apps/plugin-fs');
-      const section = sectionId === 'all' ? null : DATA_SECTIONS.find(s => s.id === sectionId);
-      const keys = section ? section.keys : DATA_SECTIONS.flatMap(s => s.keys);
-      const data = { _bankospace: true, _section: sectionId, _date: new Date().toISOString() };
+      const isAll = sectionIdOrIds === 'all';
+      const ids = isAll ? DATA_SECTIONS.map(s => s.id) : Array.isArray(sectionIdOrIds) ? sectionIdOrIds : [sectionIdOrIds];
+      const sections = ids.map(id => DATA_SECTIONS.find(s => s.id === id)).filter(Boolean);
+      const keys = sections.flatMap(s => s.keys);
+      const sectionLabel = isAll ? 'all' : ids.length === 1 ? sections[0]?.label.toLowerCase().replace(' ', '-') : 'selected';
+      const data = { _bankospace: true, _section: isAll ? 'all' : ids.length === 1 ? ids[0] : ids, _date: new Date().toISOString() };
       keys.forEach(key => {
         const val = localStorage.getItem(key);
         if (val !== null) {
           try { data[key] = JSON.parse(val); } catch { data[key] = val; }
         }
       });
-      if (sectionId === 'todos') data['todos'] = todos;
+      if (ids.includes('todos')) data['todos'] = todos;
       const date = new Date().toISOString().split('T')[0];
-      const label = section ? section.label.toLowerCase().replace(' ', '-') : 'all';
       const filePath = await save({
-        defaultPath: `bankospace-${label}-${date}.json`,
+        defaultPath: `bankospace-${sectionLabel}-${date}.json`,
         filters: [{ name: 'JSON', extensions: ['json'] }]
       });
       if (filePath) {
         await writeTextFile(filePath, JSON.stringify(data, null, 2));
-        alert(`${section?.label || 'All data'} exported successfully!`);
+        alert(`${isAll ? 'All data' : sections.map(s => s.label).join(', ')} exported successfully!`);
       }
     } catch (e) {
       console.error('Export error:', e);
@@ -1153,8 +1156,14 @@ function App({ session, onLogout }) {
       const data = JSON.parse(await readTextFile(filePath));
       if (!data._bankospace) { alert('Invalid file. Please select a BankoSpace export file.'); return; }
       const sectionId = data._section;
-      const section = sectionId === 'all' ? null : DATA_SECTIONS.find(s => s.id === sectionId);
-      const keys = section ? section.keys : DATA_SECTIONS.flatMap(s => s.keys);
+      const keys = sectionId === 'all' || !sectionId
+        ? DATA_SECTIONS.flatMap(s => s.keys)
+        : Array.isArray(sectionId)
+          ? sectionId.flatMap(id => DATA_SECTIONS.find(s => s.id === id)?.keys || [])
+          : (DATA_SECTIONS.find(s => s.id === sectionId)?.keys || []);
+      const sectionLabel = Array.isArray(sectionId)
+        ? sectionId.map(id => DATA_SECTIONS.find(s => s.id === id)?.label).filter(Boolean).join(', ')
+        : DATA_SECTIONS.find(s => s.id === sectionId)?.label || 'All data';
       keys.forEach(key => {
         if (data[key] !== undefined) {
           const val = typeof data[key] === 'string' ? data[key] : JSON.stringify(data[key]);
@@ -1162,7 +1171,7 @@ function App({ session, onLogout }) {
         }
       });
       if (data.todos) { setTodos(data.todos); localStorage.setItem('todos', JSON.stringify(data.todos)); }
-      alert(`${section?.label || 'All data'} imported successfully! Page will reload.`);
+      alert(`${sectionLabel} imported successfully! Page will reload.`);
       window.location.reload();
     } catch (e) {
       console.error('Import error:', e);
@@ -1626,19 +1635,32 @@ function App({ session, onLogout }) {
                       <h2 className="settings-modal-title">Veri</h2>
 
                       <div className="settings-section-title">Export</div>
-                      <div className="settings-data-row">
-                        <div>
-                          <div className="settings-row-name">Export All</div>
-                          <div className="settings-row-sub">Download all sections as a single JSON file</div>
-                        </div>
-                        <button className="settings-action-btn" onClick={() => exportSection('all')}>Export All</button>
-                      </div>
                       <div className="settings-export-grid">
-                        {DATA_SECTIONS.map(s => (
-                          <button key={s.id} className="settings-export-section-btn" onClick={() => exportSection(s.id)}>
-                            {s.label}
-                          </button>
-                        ))}
+                        {DATA_SECTIONS.map(s => {
+                          const checked = selectedExportSections.includes(s.id);
+                          return (
+                            <div
+                              key={s.id}
+                              className={`settings-export-section-btn ${checked ? 'selected' : ''}`}
+                              onClick={() => setSelectedExportSections(prev =>
+                                prev.includes(s.id) ? prev.filter(x => x !== s.id) : [...prev, s.id]
+                              )}
+                            >
+                              <span className="settings-export-check">{checked ? '✓' : ''}</span>
+                              {s.label}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="settings-export-actions">
+                        <button
+                          className="settings-action-btn"
+                          disabled={selectedExportSections.length === 0}
+                          onClick={() => { exportSection(selectedExportSections); setSelectedExportSections([]); }}
+                        >
+                          {selectedExportSections.length > 0 ? `Export Selected (${selectedExportSections.length})` : 'Select sections above'}
+                        </button>
+                        <button className="settings-action-btn" onClick={() => exportSection('all')}>Export All</button>
                       </div>
 
                       <div className="settings-section-title" style={{marginTop:'20px'}}>Import</div>

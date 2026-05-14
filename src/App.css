@@ -11353,7 +11353,7 @@ input::placeholder, textarea::placeholder { color: var(--text-muted) !important;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
-  margin: 10px 0 4px;
+  margin: 10px 0 12px;
 }
 
 .settings-export-section-btn {
@@ -11362,14 +11362,43 @@ input::placeholder, textarea::placeholder { color: var(--text-muted) !important;
   border-radius: 6px;
   color: var(--text-primary);
   font-size: 12px;
-  padding: 7px 10px;
+  padding: 8px 10px;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
   text-align: center;
+  user-select: none;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
 }
 
 .settings-export-section-btn:hover {
   background: var(--bg-hover);
   border-color: var(--accent);
+}
+
+.settings-export-section-btn.selected {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.settings-export-check {
+  font-size: 10px;
+  width: 10px;
+  display: inline-block;
+}
+
+.settings-export-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.settings-export-actions .settings-action-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
