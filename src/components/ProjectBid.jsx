@@ -12,7 +12,7 @@ const BID_RULES = `Write a very short bid (2-3 sentences max). Follow these rule
 - Maximum 60 words total (excluding sign-off)
 - Confident, direct, no fluff`;
 
-const ANALYZE_RULES = `Analyze the following project listing. Write 2-3 sentences in Turkish. Say what the client wants and what needs to be done. Include budget/deadline only if specified. No headers, no bullets, plain text only. Be brief.`;
+const ANALYZE_RULES = `Summarize the following project listing in 2-3 sentences in Turkish. Only mention what is explicitly written. Do not comment on missing information. No headers, no bullets, plain text only.`;
 
 export default function ProjectBid() {
   const [projectDetails, setProjectDetails] = useState('');
