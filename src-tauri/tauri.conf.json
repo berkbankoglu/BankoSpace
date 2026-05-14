@@ -1,6 +1,6 @@
 {
   "productName": "BankoSpace",
-  "version": "4.0.5",
+  "version": "4.0.6",
   "identifier": "com.berkbankoglu.bankospace",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -130,7 +130,7 @@
         "https://github.com/berkbankoglu/BankoSpace/releases/latest/download/latest.json"
       ],
       "dialog": true,
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQwNzI1NUJBQjBDMEYyQ0YKUldUUDhzQ3d1bFZ5MEtHMzEyQVBWSURyKzNXd2xTaXhpbnpCWlMxNDB3bWJnbkNrQnpYY1c0L2YK"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEE4RjM0RTU0MzgyNENCNzMKUldSenl5UTRWRTd6cUJqS3N4bUZsNVJHUnpxYzZtNXpFaTZsN2dxQzJsdDBuMHk5UmRrMTJiTEEK"
     }
   }
 }
