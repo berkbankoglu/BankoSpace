@@ -125,7 +125,6 @@
       }
     },
     "updater": {
-      "active": true,
       "endpoints": [
         "https://github.com/berkbankoglu/BankoSpace/releases/latest/download/latest.json"
       ],
