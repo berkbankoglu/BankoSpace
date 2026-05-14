@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import './ProjectBid.css';
 
-const BID_RULES = `Follow these rules when writing a bid:
-- Be concise (max 150 words)
-- Show that you understood the client's problem
-- Mention your experience with a concrete example
-- Add price/timeline estimate at the end
-- Use a sincere and professional tone
-- Write in English`;
+const BID_RULES = `Write a very short bid (2-3 sentences max). Follow these rules strictly:
+- Open with a single enthusiastic word: "Absolutely!", "Perfect!", or "Yes!" — never start with "Hi" or the client name unless a name is provided, in which case use "Hi [name], Yes!" or "Hi [name], Absolutely!"
+- Immediately say you do this type of work daily/regularly and can start right away with fast delivery
+- Add one short sentence hinting at the result (not tasks) — what the client will get
+- End with a call to action: ask them to send the files/details
+- Sign off with: "Kind regards,\\nBerk"
+- Never list tasks or deliverables
+- Never mention price or timeline
+- Maximum 60 words total (excluding sign-off)
+- Confident, direct, no fluff`;
 
 const ANALYZE_RULES = `Analyze the following project listing. Respond in this exact format (nothing else):
 
