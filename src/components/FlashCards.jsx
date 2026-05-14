@@ -419,7 +419,119 @@ function FlashCards({ fullscreen = false }) {
           <h2>Flash Cards</h2>
         </div>
 
-        {/* AI Assistant — inside sidebar */}
+        <div className="fc-menu">
+          {/* New Deck Section */}
+          <div className="fc-menu-section">
+            {showNewDeckInput ? (
+              <div className="fc-new-deck-form">
+                <input
+                  type="text"
+                  placeholder="Deck name..."
+                  value={newDeckName}
+                  onChange={(e) => { playTypeSoundThrottled(); setNewDeckName(e.target.value); }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') createDeck();
+                    if (e.key === 'Escape') {
+                      setShowNewDeckInput(false);
+                      setNewDeckName('');
+                    }
+                  }}
+                  autoFocus
+                />
+                <button onClick={createDeck}>Add</button>
+                <button onClick={() => {
+                  setShowNewDeckInput(false);
+                  setNewDeckName('');
+                }}>Cancel</button>
+              </div>
+            ) : (
+              <button
+                className="fc-menu-btn fc-new-deck-btn"
+                onClick={() => setShowNewDeckInput(true)}
+              >
+                + New Deck
+              </button>
+            )}
+          </div>
+
+          {/* Decks List */}
+          <div className="fc-menu-section">
+            <div className="fc-menu-label">Your Decks</div>
+            {getAllDecks().length === 0 ? (
+              <div className="fc-menu-empty">No decks yet</div>
+            ) : (
+              <div className="fc-decks-menu">
+                {getAllDecks().map(deck => {
+                  const deckStats = getDeckStats(deck.name);
+                  return (
+                    <div
+                      key={deck.name}
+                      className={`fc-deck-item ${selectedDeck === deck.name ? 'active' : ''}`}
+                      onClick={() => {
+                        setSelectedDeck(deck.name);
+                        setActiveView('cards');
+                      }}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedDeck(deck.name);
+                        setActiveView('cards');
+                        setEditingDeckName(deck.name);
+                        setEditingDeckTitle(deck.name);
+                      }}
+                    >
+                      <div className="fc-deck-item-color" style={{ backgroundColor: deck.color }} />
+                      {editingDeckName === deck.name ? (
+                        <input
+                          className="fc-deck-item-rename-input"
+                          value={editingDeckTitle}
+                          onChange={(e) => setEditingDeckTitle(e.target.value)}
+                          onBlur={() => {
+                            if (editingDeckTitle.trim()) renameDeck(deck.name, editingDeckTitle);
+                            else { setEditingDeckName(null); setEditingDeckTitle(''); }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && editingDeckTitle.trim()) renameDeck(deck.name, editingDeckTitle);
+                            if (e.key === 'Escape') { setEditingDeckName(null); setEditingDeckTitle(''); }
+                            e.stopPropagation();
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          autoFocus
+                        />
+                      ) : (
+                        <div className="fc-deck-item-name">{deck.name}</div>
+                      )}
+                      <div className="fc-deck-item-count">{deckStats.total}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* AI Assistant — bottom of sidebar */}
+        <div className="fc-ai-resize-handle"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            isResizingRef.current = true;
+            const startY = e.clientY;
+            const startHeight = aiPanelHeight;
+            const onMove = (ev) => {
+              if (!isResizingRef.current) return;
+              const delta = startY - ev.clientY;
+              const newH = Math.max(120, Math.min(700, startHeight + delta));
+              setAiPanelHeight(newH);
+              localStorage.setItem('fc_ai_panel_height', String(newH));
+            };
+            const onUp = () => {
+              isResizingRef.current = false;
+              window.removeEventListener('mousemove', onMove);
+              window.removeEventListener('mouseup', onUp);
+            };
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('mouseup', onUp);
+          }}
+        />
         <div className="fc-ai-panel" style={{ maxHeight: aiPanelHeight, minHeight: 120 }}>
           <div className="fc-ai-panel-header">
             <span className="fc-ai-panel-title">AI Asistan</span>
@@ -559,121 +671,6 @@ function FlashCards({ fullscreen = false }) {
           )}
         </div>
 
-        {/* Resize handle between AI panel and deck list */}
-        <div
-          className="fc-ai-resize-handle"
-          onMouseDown={(e) => {
-            e.preventDefault();
-            isResizingRef.current = true;
-            const startY = e.clientY;
-            const startHeight = aiPanelHeight;
-            const onMove = (ev) => {
-              if (!isResizingRef.current) return;
-              const delta = ev.clientY - startY;
-              const newH = Math.max(120, Math.min(700, startHeight + delta));
-              setAiPanelHeight(newH);
-              localStorage.setItem('fc_ai_panel_height', String(newH));
-            };
-            const onUp = () => {
-              isResizingRef.current = false;
-              window.removeEventListener('mousemove', onMove);
-              window.removeEventListener('mouseup', onUp);
-            };
-            window.addEventListener('mousemove', onMove);
-            window.addEventListener('mouseup', onUp);
-          }}
-        />
-
-        <div className="fc-menu">
-          {/* New Deck Section */}
-          <div className="fc-menu-section">
-            {showNewDeckInput ? (
-              <div className="fc-new-deck-form">
-                <input
-                  type="text"
-                  placeholder="Deck name..."
-                  value={newDeckName}
-                  onChange={(e) => { playTypeSoundThrottled(); setNewDeckName(e.target.value); }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') createDeck();
-                    if (e.key === 'Escape') {
-                      setShowNewDeckInput(false);
-                      setNewDeckName('');
-                    }
-                  }}
-                  autoFocus
-                />
-                <button onClick={createDeck}>Add</button>
-                <button onClick={() => {
-                  setShowNewDeckInput(false);
-                  setNewDeckName('');
-                }}>Cancel</button>
-              </div>
-            ) : (
-              <button
-                className="fc-menu-btn fc-new-deck-btn"
-                onClick={() => setShowNewDeckInput(true)}
-              >
-                + New Deck
-              </button>
-            )}
-          </div>
-
-          {/* Decks List */}
-          <div className="fc-menu-section">
-            <div className="fc-menu-label">Your Decks</div>
-            {getAllDecks().length === 0 ? (
-              <div className="fc-menu-empty">No decks yet</div>
-            ) : (
-              <div className="fc-decks-menu">
-                {getAllDecks().map(deck => {
-                  const deckStats = getDeckStats(deck.name);
-                  return (
-                    <div
-                      key={deck.name}
-                      className={`fc-deck-item ${selectedDeck === deck.name ? 'active' : ''}`}
-                      onClick={() => {
-                        setSelectedDeck(deck.name);
-                        setActiveView('cards');
-                      }}
-                      onDoubleClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedDeck(deck.name);
-                        setActiveView('cards');
-                        setEditingDeckName(deck.name);
-                        setEditingDeckTitle(deck.name);
-                      }}
-                    >
-                      <div className="fc-deck-item-color" style={{ backgroundColor: deck.color }} />
-                      {editingDeckName === deck.name ? (
-                        <input
-                          className="fc-deck-item-rename-input"
-                          value={editingDeckTitle}
-                          onChange={(e) => setEditingDeckTitle(e.target.value)}
-                          onBlur={() => {
-                            if (editingDeckTitle.trim()) renameDeck(deck.name, editingDeckTitle);
-                            else { setEditingDeckName(null); setEditingDeckTitle(''); }
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && editingDeckTitle.trim()) renameDeck(deck.name, editingDeckTitle);
-                            if (e.key === 'Escape') { setEditingDeckName(null); setEditingDeckTitle(''); }
-                            e.stopPropagation();
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                          autoFocus
-                        />
-                      ) : (
-                        <div className="fc-deck-item-name">{deck.name}</div>
-                      )}
-                      <div className="fc-deck-item-count">{deckStats.total}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
       </div>
 
       {/* Main Content Area */}
@@ -681,9 +678,6 @@ function FlashCards({ fullscreen = false }) {
         {/* Decks Overview */}
         {activeView === 'decks' && (
           <div className="fc-main-view">
-            <div className="fc-main-header">
-              <h1>Flash Card Decks</h1>
-            </div>
             <div className="fc-decks-overview">
               {getAllDecks().length === 0 ? (
                 <div className="fc-empty-state">
