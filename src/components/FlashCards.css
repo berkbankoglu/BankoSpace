@@ -19,13 +19,36 @@
    ========================================== */
 
 .fc-sidebar {
-  width: 340px;
-  min-width: 340px;
+  width: 580px;
+  min-width: 580px;
   background: var(--bg-base);
   border-right: 1px solid var(--border);
   display: flex;
+  flex-direction: row;
+  overflow: hidden;
+}
+
+.fc-deck-col {
+  width: 200px;
+  min-width: 200px;
+  display: flex;
   flex-direction: column;
   overflow-y: auto;
+  border-right: none;
+}
+
+.fc-col-divider {
+  width: 1px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+.fc-ai-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
 }
 
 .fc-sidebar-header {
@@ -50,6 +73,7 @@
 .fc-menu {
   flex: 1;
   padding: 12px;
+  overflow-y: auto;
 }
 
 .fc-menu-section {
@@ -1024,13 +1048,13 @@
 
 .fc-ai-panel {
   width: 100%;
+  height: 100%;
   background: var(--bg-base);
-  border-top: none;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
   padding: 0;
-  flex-shrink: 0;
+  flex: 1;
 }
 
 .fc-ai-resize-handle {

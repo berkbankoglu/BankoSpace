@@ -413,12 +413,11 @@ function FlashCards({ fullscreen = false }) {
 
   return (
     <div className={`fc-wrapper ${fullscreen ? 'fullscreen' : ''}`}>
-      {/* Left Sidebar Menu */}
+      {/* Left Panel: deck list + AI side by side */}
       <div className="fc-sidebar" ref={sidebarRef}>
-        <div className="fc-sidebar-header" style={{ display: 'none' }}>
-          <h2>Flash Cards</h2>
-        </div>
 
+        {/* Deck column */}
+        <div className="fc-deck-col">
         <div className="fc-menu">
           {/* New Deck Section */}
           <div className="fc-menu-section">
@@ -508,9 +507,16 @@ function FlashCards({ fullscreen = false }) {
             )}
           </div>
         </div>
+        </div>{/* end fc-deck-col */}
 
-        {/* AI Assistant — bottom of sidebar */}
-        <div className="fc-ai-resize-handle"
+        {/* Vertical divider */}
+        <div className="fc-col-divider" />
+
+        {/* AI column */}
+        <div className="fc-ai-col">
+        <div className="fc-ai-panel" style={{}}>
+        <div className="fc-ai-resize-handle" style={{ display: 'none' }}
+          onMouseDown={(e) => {
           onMouseDown={(e) => {
             e.preventDefault();
             isResizingRef.current = true;
@@ -670,6 +676,8 @@ function FlashCards({ fullscreen = false }) {
             </div>
           )}
         </div>
+        </div>{/* end fc-ai-panel */}
+        </div>{/* end fc-ai-col */}
 
       </div>
 
