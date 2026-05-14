@@ -514,169 +514,142 @@ function FlashCards({ fullscreen = false }) {
 
         {/* AI column */}
         <div className="fc-ai-col">
-        <div className="fc-ai-panel" style={{}}>
-        <div className="fc-ai-resize-handle" style={{ display: 'none' }}
-          onMouseDown={(e) => {
-          onMouseDown={(e) => {
-            e.preventDefault();
-            isResizingRef.current = true;
-            const startY = e.clientY;
-            const startHeight = aiPanelHeight;
-            const onMove = (ev) => {
-              if (!isResizingRef.current) return;
-              const delta = startY - ev.clientY;
-              const newH = Math.max(120, Math.min(700, startHeight + delta));
-              setAiPanelHeight(newH);
-              localStorage.setItem('fc_ai_panel_height', String(newH));
-            };
-            const onUp = () => {
-              isResizingRef.current = false;
-              window.removeEventListener('mousemove', onMove);
-              window.removeEventListener('mouseup', onUp);
-            };
-            window.addEventListener('mousemove', onMove);
-            window.addEventListener('mouseup', onUp);
-          }}
-        />
-        <div className="fc-ai-panel" style={{ maxHeight: aiPanelHeight, minHeight: 120 }}>
-          <div className="fc-ai-panel-header">
-            <span className="fc-ai-panel-title">AI Asistan</span>
-            <button
-              className="fc-ai-key-btn"
-              onClick={() => { setApiKeyDraft(localStorage.getItem('anthropic_api_key') || ''); setShowApiKeyInput(true); }}
-              title="API Key ayarla"
-            >🔑</button>
-          </div>
-
-          <div className="fc-ai-mode-toggle">
-            <button
-              className={`fc-ai-mode-btn ${aiMode === 'single' ? 'active' : ''}`}
-              onClick={() => { setAiMode('single'); setAiError(null); setBulkResults(null); }}
-            >Single</button>
-            <button
-              className={`fc-ai-mode-btn ${aiMode === 'bulk' ? 'active' : ''}`}
-              onClick={() => { setAiMode('bulk'); setAiError(null); setAiResult(null); }}
-            >Bulk</button>
-          </div>
-
-          {showApiKeyInput ? (
-            <div className="fc-ai-apikey-row">
-              <input
-                type="password"
-                className="fc-ai-key-input"
-                placeholder="Anthropic API key..."
-                value={apiKeyDraft}
-                onChange={e => setApiKeyDraft(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') saveApiKey(); if (e.key === 'Escape') setShowApiKeyInput(false); }}
-                autoFocus
-              />
-              <div className="fc-ai-apikey-btns">
-                <button className="fc-ai-save-btn" onClick={saveApiKey}>Save</button>
-                <button className="fc-ai-cancel-btn" onClick={() => setShowApiKeyInput(false)}>Cancel</button>
-              </div>
+          <div className="fc-ai-panel">
+            <div className="fc-ai-panel-header">
+              <span className="fc-ai-panel-title">AI Asistan</span>
+              <button
+                className="fc-ai-key-btn"
+                onClick={() => { setApiKeyDraft(localStorage.getItem('anthropic_api_key') || ''); setShowApiKeyInput(true); }}
+                title="API Key ayarla"
+              >🔑</button>
             </div>
-          ) : aiMode === 'single' ? (
-            <div className="fc-ai-input-row">
-              <input
-                type="text"
-                className="fc-ai-input"
-                placeholder="Enter a word or concept..."
-                value={aiWord}
-                onChange={e => setAiWord(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') askAI(); }}
-                disabled={aiLoading}
-              />
-              <button className="fc-ai-ask-btn" onClick={askAI} disabled={aiLoading || !aiWord.trim()} title="Ask AI">
-                {aiLoading ? <span className="fc-ai-spinner" /> : 'Ask'}
-              </button>
-            </div>
-          ) : (
-            <div className="fc-ai-bulk-input-area">
-              <textarea
-                className="fc-ai-bulk-textarea"
-                placeholder="Describe what cards to generate, e.g. '12 months of the year in English and Turkish'"
-                value={bulkPrompt}
-                onChange={e => setBulkPrompt(e.target.value)}
-                disabled={aiLoading}
-                rows={3}
-              />
-              <button className="fc-ai-ask-btn" onClick={generateBulk} disabled={aiLoading || !bulkPrompt.trim()}>
-                {aiLoading ? <span className="fc-ai-spinner" /> : 'Generate'}
-              </button>
-            </div>
-          )}
 
-          {aiError && <div className="fc-ai-error">{aiError}</div>}
-
-          {aiLoading && (
-            <div className="fc-ai-loading-state">
-              <span className="fc-ai-spinner-lg" />
-              <span>Waiting for response...</span>
+            <div className="fc-ai-mode-toggle">
+              <button
+                className={`fc-ai-mode-btn ${aiMode === 'single' ? 'active' : ''}`}
+                onClick={() => { setAiMode('single'); setAiError(null); setBulkResults(null); }}
+              >Single</button>
+              <button
+                className={`fc-ai-mode-btn ${aiMode === 'bulk' ? 'active' : ''}`}
+                onClick={() => { setAiMode('bulk'); setAiError(null); setAiResult(null); }}
+              >Bulk</button>
             </div>
-          )}
 
-          {aiMode === 'single' && aiResult && !aiLoading && (
-            <div className="fc-ai-result-panel">
-              <div className="fc-ai-result-word">{aiResult.word}</div>
-              <div className="fc-ai-result-translation">{aiResult.translation}</div>
-              <div className="fc-ai-result-divider" />
-              <div className="fc-ai-result-explanation">{aiResult.explanation}</div>
-              <div className="fc-ai-card-preview">
-                <div className="fc-ai-card-preview-label">Flash Card preview</div>
-                <div className="fc-ai-card-preview-front">
-                  <span className="fc-ai-card-side-label">Front</span>
-                  <span>{aiResult.word}</span>
-                </div>
-                <div className="fc-ai-card-preview-back">
-                  <span className="fc-ai-card-side-label">Back</span>
-                  {aiResult.translation && <span className="fc-ai-preview-translation">{aiResult.translation}</span>}
-                  <span>{aiResult.explanation}</span>
+            {showApiKeyInput ? (
+              <div className="fc-ai-apikey-row">
+                <input
+                  type="password"
+                  className="fc-ai-key-input"
+                  placeholder="Anthropic API key..."
+                  value={apiKeyDraft}
+                  onChange={e => setApiKeyDraft(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') saveApiKey(); if (e.key === 'Escape') setShowApiKeyInput(false); }}
+                  autoFocus
+                />
+                <div className="fc-ai-apikey-btns">
+                  <button className="fc-ai-save-btn" onClick={saveApiKey}>Save</button>
+                  <button className="fc-ai-cancel-btn" onClick={() => setShowApiKeyInput(false)}>Cancel</button>
                 </div>
               </div>
-              <button className="fc-ai-add-btn" onClick={addAiCardToFlashCards}>
-                + Add to Flash Cards
-              </button>
-              {!selectedDeck && decks.length === 0 && (
-                <div className="fc-ai-no-deck-hint">Create a deck first</div>
-              )}
-            </div>
-          )}
-
-          {aiMode === 'bulk' && bulkResults && !aiLoading && (
-            <div className="fc-ai-bulk-results">
-              <div className="fc-ai-bulk-results-header">
-                <span>{bulkResults.length} cards generated</span>
-                <button className="fc-ai-add-btn" onClick={addAllBulkCards}>
-                  + Add All
+            ) : aiMode === 'single' ? (
+              <div className="fc-ai-input-row">
+                <input
+                  type="text"
+                  className="fc-ai-input"
+                  placeholder="Enter a word or concept..."
+                  value={aiWord}
+                  onChange={e => setAiWord(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') askAI(); }}
+                  disabled={aiLoading}
+                />
+                <button className="fc-ai-ask-btn" onClick={askAI} disabled={aiLoading || !aiWord.trim()} title="Ask AI">
+                  {aiLoading ? <span className="fc-ai-spinner" /> : 'Ask'}
                 </button>
               </div>
-              <div className="fc-ai-bulk-list">
-                {bulkResults.map((item, i) => (
-                  <div key={i} className="fc-ai-bulk-item">
-                    <span className="fc-ai-bulk-front">{item.front}</span>
-                    <span className="fc-ai-bulk-arrow">→</span>
-                    <span className="fc-ai-bulk-back">{item.back}</span>
-                  </div>
-                ))}
+            ) : (
+              <div className="fc-ai-bulk-input-area">
+                <textarea
+                  className="fc-ai-bulk-textarea"
+                  placeholder="Describe what cards to generate, e.g. '12 months of the year in English and Turkish'"
+                  value={bulkPrompt}
+                  onChange={e => setBulkPrompt(e.target.value)}
+                  disabled={aiLoading}
+                  rows={3}
+                />
+                <button className="fc-ai-ask-btn" onClick={generateBulk} disabled={aiLoading || !bulkPrompt.trim()}>
+                  {aiLoading ? <span className="fc-ai-spinner" /> : 'Generate'}
+                </button>
               </div>
-              {!selectedDeck && decks.length === 0 && (
-                <div className="fc-ai-no-deck-hint">Create a deck first</div>
-              )}
-            </div>
-          )}
+            )}
 
-          {!aiResult && !bulkResults && !aiLoading && !aiError && (
-            <div className="fc-ai-empty-state">
-              <div className="fc-ai-empty-icon">✦</div>
-              <div className="fc-ai-empty-text">
-                {aiMode === 'single'
-                  ? 'Type a word or concept you\'re curious about, let AI explain it and add it as a flash card.'
-                  : 'Describe a topic and AI will generate multiple flash cards at once.'}
+            {aiError && <div className="fc-ai-error">{aiError}</div>}
+
+            {aiLoading && (
+              <div className="fc-ai-loading-state">
+                <span className="fc-ai-spinner-lg" />
+                <span>Waiting for response...</span>
               </div>
-            </div>
-          )}
-        </div>
-        </div>{/* end fc-ai-panel */}
+            )}
+
+            {aiMode === 'single' && aiResult && !aiLoading && (
+              <div className="fc-ai-result-panel">
+                <div className="fc-ai-result-word">{aiResult.word}</div>
+                <div className="fc-ai-result-translation">{aiResult.translation}</div>
+                <div className="fc-ai-result-divider" />
+                <div className="fc-ai-result-explanation">{aiResult.explanation}</div>
+                <div className="fc-ai-card-preview">
+                  <div className="fc-ai-card-preview-label">Flash Card preview</div>
+                  <div className="fc-ai-card-preview-front">
+                    <span className="fc-ai-card-side-label">Front</span>
+                    <span>{aiResult.word}</span>
+                  </div>
+                  <div className="fc-ai-card-preview-back">
+                    <span className="fc-ai-card-side-label">Back</span>
+                    {aiResult.translation && <span className="fc-ai-preview-translation">{aiResult.translation}</span>}
+                    <span>{aiResult.explanation}</span>
+                  </div>
+                </div>
+                <button className="fc-ai-add-btn" onClick={addAiCardToFlashCards}>
+                  + Add to Flash Cards
+                </button>
+                {!selectedDeck && decks.length === 0 && (
+                  <div className="fc-ai-no-deck-hint">Create a deck first</div>
+                )}
+              </div>
+            )}
+
+            {aiMode === 'bulk' && bulkResults && !aiLoading && (
+              <div className="fc-ai-bulk-results">
+                <div className="fc-ai-bulk-results-header">
+                  <span>{bulkResults.length} cards generated</span>
+                  <button className="fc-ai-add-btn" onClick={addAllBulkCards}>+ Add All</button>
+                </div>
+                <div className="fc-ai-bulk-list">
+                  {bulkResults.map((item, i) => (
+                    <div key={i} className="fc-ai-bulk-item">
+                      <span className="fc-ai-bulk-front">{item.front}</span>
+                      <span className="fc-ai-bulk-arrow">→</span>
+                      <span className="fc-ai-bulk-back">{item.back}</span>
+                    </div>
+                  ))}
+                </div>
+                {!selectedDeck && decks.length === 0 && (
+                  <div className="fc-ai-no-deck-hint">Create a deck first</div>
+                )}
+              </div>
+            )}
+
+            {!aiResult && !bulkResults && !aiLoading && !aiError && (
+              <div className="fc-ai-empty-state">
+                <div className="fc-ai-empty-icon">✦</div>
+                <div className="fc-ai-empty-text">
+                  {aiMode === 'single'
+                    ? "Type a word or concept you're curious about, let AI explain it and add it as a flash card."
+                    : 'Describe a topic and AI will generate multiple flash cards at once.'}
+                </div>
+              </div>
+            )}
+          </div>
         </div>{/* end fc-ai-col */}
 
       </div>

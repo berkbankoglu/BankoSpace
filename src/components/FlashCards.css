@@ -19,8 +19,8 @@
    ========================================== */
 
 .fc-sidebar {
-  width: 580px;
-  min-width: 580px;
+  width: 560px;
+  min-width: 400px;
   background: var(--bg-base);
   border-right: 1px solid var(--border);
   display: flex;
@@ -29,12 +29,12 @@
 }
 
 .fc-deck-col {
-  width: 200px;
-  min-width: 200px;
+  width: 180px;
+  min-width: 160px;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
-  border-right: none;
+  flex-shrink: 0;
 }
 
 .fc-col-divider {
