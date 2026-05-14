@@ -14,13 +14,10 @@ const BID_RULES = `Write a very short bid (2-3 sentences max). Follow these rule
 
 const ANALYZE_RULES = `Analyze the following project listing. Respond in this exact format (nothing else):
 
-**What they want:** <2-3 sentences: what exactly the client wants to build, what problem it solves>
-**Tasks:** <bullet-point list of everything that needs to be done, miss nothing>
-**Tech/Domain:** <technologies, tools, platforms to be used>
-**Timeline:** <duration and deadline if specified, otherwise "Not specified">
-**Budget:** <budget range if specified, otherwise "Not specified">
-**Notes:** <special requirements, preferences, or expectations that must/must not be done>
-**Difficulty:** <Easy / Medium / Hard — why>`;
+**What:** <1 sentence — what the client wants>
+**Do:** <bullet list — what you need to deliver, keep each point short>
+**Budget:** <amount or "Not specified">
+**Deadline:** <date/duration or "Not specified">`;
 
 export default function ProjectBid() {
   const [projectDetails, setProjectDetails] = useState('');
