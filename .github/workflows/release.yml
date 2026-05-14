@@ -46,21 +46,50 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: 'BankoSpace ${{ github.ref_name }}'
           releaseBody: |
-            # BankoSpace ${{ github.ref_name }}
-
-            ## 📥 Downloads
-
-            ### Windows
-            Download `BankoSpace_${{ github.ref_name }}_x64-setup.exe` and run the installer.
-
-            ### macOS (Apple Silicon)
-            Download `BankoSpace_${{ github.ref_name }}_aarch64.dmg` and install.
-
-            ---
-
-            See the assets below to download this version and install.
+            See the assets below to download and install.
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
           updaterJsonPreferNsis: true
           updaterJsonKeepUniversal: true
+
+      - name: Sign and upload latest.json (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          EXE=$(find src-tauri/target/release/bundle/nsis -name "*.exe" 2>/dev/null | head -1)
+          if [ -z "$EXE" ]; then
+            echo "No NSIS installer found, skipping signing"
+            exit 0
+          fi
+
+          echo "Signing: $EXE"
+          npx tauri signer sign "$EXE"
+
+          SIG=$(cat "${EXE}.sig" | tr -d '\n')
+          VERSION=$(echo $TAG | sed 's/^v//')
+          EXE_NAME=$(basename "$EXE")
+          PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          BASE_URL="https://github.com/berkbankoglu/BankoSpace/releases/download/${TAG}"
+
+          cat > latest.json << JSONEOF
+          {
+            "version": "${VERSION}",
+            "notes": "",
+            "pub_date": "${PUB_DATE}",
+            "platforms": {
+              "windows-x86_64": {
+                "signature": "${SIG}",
+                "url": "${BASE_URL}/${EXE_NAME}"
+              }
+            }
+          }
+          JSONEOF
+
+          gh release upload "${TAG}" "${EXE}.sig" "latest.json" --clobber
+          echo "Done — latest.json and .sig uploaded"
