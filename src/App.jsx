@@ -88,8 +88,6 @@ function QuickLaunchPanel() {
   );
 }
 import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, setVolume, getVolume } from './utils/sounds';
-import { check } from '@tauri-apps/plugin-updater';
-import { relaunch } from '@tauri-apps/plugin-process';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
 const APP_VERSION = '4.1.3';
@@ -173,8 +171,6 @@ function App({ session, onLogout }) {
   };
 
   const [showUpdateWarning, setShowUpdateWarning] = useState(false);
-  const [updateAvailable, setUpdateAvailable] = useState(null);
-  const [isUpdating, setIsUpdating] = useState(false);
 
   // WebView2 freeze fix — focus/visibility sonrası repaint zorla
   useEffect(() => {
@@ -270,43 +266,7 @@ function App({ session, onLogout }) {
     };
   }, []);
 
-  // Auto-update check
-  useEffect(() => {
-    const checkForUpdates = async () => {
-      try {
-        const update = await check();
-        if (update) {
-          setUpdateAvailable(update);
-        }
-      } catch (error) {
-        // Update check can fail silently
-      }
-    };
-    checkForUpdates();
-    const interval = setInterval(checkForUpdates, 10 * 60 * 1000); // 10 dakikada bir
-    return () => clearInterval(interval);
-  }, []);
-
-  // Install update function
-  const installUpdate = async () => {
-    if (!updateAvailable) return;
-
-    try {
-      setIsUpdating(true);
-      console.log('Downloading and installing update...');
-
-      await updateAvailable.downloadAndInstall();
-
-      console.log('Update installed, relaunching app...');
-      await relaunch();
-    } catch (error) {
-      console.error('Failed to install update:', error);
-      setIsUpdating(false);
-      alert('Update failed. Please try again or download manually from GitHub.');
-    }
-  };
-
-  // Version check - for auto-update
+  // Version check
   useEffect(() => {
     const savedVersion = localStorage.getItem('appVersion');
     if (savedVersion && savedVersion !== APP_VERSION) {
@@ -1308,21 +1268,6 @@ function App({ session, onLogout }) {
               <button onClick={() => setShowSettings(false)} className="btn-secondary">Close</button>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Auto-update notification */}
-      {updateAvailable && (
-        <div className="update-banner">
-          <span>🚀 New version available: <strong>v{updateAvailable.version}</strong></span>
-          <button
-            className="update-install-btn"
-            onClick={installUpdate}
-            disabled={isUpdating}
-          >
-            {isUpdating ? 'Installing...' : 'Install & Restart'}
-          </button>
-          <button className="update-dismiss-btn" onClick={() => setUpdateAvailable(null)}>✕</button>
         </div>
       )}
 
