@@ -24,13 +24,8 @@ import App from './App.jsx'
   // Ana thread'den worker'a heartbeat gönder
   setInterval(() => { worker.postMessage('ping'); }, 500);
 
-  worker.onmessage = async () => {
-    try {
-      const { exit } = await import('@tauri-apps/plugin-process');
-      await exit(0);
-    } catch {
-      window.location.reload();
-    }
+  worker.onmessage = () => {
+    window.location.reload();
   };
 })();
 
