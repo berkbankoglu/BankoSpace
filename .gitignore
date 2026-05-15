@@ -31,3 +31,9 @@ src-tauri/target/
 
 # Temporary files
 create-icon.ps1.claude/
+
+# Signing keys (never commit these)
+*.key
+*.key.pub
+*.sig
+test_sign.txt
