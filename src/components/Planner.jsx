@@ -109,9 +109,14 @@ export default function Planner({ onPlannerToast }) {
   const [qtForm,      setQtForm]      = useState({});
   const [notifOk,     setNotifOk]     = useState(false);
   const [nowMins,     setNowMins]     = useState(() => new Date().getHours() * 60 + new Date().getMinutes());
-  const [ghost,       setGhost]       = useState(null);
+  const [ghost,      setGhost]      = useState(null); // qtask drag preview only
+  const [dragState,  setDragState]  = useState(null); // { ids, timeDelta, dateStr }
 
+  const [panelWidth,   setPanelWidth]   = useState(220);
+  const [selectedIds,  setSelectedIds]  = useState(new Set());
+  const [selectionBox, setSelectionBox] = useState(null);
   const weekGridRef = useRef(null);
+  const panelRef    = useRef(null);
   const notifTimers = useRef([]);
 
   useEffect(() => {
@@ -171,6 +176,18 @@ export default function Planner({ onPlannerToast }) {
     }
   }, [viewMode]);
 
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIds.size > 0) {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        setBlocks(prev => prev.filter(b => !selectedIds.has(b.id)));
+        setSelectedIds(new Set());
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectedIds]);
+
   // Derived
   const today     = todayStr();
   const monthDays = getMonthDays(currentDate.year, currentDate.month);
@@ -225,33 +242,39 @@ export default function Planner({ onPlannerToast }) {
     openAdd(dateStr, clamp(snapTo((y / HOUR_HEIGHT) * 60), 0, 23*60));
   };
 
-  // Drag block in week view
-  const handleWeekBlockMove = (e, block) => {
+  // Resize quick tasks panel
+  const handlePanelResizeStart = (e) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = panelRef.current?.offsetWidth || panelWidth;
+    const onMove = (ev) => setPanelWidth(Math.max(160, Math.min(520, startW + (startX - ev.clientX))));
+    const onUp   = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  // Drag quick task onto week grid
+  const handleQtaskDragToGrid = (e, task) => {
     e.preventDefault();
     e.stopPropagation();
     const gridEl = weekGridRef.current;
     if (!gridEl) return;
-
-    const startM   = timeToMinutes(block.startTime);
-    const duration = timeToMinutes(block.endTime) - startM;
-    const gridRect = gridEl.getBoundingClientRect();
-    const clickOffY = (e.clientY - gridRect.top + gridEl.scrollTop) - (startM / 60) * HOUR_HEIGHT;
-
-    setGhost({ blockId: block.id, dateStr: block.date, startM, endM: startM + duration, color: block.color, title: block.title });
+    const duration = task.defaultDuration || 60;
+    const getPos = (ev) => {
+      const gridRect = gridEl.getBoundingClientRect();
+      const y      = ev.clientY - gridRect.top + gridEl.scrollTop;
+      const startM = clamp(snapTo((y / HOUR_HEIGHT) * 60), 0, 24*60 - duration);
+      const colW   = (gridRect.width - TIME_COL_W) / 7;
+      const ci     = clamp(Math.floor((ev.clientX - gridRect.left - TIME_COL_W) / colW), 0, 6);
+      const onGrid = ev.clientX > gridRect.left + TIME_COL_W && ev.clientX < gridRect.right;
+      return { startM, endM: startM + duration, dateStr: onGrid ? weekDays[ci]?.dateStr : null };
+    };
     document.body.style.cursor = 'grabbing';
     document.body.style.userSelect = 'none';
-
-    const getPos = (ev) => {
-      const y    = ev.clientY - gridRect.top + gridEl.scrollTop;
-      const newS = clamp(snapTo(((y - clickOffY) / HOUR_HEIGHT) * 60), 0, 24*60 - duration);
-      const colW = (gridRect.width - TIME_COL_W) / 7;
-      const ci   = clamp(Math.floor((ev.clientX - gridRect.left - TIME_COL_W) / colW), 0, 6);
-      return { startM: newS, endM: newS + duration, dateStr: weekDays[ci].dateStr };
-    };
-
     const onMove = (ev) => {
       const pos = getPos(ev);
-      setGhost(g => ({ ...g, dateStr: pos.dateStr, startM: pos.startM, endM: pos.endM }));
+      if (pos.dateStr) setGhost({ blockId: null, dateStr: pos.dateStr, startM: pos.startM, endM: pos.endM, color: task.color, title: task.title });
+      else setGhost(null);
     };
     const onUp = (ev) => {
       window.removeEventListener('mousemove', onMove);
@@ -260,10 +283,197 @@ export default function Planner({ onPlannerToast }) {
       document.body.style.userSelect = '';
       const pos = getPos(ev);
       setGhost(null);
-      setBlocks(prev => prev.map(b => b.id === block.id
-        ? { ...b, date: pos.dateStr, startTime: minutesToTime(pos.startM), endTime: minutesToTime(pos.endM) }
-        : b));
+      if (pos.dateStr) {
+        setBlocks(prev => {
+          const snapped = findFreeSlot(prev, pos.dateStr, pos.startM, duration, new Set());
+          return [...prev, { id: Date.now(), date: pos.dateStr, title: task.title, startTime: minutesToTime(snapped), endTime: minutesToTime(snapped + duration), color: task.color, recur: 'none', note: task.note || '' }];
+        });
+      }
     };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  // Resize block from top or bottom edge
+  const handleBlockResize = (e, block, edge) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const gridEl = weekGridRef.current;
+    if (!gridEl) return;
+    document.body.style.cursor = 'ns-resize';
+    document.body.style.userSelect = 'none';
+    const gridRect = gridEl.getBoundingClientRect();
+    const onMove = (ev) => {
+      const y = ev.clientY - gridRect.top + gridEl.scrollTop;
+      const mins = clamp(snapTo((y / HOUR_HEIGHT) * 60), 0, 24 * 60);
+      setBlocks(prev => prev.map(b => {
+        if (b.id !== block.id) return b;
+        if (edge === 'bottom') {
+          const startM = timeToMinutes(b.startTime);
+          return { ...b, endTime: minutesToTime(Math.max(startM + 15, mins)) };
+        } else {
+          const endM = timeToMinutes(b.endTime);
+          return { ...b, startTime: minutesToTime(Math.min(endM - 15, mins)) };
+        }
+      }));
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  // Rubber-band selection on grid background
+  const handleGridMouseDown = (e) => {
+    if (e.button !== 0) return;
+    if (e.target.closest('.pl-wk-block') || e.target.closest('.pl-wk-times')) return;
+    e.preventDefault();
+    const gridEl = weekGridRef.current;
+    const gridRect = gridEl.getBoundingClientRect();
+    const startX = e.clientX - gridRect.left;
+    const startY = e.clientY - gridRect.top + gridEl.scrollTop;
+    let moved = false;
+    const onMove = (ev) => {
+      const cx = ev.clientX - gridRect.left;
+      const cy = ev.clientY - gridRect.top + gridEl.scrollTop;
+      if (!moved && Math.hypot(cx - startX, cy - startY) > 4) moved = true;
+      if (moved) setSelectionBox({ startX, startY, currentX: cx, currentY: cy });
+    };
+    const onUp = (ev) => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      if (moved) {
+        const endX = ev.clientX - gridRect.left;
+        const endY = ev.clientY - gridRect.top + gridEl.scrollTop;
+        const minX = Math.min(startX, endX), maxX = Math.max(startX, endX);
+        const minY = Math.min(startY, endY), maxY = Math.max(startY, endY);
+        const colW = (gridRect.width - TIME_COL_W) / 7;
+        const newSel = new Set();
+        blocks.forEach(b => {
+          const ci = weekDays.findIndex(wd => blockMatchesDate(b, wd.dateStr));
+          if (ci === -1) return;
+          const bL = TIME_COL_W + ci * colW, bR = bL + colW;
+          const bT = (timeToMinutes(b.startTime) / 60) * HOUR_HEIGHT;
+          const bB = (timeToMinutes(b.endTime) / 60) * HOUR_HEIGHT;
+          if (bL < maxX && bR > minX && bT < maxY && bB > minY) newSel.add(b.id);
+        });
+        setSelectedIds(newSel);
+      } else {
+        setSelectedIds(new Set());
+      }
+      setSelectionBox(null);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  // Find nearest free time slot avoiding overlaps
+  const findFreeSlot = (allBlocks, dateStr, desiredStartM, duration, excludeIds) => {
+    const dayBlks = allBlocks.filter(b => blockMatchesDate(b, dateStr) && !excludeIds.has(b.id));
+    const conflict = dayBlks.find(b => {
+      const bS = timeToMinutes(b.startTime), bE = timeToMinutes(b.endTime);
+      return desiredStartM < bE && (desiredStartM + duration) > bS;
+    });
+    if (!conflict) return desiredStartM;
+    const bS = timeToMinutes(conflict.startTime), bE = timeToMinutes(conflict.endTime);
+    const after  = Math.min(24*60 - duration, bE);
+    const before = Math.max(0, bS - duration);
+    return Math.abs(desiredStartM - before) <= Math.abs(desiredStartM - after) ? before : after;
+  };
+
+  // Click vs drag handler for blocks
+  const handleBlockMouseDown = (e, block) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    e.preventDefault();
+    let dragged = false;
+    const startX = e.clientX, startY = e.clientY;
+    const draggingIds = selectedIds.has(block.id) ? new Set(selectedIds) : new Set([block.id]);
+
+    const onMove = (ev) => {
+      if (!dragged && (Math.abs(ev.clientX - startX) > 4 || Math.abs(ev.clientY - startY) > 4)) {
+        dragged = true;
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+        if (!selectedIds.has(block.id)) setSelectedIds(new Set([block.id]));
+        handleWeekBlockMove(e, block, draggingIds);
+      }
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      if (!dragged) {
+        if (e.shiftKey || e.ctrlKey || e.metaKey) {
+          setSelectedIds(prev => { const n = new Set(prev); n.has(block.id) ? n.delete(block.id) : n.add(block.id); return n; });
+        } else {
+          setSelectedIds(new Set([block.id]));
+        }
+      }
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  // Drag block(s) in week view
+  const handleWeekBlockMove = (e, block, draggingIds) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const gridEl = weekGridRef.current;
+    if (!gridEl) return;
+
+    const startM          = timeToMinutes(block.startTime);
+    const duration        = timeToMinutes(block.endTime) - startM;
+    const primaryOrigCol  = weekDays.findIndex(wd => wd.dateStr === block.date);
+    const gridRect        = gridEl.getBoundingClientRect();
+    const clickOffY       = (e.clientY - gridRect.top + gridEl.scrollTop) - (startM / 60) * HOUR_HEIGHT;
+
+    // Store each dragging block's original column index
+    const blockOrigCols = new Map();
+    blocks.forEach(b => { if (draggingIds.has(b.id)) blockOrigCols.set(b.id, weekDays.findIndex(wd => wd.dateStr === b.date)); });
+
+    document.body.style.cursor = 'grabbing';
+    document.body.style.userSelect = 'none';
+
+    const getPos = (ev) => {
+      const y    = ev.clientY - gridRect.top + gridEl.scrollTop;
+      const newS = clamp(snapTo(((y - clickOffY) / HOUR_HEIGHT) * 60), 0, 24*60 - duration);
+      const colW = (gridRect.width - TIME_COL_W) / 7;
+      const ci   = clamp(Math.floor((ev.clientX - gridRect.left - TIME_COL_W) / colW), 0, 6);
+      return { startM: newS, colIdx: ci };
+    };
+
+    const onMove = (ev) => {
+      const pos = getPos(ev);
+      setDragState({ ids: draggingIds, timeDelta: pos.startM - startM, colDelta: pos.colIdx - primaryOrigCol, blockOrigCols });
+    };
+
+    const onUp = (ev) => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      const pos      = getPos(ev);
+      const colDelta = pos.colIdx - primaryOrigCol;
+      const timeDelta = pos.startM - startM;
+      setDragState(null);
+      setBlocks(prev => prev.map(b => {
+        if (!draggingIds.has(b.id)) return b;
+        const origCol    = blockOrigCols.get(b.id) ?? primaryOrigCol;
+        const targetCol  = clamp(origCol + colDelta, 0, 6);
+        const targetDate = weekDays[targetCol]?.dateStr || b.date;
+        const bDur       = timeToMinutes(b.endTime) - timeToMinutes(b.startTime);
+        const rawStart   = timeToMinutes(b.startTime) + timeDelta;
+        const finalStart = draggingIds.size === 1
+          ? findFreeSlot(prev, targetDate, rawStart, bDur, draggingIds)
+          : clamp(rawStart, 0, 24*60 - bDur);
+        return { ...b, date: targetDate, startTime: minutesToTime(finalStart), endTime: minutesToTime(finalStart + bDur) };
+      }));
+    };
+
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
   };
@@ -282,6 +492,7 @@ export default function Planner({ onPlannerToast }) {
           <button className="pl-today-btn" onClick={goToday}>Today</button>
         </div>
         <div className="pl-header-right">
+          <button className="pl-add-btn" onClick={() => openAdd(today)}>+ Add Block</button>
           <div className="pl-view-switch">
             <button className={`pl-view-btn${viewMode==='month'?' active':''}`} onClick={() => setViewMode('month')}>Month</button>
             <button className={`pl-view-btn${viewMode==='week'?' active':''}`}  onClick={() => setViewMode('week')}>Week</button>
@@ -330,19 +541,27 @@ export default function Planner({ onPlannerToast }) {
             {weekDays.map(wd => (
               <div key={wd.dateStr}
                 className={`pl-wk-day-hdr${wd.dateStr === today ? ' today' : ''}`}
-                onClick={() => openAdd(wd.dateStr)}
               >
                 <span className="pl-wk-day-name">{wd.dayShort}</span>
                 <span className={`pl-wk-day-num${wd.dateStr === today ? ' today' : ''}`}>{wd.dayNum}</span>
               </div>
             ))}
-            <div className="pl-wk-panel-spacer" />
+            <div className="pl-wk-panel-spacer" style={{ width: panelWidth }} />
           </div>
 
           {/* Grid + panel */}
           <div className="pl-wk-body-row">
 
-            <div className="pl-wk-grid" ref={weekGridRef}>
+            <div className="pl-wk-grid" ref={weekGridRef} onMouseDown={handleGridMouseDown}>
+              {/* Rubber-band selection box */}
+              {selectionBox && (() => {
+                const x = Math.min(selectionBox.startX, selectionBox.currentX);
+                const y = Math.min(selectionBox.startY, selectionBox.currentY);
+                const w = Math.abs(selectionBox.currentX - selectionBox.startX);
+                const h = Math.abs(selectionBox.currentY - selectionBox.startY);
+                return <div className="pl-selection-box" style={{ left: x, top: y, width: w, height: h }} />;
+              })()}
+
               {/* Time gutter */}
               <div className="pl-wk-times">
                 {Array.from({ length: 24 }, (_, h) => (
@@ -354,13 +573,19 @@ export default function Planner({ onPlannerToast }) {
 
               {/* Day columns */}
               {weekDays.map(wd => {
-                const dayBlks = blocks.filter(b => blockMatchesDate(b, wd.dateStr));
-                const layout  = layoutVertical(dayBlks);
+                const dayBlks = blocks.filter(b => {
+                  if (dragState?.ids?.has(b.id)) {
+                    const origCol   = dragState.blockOrigCols?.get(b.id) ?? -1;
+                    const targetCol = clamp(origCol + (dragState.colDelta ?? 0), 0, 6);
+                    return weekDays[targetCol]?.dateStr === wd.dateStr;
+                  }
+                  return blockMatchesDate(b, wd.dateStr);
+                });
                 return (
                   <div key={wd.dateStr}
                     className={`pl-wk-day-col${wd.dateStr === today ? ' today' : ''}`}
                     style={{ height: 24 * HOUR_HEIGHT }}
-                    onClick={(e) => handleWeekColClick(e, wd.dateStr)}
+                    onClick={() => setSelectedIds(new Set())}
                   >
                     {Array.from({ length: 24 }, (_, h) => (
                       <div key={h} className="pl-wk-hline" style={{ top: h * HOUR_HEIGHT }} />
@@ -389,30 +614,36 @@ export default function Planner({ onPlannerToast }) {
                     )}
 
                     {dayBlks.map(block => {
-                      const startM = timeToMinutes(block.startTime);
-                      const endM   = timeToMinutes(block.endTime);
+                      const origStartM = timeToMinutes(block.startTime);
+                      const origEndM   = timeToMinutes(block.endTime);
+                      const isDragging = dragState?.ids?.has(block.id);
+                      const startM = isDragging ? clamp(origStartM + dragState.timeDelta, 0, 24*60 - (origEndM - origStartM)) : origStartM;
+                      const endM   = startM + (origEndM - origStartM);
                       const topPx  = (startM / 60) * HOUR_HEIGHT;
                       const hPx    = Math.max(((endM - startM) / 60) * HOUR_HEIGHT, 22);
-                      const { left, width } = layout.get(block.id) || { left: 0, width: 1 };
                       const color  = colorHex(block.color);
+                      const isSelected = selectedIds.has(block.id);
                       return (
                         <div key={block.id}
-                          className={`pl-wk-block${ghost?.blockId === block.id ? ' pl-wk-dragging' : ''}`}
+                          className={`pl-wk-block${isSelected ? ' pl-wk-selected' : ''}`}
                           style={{
                             top:    topPx,
                             height: hPx,
-                            left:   `calc(${left * 100}% + 2px)`,
-                            width:  `calc(${width * 100}% - 4px)`,
-                            background: color + '22',
+                            left:   '2px',
+                            right:  '2px',
+                            background: color + (isSelected ? '44' : '22'),
                             borderLeft: `3px solid ${color}`,
+                            outline: isSelected ? `2px solid ${color}` : 'none',
                           }}
-                          onMouseDown={(e) => handleWeekBlockMove(e, block)}
+                          onMouseDown={(e) => handleBlockMouseDown(e, block)}
                           onDoubleClick={(e) => { e.stopPropagation(); openEdit(block); }}
                           onClick={(e) => e.stopPropagation()}
                         >
+                          <div className="pl-wk-resize-top" onMouseDown={(e) => handleBlockResize(e, block, 'top')} />
                           <div className="pl-wk-block-title">{block.title}</div>
                           {hPx > 38 && <div className="pl-wk-block-time">{block.startTime}–{block.endTime}</div>}
                           {block.recur !== 'none' && <span className="pl-wk-recur">↻</span>}
+                          <div className="pl-wk-resize-bottom" onMouseDown={(e) => handleBlockResize(e, block, 'bottom')} />
                         </div>
                       );
                     })}
@@ -422,18 +653,23 @@ export default function Planner({ onPlannerToast }) {
             </div>
 
             {/* Right panel */}
-            <div className="pl-wk-panel">
+            <div className="pl-wk-panel" ref={panelRef} style={{ width: panelWidth }}>
+              <div className="pl-panel-resize-handle" onMouseDown={handlePanelResizeStart} />
               <div className="pl-panel-header">
                 <span className="pl-panel-title">Quick Tasks</span>
                 <button className="pl-qt-add-btn" onClick={openQtAdd}>+</button>
               </div>
               <div className="pl-qtasks-list">
-                {qTasks.length === 0 && <div className="pl-empty-day">Add tasks here</div>}
+                {qTasks.length === 0 && <div className="pl-empty-day">Drag to calendar</div>}
                 {qTasks.map(task => (
-                  <div key={task.id} className="pl-qtask-item" onClick={() => openQtEdit(task)}>
+                  <div key={task.id} className="pl-qtask-item"
+                    onDoubleClick={() => openQtEdit(task)}
+                    onMouseDown={(e) => { if (e.button === 0) handleQtaskDragToGrid(e, task); }}
+                  >
                     <span className="pl-qtask-bar" style={{ background: colorHex(task.color) }} />
                     <span className="pl-qtask-title">{task.title}</span>
                     {task.defaultDuration && <span className="pl-qtask-dur">{task.defaultDuration}m</span>}
+                    <span className="pl-qtask-drag-hint">⠿</span>
                   </div>
                 ))}
               </div>

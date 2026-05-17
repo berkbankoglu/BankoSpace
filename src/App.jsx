@@ -18,6 +18,7 @@ import StockNews from './components/StockNews';
 import Translate from './components/Translate';
 import ProjectBid from './components/ProjectBid';
 import Planner from './components/Planner';
+import Notes from './components/Notes';
 import { onAction, registerActionTypes } from '@tauri-apps/plugin-notification';
 
 const QUICK_BUTTONS = [
@@ -172,19 +173,38 @@ function App({ session, onLogout }) {
 
   const [showUpdateWarning, setShowUpdateWarning] = useState(false);
 
-  // WebView2 freeze fix — focus/visibility sonrası repaint zorla
+  // WebView2 freeze fix — virtual desktop switching causes GPU occlusion freeze
   useEffect(() => {
     const forceRepaint = () => {
+      // Force a layout + composite cycle
+      const el = document.documentElement;
+      el.style.transform = 'translateZ(0)';
+      requestAnimationFrame(() => { el.style.transform = ''; });
       window.dispatchEvent(new Event('resize'));
     };
+
+    // Fire on focus regain (covers alt-tab and virtual desktop return)
+    window.addEventListener('focus', forceRepaint);
+
+    // Fire on visibility change
     const onVisibility = () => {
       if (document.visibilityState === 'visible') forceRepaint();
     };
-    window.addEventListener('focus', forceRepaint);
     document.addEventListener('visibilitychange', onVisibility);
+
+    // Periodic heartbeat — keeps compositor alive, catches cases focus event misses
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        const el = document.documentElement;
+        el.style.transform = 'translateZ(0)';
+        requestAnimationFrame(() => { el.style.transform = ''; });
+      }
+    }, 2000);
+
     return () => {
       window.removeEventListener('focus', forceRepaint);
       document.removeEventListener('visibilitychange', onVisibility);
+      clearInterval(interval);
     };
   }, []);
 
@@ -309,6 +329,7 @@ function App({ session, onLogout }) {
       { id: 'japanesekana', label: 'Japanese Kana',    view: 'japanesekana', hidden: false },
       { id: 'fitness',      label: 'Fitness',           view: 'fitness',      hidden: false },
       { id: 'planner',      label: 'Planner',           view: 'planner',      hidden: false },
+      { id: 'notes',        label: 'Notes',             view: 'notes',        hidden: false },
     ];
     const saved = localStorage.getItem('sidebarOrder');
     if (saved) {
@@ -1275,7 +1296,7 @@ function App({ session, onLogout }) {
         {/* Left Sidebar - Notion Style */}
         <div className={`notion-sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
           {/* Sidebar Header */}
-          <div className="sidebar-header">
+          <div className="sidebar-header" data-tauri-drag-region>
             <div className="sidebar-title">
               {!sidebarCollapsed && <img src={logo} alt="BankoSpace" className="sidebar-logo" />}
             </div>
@@ -1744,6 +1765,13 @@ function App({ session, onLogout }) {
           {activeView === 'planner' && (
             <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
               <Planner onPlannerToast={showPlannerToast} onOpenPlanner={() => setActiveView('planner')} />
+            </div>
+          )}
+
+          {/* Notes */}
+          {activeView === 'notes' && (
+            <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <Notes />
             </div>
           )}
 

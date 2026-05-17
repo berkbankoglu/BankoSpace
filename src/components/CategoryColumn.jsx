@@ -9,11 +9,11 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editTitleValue, setEditTitleValue] = useState(title);
   const [expandedTodos, setExpandedTodos] = useState(() => {
-    // Start with all todos that have subtasks expanded
     const s = new Set();
     todos.forEach(t => { if (t.subtasks && t.subtasks.length > 0) s.add(t.id); });
     return s;
   });
+  const [manuallyClosed, setManuallyClosed] = useState(new Set());
   const [subtaskInputs, setSubtaskInputs] = useState({});
   const [editingTodoId, setEditingTodoId] = useState(null);
   const [editingTodoText, setEditingTodoText] = useState('');
@@ -29,13 +29,13 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
   const editInputRef = useRef(null);
   const editSubtaskInputRef = useRef(null);
 
-  // Auto-expand todos that have subtasks
+  // Auto-expand only newly added todos that have subtasks (skip manually closed ones)
   useEffect(() => {
     setExpandedTodos(prev => {
       let changed = false;
       const next = new Set(prev);
       todos.forEach(t => {
-        if (t.subtasks && t.subtasks.length > 0 && !next.has(t.id)) {
+        if (t.subtasks && t.subtasks.length > 0 && !next.has(t.id) && !manuallyClosed.has(t.id)) {
           next.add(t.id);
           changed = true;
         }
@@ -89,6 +89,12 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
     setExpandedTodos(prev => {
       const next = new Set(prev);
       if (next.has(todoId)) next.delete(todoId);
+      else next.add(todoId);
+      return next;
+    });
+    setManuallyClosed(prev => {
+      const next = new Set(prev);
+      if (isOpening) next.delete(todoId);
       else next.add(todoId);
       return next;
     });
@@ -220,6 +226,7 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
             data-todo-id={todo.id}
             className={`cc-item ${todo.completed ? 'completed' : ''} ${completingIds.has(todo.id) ? 'completing' : ''}`}
             style={{ animationDelay: `${idx * 0.22}s` }}
+            onClick={() => { if (todo.subtasks && todo.subtasks.length > 0) toggleExpand(todo.id); }}
           >
             {todo.color && <div className="cc-item-color-bar" style={{ background: todo.color }} />}
             {/* Top row: drag handle + checkbox + actions */}
@@ -265,17 +272,17 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
                 )}
                 <button
                   className="cc-action-btn edit-btn"
-                  onClick={() => { setEditingTodoId(todo.id); setEditingTodoText(todo.text); }}
+                  onClick={(e) => { e.stopPropagation(); setEditingTodoId(todo.id); setEditingTodoText(todo.text); }}
                   title="Edit"
                 >✎</button>
                 <button
                   className="cc-action-btn expand"
-                  onClick={() => toggleExpand(todo.id)}
+                  onClick={(e) => { e.stopPropagation(); toggleExpand(todo.id); }}
                   title="Subtasks"
                 >{expandedTodos.has(todo.id) ? '−' : '+'}</button>
                 <button
                   className="cc-action-btn delete"
-                  onClick={() => { playDeleteSound(); onDeleteTodo(todo.id); }}
+                  onClick={(e) => { e.stopPropagation(); playDeleteSound(); onDeleteTodo(todo.id); }}
                   title="Delete"
                 >×</button>
               </div>
