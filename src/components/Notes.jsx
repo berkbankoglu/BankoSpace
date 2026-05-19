@@ -83,6 +83,13 @@ function migrateNote(note) {
 const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, ref) => {
   const editorRef = useRef(null);
   const [isEmpty, setIsEmpty] = useState(!content);
+  const [pendingImg, setPendingImg] = useState(null); // { dataUrl, anchorRect }
+  const [pendingTitle, setPendingTitle] = useState('Screenshot');
+  const [preview, setPreview] = useState(null); // { dataUrl, rect }
+  const [lightbox, setLightbox] = useState(null); // { dataUrl }
+  const [lightboxZoom, setLightboxZoom] = useState(1);
+  const pendingRangeRef = useRef(null);
+  const titleInputRef = useRef(null);
 
   useEffect(() => {
     if (editorRef.current && editorRef.current.innerHTML !== content) {
@@ -91,82 +98,160 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
     }
   }, []);
 
+  useEffect(() => {
+    if (pendingImg) setTimeout(() => { titleInputRef.current?.focus(); titleInputRef.current?.select(); }, 0);
+  }, [pendingImg]);
+
   const handleInput = () => {
     playTypeSoundThrottled();
     if (editorRef.current) {
       const html = editorRef.current.innerHTML;
-      const textContent = editorRef.current.textContent;
-      setIsEmpty(!textContent || textContent.trim() === '');
+      setIsEmpty(!editorRef.current.textContent?.trim());
       onChange(html);
     }
+  };
+
+  const insertImageEmbed = (dataUrl, title) => {
+    const range = pendingRangeRef.current;
+    if (!range) return;
+    const span = document.createElement('span');
+    span.className = 'note-img-embed';
+    span.contentEditable = 'false';
+    span.setAttribute('data-img', dataUrl);
+    span.textContent = '📷 ' + (title.trim() || 'Screenshot');
+    range.deleteContents();
+    range.insertNode(span);
+    const newRange = document.createRange();
+    newRange.setStartAfter(span);
+    newRange.collapse(true);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(newRange);
+    pendingRangeRef.current = null;
+    setPendingImg(null);
+    setPendingTitle('Screenshot');
+    if (editorRef.current) { setIsEmpty(false); onChange(editorRef.current.innerHTML); }
   };
 
   const handlePaste = (e) => {
     const items = Array.from(e.clipboardData?.items || []);
     const imageItem = items.find(item => item.type.startsWith('image/'));
-    if (!imageItem) return; // let default text paste through
-
+    if (!imageItem) return;
     e.preventDefault();
     const file = imageItem.getAsFile();
     if (!file) return;
 
+    const sel = window.getSelection();
+    pendingRangeRef.current = sel?.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
+    let anchorRect = { top: 120, left: 200 };
+    if (pendingRangeRef.current) {
+      const rects = pendingRangeRef.current.getClientRects();
+      if (rects.length > 0) anchorRect = { top: rects[0].bottom + 6, left: rects[0].left };
+    }
+
     const reader = new FileReader();
     reader.onload = (ev) => {
-      const raw = ev.target.result;
       const imgEl = new window.Image();
       imgEl.onload = () => {
-        const maxW = 1200;
+        const maxW = 1600;
         const scale = imgEl.width > maxW ? maxW / imgEl.width : 1;
         const canvas = document.createElement('canvas');
         canvas.width = Math.round(imgEl.width * scale);
         canvas.height = Math.round(imgEl.height * scale);
         canvas.getContext('2d').drawImage(imgEl, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-
-        const img = document.createElement('img');
-        img.src = dataUrl;
-        img.style.cssText = 'max-width:100%;border-radius:6px;margin:6px 0;display:block;cursor:pointer;';
-        img.title = 'Click to view full size';
-        img.onclick = () => window.open(dataUrl, '_blank');
-
-        const sel = window.getSelection();
-        if (sel && sel.rangeCount > 0) {
-          const range = sel.getRangeAt(0);
-          range.deleteContents();
-          range.insertNode(img);
-          range.setStartAfter(img);
-          range.collapse(true);
-          sel.removeAllRanges();
-          sel.addRange(range);
-        } else {
-          editorRef.current?.appendChild(img);
-        }
-
-        if (editorRef.current) {
-          const html = editorRef.current.innerHTML;
-          setIsEmpty(false);
-          onChange(html);
-        }
+        setPendingImg({ dataUrl: canvas.toDataURL('image/png'), anchorRect });
+        setPendingTitle('Screenshot');
       };
-      imgEl.src = raw;
+      imgEl.src = ev.target.result;
     };
     reader.readAsDataURL(file);
   };
 
+  // Hover preview & click lightbox via event delegation
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    const onOver = (e) => {
+      const embed = e.target.closest?.('.note-img-embed');
+      if (embed) setPreview({ dataUrl: embed.getAttribute('data-img'), rect: embed.getBoundingClientRect() });
+    };
+    const onOut = (e) => {
+      if (e.target.closest?.('.note-img-embed')) setPreview(null);
+    };
+    const onClick = (e) => {
+      const embed = e.target.closest?.('.note-img-embed');
+      if (embed) { e.preventDefault(); setLightbox({ dataUrl: embed.getAttribute('data-img') }); setLightboxZoom(1); }
+    };
+    editor.addEventListener('mouseover', onOver);
+    editor.addEventListener('mouseout', onOut);
+    editor.addEventListener('click', onClick);
+    return () => { editor.removeEventListener('mouseover', onOver); editor.removeEventListener('mouseout', onOut); editor.removeEventListener('click', onClick); };
+  }, []);
+
   return (
-    <div
-      ref={(el) => {
-        editorRef.current = el;
-        if (ref) ref.current = el;
-      }}
-      className={`notebook-page-editor ${isEmpty ? 'empty' : ''}`}
-      contentEditable
-      suppressContentEditableWarning
-      onInput={handleInput}
-      onPaste={handlePaste}
-      data-placeholder={placeholder}
-      style={style}
-    />
+    <>
+      <div
+        ref={(el) => { editorRef.current = el; if (ref) ref.current = el; }}
+        className={`notebook-page-editor ${isEmpty ? 'empty' : ''}`}
+        contentEditable
+        suppressContentEditableWarning
+        onInput={handleInput}
+        onPaste={handlePaste}
+        data-placeholder={placeholder}
+        style={style}
+      />
+
+      {/* Title input overlay — appears at cursor after paste */}
+      {pendingImg && (
+        <div className="note-img-title-overlay" style={{ top: pendingImg.anchorRect.top, left: pendingImg.anchorRect.left }}>
+          <span className="note-img-title-icon">📷</span>
+          <input
+            ref={titleInputRef}
+            className="note-img-title-input"
+            value={pendingTitle}
+            onChange={e => setPendingTitle(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') { e.preventDefault(); insertImageEmbed(pendingImg.dataUrl, pendingTitle); }
+              if (e.key === 'Escape') { setPendingImg(null); pendingRangeRef.current = null; }
+            }}
+            placeholder="Başlık yaz, Enter'a bas..."
+          />
+          <button className="note-img-title-confirm" onClick={() => insertImageEmbed(pendingImg.dataUrl, pendingTitle)}>↵</button>
+        </div>
+      )}
+
+      {/* Hover preview */}
+      {preview && (
+        <div className="note-img-preview" style={{
+          top: Math.max(8, preview.rect.top - 210),
+          left: Math.min(preview.rect.left, window.innerWidth - 320),
+        }}>
+          <img src={preview.dataUrl} className="note-img-preview-img" alt="" />
+        </div>
+      )}
+
+      {/* Lightbox */}
+      {lightbox && (
+        <div className="note-img-lightbox" onClick={() => setLightbox(null)} onWheel={e => { e.preventDefault(); setLightboxZoom(z => Math.min(6, Math.max(0.25, z - e.deltaY * 0.001))); }}>
+          <div className="note-img-lightbox-bar" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setLightboxZoom(z => Math.min(6, z + 0.25))}>＋</button>
+            <span>{Math.round(lightboxZoom * 100)}%</span>
+            <button onClick={() => setLightboxZoom(z => Math.max(0.25, z - 0.25))}>－</button>
+            <button onClick={() => setLightboxZoom(1)}>1:1</button>
+            <button className="note-img-lightbox-close" onClick={() => setLightbox(null)}>✕</button>
+          </div>
+          <div className="note-img-lightbox-body" onClick={e => e.stopPropagation()}>
+            <img
+              src={lightbox.dataUrl}
+              className="note-img-lightbox-img"
+              style={{ transform: `scale(${lightboxZoom})`, transformOrigin: 'top center' }}
+              draggable={false}
+              alt=""
+            />
+          </div>
+        </div>
+      )}
+    </>
   );
 });
 
