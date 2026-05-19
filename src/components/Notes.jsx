@@ -144,18 +144,16 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
     const sel = window.getSelection();
     pendingRangeRef.current = sel?.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
 
-    // Insert a temporary anchor span to measure exact cursor position
+    // Get cursor position without touching the DOM
     let anchorRect = { top: 120, left: 200 };
     if (pendingRangeRef.current) {
-      const anchor = document.createElement('span');
-      anchor.id = '__img_anchor__';
-      anchor.textContent = '​'; // zero-width space
-      pendingRangeRef.current.insertNode(anchor);
-      const r = anchor.getBoundingClientRect();
-      anchorRect = { top: r.bottom + 4, left: r.left };
-      anchor.remove();
-      // Restore range after anchor removal
-      pendingRangeRef.current = sel?.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
+      const rects = pendingRangeRef.current.getClientRects();
+      if (rects.length > 0) {
+        anchorRect = { top: rects[0].bottom + 6, left: rects[0].left };
+      } else if (editorRef.current) {
+        const er = editorRef.current.getBoundingClientRect();
+        anchorRect = { top: er.top + 40, left: er.left + 20 };
+      }
     }
 
     const reader = new FileReader();
