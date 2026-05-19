@@ -226,7 +226,6 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
             data-todo-id={todo.id}
             className={`cc-item ${todo.completed ? 'completed' : ''} ${completingIds.has(todo.id) ? 'completing' : ''}`}
             style={{ animationDelay: `${idx * 0.22}s` }}
-            onClick={() => { if (todo.subtasks && todo.subtasks.length > 0) toggleExpand(todo.id); }}
           >
             {todo.color && <div className="cc-item-color-bar" style={{ background: todo.color }} />}
             {/* Top row: drag handle + checkbox + actions */}
