@@ -8,12 +8,17 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
   const [inputValue, setInputValue] = useState('');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editTitleValue, setEditTitleValue] = useState(title);
+  const manuallyClosedRef = useRef(null);
+  if (!manuallyClosedRef.current) {
+    try { manuallyClosedRef.current = new Set(JSON.parse(localStorage.getItem(`cc_closed_${category}`) || '[]')); }
+    catch { manuallyClosedRef.current = new Set(); }
+  }
   const [expandedTodos, setExpandedTodos] = useState(() => {
+    const closed = manuallyClosedRef.current;
     const s = new Set();
-    todos.forEach(t => { if (t.subtasks && t.subtasks.length > 0) s.add(t.id); });
+    todos.forEach(t => { if (t.subtasks && t.subtasks.length > 0 && !closed.has(t.id)) s.add(t.id); });
     return s;
   });
-  const manuallyClosedRef = useRef(new Set());
   const [subtaskInputs, setSubtaskInputs] = useState({});
   const [editingTodoId, setEditingTodoId] = useState(null);
   const [editingTodoText, setEditingTodoText] = useState('');
@@ -94,6 +99,7 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
     });
     if (isOpening) manuallyClosedRef.current.delete(todoId);
     else manuallyClosedRef.current.add(todoId);
+    localStorage.setItem(`cc_closed_${category}`, JSON.stringify([...manuallyClosedRef.current]));
     setSubtaskInputs(prev => ({ ...prev, [todoId]: '' }));
     if (isOpening) {
       setTimeout(() => {
@@ -222,6 +228,7 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
             data-todo-id={todo.id}
             className={`cc-item ${todo.completed ? 'completed' : ''} ${completingIds.has(todo.id) ? 'completing' : ''}`}
             style={{ animationDelay: `${idx * 0.22}s` }}
+            onClick={() => { if (todo.subtasks && todo.subtasks.length > 0) toggleExpand(todo.id); }}
           >
             {todo.color && <div className="cc-item-color-bar" style={{ background: todo.color }} />}
             {/* Top row: drag handle + checkbox + actions */}
