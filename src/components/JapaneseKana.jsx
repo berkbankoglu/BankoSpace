@@ -2548,7 +2548,8 @@ function VocabularyTab() {
   return (
     <div className="vocab-tab">
       <div className="vocab-sidebar">
-        <div className="vocab-sidebar-inner">
+        {/* Categories column */}
+        <div className="vocab-sidebar-col vocab-sidebar-col--cats">
           <div className="vocab-sidebar-section-label">Kategoriler</div>
           {sidebarCategories.map(({ key, label }) => (
             <button
@@ -2559,10 +2560,11 @@ function VocabularyTab() {
               {label}
             </button>
           ))}
+        </div>
 
-          <div className="vocab-folders-label">
-            <span className="vocab-sidebar-section-label" style={{ padding: '8px 0 4px' }}>Klasörler</span>
-          </div>
+        {/* Folders column */}
+        <div className="vocab-sidebar-col vocab-sidebar-col--folders">
+          <div className="vocab-sidebar-section-label">Klasörler</div>
 
           {folders.map(folder => (
             <div
