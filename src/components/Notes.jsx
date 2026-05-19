@@ -101,6 +101,58 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
     }
   };
 
+  const handlePaste = (e) => {
+    const items = Array.from(e.clipboardData?.items || []);
+    const imageItem = items.find(item => item.type.startsWith('image/'));
+    if (!imageItem) return; // let default text paste through
+
+    e.preventDefault();
+    const file = imageItem.getAsFile();
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const raw = ev.target.result;
+      const imgEl = new window.Image();
+      imgEl.onload = () => {
+        const maxW = 1200;
+        const scale = imgEl.width > maxW ? maxW / imgEl.width : 1;
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(imgEl.width * scale);
+        canvas.height = Math.round(imgEl.height * scale);
+        canvas.getContext('2d').drawImage(imgEl, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+        const img = document.createElement('img');
+        img.src = dataUrl;
+        img.style.cssText = 'max-width:100%;border-radius:6px;margin:6px 0;display:block;cursor:pointer;';
+        img.title = 'Click to view full size';
+        img.onclick = () => window.open(dataUrl, '_blank');
+
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) {
+          const range = sel.getRangeAt(0);
+          range.deleteContents();
+          range.insertNode(img);
+          range.setStartAfter(img);
+          range.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        } else {
+          editorRef.current?.appendChild(img);
+        }
+
+        if (editorRef.current) {
+          const html = editorRef.current.innerHTML;
+          setIsEmpty(false);
+          onChange(html);
+        }
+      };
+      imgEl.src = raw;
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <div
       ref={(el) => {
@@ -111,6 +163,7 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
       contentEditable
       suppressContentEditableWarning
       onInput={handleInput}
+      onPaste={handlePaste}
       data-placeholder={placeholder}
       style={style}
     />
