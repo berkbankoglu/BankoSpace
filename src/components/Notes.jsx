@@ -143,10 +143,19 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
 
     const sel = window.getSelection();
     pendingRangeRef.current = sel?.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
+
+    // Insert a temporary anchor span to measure exact cursor position
     let anchorRect = { top: 120, left: 200 };
     if (pendingRangeRef.current) {
-      const rects = pendingRangeRef.current.getClientRects();
-      if (rects.length > 0) anchorRect = { top: rects[0].bottom + 6, left: rects[0].left };
+      const anchor = document.createElement('span');
+      anchor.id = '__img_anchor__';
+      anchor.textContent = '​'; // zero-width space
+      pendingRangeRef.current.insertNode(anchor);
+      const r = anchor.getBoundingClientRect();
+      anchorRect = { top: r.bottom + 4, left: r.left };
+      anchor.remove();
+      // Restore range after anchor removal
+      pendingRangeRef.current = sel?.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
     }
 
     const reader = new FileReader();
@@ -223,8 +232,8 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
       {/* Hover preview */}
       {preview && (
         <div className="note-img-preview" style={{
-          top: Math.max(8, preview.rect.top - 210),
-          left: Math.min(preview.rect.left, window.innerWidth - 320),
+          top: Math.max(8, preview.rect.top - 436),
+          left: Math.min(Math.max(8, preview.rect.left), window.innerWidth - 656),
         }}>
           <img src={preview.dataUrl} className="note-img-preview-img" alt="" />
         </div>

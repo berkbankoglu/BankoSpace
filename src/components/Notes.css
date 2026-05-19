@@ -1509,17 +1509,17 @@
   position: fixed;
   z-index: 9500;
   pointer-events: none;
-  border-radius: 8px;
+  border-radius: 10px;
   overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.7);
+  box-shadow: 0 12px 48px rgba(0,0,0,0.85);
   border: 1px solid #2d4a6a;
   background: #0d1117;
-  max-width: 300px;
+  max-width: 640px;
 }
 .note-img-preview-img {
   display: block;
-  max-width: 300px;
-  max-height: 200px;
+  max-width: 640px;
+  max-height: 420px;
   object-fit: contain;
 }
 
