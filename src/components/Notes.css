@@ -1508,7 +1508,7 @@
 .note-img-preview {
   position: fixed;
   z-index: 9500;
-  pointer-events: none;
+  pointer-events: auto;
   border-radius: 10px;
   overflow: hidden;
   box-shadow: 0 12px 48px rgba(0,0,0,0.85);
@@ -1522,6 +1522,28 @@
   max-height: 420px;
   object-fit: contain;
 }
+.note-img-delete-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  background: rgba(248,81,73,0.85);
+  border: none;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.note-img-preview:hover .note-img-delete-btn { opacity: 1; }
+.note-img-delete-btn:hover { background: #f85149; }
+.note-img-preview { position: relative; }
 
 /* Lightbox */
 .note-img-lightbox {
