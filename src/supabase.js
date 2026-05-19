@@ -91,8 +91,6 @@ export const SYNC_KEYS = [
   'chat_username',
   'planner_blocks',
   'planner_qtasks',
-  'vocab_groups',
-  'vocab_words',
 ];
 
 // Cache userId to avoid network call on every push
