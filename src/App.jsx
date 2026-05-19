@@ -19,7 +19,6 @@ import Translate from './components/Translate';
 import ProjectBid from './components/ProjectBid';
 import Planner from './components/Planner';
 import Notes from './components/Notes';
-import Vocabulary from './components/Vocabulary';
 import { onAction, registerActionTypes } from '@tauri-apps/plugin-notification';
 
 const QUICK_BUTTONS = [
@@ -331,7 +330,6 @@ function App({ session, onLogout }) {
       { id: 'fitness',      label: 'Fitness',           view: 'fitness',      hidden: false },
       { id: 'planner',      label: 'Planner',           view: 'planner',      hidden: false },
       { id: 'notes',        label: 'Notes',             view: 'notes',        hidden: false },
-      { id: 'vocabulary',   label: 'Vocabulary',        view: 'vocabulary',   hidden: false },
     ];
     const saved = localStorage.getItem('sidebarOrder');
     if (saved) {
@@ -1798,12 +1796,6 @@ function App({ session, onLogout }) {
             <JapaneseKana />
           )}
 
-          {/* Vocabulary */}
-          {activeView === 'vocabulary' && (
-            <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-              <Vocabulary />
-            </div>
-          )}
 
 
           {/* Dashboard View */}
