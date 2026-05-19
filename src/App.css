@@ -183,9 +183,9 @@ body {
 .custom-titlebar {
     position: fixed;
     top: 0;
+    left: 0;
     right: 0;
     height: 32px;
-    width: auto;
     background: transparent;
     border: none;
     display: flex;
@@ -256,7 +256,10 @@ body {
 }
 
 .titlebar-drag-region {
-    display: none;
+    flex: 1;
+    height: 100%;
+    pointer-events: auto;
+    cursor: move;
 }
 
 .titlebar-left {
