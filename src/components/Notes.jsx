@@ -182,7 +182,7 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
     if (!editor) return;
     const onOver = (e) => {
       const embed = e.target.closest?.('.note-img-embed');
-      if (embed) setPreview({ dataUrl: embed.getAttribute('data-img'), rect: embed.getBoundingClientRect() });
+      if (embed) setPreview({ dataUrl: embed.getAttribute('data-img'), rect: embed.getBoundingClientRect(), el: embed });
     };
     const onOut = (e) => {
       if (e.target.closest?.('.note-img-embed')) setPreview(null);
@@ -196,6 +196,20 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
     editor.addEventListener('click', onClick);
     return () => { editor.removeEventListener('mouseover', onOver); editor.removeEventListener('mouseout', onOut); editor.removeEventListener('click', onClick); };
   }, []);
+
+  // Esc closes lightbox
+  useEffect(() => {
+    if (!lightbox) return;
+    const onKey = (e) => { if (e.key === 'Escape') setLightbox(null); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [lightbox]);
+
+  const deleteEmbed = (el) => {
+    el?.remove();
+    setPreview(null);
+    if (editorRef.current) { setIsEmpty(!editorRef.current.textContent?.trim()); onChange(editorRef.current.innerHTML); }
+  };
 
   return (
     <>
@@ -236,6 +250,11 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
           left: Math.min(Math.max(8, preview.rect.left), window.innerWidth - 656),
         }}>
           <img src={preview.dataUrl} className="note-img-preview-img" alt="" />
+          <button
+            className="note-img-delete-btn"
+            onClick={(e) => { e.stopPropagation(); deleteEmbed(preview.el); }}
+            title="Sil"
+          >×</button>
         </div>
       )}
 
