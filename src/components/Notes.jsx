@@ -229,10 +229,10 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
         </div>
       )}
 
-      {/* Hover preview */}
+      {/* Hover preview — pinned directly above the embed chip */}
       {preview && (
         <div className="note-img-preview" style={{
-          top: Math.max(8, preview.rect.top - 436),
+          bottom: window.innerHeight - preview.rect.top + 6,
           left: Math.min(Math.max(8, preview.rect.left), window.innerWidth - 656),
         }}>
           <img src={preview.dataUrl} className="note-img-preview-img" alt="" />
