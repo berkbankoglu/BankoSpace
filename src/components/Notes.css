@@ -1543,7 +1543,6 @@
 }
 .note-img-preview:hover .note-img-delete-btn { opacity: 1; }
 .note-img-delete-btn:hover { background: #f85149; }
-.note-img-preview { position: relative; }
 
 /* Lightbox */
 .note-img-lightbox {
