@@ -2367,10 +2367,13 @@ function VocabularyTab() {
   const [customWords, setCustomWords] = useState(loadCustomWords);
   const [showAddModal, setShowAddModal] = useState(false);
   const [addForm, setAddForm] = useState({ kana: "", romaji: "", meaning: "" });
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupError, setLookupError] = useState(null);
   const [quizState, setQuizState] = useState(null); // null or quiz object
   const [quizMode, setQuizMode] = useState("kana_to_romaji"); // "kana_to_romaji" | "meaning_to_kana"
 
   const quizInputRef = useRef(null);
+  const romajiInputRef = useRef(null);
 
   const customWordsWithCat = customWords.map(w => ({ ...w, category: "my_words" }));
   const allWords = [...VOCAB_ALL_BUILTIN, ...customWordsWithCat];
@@ -2425,7 +2428,38 @@ function VocabularyTab() {
     setCustomWords(next);
     saveCustomWords(next);
     setAddForm({ kana: "", romaji: "", meaning: "" });
+    setLookupError(null);
     setShowAddModal(false);
+  }
+
+  async function lookupWord() {
+    const romaji = addForm.romaji.trim();
+    if (!romaji) return;
+    const key = localStorage.getItem('anthropic_api_key');
+    if (!key) { setLookupError('API key gerekli — FlashCards > AI kısmından gir'); return; }
+    setLookupLoading(true);
+    setLookupError(null);
+    try {
+      const bodyStr = JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 200,
+        messages: [{ role: 'user', content: `Japanese word lookup. Romaji input: "${romaji}". Return JSON only, nothing else:\n{"kana":"<japanese script>","romaji":"<correct romaji>","meaning":"<English meaning>"}` }]
+      });
+      const text = await invoke('fetch_post', {
+        url: 'https://api.anthropic.com/v1/messages',
+        headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+        body: bodyStr,
+      });
+      const data = JSON.parse(text);
+      if (data.error) throw new Error(data.error.message);
+      const content = data.content[0].text.trim();
+      const j = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1));
+      setAddForm(f => ({ ...f, kana: j.kana || f.kana, romaji: j.romaji || f.romaji, meaning: j.meaning || f.meaning }));
+    } catch (e) {
+      setLookupError('Bulunamadı: ' + (e?.message || 'Bilinmeyen hata'));
+    } finally {
+      setLookupLoading(false);
+    }
   }
 
   function startQuiz(words) {
@@ -2642,36 +2676,53 @@ function VocabularyTab() {
 
       {/* Add Word Modal */}
       {showAddModal && (
-        <div className="vocab-modal-overlay" onClick={() => setShowAddModal(false)}>
+        <div className="vocab-modal-overlay" onClick={() => { setShowAddModal(false); setLookupError(null); }}>
           <div className="vocab-modal" onClick={e => e.stopPropagation()}>
-            <h3 className="vocab-modal-title">Add Word</h3>
+            <h3 className="vocab-modal-title">Kelime Ekle</h3>
             <div className="vocab-modal-fields">
+              {/* Romaji — main input, triggers lookup */}
+              <div className="vocab-modal-lookup-row">
+                <input
+                  ref={romajiInputRef}
+                  className="vocab-modal-input"
+                  type="text"
+                  placeholder="Romaji yaz (örn: totemo)"
+                  value={addForm.romaji}
+                  onChange={e => { setAddForm(f => ({ ...f, romaji: e.target.value })); setLookupError(null); }}
+                  onKeyDown={e => { if (e.key === "Enter") lookupWord(); }}
+                  autoFocus
+                />
+                <button
+                  className="vocab-lookup-btn"
+                  onClick={lookupWord}
+                  disabled={lookupLoading || !addForm.romaji.trim()}
+                  title="AI ile ara"
+                >
+                  {lookupLoading ? <span className="vocab-lookup-spinner" /> : 'Ara'}
+                </button>
+              </div>
+              {lookupError && <div className="vocab-lookup-error">{lookupError}</div>}
+              {/* Kana — auto-filled, editable */}
               <input
                 className="vocab-modal-input"
                 type="text"
-                placeholder="Kana (e.g. ねこ)"
+                placeholder="Kana (otomatik gelir, düzenleyebilirsin)"
                 value={addForm.kana}
                 onChange={e => setAddForm(f => ({ ...f, kana: e.target.value }))}
               />
+              {/* Meaning — auto-filled, editable */}
               <input
                 className="vocab-modal-input"
                 type="text"
-                placeholder="Romaji (e.g. neko)"
-                value={addForm.romaji}
-                onChange={e => setAddForm(f => ({ ...f, romaji: e.target.value }))}
-              />
-              <input
-                className="vocab-modal-input"
-                type="text"
-                placeholder="Meaning (e.g. cat)"
+                placeholder="Anlam (otomatik gelir, düzenleyebilirsin)"
                 value={addForm.meaning}
                 onChange={e => setAddForm(f => ({ ...f, meaning: e.target.value }))}
                 onKeyDown={e => { if (e.key === "Enter") handleAddWord(); }}
               />
             </div>
             <div className="vocab-modal-actions">
-              <button className="submit-btn" onClick={handleAddWord}>Save</button>
-              <button className="reset-btn" onClick={() => setShowAddModal(false)}>Cancel</button>
+              <button className="submit-btn" onClick={handleAddWord} disabled={!addForm.kana.trim() || !addForm.romaji.trim() || !addForm.meaning.trim()}>Kaydet</button>
+              <button className="reset-btn" onClick={() => { setShowAddModal(false); setLookupError(null); }}>İptal</button>
             </div>
           </div>
         </div>

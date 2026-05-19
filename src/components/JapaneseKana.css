@@ -1544,6 +1544,55 @@
   gap: 0.5rem;
 }
 
+.vocab-modal-lookup-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.vocab-modal-lookup-row .vocab-modal-input {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.vocab-lookup-btn {
+  background: var(--accent);
+  border: none;
+  color: #000;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 0 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  height: 38px;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 52px;
+}
+.vocab-lookup-btn:hover:not(:disabled) { opacity: 0.85; }
+.vocab-lookup-btn:disabled { opacity: 0.4; cursor: default; }
+
+.vocab-lookup-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(0,0,0,0.3);
+  border-top-color: #000;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.vocab-lookup-error {
+  font-size: 11px;
+  color: #ef4444;
+  padding: 4px 2px;
+}
+
 /* ── Write Card (deftere yaz modu) ──────────────────────────────────────────── */
 
 .write-card {
