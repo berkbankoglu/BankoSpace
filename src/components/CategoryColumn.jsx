@@ -13,7 +13,7 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
     todos.forEach(t => { if (t.subtasks && t.subtasks.length > 0) s.add(t.id); });
     return s;
   });
-  const [manuallyClosed, setManuallyClosed] = useState(new Set());
+  const manuallyClosedRef = useRef(new Set());
   const [subtaskInputs, setSubtaskInputs] = useState({});
   const [editingTodoId, setEditingTodoId] = useState(null);
   const [editingTodoText, setEditingTodoText] = useState('');
@@ -35,7 +35,7 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
       let changed = false;
       const next = new Set(prev);
       todos.forEach(t => {
-        if (t.subtasks && t.subtasks.length > 0 && !next.has(t.id) && !manuallyClosed.has(t.id)) {
+        if (t.subtasks && t.subtasks.length > 0 && !next.has(t.id) && !manuallyClosedRef.current.has(t.id)) {
           next.add(t.id);
           changed = true;
         }
@@ -92,12 +92,8 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
       else next.add(todoId);
       return next;
     });
-    setManuallyClosed(prev => {
-      const next = new Set(prev);
-      if (isOpening) next.delete(todoId);
-      else next.add(todoId);
-      return next;
-    });
+    if (isOpening) manuallyClosedRef.current.delete(todoId);
+    else manuallyClosedRef.current.add(todoId);
     setSubtaskInputs(prev => ({ ...prev, [todoId]: '' }));
     if (isOpening) {
       setTimeout(() => {
