@@ -1207,13 +1207,31 @@
 
 /* Sidebar */
 .vocab-sidebar {
-  width: 230px;
+  width: 340px;
   flex-shrink: 0;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   border-right: 1px solid var(--border-hover);
   background: var(--bg-surface);
   overflow: hidden;
+}
+
+.vocab-sidebar-col {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 0.5rem 0.4rem;
+  gap: 2px;
+  min-width: 0;
+}
+
+.vocab-sidebar-col--cats {
+  flex: 0 0 160px;
+  border-right: 1px solid var(--border);
+}
+
+.vocab-sidebar-col--folders {
+  flex: 1;
 }
 
 .vocab-cat-list {
@@ -1815,16 +1833,6 @@
   outline: none;
 }
 .vocab-modal-select:focus { border-color: var(--accent); }
-
-/* ── Vocab sidebar inner scroll ───────────────────────────────────────────── */
-.vocab-sidebar-inner {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0.5rem 0.4rem;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
 
 /* ── Folder rows in sidebar ────────────────────────────────────────────────── */
 .vocab-folder-row {
