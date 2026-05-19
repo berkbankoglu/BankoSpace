@@ -62,6 +62,7 @@ export const SYNC_KEYS = [
   'kana_learned_words',
   'kana_selected_rows',
   'kana_custom_words',
+  'kana_custom_folders',
   'kana_selected_vocab',
   'kana_stats',
   'kana_prefs',
