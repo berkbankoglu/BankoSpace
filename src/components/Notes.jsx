@@ -182,7 +182,11 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
     if (!editor) return;
     const onOver = (e) => {
       const embed = e.target.closest?.('.note-img-embed');
-      if (embed) setPreview({ dataUrl: embed.getAttribute('data-img'), rect: embed.getBoundingClientRect(), el: embed });
+      if (embed) setPreview({ dataUrl: embed.getAttribute('data-img'), x: e.clientX, y: e.clientY, el: embed });
+    };
+    const onMove = (e) => {
+      const embed = e.target.closest?.('.note-img-embed');
+      if (embed) setPreview(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
     };
     const onOut = (e) => {
       if (e.target.closest?.('.note-img-embed')) setPreview(null);
@@ -192,9 +196,15 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
       if (embed) { e.preventDefault(); setLightbox({ dataUrl: embed.getAttribute('data-img') }); setLightboxZoom(1); }
     };
     editor.addEventListener('mouseover', onOver);
+    editor.addEventListener('mousemove', onMove);
     editor.addEventListener('mouseout', onOut);
     editor.addEventListener('click', onClick);
-    return () => { editor.removeEventListener('mouseover', onOver); editor.removeEventListener('mouseout', onOut); editor.removeEventListener('click', onClick); };
+    return () => {
+      editor.removeEventListener('mouseover', onOver);
+      editor.removeEventListener('mousemove', onMove);
+      editor.removeEventListener('mouseout', onOut);
+      editor.removeEventListener('click', onClick);
+    };
   }, []);
 
   // Esc closes lightbox
@@ -243,11 +253,11 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
         </div>
       )}
 
-      {/* Hover preview — pinned directly above the embed chip */}
+      {/* Hover preview — above mouse cursor */}
       {preview && (
         <div className="note-img-preview" style={{
-          bottom: window.innerHeight - preview.rect.top + 6,
-          left: Math.min(Math.max(8, preview.rect.left), window.innerWidth - 656),
+          bottom: window.innerHeight - preview.y + 14,
+          left: Math.min(Math.max(8, preview.x - 8), window.innerWidth - 656),
         }}>
           <img src={preview.dataUrl} className="note-img-preview-img" alt="" />
           <button
