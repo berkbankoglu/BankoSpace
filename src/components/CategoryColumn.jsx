@@ -39,8 +39,8 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
   useEffect(() => {
     if (!colorPickerTodoId) return;
     const close = () => { setColorPickerTodoId(null); setColorPickerPos(null); };
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
   }, [colorPickerTodoId]);
 
   // Auto-expand only newly added todos that have subtasks (skip manually closed ones)
@@ -430,6 +430,7 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
           className="cc-color-picker"
           style={{ position: 'fixed', bottom: colorPickerPos.bottom, left: colorPickerPos.left }}
           onMouseDown={e => e.stopPropagation()}
+          onClick={e => e.stopPropagation()}
         >
           {TODO_COLORS.map(c => {
             const activeTodo = todos.find(t => t.id === colorPickerTodoId);
