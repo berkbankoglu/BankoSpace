@@ -8752,7 +8752,7 @@ body.light .sidebar-bottom {
   flex: 1;
   overflow: hidden;
   background: #191919 !important;
-  padding-top: 32px;
+  padding-top: 30px;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -8959,7 +8959,7 @@ body.light .todo-drag-ghost .cc-checkmark {
 }
 
 .dashboard-container {
-  padding: 0 0 20px;
+  padding: 12px 20px 20px;
   flex: 1;
   min-height: 0;
   overflow: hidden;
