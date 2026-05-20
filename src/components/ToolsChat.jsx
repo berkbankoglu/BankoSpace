@@ -26,8 +26,8 @@ const DEFAULT_ANALYZE_RULES = `- İngilizce proje açıklamasını analiz et
 - Sade ve doğrudan yaz`;
 
 const DEFAULT_BID_RULES = `**TEKLİF YAZMA KURALLARI**
-- İsmini yazmayı unutma
-- MAX 30 KELİME — kesinlikle aşma. Yazmadan önce say, 20'yi geçiyorsa kıs.
+
+- **MAX 30 KELİME — kesinlikle aşma. Yazmadan önce say, 20'yi geçiyorsa kıs.**
 - Tek paragraf, max 2 satır, kopyalamaya hazır
 - Her zaman İngilizce yaz
 - Açılışta kısa onay ifadesi kullan — sanki projesini okuyup onaylıyormuşsun gibi (örn. "Yes!", "Absolutely!", "Perfect!")
@@ -38,7 +38,12 @@ const DEFAULT_BID_RULES = `**TEKLİF YAZMA KURALLARI**
 - Bilmediğin veya projede yazmayan detaylar hakkında asla yorum yapma
 - Müşterinin kullandığı kelimeleri tekrarlama
 - Aynı anlama gelen ifadeleri tekrarlama
-- Sona boşluk bırakıp şunu ekle: Kind regards, Berk`;
+- Sona boşluk bırakıp şunu ekle: \`Kind regards,\` \`Berk\`
+
+ÖRNEK TEKLİF YAZISI:
+"Evet bu tip hataların olması çok normal, eğer simdi bana ulaşırsan hemen bu sıkıntılı noktaları düzeltebilirim. Bu tip işleri günlük işlerimde sürekli yapıyorum benim için çocuk oyuncağı ^^ Senden haber bekliyorum Berk"
+
+Output only the letter, nothing else.`;
 
 function getLangLabel(code) {
   return LANGUAGES.find(l => l.code === code)?.label || code;
