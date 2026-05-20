@@ -90,6 +90,7 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
   const [lightboxZoom, setLightboxZoom] = useState(1);
   const pendingRangeRef = useRef(null);
   const titleInputRef = useRef(null);
+  const previewPinnedRef = useRef(false); // mouse is over delete button — keep preview alive
 
   useEffect(() => {
     if (editorRef.current && editorRef.current.innerHTML !== content) {
@@ -192,14 +193,14 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
     if (!editor) return;
     const onOver = (e) => {
       const embed = e.target.closest?.('.note-img-embed');
-      if (embed) setPreview({ dataUrl: embed.getAttribute('data-img'), x: e.clientX, y: e.clientY, el: embed });
+      if (embed) { previewElRef.current = embed; setPreview({ dataUrl: embed.getAttribute('data-img'), x: e.clientX, y: e.clientY, el: embed }); }
     };
     const onMove = (e) => {
       const embed = e.target.closest?.('.note-img-embed');
       if (embed) setPreview(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
     };
     const onOut = (e) => {
-      if (e.target.closest?.('.note-img-embed')) setPreview(null);
+      if (e.target.closest?.('.note-img-embed') && !previewPinnedRef.current) setPreview(null);
     };
     const onClick = (e) => {
       const embed = e.target.closest?.('.note-img-embed');
@@ -225,8 +226,12 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
     return () => document.removeEventListener('keydown', onKey);
   }, [lightbox]);
 
+  const previewElRef = useRef(null);
   const deleteEmbed = (el) => {
-    el?.remove();
+    const target = el || previewElRef.current;
+    target?.remove();
+    previewPinnedRef.current = false;
+    previewElRef.current = null;
     setPreview(null);
     if (editorRef.current) { setIsEmpty(!editorRef.current.textContent?.trim()); onChange(editorRef.current.innerHTML); }
   };
@@ -240,6 +245,17 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
         suppressContentEditableWarning
         onInput={handleInput}
         onPaste={handlePaste}
+        onKeyDown={(e) => {
+          if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'z') {
+            e.preventDefault();
+            document.execCommand('undo');
+            if (editorRef.current) { setIsEmpty(!editorRef.current.textContent?.trim()); onChange(editorRef.current.innerHTML); }
+          } else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) {
+            e.preventDefault();
+            document.execCommand('redo');
+            if (editorRef.current) { setIsEmpty(!editorRef.current.textContent?.trim()); onChange(editorRef.current.innerHTML); }
+          }
+        }}
         data-placeholder={placeholder}
         style={style}
       />
@@ -272,6 +288,8 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
           <img src={preview.dataUrl} className="note-img-preview-img" alt="" />
           <button
             className="note-img-delete-btn"
+            onMouseEnter={() => { previewPinnedRef.current = true; }}
+            onMouseLeave={() => { previewPinnedRef.current = false; setPreview(null); }}
             onClick={(e) => { e.stopPropagation(); deleteEmbed(preview.el); }}
             title="Sil"
           >×</button>

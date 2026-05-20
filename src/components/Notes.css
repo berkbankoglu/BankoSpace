@@ -15,8 +15,9 @@
   width: 300px;
   min-width: 180px;
   max-width: 500px;
-  background: var(--bg-base);
-  border-right: 1px solid #3a3a3a;
+  background: #191919;
+  border-right: 1px solid rgba(255,255,255,0.06);
+  border-top: 1px solid rgba(255,255,255,0.06);
   display: flex;
   flex-direction: column;
   overflow: visible;
@@ -37,18 +38,17 @@
 .notes-collapse-btn {
   background: none;
   border: none;
-  color: var(--text-muted);
+  color: rgba(255,255,255,0.25);
   cursor: pointer;
-  font-size: 16px;
-  padding: 4px 8px;
+  font-size: 14px;
+  padding: 10px 12px;
   border-radius: 4px;
   flex-shrink: 0;
-  transition: all 0.2s;
+  transition: color 0.15s;
 }
 
 .notes-collapse-btn:hover {
-  background: var(--bg-card);
-  color: var(--text-primary);
+  color: rgba(255,255,255,0.7);
 }
 
 .notes-sidebar-resizer-handle {
@@ -79,8 +79,8 @@
 }
 
 .notes-sidebar-header {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border);
+  padding: 10px 10px 10px 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -89,28 +89,31 @@
 
 .notes-header-label {
   font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
-  letter-spacing: 1.5px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.25);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  flex: 1;
 }
 
 .notes-new-btn {
-  padding: 5px 10px;
+  padding: 3px 9px;
   background: transparent;
-  border: 1px solid var(--border-hover);
-  border-radius: 4px;
-  color: #7ee787;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 5px;
+  color: rgba(255,255,255,0.35);
+  font-size: 13px;
+  font-weight: 400;
   cursor: pointer;
   font-family: inherit;
   transition: all 0.15s;
+  line-height: 1.6;
 }
 
 .notes-new-btn:hover {
-  background: #1e2a1e;
-  border-color: #7ee787;
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.75);
 }
 
 /* ─── Search ─── */
@@ -123,28 +126,30 @@
 }
 
 .notes-search {
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--border);
+  padding: 8px 10px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
 }
 
 .notes-search input {
   width: 100%;
   padding: 6px 10px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-hover);
-  border-radius: 4px;
-  color: var(--text-primary);
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 6px;
+  color: rgba(255,255,255,0.7);
   font-size: 12px;
   font-family: inherit;
+  box-sizing: border-box;
 }
 
 .notes-search input:focus {
   outline: none;
-  border-color: var(--accent);
+  border-color: rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.07);
 }
 
 .notes-search input::placeholder {
-  color: var(--text-muted);
+  color: rgba(255,255,255,0.2);
 }
 
 /* ─── Tree View ─── */
@@ -162,34 +167,30 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 7px 8px 7px 8px;
+  padding: 6px 10px;
   cursor: pointer;
   border-radius: 6px;
-  margin: 0 6px 4px;
-  min-height: 34px;
+  margin: 1px 6px;
+  min-height: 32px;
   position: relative;
-  background: #2a2a2a;
-  border: 1px solid #3a3a3a;
-  transition: border-color 0.12s, background 0.12s;
+  background: transparent;
+  border: none;
+  transition: background 0.12s, color 0.12s;
 }
 
 .notes-tree-row:hover {
-  background: #2f2f2f;
-  border-color: #4a4a4a;
+  background: rgba(255,255,255,0.06);
 }
 
 .notes-tree-row.active {
-  background: #2f2f2f;
-  border-color: var(--accent);
-  border-left: 2px solid var(--accent);
-  padding-left: 7px;
+  background: rgba(255,255,255,0.09);
 }
 
 .notes-sub-row {
   padding-left: 36px;
   margin-left: 20px;
   margin-right: 6px;
-  min-height: 30px;
+  min-height: 28px;
   position: relative;
   background: transparent;
   border: none;
@@ -201,30 +202,28 @@
   left: 10px;
   top: 50%;
   width: 16px;
-  height: 1.5px;
-  background: #4a4a4a;
+  height: 1px;
+  background: rgba(255,255,255,0.1);
   border-radius: 1px;
   transition: background 0.15s;
 }
 
 .notes-sub-row:hover {
-  background: rgba(255,255,255,0.04);
+  background: rgba(255,255,255,0.05);
   border: none;
 }
 
 .notes-sub-row:hover::before {
-  background: var(--accent);
+  background: rgba(255,255,255,0.25);
 }
 
 .notes-sub-row.active {
-  background: rgba(255,255,255,0.05);
+  background: rgba(255,255,255,0.07);
   border: none;
-  border-left: 2px solid var(--accent);
-  padding-left: 34px;
 }
 
 .notes-sub-row.active::before {
-  background: var(--accent);
+  background: rgba(255,255,255,0.35);
 }
 
 .notes-expand-btn {
@@ -256,28 +255,30 @@
 
 .notes-tree-title {
   flex: 1;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-primary);
+  font-size: 13.5px;
+  font-weight: 450;
+  color: rgba(255,255,255,0.45);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
   user-select: none;
+  letter-spacing: 0.01em;
 }
 
 .notes-sub-row .notes-tree-title {
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 400;
-  color: var(--text-secondary);
+  color: rgba(255,255,255,0.3);
 }
 
 .notes-tree-row.active .notes-tree-title {
-  color: var(--text-primary);
+  color: rgba(255,255,255,0.9);
+  font-weight: 500;
 }
 
 .notes-tree-row:hover .notes-tree-title {
-  color: var(--text-primary);
+  color: rgba(255,255,255,0.75);
 }
 
 .notes-tree-actions {
@@ -613,6 +614,7 @@
   flex-direction: column;
   background: var(--bg-base);
   overflow: hidden;
+  border-top: 1px solid rgba(255,255,255,0.06);
 }
 
 .notes-editor-header {

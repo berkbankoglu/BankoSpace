@@ -61,6 +61,9 @@ function QuickLaunchPanel() {
   return (
     <>
       <div className="ql-panel">
+        <div className="ql-timer-row">
+          <Timer isCompact={true} />
+        </div>
         <div className="ql-title">Quick Launch</div>
         <div className="ql-grid">
           {QUICK_BUTTONS.map((btn, idx) => (
@@ -320,16 +323,16 @@ function App({ session, onLogout }) {
 
   const [sidebarItems, setSidebarItems] = useState(() => {
     const defaults = [
-      { id: 'dashboard',  label: 'Dashboard',      view: 'dashboard',  hidden: false },
-      { id: 'calendar',   label: 'Calendar',        view: 'calendar',   hidden: false },
-      { id: 'flashcards', label: 'Flash Cards',     view: 'flashcards', hidden: false },
-      { id: 'checklists', label: 'Checklists',      view: 'checklists', hidden: false },
-      { id: 'income',     label: 'Income Tracker',  view: 'income',     hidden: false },
-      { id: 'tools',        label: 'Tools',            view: 'tools',        hidden: true },
-      { id: 'japanesekana', label: 'Japanese Kana',    view: 'japanesekana', hidden: false },
-      { id: 'fitness',      label: 'Fitness',           view: 'fitness',      hidden: false },
-      { id: 'planner',      label: 'Planner',           view: 'planner',      hidden: false },
-      { id: 'notes',        label: 'Notes',             view: 'notes',        hidden: false },
+      { id: 'dashboard',    label: 'Dashboard',      view: 'dashboard',    hidden: false, icon: '⊞' },
+      { id: 'calendar',     label: 'Calendar',        view: 'calendar',     hidden: false, icon: '◻' },
+      { id: 'flashcards',   label: 'Flash Cards',     view: 'flashcards',   hidden: false, icon: '⧉' },
+      { id: 'checklists',   label: 'Checklists',      view: 'checklists',   hidden: false, icon: '✓' },
+      { id: 'income',       label: 'Income Tracker',  view: 'income',       hidden: false, icon: '$' },
+      { id: 'tools',        label: 'Tools',            view: 'tools',        hidden: true,  icon: '⚙' },
+      { id: 'japanesekana', label: 'Japanese Kana',    view: 'japanesekana', hidden: false, icon: 'あ' },
+      { id: 'fitness',      label: 'Fitness',          view: 'fitness',      hidden: false, icon: '◈' },
+      { id: 'planner',      label: 'Planner',          view: 'planner',      hidden: false, icon: '≡' },
+      { id: 'notes',        label: 'Notes',            view: 'notes',        hidden: false, icon: '✎' },
     ];
     const saved = localStorage.getItem('sidebarOrder');
     if (saved) {
@@ -339,7 +342,7 @@ function App({ session, onLogout }) {
         .filter(item => defaults.find(d => d.id === item.id))
         .map(item => {
           const def = defaults.find(d => d.id === item.id);
-          const merged = { ...def, ...item };
+          const merged = { ...def, ...item, icon: def.icon };
           // Force hidden state for items that should always be hidden
           if (def.hidden) merged.hidden = true;
           return merged;
@@ -1297,17 +1300,17 @@ function App({ session, onLogout }) {
         <div className={`notion-sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
           {/* Sidebar Header */}
           <div className="sidebar-header" data-tauri-drag-region>
-            <div className="sidebar-title">
-              {!sidebarCollapsed && <img src={logo} alt="BankoSpace" className="sidebar-logo" />}
-            </div>
-            <div className="sidebar-header-actions">
-              <button
-                className="sidebar-toggle"
-                onClick={() => { setSidebarCollapsed(c => !c); setColWidths([null, null, null]); }}
-              >
-                {sidebarCollapsed ? '»' : '«'}
-              </button>
-            </div>
+            <button
+              className="sidebar-toggle"
+              onClick={() => { setSidebarCollapsed(c => !c); setColWidths([null, null, null]); }}
+            >
+              {sidebarCollapsed ? '»' : '«'}
+            </button>
+            {!sidebarCollapsed && (
+              <div className="sidebar-logo-center">
+                <img src={logo} alt="BankoSpace" className="sidebar-logo" />
+              </div>
+            )}
           </div>
 
           {/* Settings Modal - Notion Style */}
@@ -1653,11 +1656,6 @@ function App({ session, onLogout }) {
             </div>
           )}
 
-          {/* Timer — always mounted so it doesn't reset on collapse */}
-          <div className="sidebar-timer-widget" style={{ display: sidebarCollapsed ? 'none' : undefined }}>
-            <Timer isCompact={true} />
-          </div>
-
           {!sidebarCollapsed && (
             <div className="sidebar-content">
               {/* Draggable Sidebar Items */}
@@ -1677,6 +1675,7 @@ function App({ session, onLogout }) {
                     setActiveView(item.view);
                   }}
                 >
+                  <span className="sidebar-item-icon">{item.icon}</span>
                   <span className="item-name">{item.label}</span>
                   <span className="sidebar-drag-handle">⠿</span>
                 </div>
@@ -1691,6 +1690,7 @@ function App({ session, onLogout }) {
                     width: draggedSidebarItem.width,
                   }}
                 >
+                  <span className="sidebar-item-icon">{draggedSidebarItem.item.icon}</span>
                   <span className="item-name">{draggedSidebarItem.item.label}</span>
                   <span className="sidebar-drag-handle">⠿</span>
                 </div>
