@@ -243,8 +243,7 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
       }
     };
     const onClick = (e) => {
-      const embed = e.target.closest?.('.note-img-embed');
-      if (embed) { e.preventDefault(); setLightbox({ dataUrl: embed.getAttribute('data-img') }); setLightboxZoom(1); }
+      // tıklama artık lightbox açmıyor — büyütme butonu ile açılıyor
     };
     // Custom mouse-based drag (HTML5 drag API unreliable in WebView2)
     let ghostEl = null;
@@ -424,16 +423,24 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
         </div>
       )}
 
-      {/* Embed chip delete button — appears top-right of chip on hover */}
+      {/* Embed chip buttons — appears top-right of chip on hover */}
       {embedHover && ReactDOM.createPortal(
-        <button
-          className="note-embed-chip-delete"
-          style={{ position: 'fixed', top: embedHover.rect.top - 7, left: embedHover.rect.right - 14 }}
+        <div
+          style={{ position: 'fixed', top: embedHover.rect.top - 9, left: embedHover.rect.right - 36, display: 'flex', gap: 3, pointerEvents: 'auto' }}
           onMouseEnter={() => { embedDeleteHoveredRef.current = true; }}
           onMouseLeave={() => { embedDeleteHoveredRef.current = false; setEmbedHover(null); }}
-          onClick={(e) => { e.stopPropagation(); deleteEmbed(embedHover.el); }}
-          title="Sil"
-        >×</button>,
+        >
+          <button
+            className="note-embed-chip-btn zoom"
+            onClick={(e) => { e.stopPropagation(); setLightbox({ dataUrl: embedHover.el.getAttribute('data-img') }); setLightboxZoom(1); }}
+            title="Büyüt"
+          >⤢</button>
+          <button
+            className="note-embed-chip-btn delete"
+            onClick={(e) => { e.stopPropagation(); deleteEmbed(embedHover.el); }}
+            title="Sil"
+          >×</button>
+        </div>,
         document.body
       )}
 
