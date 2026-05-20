@@ -1263,6 +1263,7 @@ function App({ session, onLogout }) {
       >
         <div className="titlebar-left">
         </div>
+        <div className="titlebar-sidebar-spacer" style={{ width: sidebarCollapsed ? 50 : 240, flexShrink: 0, pointerEvents: 'none' }} />
         <div className="titlebar-drag-region" data-tauri-drag-region onDoubleClick={maximizeWindow} />
         <div className="titlebar-controls">
           <button className="titlebar-btn minimize" onClick={minimizeWindow}>─</button>
@@ -1299,7 +1300,7 @@ function App({ session, onLogout }) {
         {/* Left Sidebar - Notion Style */}
         <div className={`notion-sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
           {/* Sidebar Header */}
-          <div className="sidebar-header" data-tauri-drag-region>
+          <div className="sidebar-header">
             <button
               className="sidebar-toggle"
               onClick={() => { setSidebarCollapsed(c => !c); setColWidths([null, null, null]); }}
