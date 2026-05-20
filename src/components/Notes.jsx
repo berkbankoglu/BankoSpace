@@ -246,14 +246,12 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
         onInput={handleInput}
         onPaste={handlePaste}
         onKeyDown={(e) => {
-          if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'z') {
-            e.preventDefault();
-            document.execCommand('undo');
-            if (editorRef.current) { setIsEmpty(!editorRef.current.textContent?.trim()); onChange(editorRef.current.innerHTML); }
-          } else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) {
-            e.preventDefault();
-            document.execCommand('redo');
-            if (editorRef.current) { setIsEmpty(!editorRef.current.textContent?.trim()); onChange(editorRef.current.innerHTML); }
+          const isUndo = (e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'z';
+          const isRedo = (e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'));
+          if (isUndo || isRedo) {
+            setTimeout(() => {
+              if (editorRef.current) { setIsEmpty(!editorRef.current.textContent?.trim()); onChange(editorRef.current.innerHTML); }
+            }, 0);
           }
         }}
         data-placeholder={placeholder}
@@ -358,6 +356,7 @@ function Notes() {
   });
   const [showMenu, setShowMenu] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null); // { noteId, subId? }
+  const [showShortcuts, setShowShortcuts] = useState(false);
 
   const sidebarRef = useRef(null);
   const editorRef = useRef(null);
@@ -959,10 +958,41 @@ function Notes() {
                   </div>
                 )}
               </div>
+
+              <div className="toolbar-divider" />
+
+              <div className="toolbar-group" style={{ position: 'relative' }}>
+                <button
+                  className={`toolbar-btn ${showShortcuts ? 'active' : ''}`}
+                  onMouseDown={e => { e.preventDefault(); e.stopPropagation(); saveSelection(); setShowShortcuts(v => !v); setShowColorPresets(false); }}
+                  title="Kısayollar"
+                >⌨</button>
+                {showShortcuts && (
+                  <div className="notes-shortcuts-panel">
+                    <div className="notes-shortcuts-title">Kısayollar</div>
+                    {[
+                      ['Ctrl+Z', 'Geri al'],
+                      ['Ctrl+Y', 'Yinele'],
+                      ['Ctrl+Shift+Z', 'Yinele'],
+                      ['Ctrl+B', 'Kalın'],
+                      ['Ctrl+I', 'İtalik'],
+                      ['Ctrl+U', 'Altı çizili'],
+                      ['Ctrl+V', 'Görsel / ekran görüntüsü yapıştır'],
+                      ['Alt+1–9', 'Renk kısayolu uygula'],
+                      ["Alt+' veya \"", 'Rengi sıfırla'],
+                    ].map(([key, desc]) => (
+                      <div key={key} className="notes-shortcut-row">
+                        <kbd className="notes-shortcut-key">{key}</kbd>
+                        <span className="notes-shortcut-desc">{desc}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Single full-width editor */}
-            <div className="notes-notebook" onClick={() => showColorPresets && setShowColorPresets(false)}>
+            <div className="notes-notebook" onClick={() => { showColorPresets && setShowColorPresets(false); showShortcuts && setShowShortcuts(false); }}>
               <RichTextEditor
                 key={`${selected.noteId}-${selected.subId}`}
                 ref={editorRef}
