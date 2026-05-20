@@ -112,6 +112,7 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
   };
 
   const insertImageEmbed = (dataUrl, title) => {
+    if (!dataUrl) return; // still loading
     const range = pendingRangeRef.current;
     if (!range) return;
     const span = document.createElement('span');
@@ -144,17 +145,32 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
     const sel = window.getSelection();
     pendingRangeRef.current = sel?.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
 
-    // Get cursor position without touching the DOM
+    // Measure cursor position using a hidden anchor span (synchronous — no paint between insert and remove)
     let anchorRect = { top: 120, left: 200 };
     if (pendingRangeRef.current) {
-      const rects = pendingRangeRef.current.getClientRects();
-      if (rects.length > 0) {
-        anchorRect = { top: rects[0].bottom + 6, left: rects[0].left };
+      const anchor = document.createElement('span');
+      anchor.style.cssText = 'visibility:hidden;font-size:0;line-height:0;';
+      anchor.textContent = '|';
+      pendingRangeRef.current.insertNode(anchor);
+      const r = anchor.getBoundingClientRect();
+      if (r.width > 0 || r.height > 0) {
+        anchorRect = { top: r.bottom + 6, left: r.left };
       } else if (editorRef.current) {
-        const er = editorRef.current.getBoundingClientRect();
-        anchorRect = { top: er.top + 40, left: er.left + 20 };
+        // anchor had no size — use its parent line position
+        const parent = anchor.parentElement;
+        const pr = parent ? parent.getBoundingClientRect() : editorRef.current.getBoundingClientRect();
+        anchorRect = { top: pr.bottom + 6, left: pr.left + 20 };
       }
+      anchor.remove();
+      // Re-save range after DOM mutation
+      pendingRangeRef.current = window.getSelection()?.rangeCount > 0
+        ? window.getSelection().getRangeAt(0).cloneRange()
+        : null;
     }
+
+    // Show overlay immediately (loading state) so user sees it at cursor right away
+    setPendingImg({ dataUrl: null, anchorRect });
+    setPendingTitle('Screenshot');
 
     const reader = new FileReader();
     reader.onload = (ev) => {
@@ -166,8 +182,7 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
         canvas.width = Math.round(imgEl.width * scale);
         canvas.height = Math.round(imgEl.height * scale);
         canvas.getContext('2d').drawImage(imgEl, 0, 0, canvas.width, canvas.height);
-        setPendingImg({ dataUrl: canvas.toDataURL('image/png'), anchorRect });
-        setPendingTitle('Screenshot');
+        setPendingImg(prev => prev ? { ...prev, dataUrl: canvas.toDataURL('image/png') } : null);
       };
       imgEl.src = ev.target.result;
     };
@@ -232,10 +247,10 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
         style={style}
       />
 
-      {/* Title input overlay — appears at cursor after paste */}
+      {/* Title input overlay — appears at cursor right after paste */}
       {pendingImg && (
         <div className="note-img-title-overlay" style={{ top: pendingImg.anchorRect.top, left: pendingImg.anchorRect.left }}>
-          <span className="note-img-title-icon">📷</span>
+          <span className="note-img-title-icon">{pendingImg.dataUrl ? '📷' : '⏳'}</span>
           <input
             ref={titleInputRef}
             className="note-img-title-input"
@@ -245,9 +260,14 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
               if (e.key === 'Enter') { e.preventDefault(); insertImageEmbed(pendingImg.dataUrl, pendingTitle); }
               if (e.key === 'Escape') { setPendingImg(null); pendingRangeRef.current = null; }
             }}
-            placeholder="Başlık yaz, Enter'a bas..."
+            placeholder={pendingImg.dataUrl ? 'Başlık yaz, Enter\'a bas...' : 'Yükleniyor...'}
+            disabled={!pendingImg.dataUrl}
           />
-          <button className="note-img-title-confirm" onClick={() => insertImageEmbed(pendingImg.dataUrl, pendingTitle)}>↵</button>
+          <button
+            className="note-img-title-confirm"
+            onClick={() => insertImageEmbed(pendingImg.dataUrl, pendingTitle)}
+            disabled={!pendingImg.dataUrl}
+          >↵</button>
         </div>
       )}
 
