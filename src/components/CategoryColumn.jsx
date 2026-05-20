@@ -29,10 +29,18 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
   const [pressedSubtaskId, setPressedSubtaskId] = useState(null);
   const [completingIds, setCompletingIds] = useState(new Set());
   const [colorPickerTodoId, setColorPickerTodoId] = useState(null);
+  const [colorPickerPos, setColorPickerPos] = useState(null);
   const [copiedSubtaskId, setCopiedSubtaskId] = useState(null);
   const inputRef = useRef(null);
   const editInputRef = useRef(null);
   const editSubtaskInputRef = useRef(null);
+
+  useEffect(() => {
+    if (!colorPickerTodoId) return;
+    const close = () => { setColorPickerTodoId(null); setColorPickerPos(null); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [colorPickerTodoId]);
 
   // Auto-expand only newly added todos that have subtasks (skip manually closed ones)
   useEffect(() => {
@@ -256,22 +264,18 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
                 )}
                 <button
                   className="cc-action-btn color-btn"
-                  onClick={(e) => { e.stopPropagation(); setColorPickerTodoId(colorPickerTodoId === todo.id ? null : todo.id); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (colorPickerTodoId === todo.id) { setColorPickerTodoId(null); setColorPickerPos(null); }
+                    else {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      setColorPickerPos({ top: rect.bottom + 4, left: rect.left });
+                      setColorPickerTodoId(todo.id);
+                    }
+                  }}
                   title="Renk"
                   style={{ color: todo.color || '#333' }}
                 >●</button>
-                {colorPickerTodoId === todo.id && (
-                  <div className="cc-color-picker" onClick={e => e.stopPropagation()}>
-                    {TODO_COLORS.map(c => (
-                      <button
-                        key={c}
-                        className="cc-color-swatch"
-                        style={{ background: c, outline: todo.color === c ? '2px solid white' : 'none' }}
-                        onClick={() => { onUpdateTodo(todo.id, { color: todo.color === c ? null : c }); setColorPickerTodoId(null); }}
-                      />
-                    ))}
-                  </div>
-                )}
                 <button
                   className="cc-action-btn edit-btn"
                   onClick={(e) => { e.stopPropagation(); setEditingTodoId(todo.id); setEditingTodoText(todo.text); }}
@@ -416,6 +420,27 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
       {todos.length === 0 && (
         <div className="cc-empty">
           <span>No tasks yet</span>
+        </div>
+      )}
+
+      {/* Color picker portal — fixed so it's never clipped by overflow */}
+      {colorPickerTodoId && colorPickerPos && (
+        <div
+          className="cc-color-picker"
+          style={{ position: 'fixed', top: colorPickerPos.top, left: colorPickerPos.left }}
+          onClick={e => e.stopPropagation()}
+        >
+          {TODO_COLORS.map(c => {
+            const todo = todos.find(t => t.id === colorPickerTodoId);
+            return (
+              <button
+                key={c}
+                className="cc-color-swatch"
+                style={{ background: c, outline: todo?.color === c ? '2px solid white' : 'none' }}
+                onClick={() => { onUpdateTodo(colorPickerTodoId, { color: todo?.color === c ? null : c }); setColorPickerTodoId(null); setColorPickerPos(null); }}
+              />
+            );
+          })}
         </div>
       )}
     </div>

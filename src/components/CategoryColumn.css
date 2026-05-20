@@ -399,16 +399,13 @@
 }
 
 .cc-color-picker {
-  position: absolute;
-  top: 100%;
-  left: 0;
   display: flex;
   gap: 4px;
   background: #111;
-  border: 1px solid #222;
+  border: 1px solid #333;
   border-radius: 6px;
   padding: 6px;
-  z-index: 100;
+  z-index: 9000;
   box-shadow: 0 4px 12px rgba(0,0,0,0.7);
 }
 
