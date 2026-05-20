@@ -1258,17 +1258,34 @@ function App({ session, onLogout }) {
   return (
     <div className="container" style={{ zoom: appZoom }}>
       {/* Custom Title Bar */}
-      <div
-        className="custom-titlebar"
-      >
-        <div className="titlebar-left">
+      <div className="custom-titlebar">
+        {/* Workspace / user info — left side, within sidebar width */}
+        <div className="titlebar-workspace" style={{ width: sidebarCollapsed ? 50 : 240, flexShrink: 0 }}>
+          {!sidebarCollapsed && (
+            <button
+              className="titlebar-workspace-btn"
+              onClick={() => { setShowSidebarSettings(true); setSettingsTab('account'); }}
+            >
+              <span className="titlebar-workspace-avatar">
+                {session?.user?.email ? session.user.email[0].toUpperCase() : 'B'}
+              </span>
+              <span className="titlebar-workspace-name">
+                {session?.user?.email ? session.user.email.split('@')[0] : 'BankoSpace'}
+              </span>
+            </button>
+          )}
         </div>
-        <div className="titlebar-sidebar-spacer" style={{ width: sidebarCollapsed ? 50 : 240, flexShrink: 0, pointerEvents: 'none' }} />
         <div className="titlebar-drag-region" data-tauri-drag-region onDoubleClick={maximizeWindow} />
         <div className="titlebar-controls">
-          <button className="titlebar-btn minimize" onClick={minimizeWindow}>─</button>
-          <button className="titlebar-btn maximize" onClick={maximizeWindow}>□</button>
-          <button className="titlebar-btn close" onClick={closeWindow}>×</button>
+          <button className="titlebar-btn minimize" onClick={minimizeWindow} title="Minimize">
+            <svg width="11" height="1" viewBox="0 0 11 1"><rect width="11" height="1.5" rx="0.75" fill="currentColor"/></svg>
+          </button>
+          <button className="titlebar-btn maximize" onClick={maximizeWindow} title="Maximize">
+            <svg width="10" height="10" viewBox="0 0 10 10"><rect x="0.75" y="0.75" width="8.5" height="8.5" rx="1" stroke="currentColor" strokeWidth="1.5" fill="none"/></svg>
+          </button>
+          <button className="titlebar-btn close" onClick={closeWindow} title="Close">
+            <svg width="10" height="10" viewBox="0 0 10 10"><line x1="0.5" y1="0.5" x2="9.5" y2="9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><line x1="9.5" y1="0.5" x2="0.5" y2="9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+          </button>
         </div>
       </div>
 
