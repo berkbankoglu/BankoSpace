@@ -10,6 +10,12 @@ function rgbToHex(rgb) {
   return '#' + [m[1], m[2], m[3]].map(v => parseInt(v).toString(16).padStart(2, '0')).join('');
 }
 
+const NOTE_COLORS = [
+  '#3b82f6', '#22c55e', '#f59e0b', '#ef4444',
+  '#a855f7', '#ec4899', '#14b8a6', '#f97316',
+  '#667eea', '#06b6d4', '#e2e8f0', '#d4a017',
+];
+
 const COLOR_PRESETS = [
   { fg: '#c9d1d9', bg: null,      label: 'Default'   },
   { fg: '#ff6b6b', bg: null,      label: 'Red'       },
@@ -507,6 +513,7 @@ function Notes() {
   const [showMenu, setShowMenu] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null); // { noteId, subId? }
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [colorPickerNote, setColorPickerNote] = useState(null);
 
   const sidebarRef = useRef(null);
   const editorRef = useRef(null);
@@ -514,6 +521,9 @@ function Notes() {
   const resizeStartXRef = useRef(0);
   const resizeStartWidthRef = useRef(0);
   const isResizingRef = useRef(false);
+  const toolbarRef = useRef(null);
+  const editorScrollRef = useRef(null);
+  const [animKey, setAnimKey] = useState(0);
 
   useEffect(() => {
     if (notes.length === 0) return;
@@ -625,6 +635,26 @@ function Notes() {
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
   }, [showMenu]);
+
+  useEffect(() => {
+    if (!colorPickerNote) return;
+    const close = () => setColorPickerNote(null);
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [colorPickerNote]);
+
+  useEffect(() => {
+    setAnimKey(k => k + 1);
+  }, [selected?.noteId, selected?.subId]);
+
+  useEffect(() => {
+    const container = editorScrollRef.current;
+    const toolbar = toolbarRef.current;
+    if (!container || !toolbar) return;
+    const onScroll = () => toolbar.classList.toggle('scrolled', container.scrollTop > 10);
+    container.addEventListener('scroll', onScroll);
+    return () => container.removeEventListener('scroll', onScroll);
+  }, [animKey]);
 
   const createNote = () => {
     const id = Date.now();
@@ -980,8 +1010,10 @@ ${body}
                 {/* Note row */}
                 <div
                   className={`notes-tree-row${selected?.noteId === note.id && selected?.subId == null ? ' active' : ''}`}
+                  style={{ '--note-color': note.color || '#667eea' }}
                   onClick={() => setSelected({ noteId: note.id, subId: null })}
                 >
+                  <span className="notes-tree-bar" style={{ background: note.color || '#667eea' }} />
                   <button
                     className="notes-expand-btn"
                     onClick={e => toggleExpand(note.id, e)}
@@ -1017,6 +1049,12 @@ ${body}
 
                   <div className="notes-tree-actions">
                     <button
+                      className="notes-tree-color-btn"
+                      title="Renk değiştir"
+                      style={{ background: note.color || '#667eea' }}
+                      onClick={e => { e.stopPropagation(); setColorPickerNote(v => v === note.id ? null : note.id); }}
+                    />
+                    <button
                       className="notes-tree-add-sub"
                       title="Add sub note"
                       onClick={e => addSubNote(note.id, e)}
@@ -1027,6 +1065,18 @@ ${body}
                       onClick={e => startDeleteNote(note.id, null, e)}
                     >×</button>
                   </div>
+                  {colorPickerNote === note.id && (
+                    <div className="notes-color-picker" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
+                      {NOTE_COLORS.map(c => (
+                        <button
+                          key={c}
+                          className={`notes-color-swatch-btn${note.color === c ? ' active' : ''}`}
+                          style={{ background: c }}
+                          onClick={() => { setNotes(prev => prev.map(n => n.id === note.id ? { ...n, color: c } : n)); setColorPickerNote(null); }}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Sub notes */}
@@ -1034,8 +1084,10 @@ ${body}
                   <div
                     key={sub.id}
                     className={`notes-tree-row notes-sub-row${selected?.noteId === note.id && selected?.subId === sub.id ? ' active' : ''}`}
+                    style={{ '--note-color': note.color || '#667eea' }}
                     onClick={() => setSelected({ noteId: note.id, subId: sub.id })}
                   >
+                    <span className="notes-tree-bar" style={{ background: note.color || '#667eea', opacity: 0.55 }} />
                     {editingTitle?.noteId === note.id && editingTitle?.subId === sub.id ? (
                       <input
                         className="notes-title-edit-inline"
@@ -1076,9 +1128,9 @@ ${body}
       </div>
 
       {/* Editor */}
-      <div className="notes-editor">
+      <div className="notes-editor" style={selectedNote ? { '--note-color': selectedNote.color || '#667eea' } : {}}>
         {selectedNote ? (
-          <>
+          <div ref={editorScrollRef} key={animKey} className="notes-editor-fade">
             <div className="notes-editor-header">
               <input
                 className="notes-title-input"
@@ -1089,7 +1141,7 @@ ${body}
             </div>
 
             {/* Formatting Toolbar */}
-            <div className="notes-formatting-toolbar">
+            <div className="notes-formatting-toolbar" ref={toolbarRef}>
               <div className="toolbar-group">
                 <button className={`toolbar-btn ${activeFormats.bold ? 'active' : ''}`} onMouseDown={e => { e.preventDefault(); execFormat('bold'); }} title="Bold (Ctrl+B)"><strong>B</strong></button>
                 <button className={`toolbar-btn ${activeFormats.italic ? 'active' : ''}`} onMouseDown={e => { e.preventDefault(); execFormat('italic'); }} title="Italic (Ctrl+I)"><em>I</em></button>
@@ -1225,7 +1277,7 @@ ${body}
                 onChange={updateSelectedContent}
               />
             </div>
-          </>
+          </div>
         ) : (
           <div className="notes-editor-empty">
             <h3>Select a note</h3>
