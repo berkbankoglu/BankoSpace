@@ -5,7 +5,6 @@ import './App.css';
 import { supabase, pullFromSupabase, pushKeyToSupabase, pushAllToSupabase, SYNC_KEYS } from './supabase';
 import Login from './components/Login';
 import CategoryColumn from './components/CategoryColumn';
-import Timer from './components/Timer';
 import FlashCards from './components/FlashCards';
 import DailyChecklist from './components/DailyChecklist';
 import IncomeTracker from './components/IncomeTracker';
@@ -61,9 +60,6 @@ function QuickLaunchPanel() {
   return (
     <>
       <div className="ql-panel">
-        <div className="ql-timer-row">
-          <Timer isCompact={true} />
-        </div>
         <div className="ql-title">Quick Launch</div>
         <div className="ql-grid">
           {QUICK_BUTTONS.map((btn, idx) => (
@@ -102,12 +98,6 @@ function App({ session, onLogout }) {
   // Check if this is a popup window
   const popupType = new URLSearchParams(window.location.search).get('popup');
 
-  // If popup mode, show appropriate component
-  // Timer popup mode
-  if (popupType === 'timer') {
-    const isCompact = new URLSearchParams(window.location.search).get('compact') === '1';
-    return <TimerPopupWrapper isCompact={isCompact} />;
-  }
 
 
   // [dailyPx, stockPx] — Weekly is flex:1 in the middle, always fills remaining space
@@ -416,41 +406,13 @@ function App({ session, onLogout }) {
     const saved = localStorage.getItem('remindersCollapsed');
     return saved === 'true';
   });
-  const [timerCollapsed, setTimerCollapsed] = useState(() => {
-    const saved = localStorage.getItem('timerCollapsed');
-    return saved === 'true';
-  });
-  const [todoFontSize, setTodoFontSize] = useState(() => localStorage.getItem('todoFontSize') || 'M');
+const [todoFontSize, setTodoFontSize] = useState(() => localStorage.getItem('todoFontSize') || 'M');
   const [subtaskFontSize, setSubtaskFontSize] = useState(() => localStorage.getItem('subtaskFontSize') || 'M');
   const [fontSizeOpen, setFontSizeOpen] = useState(false);
   const fontSizeMap = { S: '11px', M: '13px', L: '16px', XL: '20px' };
   const subtaskFontSizeMap = { S: '11px', M: '14px', L: '17px', XL: '21px' };
   const [useEmoji, setUseEmoji] = useState(() => localStorage.getItem('useEmoji') !== 'false');
-  const [timerWidgetOpen, setTimerWidgetOpen] = useState(false);
-  const [timerWidgetCompact, setTimerWidgetCompact] = useState(true);
-  const [timerWidgetPos, setTimerWidgetPos] = useState({ top: 0, left: 0 });
-  const timerBtnRef = useRef(null);
-
-  const handleTimerDragStart = (e) => {
-    e.preventDefault();
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const origTop = timerWidgetPos.top;
-    const origLeft = timerWidgetPos.left;
-    const onMove = (ev) => {
-      setTimerWidgetPos({
-        top: origTop + ev.clientY - startY,
-        left: origLeft + ev.clientX - startX,
-      });
-    };
-    const onUp = () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-  };
-  const [dailyChecklistCollapsed, setDailyChecklistCollapsed] = useState(() => {
+const [dailyChecklistCollapsed, setDailyChecklistCollapsed] = useState(() => {
     const saved = localStorage.getItem('dailyChecklistCollapsed');
     return saved === 'true';
   });
@@ -630,11 +592,7 @@ function App({ session, onLogout }) {
     localStorage.setItem('remindersCollapsed', remindersCollapsed);
   }, [remindersCollapsed]);
 
-  useEffect(() => {
-    localStorage.setItem('timerCollapsed', timerCollapsed);
-  }, [timerCollapsed]);
-
-  useEffect(() => {
+useEffect(() => {
     localStorage.setItem('dailyChecklistCollapsed', dailyChecklistCollapsed);
   }, [dailyChecklistCollapsed]);
 
@@ -1175,7 +1133,6 @@ function App({ session, onLogout }) {
       '• References and notes\n' +
       '• Flash cards\n' +
       '• Goals and reminders\n' +
-      '• Timer settings\n' +
       '• Achievements and heatmap\n\n' +
       'Type "YES" to continue:');
 
@@ -1539,8 +1496,7 @@ function App({ session, onLogout }) {
 
                       <div className="settings-section-title" style={{marginTop:'20px'}}>Quick Actions</div>
                       <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-                        <button className="settings-action-btn" onClick={async () => { const { invoke } = await import('@tauri-apps/api/core'); await invoke('toggle_timer_window'); }}>Timer</button>
-                        <button className="settings-action-btn" onClick={() => { setShowSubPopup(s => !s); closeSidebarSettings(); }}>Payments</button>
+<button className="settings-action-btn" onClick={() => { setShowSubPopup(s => !s); closeSidebarSettings(); }}>Payments</button>
                       </div>
                     </div>
                   )}
@@ -1889,125 +1845,6 @@ function App({ session, onLogout }) {
         </div>
       )}
 
-      {/* Timer Widget Overlay */}
-      {timerWidgetOpen && (
-        <div className="timer-widget-overlay" style={{ top: timerWidgetPos.top, left: timerWidgetPos.left }}>
-          <div className={`timer-widget-panel ${timerWidgetCompact ? 'compact' : 'large'}`}>
-            <div className="timer-widget-header" onMouseDown={handleTimerDragStart} style={{ cursor: 'grab' }}>
-              <span className="timer-widget-title">⏱ Timer</span>
-              <div className="timer-widget-actions">
-                <button
-                  className="timer-widget-size-btn"
-                  onClick={() => setTimerWidgetCompact(p => !p)}
-                  title={timerWidgetCompact ? 'Expand' : 'Compact'}
-                >{timerWidgetCompact ? '⤢' : '⤡'}</button>
-                <button
-                  className="timer-widget-close-btn"
-                  onClick={() => { playClickSound(); setTimerWidgetOpen(false); }}
-                  title="Close"
-                >×</button>
-              </div>
-            </div>
-            <div className="timer-widget-body">
-              <Timer isPopup={true} isCompact={timerWidgetCompact} />
-            </div>
-          </div>
-        </div>
-      )}
-
-    </div>
-  );
-}
-
-// Timer Popup Wrapper Component
-function TimerPopupWrapper({ isCompact: initialCompact = false }) {
-  const [isAlwaysOnTop, setIsAlwaysOnTop] = useState(true);
-  const [compact, setCompact] = useState(initialCompact);
-  const [settingMode, setSettingMode] = useState(false);
-
-  useEffect(() => {
-    const init = async () => {
-      try {
-        await getCurrentWindow().setAlwaysOnTop(true);
-      } catch (err) {}
-    };
-    init();
-  }, []);
-
-  useEffect(() => {
-    const resize = async () => {
-      try {
-        const { LogicalSize } = await import('@tauri-apps/api/dpi');
-        if (compact) {
-          const h = settingMode ? 116 : 64;
-          await getCurrentWindow().setSize(new LogicalSize(260, h));
-        } else {
-          await getCurrentWindow().setSize(new LogicalSize(260, 310));
-        }
-      } catch (err) {}
-    };
-    resize();
-  }, [compact, settingMode]);
-
-  const toggleAlwaysOnTop = async () => {
-    try {
-      const newValue = !isAlwaysOnTop;
-      await getCurrentWindow().setAlwaysOnTop(newValue);
-      setIsAlwaysOnTop(newValue);
-    } catch (err) {}
-  };
-
-  const closePopup = async () => {
-    try {
-      await getCurrentWindow().close();
-    } catch (err) {}
-  };
-
-  if (compact) {
-    return (
-      <div className="timer-mini-popup-container">
-        <div className="timer-mini-popup-header">
-          <span className="timer-mini-popup-title">⏱</span>
-          <div className="timer-mini-popup-actions">
-            <button
-              className="timer-mini-size-btn"
-              onClick={() => setCompact(false)}
-              title="Expand"
-            >⤢</button>
-            <button
-              className={`timer-mini-pin-btn ${isAlwaysOnTop ? 'active' : ''}`}
-              onClick={toggleAlwaysOnTop}
-              title={isAlwaysOnTop ? 'Unpin' : 'Pin'}
-            >📌</button>
-            <button className="timer-mini-close-btn" onClick={closePopup}>×</button>
-          </div>
-        </div>
-        <Timer isPopup={true} isCompact={true} onSettingChange={setSettingMode} />
-      </div>
-    );
-  }
-
-  return (
-    <div className="timer-popup-container">
-      <div className="timer-popup-header" onMouseDown={async () => { const { getCurrentWindow } = await import('@tauri-apps/api/window'); getCurrentWindow().startDragging(); }}>
-        <span className="timer-popup-header-title">⏱ Timer</span>
-        <div className="timer-popup-header-actions">
-          <button
-            className="timer-popup-size-btn"
-            onClick={() => setCompact(true)}
-            title="Compact"
-          >⤡</button>
-          <button
-            className={`timer-popup-pin-btn ${isAlwaysOnTop ? 'active' : ''}`}
-            onClick={toggleAlwaysOnTop}
-            title={isAlwaysOnTop ? 'Unpin' : 'Pin'}
-          >📌</button>
-          <button className="timer-popup-close-btn" onClick={closePopup} title="Close">×</button>
-        </div>
-      </div>
-      <div className="timer-popup-body">
-        <Timer isPopup={true} />
-      </div>
     </div>
   );
 }

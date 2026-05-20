@@ -53,19 +53,6 @@
         "center": true,
         "skipTaskbar": true
       },
-      {
-        "title": "Timer",
-        "label": "timer-popup",
-        "width": 260,
-        "height": 310,
-        "resizable": false,
-        "decorations": false,
-        "alwaysOnTop": true,
-        "visible": false,
-        "url": "timer.html",
-        "center": true,
-        "skipTaskbar": true
-      }
     ],
     "withGlobalTauri": true,
     "security": {
@@ -74,7 +61,7 @@
         {
           "identifier": "main-capability",
           "description": "Main app capabilities",
-          "windows": ["main", "timer-popup", "kana-popup"],
+          "windows": ["main", "kana-popup"],
           "permissions": [
             "dialog:default",
             "dialog:allow-save",
