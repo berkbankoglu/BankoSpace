@@ -1601,3 +1601,48 @@
   border-radius: 6px;
   transition: transform 0.15s;
 }
+
+/* ─── Shortcuts Panel ─── */
+.notes-shortcuts-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 200;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 10px 12px;
+  min-width: 290px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.5);
+}
+.notes-shortcuts-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #30363d;
+}
+.notes-shortcut-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 0;
+}
+.notes-shortcut-key {
+  background: #21262d;
+  border: 1px solid #444c56;
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-size: 11px;
+  color: #c9d1d9;
+  white-space: nowrap;
+  min-width: 100px;
+  text-align: center;
+}
+.notes-shortcut-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
