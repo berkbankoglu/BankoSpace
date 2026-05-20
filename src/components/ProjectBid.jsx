@@ -1,16 +1,21 @@
 import { useState } from 'react';
 import './ProjectBid.css';
 
-const BID_RULES = `Write a very short bid (2-3 sentences max). Follow these rules strictly:
-- Open with a single enthusiastic word: "Absolutely!", "Perfect!", or "Yes!" — never start with "Hi" or the client name unless a name is provided, in which case use "Hi [name], Yes!" or "Hi [name], Absolutely!"
-- Immediately say you do this type of work daily/regularly and can start right away with fast delivery
-- Add one short sentence hinting at the result (not tasks) — what the client will get
-- End with a call to action: ask them to send the files/details
-- Sign off with: "Kind regards,\\nBerk"
-- Never list tasks or deliverables
-- Never mention price or timeline
-- Maximum 60 words total (excluding sign-off)
-- Confident, direct, no fluff`;
+function truncateBid(text, maxWords = 22) {
+  const signoffRe = /\n\nKind regards,[\s\S]*$/i;
+  const signoffMatch = text.match(signoffRe);
+  const signoff = signoffMatch ? signoffMatch[0] : '\n\nKind regards,\nBerk';
+  const body = text.replace(signoffRe, '').trim();
+  const words = body.split(/\s+/);
+  const trimmed = words.slice(0, maxWords).join(' ').replace(/[,.]?$/, '.');
+  return trimmed + signoff;
+}
+
+const BID_RULES = `Write a very short bid — MAX 22 words before the sign-off. Exactly 2 sentences:
+Sentence 1 (MAX 10 words): opener word (Yes!/Perfect!/Absolutely!) + you do this regularly + available now.
+Sentence 2 (MAX 12 words): one CTA asking them to send details.
+Sign off with: "Kind regards,\\nBerk"
+Never copy words from the project text. Never list tasks, price, or timeline.`;
 
 const ANALYZE_RULES = `Summarize the following project listing in 2-3 sentences in Turkish. Only mention what is explicitly written. Do not comment on missing information. No headers, no bullets, plain text only.`;
 
@@ -58,8 +63,8 @@ export default function ProjectBid() {
     setResultType(null);
     try {
       const res = await callApi(
-        `You are an experienced Upwork freelancer. Write a short bid proposal. Follow ALL rules strictly.\n\n[Rules]\n${BID_RULES}\n\nCRITICAL RULES (override everything else):\n1. ${clientName.trim() ? `The bid MUST begin with exactly "Hi ${clientName.trim()}, " (inline, immediately followed by the rest of the text on the SAME line — no line break after the greeting).` : 'No client name provided, skip greeting name.'}\n2. Do NOT list what you will do. Do NOT mention specific tasks, tools, or deliverables.\n3. You may use ONE single general word to hint at the domain (e.g. "design", "development", "editing") — nothing more.\n4. If the client mentions a deadline or timeline, acknowledge it naturally and confirm you can meet it easily.\n\n[Project]\n${projectDetails}\n\nOutput only the bid text.`, 400);
-      if (res) { setResult(res); setResultType('bid'); }
+        `Write a short Upwork bid using this EXACT structure:\n\n[Opener: Yes!/Perfect!/Absolutely!] [1 sentence: relevant skill + do it regularly + available now — MAX 10 words] [1 sentence: CTA to send details — MAX 12 words]\n\nKind regards,\nBerk\n\n---\nProject: ${projectDetails}\nClient: ${clientName.trim() || 'not specified'}\n---\nRules: never copy words from the project text. Output only the bid.`, 80);
+      if (res) { setResult(truncateBid(res)); setResultType('bid'); }
     } catch (e) { setError(e.message || 'Failed to generate bid.'); }
     finally { setLoading(null); }
   };
