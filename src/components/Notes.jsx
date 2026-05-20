@@ -168,10 +168,6 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
         : null;
     }
 
-    // Show overlay immediately (loading state) so user sees it at cursor right away
-    setPendingImg({ dataUrl: null, anchorRect });
-    setPendingTitle('Screenshot');
-
     const reader = new FileReader();
     reader.onload = (ev) => {
       const imgEl = new window.Image();
@@ -182,7 +178,8 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
         canvas.width = Math.round(imgEl.width * scale);
         canvas.height = Math.round(imgEl.height * scale);
         canvas.getContext('2d').drawImage(imgEl, 0, 0, canvas.width, canvas.height);
-        setPendingImg(prev => prev ? { ...prev, dataUrl: canvas.toDataURL('image/png') } : null);
+        setPendingImg({ dataUrl: canvas.toDataURL('image/png'), anchorRect });
+        setPendingTitle('Screenshot');
       };
       imgEl.src = ev.target.result;
     };
@@ -250,7 +247,7 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
       {/* Title input overlay — appears at cursor right after paste */}
       {pendingImg && (
         <div className="note-img-title-overlay" style={{ top: pendingImg.anchorRect.top, left: pendingImg.anchorRect.left }}>
-          <span className="note-img-title-icon">{pendingImg.dataUrl ? '📷' : '⏳'}</span>
+          <span className="note-img-title-icon">📷</span>
           <input
             ref={titleInputRef}
             className="note-img-title-input"
@@ -260,14 +257,9 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
               if (e.key === 'Enter') { e.preventDefault(); insertImageEmbed(pendingImg.dataUrl, pendingTitle); }
               if (e.key === 'Escape') { setPendingImg(null); pendingRangeRef.current = null; }
             }}
-            placeholder={pendingImg.dataUrl ? 'Başlık yaz, Enter\'a bas...' : 'Yükleniyor...'}
-            disabled={!pendingImg.dataUrl}
+            placeholder="Başlık yaz, Enter'a bas..."
           />
-          <button
-            className="note-img-title-confirm"
-            onClick={() => insertImageEmbed(pendingImg.dataUrl, pendingTitle)}
-            disabled={!pendingImg.dataUrl}
-          >↵</button>
+          <button className="note-img-title-confirm" onClick={() => insertImageEmbed(pendingImg.dataUrl, pendingTitle)}>↵</button>
         </div>
       )}
 
