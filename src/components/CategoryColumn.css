@@ -3,7 +3,7 @@
 .category-column-v2 {
   background: #191919;
   border-radius: 0;
-  padding: 16px;
+  padding: 0 16px 16px;
   display: flex;
   flex-direction: column;
   flex: 1;
