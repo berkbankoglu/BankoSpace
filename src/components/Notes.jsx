@@ -763,6 +763,72 @@ function Notes() {
     } catch (e) { console.error('Export error:', e); }
   };
 
+  const contentToHtml = (html) => {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html || '';
+    tmp.querySelectorAll('.note-img-embed').forEach(span => {
+      const dataUrl = span.getAttribute('data-img');
+      const label = span.textContent.replace('📷 ', '').trim();
+      const fig = document.createElement('figure');
+      fig.style.cssText = 'margin:12px 0;';
+      const img = document.createElement('img');
+      img.src = dataUrl;
+      img.alt = label;
+      img.style.cssText = 'max-width:100%;border-radius:6px;display:block;';
+      const cap = document.createElement('figcaption');
+      cap.style.cssText = 'font-size:11px;color:#888;margin-top:4px;';
+      cap.textContent = label;
+      fig.appendChild(img);
+      fig.appendChild(cap);
+      span.parentNode?.replaceChild(fig, span);
+    });
+    return tmp.innerHTML;
+  };
+
+  const exportAsHtml = async () => {
+    try {
+      const { save } = await import('@tauri-apps/plugin-dialog');
+      const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+      const date = new Date().toISOString().slice(0, 10);
+      const filePath = await save({
+        defaultPath: `notlar-${date}.html`,
+        filters: [{ name: 'HTML', extensions: ['html'] }],
+      });
+      if (!filePath) return;
+
+      const renderSection = (title, content, level = 2) =>
+        `<section><h${level}>${title || 'Untitled'}</h${level}><div class="content">${contentToHtml(content)}</div></section>`;
+
+      const body = notes.map(n =>
+        renderSection(n.title, n.content) +
+        (n.subNotes?.length ? n.subNotes.map(s => renderSection(s.title, s.content, 3)).join('') : '')
+      ).join('<hr>');
+
+      const fullHtml = `<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>BankoSpace Notlar — ${date}</title>
+<style>
+  body{font-family:system-ui,sans-serif;max-width:860px;margin:40px auto;padding:0 24px;color:#222;line-height:1.7;}
+  h2{font-size:22px;margin:32px 0 8px;border-bottom:2px solid #eee;padding-bottom:6px;}
+  h3{font-size:17px;margin:24px 0 6px;color:#444;}
+  .content{margin-bottom:20px;}
+  img{max-width:100%;border-radius:6px;margin:8px 0;}
+  figure{margin:12px 0;}
+  figcaption{font-size:11px;color:#888;}
+  hr{border:none;border-top:2px solid #eee;margin:40px 0;}
+  ul,ol{padding-left:24px;}
+</style>
+</head>
+<body>
+${body}
+</body>
+</html>`;
+      await writeTextFile(filePath, fullHtml);
+    } catch (e) { console.error('HTML export error:', e); }
+  };
+
   const importNotes = async () => {
     try {
       const { open } = await import('@tauri-apps/plugin-dialog');
@@ -871,11 +937,18 @@ function Notes() {
               }}>
                 <button
                   onMouseDown={e => e.stopPropagation()}
+                  onClick={() => { setShowMenu(false); exportAsHtml(); }}
+                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', background: 'none', border: 'none', color: '#c9d1d9', cursor: 'pointer', fontSize: 13 }}
+                  onMouseEnter={e => e.target.style.background = '#21262d'}
+                  onMouseLeave={e => e.target.style.background = 'none'}
+                >↓ Export (HTML + Görseller)</button>
+                <button
+                  onMouseDown={e => e.stopPropagation()}
                   onClick={() => { setShowMenu(false); exportAllNotes(); }}
                   style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', background: 'none', border: 'none', color: '#c9d1d9', cursor: 'pointer', fontSize: 13 }}
                   onMouseEnter={e => e.target.style.background = '#21262d'}
                   onMouseLeave={e => e.target.style.background = 'none'}
-                >↓ Export (JSON)</button>
+                >↓ Export (JSON — yedek)</button>
                 <button
                   onMouseDown={e => e.stopPropagation()}
                   onClick={() => { setShowMenu(false); importNotes(); }}
