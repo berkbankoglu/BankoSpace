@@ -90,7 +90,31 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
   const [lightboxZoom, setLightboxZoom] = useState(1);
   const pendingRangeRef = useRef(null);
   const titleInputRef = useRef(null);
-  const previewPinnedRef = useRef(false); // mouse is over delete button — keep preview alive
+  const previewPinnedRef = useRef(false);
+
+  // Custom undo/redo history
+  const historyRef = useRef([content || '']);
+  const historyIndexRef = useRef(0);
+  const saveTimerRef = useRef(null);
+
+  const pushHistory = useCallback((html) => {
+    const h = historyRef.current.slice(0, historyIndexRef.current + 1);
+    if (h[h.length - 1] === html) return;
+    h.push(html);
+    if (h.length > 200) h.shift();
+    historyRef.current = h;
+    historyIndexRef.current = h.length - 1;
+  }, []);
+
+  const moveCursorToEnd = () => {
+    if (!editorRef.current) return;
+    const range = document.createRange();
+    range.selectNodeContents(editorRef.current);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  };
 
   useEffect(() => {
     if (editorRef.current && editorRef.current.innerHTML !== content) {
@@ -109,6 +133,8 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
       const html = editorRef.current.innerHTML;
       setIsEmpty(!editorRef.current.textContent?.trim());
       onChange(html);
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(() => pushHistory(html), 400);
     }
   };
 
@@ -132,7 +158,7 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
     pendingRangeRef.current = null;
     setPendingImg(null);
     setPendingTitle('Screenshot');
-    if (editorRef.current) { setIsEmpty(false); onChange(editorRef.current.innerHTML); }
+    if (editorRef.current) { setIsEmpty(false); const html = editorRef.current.innerHTML; onChange(html); pushHistory(html); }
   };
 
   const handlePaste = (e) => {
@@ -248,10 +274,27 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
         onKeyDown={(e) => {
           const isUndo = (e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'z';
           const isRedo = (e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'));
-          if (isUndo || isRedo) {
-            setTimeout(() => {
-              if (editorRef.current) { setIsEmpty(!editorRef.current.textContent?.trim()); onChange(editorRef.current.innerHTML); }
-            }, 0);
+          if (isUndo) {
+            e.preventDefault();
+            if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); pushHistory(editorRef.current?.innerHTML || ''); }
+            if (historyIndexRef.current > 0) {
+              historyIndexRef.current--;
+              const html = historyRef.current[historyIndexRef.current];
+              editorRef.current.innerHTML = html;
+              setIsEmpty(!editorRef.current.textContent?.trim());
+              onChange(html);
+              moveCursorToEnd();
+            }
+          } else if (isRedo) {
+            e.preventDefault();
+            if (historyIndexRef.current < historyRef.current.length - 1) {
+              historyIndexRef.current++;
+              const html = historyRef.current[historyIndexRef.current];
+              editorRef.current.innerHTML = html;
+              setIsEmpty(!editorRef.current.textContent?.trim());
+              onChange(html);
+              moveCursorToEnd();
+            }
           }
         }}
         data-placeholder={placeholder}
