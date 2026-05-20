@@ -123,7 +123,6 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
   useEffect(() => {
     if (editorRef.current && editorRef.current.innerHTML !== content) {
       editorRef.current.innerHTML = content || '';
-      editorRef.current.querySelectorAll('.note-img-embed').forEach(el => el.setAttribute('draggable', 'true'));
       setIsEmpty(!content);
     }
   }, []);
@@ -150,7 +149,6 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
     const span = document.createElement('span');
     span.className = 'note-img-embed';
     span.contentEditable = 'false';
-    span.setAttribute('draggable', 'true');
     span.setAttribute('data-img', dataUrl);
     span.textContent = '📷 ' + (title.trim() || 'Screenshot');
     range.deleteContents();
@@ -248,69 +246,86 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
       const embed = e.target.closest?.('.note-img-embed');
       if (embed) { e.preventDefault(); setLightbox({ dataUrl: embed.getAttribute('data-img') }); setLightboxZoom(1); }
     };
-    const onDragStart = (e) => {
+    // Custom mouse-based drag (HTML5 drag API unreliable in WebView2)
+    let ghostEl = null;
+    let pendingEmbed = null;
+    let dragging = false;
+    let startX = 0, startY = 0;
+
+    const onMouseDown = (e) => {
       const embed = e.target.closest?.('.note-img-embed');
       if (!embed) return;
-      draggedEmbedRef.current = embed;
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', '');
-      setTimeout(() => { if (embed) embed.style.opacity = '0.4'; }, 0);
-    };
-
-    const onDragOver = (e) => {
-      if (!draggedEmbedRef.current) return;
       e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-    };
+      e.stopPropagation();
+      pendingEmbed = embed;
+      startX = e.clientX;
+      startY = e.clientY;
+      dragging = false;
 
-    const onDrop = (e) => {
-      const embed = draggedEmbedRef.current;
-      if (!embed) return;
-      e.preventDefault();
-      embed.style.opacity = '';
-      draggedEmbedRef.current = null;
+      const onMove = (ev) => {
+        if (!dragging) {
+          if (Math.abs(ev.clientX - startX) < 4 && Math.abs(ev.clientY - startY) < 4) return;
+          dragging = true;
+          draggedEmbedRef.current = pendingEmbed;
+          pendingEmbed.style.opacity = '0.3';
 
-      let range = null;
-      if (document.caretRangeFromPoint) {
-        range = document.caretRangeFromPoint(e.clientX, e.clientY);
-      } else if (document.caretPositionFromPoint) {
-        const pos = document.caretPositionFromPoint(e.clientX, e.clientY);
-        if (pos) { range = document.createRange(); range.setStart(pos.offsetNode, pos.offset); }
-      }
-      if (range && !embed.contains(range.startContainer)) {
-        range.insertNode(embed);
-      }
+          ghostEl = document.createElement('div');
+          ghostEl.className = 'note-embed-drag-ghost';
+          ghostEl.textContent = pendingEmbed.textContent;
+          document.body.appendChild(ghostEl);
+        }
+        if (ghostEl) {
+          ghostEl.style.left = ev.clientX + 10 + 'px';
+          ghostEl.style.top = ev.clientY - 12 + 'px';
+        }
+      };
 
-      setEmbedHover(null);
-      setPreview(null);
-      if (editorRef.current) {
-        const html = editorRef.current.innerHTML;
-        onChange(html);
-        pushHistory(html);
-      }
-    };
+      const onUp = (ev) => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        if (ghostEl) { ghostEl.remove(); ghostEl = null; }
+        const embedEl = draggedEmbedRef.current;
+        if (embedEl) embedEl.style.opacity = '';
+        draggedEmbedRef.current = null;
+        pendingEmbed = null;
+        if (!dragging || !embedEl) { dragging = false; return; }
+        dragging = false;
 
-    const onDragEnd = () => {
-      if (draggedEmbedRef.current) { draggedEmbedRef.current.style.opacity = ''; draggedEmbedRef.current = null; }
+        let range = null;
+        if (document.caretRangeFromPoint) {
+          range = document.caretRangeFromPoint(ev.clientX, ev.clientY);
+        } else if (document.caretPositionFromPoint) {
+          const pos = document.caretPositionFromPoint(ev.clientX, ev.clientY);
+          if (pos) { range = document.createRange(); range.setStart(pos.offsetNode, pos.offset); }
+        }
+        if (range && !embedEl.contains(range.startContainer)) {
+          embedEl.parentNode?.removeChild(embedEl);
+          range.insertNode(embedEl);
+        }
+        setEmbedHover(null);
+        setPreview(null);
+        if (editorRef.current) {
+          const html = editorRef.current.innerHTML;
+          onChange(html);
+          pushHistory(html);
+        }
+      };
+
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
     };
 
     editor.addEventListener('mouseover', onOver);
     editor.addEventListener('mousemove', onMove);
     editor.addEventListener('mouseout', onOut);
     editor.addEventListener('click', onClick);
-    editor.addEventListener('dragstart', onDragStart);
-    editor.addEventListener('dragover', onDragOver);
-    editor.addEventListener('drop', onDrop);
-    editor.addEventListener('dragend', onDragEnd);
+    editor.addEventListener('mousedown', onMouseDown);
     return () => {
       editor.removeEventListener('mouseover', onOver);
       editor.removeEventListener('mousemove', onMove);
       editor.removeEventListener('mouseout', onOut);
       editor.removeEventListener('click', onClick);
-      editor.removeEventListener('dragstart', onDragStart);
-      editor.removeEventListener('dragover', onDragOver);
-      editor.removeEventListener('drop', onDrop);
-      editor.removeEventListener('dragend', onDragEnd);
+      editor.removeEventListener('mousedown', onMouseDown);
     };
   }, []);
 

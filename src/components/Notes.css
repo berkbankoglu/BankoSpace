@@ -1453,11 +1453,25 @@
   transition: background 0.12s, border-color 0.12s;
   vertical-align: middle;
 }
-.note-img-embed[draggable="true"] {
+.note-img-embed {
   cursor: grab;
 }
-.note-img-embed[draggable="true"]:active {
+.note-img-embed:active {
   cursor: grabbing;
+}
+.note-embed-drag-ghost {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  background: #2a2a2a;
+  border: 1px solid #555;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 12px;
+  color: #ccc;
+  opacity: 0.85;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
 }
 .note-img-embed:hover {
   background: #333;
