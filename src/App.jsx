@@ -1261,19 +1261,19 @@ function App({ session, onLogout }) {
       <div className="custom-titlebar">
         {/* Workspace / user info — left side, within sidebar width */}
         <div className="titlebar-workspace" style={{ width: sidebarCollapsed ? 50 : 240, flexShrink: 0 }}>
-          {!sidebarCollapsed && (
-            <button
-              className="titlebar-workspace-btn"
-              onClick={() => { setShowSidebarSettings(true); setSettingsTab('account'); }}
-            >
-              <span className="titlebar-workspace-avatar">
-                {session?.user?.email ? session.user.email[0].toUpperCase() : 'B'}
-              </span>
+          <button
+            className="titlebar-workspace-btn"
+            onClick={() => { setShowSidebarSettings(true); setSettingsTab('account'); }}
+          >
+            <span className="titlebar-workspace-avatar">
+              {session?.user?.email ? session.user.email[0].toUpperCase() : 'B'}
+            </span>
+            {!sidebarCollapsed && (
               <span className="titlebar-workspace-name">
                 {session?.user?.email ? session.user.email.split('@')[0] : 'BankoSpace'}
               </span>
-            </button>
-          )}
+            )}
+          </button>
         </div>
         <div className="titlebar-drag-region" data-tauri-drag-region onDoubleClick={maximizeWindow} />
         <div className="titlebar-controls">
@@ -1718,19 +1718,6 @@ function App({ session, onLogout }) {
             </div>
           )}
 
-          {/* Profile bar at bottom */}
-          {!sidebarCollapsed && session?.user?.email && (
-            <div className="sidebar-profile-bar sidebar-profile-bar-bottom" onClick={() => { setShowSidebarSettings(true); setSettingsTab('account'); }}>
-              <div className="sidebar-profile-avatar">
-                {session.user.email[0].toUpperCase()}
-              </div>
-              <div className="sidebar-profile-info">
-                <span className="sidebar-profile-name">{session.user.email.split('@')[0]}</span>
-                <span className="sidebar-profile-email">{session.user.email}</span>
-              </div>
-              <span className="sidebar-profile-gear">⚙</span>
-            </div>
-          )}
         </div>
 
         {/* Main Content Area */}
