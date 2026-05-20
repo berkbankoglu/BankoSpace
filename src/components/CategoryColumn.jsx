@@ -392,7 +392,7 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
                       >✎</button>
                       <button
                         className="cc-action-btn delete small"
-                        onClick={() => { playDeleteSound(); onDeleteSubtask(todo.id, subtask.id); }}
+                        onClick={(e) => { e.stopPropagation(); playDeleteSound(); onDeleteSubtask(todo.id, subtask.id); }}
                       >×</button>
                     </div>
                   </div>
