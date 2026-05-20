@@ -37,11 +37,11 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
   const editSubtaskInputRef = useRef(null);
 
   useEffect(() => {
-    if (!colorPickerTodoId) return;
     const close = () => { setColorPickerTodoId(null); setColorPickerPos(null); };
+    window.addEventListener('close-color-pickers', close);
     document.addEventListener('click', close);
-    return () => document.removeEventListener('click', close);
-  }, [colorPickerTodoId]);
+    return () => { window.removeEventListener('close-color-pickers', close); document.removeEventListener('click', close); };
+  }, []);
 
   // Auto-expand only newly added todos that have subtasks (skip manually closed ones)
   useEffect(() => {
@@ -267,8 +267,9 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
                   className="cc-action-btn color-btn"
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (colorPickerTodoId === todo.id) { setColorPickerTodoId(null); setColorPickerPos(null); }
-                    else {
+                    const isOpen = colorPickerTodoId === todo.id;
+                    window.dispatchEvent(new Event('close-color-pickers'));
+                    if (!isOpen) {
                       const rect = e.currentTarget.getBoundingClientRect();
                       setColorPickerPos({ bottom: window.innerHeight - rect.top + 4, left: rect.left });
                       setColorPickerTodoId(todo.id);
