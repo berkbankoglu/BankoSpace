@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import './CategoryColumn.css';
 import { playTypeSoundThrottled, playCompleteSound, playUncompleteSound, playDeleteSound } from '../utils/sounds';
 
@@ -423,25 +424,26 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
         </div>
       )}
 
-      {/* Color picker portal — fixed so it's never clipped by overflow */}
-      {colorPickerTodoId && colorPickerPos && (
+      {/* Color picker rendered into document.body to escape zoom/overflow */}
+      {colorPickerTodoId && colorPickerPos && ReactDOM.createPortal(
         <div
           className="cc-color-picker"
           style={{ position: 'fixed', bottom: colorPickerPos.bottom, left: colorPickerPos.left }}
-          onClick={e => e.stopPropagation()}
+          onMouseDown={e => e.stopPropagation()}
         >
           {TODO_COLORS.map(c => {
-            const todo = todos.find(t => t.id === colorPickerTodoId);
+            const activeTodo = todos.find(t => t.id === colorPickerTodoId);
             return (
               <button
                 key={c}
                 className="cc-color-swatch"
-                style={{ background: c, outline: todo?.color === c ? '2px solid white' : 'none' }}
-                onClick={() => { onUpdateTodo(colorPickerTodoId, { color: todo?.color === c ? null : c }); setColorPickerTodoId(null); setColorPickerPos(null); }}
+                style={{ background: c, outline: activeTodo?.color === c ? '2px solid white' : 'none' }}
+                onClick={() => { onUpdateTodo(colorPickerTodoId, { color: activeTodo?.color === c ? null : c }); setColorPickerTodoId(null); setColorPickerPos(null); }}
               />
             );
           })}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
