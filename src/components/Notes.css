@@ -1546,6 +1546,26 @@
 .note-img-preview:hover .note-img-delete-btn { opacity: 1; }
 .note-img-delete-btn:hover { background: #f85149; }
 
+.note-embed-chip-delete {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #f85149;
+  border: none;
+  color: #fff;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 0;
+  pointer-events: auto;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+}
+.note-embed-chip-delete:hover { background: #ff3b30; transform: scale(1.15); }
+
 /* Lightbox */
 .note-img-lightbox {
   position: fixed;

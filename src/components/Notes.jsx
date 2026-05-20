@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, forwardRef } from 'react';
+import ReactDOM from 'react-dom';
 import './Notes.css';
 import { playTypeSoundThrottled, playClickSound, playAddSound, playDeleteSound } from '../utils/sounds';
 import { pushKeyToSupabase } from '../supabase';
@@ -88,9 +89,11 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
   const [preview, setPreview] = useState(null); // { dataUrl, rect }
   const [lightbox, setLightbox] = useState(null); // { dataUrl }
   const [lightboxZoom, setLightboxZoom] = useState(1);
+  const [embedHover, setEmbedHover] = useState(null); // { el, rect }
   const pendingRangeRef = useRef(null);
   const titleInputRef = useRef(null);
   const previewPinnedRef = useRef(false);
+  const embedDeleteHoveredRef = useRef(false);
 
   // Custom undo/redo history
   const historyRef = useRef([content || '']);
@@ -219,14 +222,24 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
     if (!editor) return;
     const onOver = (e) => {
       const embed = e.target.closest?.('.note-img-embed');
-      if (embed) { previewElRef.current = embed; setPreview({ dataUrl: embed.getAttribute('data-img'), x: e.clientX, y: e.clientY, el: embed }); }
+      if (embed) {
+        previewElRef.current = embed;
+        setPreview({ dataUrl: embed.getAttribute('data-img'), x: e.clientX, y: e.clientY, el: embed });
+        setEmbedHover({ el: embed, rect: embed.getBoundingClientRect() });
+      }
     };
     const onMove = (e) => {
       const embed = e.target.closest?.('.note-img-embed');
-      if (embed) setPreview(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
+      if (embed) {
+        setPreview(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
+        setEmbedHover({ el: embed, rect: embed.getBoundingClientRect() });
+      }
     };
     const onOut = (e) => {
-      if (e.target.closest?.('.note-img-embed') && !previewPinnedRef.current) setPreview(null);
+      if (e.target.closest?.('.note-img-embed')) {
+        if (!previewPinnedRef.current) setPreview(null);
+        setTimeout(() => { if (!embedDeleteHoveredRef.current) setEmbedHover(null); }, 50);
+      }
     };
     const onClick = (e) => {
       const embed = e.target.closest?.('.note-img-embed');
@@ -257,8 +270,10 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
     const target = el || previewElRef.current;
     target?.remove();
     previewPinnedRef.current = false;
+    embedDeleteHoveredRef.current = false;
     previewElRef.current = null;
     setPreview(null);
+    setEmbedHover(null);
     if (editorRef.current) { setIsEmpty(!editorRef.current.textContent?.trim()); onChange(editorRef.current.innerHTML); }
   };
 
@@ -335,6 +350,19 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
             title="Sil"
           >×</button>
         </div>
+      )}
+
+      {/* Embed chip delete button — appears top-right of chip on hover */}
+      {embedHover && ReactDOM.createPortal(
+        <button
+          className="note-embed-chip-delete"
+          style={{ position: 'fixed', top: embedHover.rect.top - 7, left: embedHover.rect.right - 14 }}
+          onMouseEnter={() => { embedDeleteHoveredRef.current = true; }}
+          onMouseLeave={() => { embedDeleteHoveredRef.current = false; setEmbedHover(null); }}
+          onClick={(e) => { e.stopPropagation(); deleteEmbed(embedHover.el); }}
+          title="Sil"
+        >×</button>,
+        document.body
       )}
 
       {/* Lightbox */}
