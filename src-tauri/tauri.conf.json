@@ -52,7 +52,7 @@
         "url": "kana.html",
         "center": true,
         "skipTaskbar": true
-      },
+      }
     ],
     "withGlobalTauri": true,
     "security": {
