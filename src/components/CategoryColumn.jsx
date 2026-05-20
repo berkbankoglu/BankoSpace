@@ -269,7 +269,7 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
                     if (colorPickerTodoId === todo.id) { setColorPickerTodoId(null); setColorPickerPos(null); }
                     else {
                       const rect = e.currentTarget.getBoundingClientRect();
-                      setColorPickerPos({ top: rect.bottom + 4, left: rect.left });
+                      setColorPickerPos({ bottom: window.innerHeight - rect.top + 4, left: rect.left });
                       setColorPickerTodoId(todo.id);
                     }
                   }}
@@ -427,7 +427,7 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
       {colorPickerTodoId && colorPickerPos && (
         <div
           className="cc-color-picker"
-          style={{ position: 'fixed', top: colorPickerPos.top, left: colorPickerPos.left }}
+          style={{ position: 'fixed', bottom: colorPickerPos.bottom, left: colorPickerPos.left }}
           onClick={e => e.stopPropagation()}
         >
           {TODO_COLORS.map(c => {
