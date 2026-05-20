@@ -8751,7 +8751,7 @@ body.light .sidebar-bottom {
 .main-content-area {
   flex: 1;
   overflow: hidden;
-  background: #111111 !important;
+  background: #191919 !important;
   padding-top: 30px;
   display: flex;
   flex-direction: column;
