@@ -27,7 +27,7 @@ const DEFAULT_ANALYZE_RULES = `- İngilizce proje açıklamasını analiz et
 
 const DEFAULT_BID_RULES = `**TEKLİF YAZMA KURALLARI**
 
-- **MAX 30 KELİME — kesinlikle aşma. Yazmadan önce say, 20'yi geçiyorsa kıs.**
+- **MAX 22 KELİME (Kind regards + Berk hariç) — kesinlikle aşma. Yazmadan önce say, 18'i geçiyorsa kıs.**
 - Tek paragraf, max 2 satır, kopyalamaya hazır
 - Her zaman İngilizce yaz
 - Açılışta kısa onay ifadesi kullan — sanki projesini okuyup onaylıyormuşsun gibi (örn. "Yes!", "Absolutely!", "Perfect!")
@@ -44,6 +44,16 @@ const DEFAULT_BID_RULES = `**TEKLİF YAZMA KURALLARI**
 "Evet bu tip hataların olması çok normal, eğer simdi bana ulaşırsan hemen bu sıkıntılı noktaları düzeltebilirim. Bu tip işleri günlük işlerimde sürekli yapıyorum benim için çocuk oyuncağı ^^ Senden haber bekliyorum Berk"
 
 Output only the letter, nothing else.`;
+
+function truncateBid(text, maxWords = 22) {
+  const signoffRe = /\n\nKind regards,[\s\S]*$/i;
+  const signoffMatch = text.match(signoffRe);
+  const signoff = signoffMatch ? signoffMatch[0] : '\n\nKind regards,\nBerk';
+  const body = text.replace(signoffRe, '').trim();
+  const words = body.split(/\s+/);
+  const trimmed = words.slice(0, maxWords).join(' ').replace(/[,.]?$/, '.');
+  return trimmed + signoff;
+}
 
 function getLangLabel(code) {
   return LANGUAGES.find(l => l.code === code)?.label || code;
@@ -497,11 +507,12 @@ function WriteBidChat() {
         prompt = `Sen bir teklif yazma asistanısın. Kullanıcı teklif kuralları hakkında talimat verdi.\n\nKullanıcı: "${text}"\nMevcut kurallar:\n${rules}\n\nTürkçe yanıt ver. Kural değişikliğini kısa onayla.\n\nYanıtının sonuna ekle:\n[RULE_UPDATE: {"action":"add","rule":"<rule in English>"}]`;
         maxTokens = 400;
       } else {
-        prompt = `You are an experienced Upwork freelancer. Write a bid proposal.\n\n[Bid Rules]\n${rules}\n\n[Client Name]\n${clientName.trim() || 'Not specified'}\n\n[Project Details]\n${text}\n\nWrite only the bid text, nothing else.`;
-        maxTokens = 600;
+        prompt = `Write a short Upwork bid using this EXACT structure — no more, no less:\n\n[Opener: Yes!/Perfect!/Absolutely!] [1 sentence: relevant skill + do it regularly + available now — MAX 9 words] [1 sentence: CTA to send details — MAX 7 words]\n\nKind regards,\nBerk\n\n---\nProject: ${text}\nClient: ${clientName.trim() || 'not specified'}\n---\nRules: never copy words from the project text above. Output bid only.`;
+        maxTokens = 80;
       }
       const raw = await callAI(prompt, maxTokens);
-      const { text: aiText, ruleUpdate } = parseRuleUpdate(raw);
+      const { text: rawBidText, ruleUpdate } = parseRuleUpdate(raw);
+      const aiText = isRuleCommand ? rawBidText : truncateBid(rawBidText);
       let ruleMsg = null;
       if (ruleUpdate) {
         applyUpdate(ruleUpdate, rules);
