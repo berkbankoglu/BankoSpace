@@ -8966,7 +8966,7 @@ body.light .todo-drag-ghost .cc-checkmark {
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-  background: #111111 !important;
+  background: #191919 !important;
 }
 
 .dashboard-container > * {
@@ -9265,11 +9265,11 @@ body.light .font-size-option:hover {
   transform: translateX(-50%);
   width: 1px;
   height: 80%;
-  background: #111111;
+  background: rgba(255,255,255,0.06);
   border-radius: 2px;
   transition: background 0.15s;
 }
-.col-resize-handle:hover::after { background: #2e2e2e; }
+.col-resize-handle:hover::after { background: rgba(255,255,255,0.18); }
 
 .todo-columns .category-column,
 .todo-columns .category-column-v2 {
