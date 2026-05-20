@@ -12,8 +12,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),
-        timer: resolve(__dirname, 'timer.html'),
-        kana: resolve(__dirname, 'kana.html'),
+kana: resolve(__dirname, 'kana.html'),
       }
     }
   }

@@ -95,17 +95,6 @@ async fn set_child_webview_bounds(
     Ok(())
 }
 
-#[tauri::command]
-fn toggle_timer_window(app: tauri::AppHandle) {
-    if let Some(w) = app.get_webview_window("timer-popup") {
-        if w.is_visible().unwrap_or(false) {
-            let _ = w.hide();
-        } else {
-            let _ = w.show();
-            let _ = w.set_focus();
-        }
-    }
-}
 
 #[tauri::command]
 fn toggle_kana_window(app: tauri::AppHandle) {
@@ -220,8 +209,7 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_deep_link::init())
         .invoke_handler(tauri::generate_handler![
-            toggle_timer_window,
-            toggle_kana_window,
+toggle_kana_window,
             fetch_rss,
             fetch_post,
             fetch_get,
