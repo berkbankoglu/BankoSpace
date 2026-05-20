@@ -112,7 +112,7 @@ export default function Planner({ onPlannerToast }) {
   const [ghost,      setGhost]      = useState(null); // qtask drag preview only
   const [dragState,  setDragState]  = useState(null); // { ids, timeDelta, dateStr }
 
-  const [panelWidth,   setPanelWidth]   = useState(220);
+  const [panelWidth,   setPanelWidth]   = useState(240);
   const [selectedIds,  setSelectedIds]  = useState(new Set());
   const [selectionBox, setSelectionBox] = useState(null);
   const weekGridRef = useRef(null);
@@ -247,7 +247,7 @@ export default function Planner({ onPlannerToast }) {
     e.preventDefault();
     const startX = e.clientX;
     const startW = panelRef.current?.offsetWidth || panelWidth;
-    const onMove = (ev) => setPanelWidth(Math.max(160, Math.min(520, startW + (startX - ev.clientX))));
+    const onMove = (ev) => setPanelWidth(Math.max(160, Math.min(520, startW + (ev.clientX - startX))));
     const onUp   = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
@@ -537,6 +537,7 @@ export default function Planner({ onPlannerToast }) {
 
           {/* Sticky day headers */}
           <div className="pl-wk-header">
+            <div className="pl-wk-panel-spacer" style={{ width: panelWidth }} />
             <div className="pl-wk-gutter" />
             {weekDays.map(wd => (
               <div key={wd.dateStr}
@@ -546,11 +547,33 @@ export default function Planner({ onPlannerToast }) {
                 <span className={`pl-wk-day-num${wd.dateStr === today ? ' today' : ''}`}>{wd.dayNum}</span>
               </div>
             ))}
-            <div className="pl-wk-panel-spacer" style={{ width: panelWidth }} />
           </div>
 
           {/* Grid + panel */}
           <div className="pl-wk-body-row">
+
+            {/* Left panel — Quick Tasks */}
+            <div className="pl-wk-panel" ref={panelRef} style={{ width: panelWidth }}>
+              <div className="pl-panel-resize-handle" onMouseDown={handlePanelResizeStart} />
+              <div className="pl-panel-header">
+                <span className="pl-panel-title">Quick Tasks</span>
+                <button className="pl-qt-add-btn" onClick={openQtAdd}>+</button>
+              </div>
+              <div className="pl-qtasks-list">
+                {qTasks.length === 0 && <div className="pl-empty-day">Drag to calendar</div>}
+                {qTasks.map(task => (
+                  <div key={task.id} className="pl-qtask-item"
+                    onDoubleClick={() => openQtEdit(task)}
+                    onMouseDown={(e) => { if (e.button === 0) handleQtaskDragToGrid(e, task); }}
+                  >
+                    <span className="pl-qtask-bar" style={{ background: colorHex(task.color) }} />
+                    <span className="pl-qtask-title">{task.title}</span>
+                    {task.defaultDuration && <span className="pl-qtask-dur">{task.defaultDuration}m</span>}
+                    <span className="pl-qtask-drag-hint">⠿</span>
+                  </div>
+                ))}
+              </div>
+            </div>
 
             <div className="pl-wk-grid" ref={weekGridRef} onMouseDown={handleGridMouseDown}>
               {/* Rubber-band selection box */}
@@ -652,28 +675,6 @@ export default function Planner({ onPlannerToast }) {
               })}
             </div>
 
-            {/* Right panel */}
-            <div className="pl-wk-panel" ref={panelRef} style={{ width: panelWidth }}>
-              <div className="pl-panel-resize-handle" onMouseDown={handlePanelResizeStart} />
-              <div className="pl-panel-header">
-                <span className="pl-panel-title">Quick Tasks</span>
-                <button className="pl-qt-add-btn" onClick={openQtAdd}>+</button>
-              </div>
-              <div className="pl-qtasks-list">
-                {qTasks.length === 0 && <div className="pl-empty-day">Drag to calendar</div>}
-                {qTasks.map(task => (
-                  <div key={task.id} className="pl-qtask-item"
-                    onDoubleClick={() => openQtEdit(task)}
-                    onMouseDown={(e) => { if (e.button === 0) handleQtaskDragToGrid(e, task); }}
-                  >
-                    <span className="pl-qtask-bar" style={{ background: colorHex(task.color) }} />
-                    <span className="pl-qtask-title">{task.title}</span>
-                    {task.defaultDuration && <span className="pl-qtask-dur">{task.defaultDuration}m</span>}
-                    <span className="pl-qtask-drag-hint">⠿</span>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
         </div>
       )}
