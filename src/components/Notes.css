@@ -639,11 +639,11 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: #0f0f0f;
+  background: var(--bg-base);
   overflow: hidden;
-  border-top: 2px solid var(--note-color, rgba(255,255,255,0.06));
-  background-image: radial-gradient(ellipse 70% 280px at 50% 0%, color-mix(in srgb, var(--note-color, #667eea) 9%, transparent) 0%, transparent 100%);
-  transition: border-color 0.4s ease, background-image 0s;
+  border-left: 1px solid var(--border);
+  border-top: 2px solid var(--note-color, var(--border));
+  transition: border-color 0.35s ease;
 }
 
 .notes-editor-fade {
@@ -661,13 +661,7 @@
   to   { opacity: 1; transform: translateY(0);    }
 }
 
-.notes-editor-header {
-  padding: 10px 20px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
+/* .notes-editor-header defined below in Editor Header section */
 
 /* Spread Navigation in header */
 .notes-spread-nav {
@@ -744,26 +738,7 @@
   border-color: #f85149;
 }
 
-/* ─── Title Input ─── */
-.notes-title-input {
-  width: 100%;
-  padding: 18px 20px;
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid var(--border);
-  color: var(--text-primary);
-  font-size: 20px;
-  font-weight: 600;
-  font-family: inherit;
-}
-
-.notes-title-input:focus {
-  outline: none;
-}
-
-.notes-title-input::placeholder {
-  color: var(--text-muted);
-}
+/* .notes-title-input defined below in Editor Header section */
 
 /* ─── Pages Nav ─── */
 .notes-pages-nav {
@@ -1057,14 +1032,14 @@
   outline: none;
 }
 
-/* ─── Editor Header Updated ─── */
+/* ─── Editor Header ─── */
 .notes-editor-header {
-  padding: 48px 88px 0;
-  border-bottom: none;
+  padding: 20px 20px 12px;
+  border-bottom: 1px solid var(--border);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   flex-shrink: 0;
 }
 
@@ -1073,11 +1048,10 @@
   padding: 0;
   background: transparent;
   border: none;
-  color: #f0f0f0;
-  font-size: 28px;
-  font-weight: 700;
+  color: var(--text-primary);
+  font-size: 18px;
+  font-weight: 600;
   font-family: inherit;
-  letter-spacing: -0.02em;
 }
 
 .notes-title-input:hover { border-color: transparent; }
@@ -1093,23 +1067,18 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 10px 88px;
-  background: transparent;
-  border-bottom: 1px solid rgba(255,255,255,0.07);
-  margin-top: 20px;
+  padding: 6px 12px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
   flex-wrap: wrap;
   position: sticky;
   top: 0;
   z-index: 5;
-  transition: background 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  transition: box-shadow 0.2s ease;
 }
 
 .notes-formatting-toolbar.scrolled {
-  background: rgba(12, 12, 12, 0.82);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-bottom-color: rgba(255,255,255,0.12);
-  box-shadow: 0 2px 16px rgba(0,0,0,0.4);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.35);
 }
 
 .toolbar-group {
@@ -1386,9 +1355,9 @@
 /* ─── Rich Text Editor ─── */
 .notebook-page-editor {
   width: 100%;
-  padding: 28px 88px 120px;
+  padding: 20px 20px 80px;
   background: transparent;
-  color: rgba(255,255,255,0.85);
+  color: var(--text-primary);
   font-size: 14.5px;
   line-height: 1.85;
   font-family: inherit;
