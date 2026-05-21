@@ -1,0 +1,210 @@
+/* ── Root ── */
+.rb-root {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  height: 100%;
+  overflow: hidden;
+  background: #0e0e0e;
+  user-select: none;
+}
+
+/* ── Toolbar ── */
+.rb-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background: #141414;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.rb-btn {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.6);
+  cursor: pointer;
+  padding: 4px 9px;
+  border-radius: 5px;
+  font-size: 13px;
+  transition: background 0.12s, color 0.12s;
+  white-space: nowrap;
+}
+.rb-btn:hover  { background: rgba(255,255,255,0.09); color: #fff; }
+.rb-btn.active { background: rgba(99,179,237,0.18); color: #63b3ed; }
+.rb-btn.danger { color: rgba(252,129,129,0.7); }
+.rb-btn.danger:hover { background: rgba(239,68,68,0.12); color: #fc8181; }
+.rb-btn.muted  { color: rgba(255,255,255,0.3); font-size: 12px; }
+.rb-btn.muted:hover { color: rgba(255,255,255,0.6); }
+
+.rb-sep { width: 1px; height: 18px; background: rgba(255,255,255,0.1); margin: 0 3px; flex-shrink: 0; }
+
+.rb-zoom-pct {
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  color: rgba(255,255,255,0.35);
+  min-width: 38px;
+  text-align: right;
+}
+
+.rb-hint {
+  font-size: 11px;
+  color: rgba(255,255,255,0.2);
+  padding: 0 6px;
+}
+
+.rb-opacity-label {
+  font-size: 11px;
+  color: rgba(255,255,255,0.35);
+  margin-right: 2px;
+}
+.rb-opacity-val {
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  color: rgba(255,255,255,0.35);
+  min-width: 32px;
+}
+
+.rb-slider {
+  width: 72px;
+  accent-color: #3b82f6;
+  cursor: pointer;
+}
+
+/* ── Canvas root (pan zone) ── */
+.rb-canvas-root {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  cursor: default;
+  /* dot grid */
+  background-color: #0e0e0e;
+  background-image: radial-gradient(circle, #2a2a2a 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* ── Infinite canvas ── */
+.rb-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  /* canvas has no size; items are positioned inside it */
+}
+
+/* ── Image item ── */
+.rb-item {
+  position: absolute;
+  transform-origin: center;
+  cursor: grab;
+  box-sizing: border-box;
+}
+.rb-item:active { cursor: grabbing; }
+
+.rb-item.selected {
+  outline: 1.5px solid #3b82f6;
+  outline-offset: 1px;
+}
+
+.rb-item img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  pointer-events: none;
+}
+
+/* ── Resize handles ── */
+.rb-handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: #3b82f6;
+  border: 1.5px solid #fff;
+  border-radius: 2px;
+  z-index: 5;
+  box-shadow: 0 0 4px rgba(0,0,0,0.5);
+}
+
+.rb-h-nw { top: -4px; left: -4px;              cursor: nw-resize; }
+.rb-h-n  { top: -4px; left: calc(50% - 4px);   cursor: n-resize;  }
+.rb-h-ne { top: -4px; right: -4px;             cursor: ne-resize; }
+.rb-h-e  { top: calc(50% - 4px); right: -4px;  cursor: e-resize;  }
+.rb-h-se { bottom: -4px; right: -4px;          cursor: se-resize; }
+.rb-h-s  { bottom: -4px; left: calc(50% - 4px); cursor: s-resize; }
+.rb-h-sw { bottom: -4px; left: -4px;           cursor: sw-resize; }
+.rb-h-w  { top: calc(50% - 4px); left: -4px;   cursor: w-resize;  }
+
+/* ── Rotate handle ── */
+.rb-rotate-line {
+  position: absolute;
+  top: -20px;
+  left: calc(50% - 0.5px);
+  width: 1px;
+  height: 16px;
+  background: rgba(59,130,246,0.6);
+  pointer-events: none;
+}
+
+.rb-rotate-handle {
+  position: absolute;
+  top: -34px;
+  left: calc(50% - 10px);
+  width: 20px;
+  height: 20px;
+  background: #1e1e2e;
+  border: 1.5px solid #3b82f6;
+  border-radius: 50%;
+  cursor: grab;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.6);
+  transition: background 0.1s;
+}
+.rb-rotate-handle:hover  { background: #2a2a3e; }
+.rb-rotate-handle:active { cursor: grabbing; }
+
+/* ── Empty state ── */
+.rb-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  gap: 10px;
+  color: rgba(255,255,255,0.12);
+}
+
+.rb-empty-icon { line-height: 1; }
+
+.rb-empty-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.15);
+}
+
+.rb-empty-sub {
+  font-size: 12px;
+  color: rgba(255,255,255,0.1);
+}
+
+.rb-empty-keys {
+  font-size: 11px;
+  color: rgba(255,255,255,0.1);
+  margin-top: 4px;
+}
+
+.rb-empty-keys kbd {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+}
