@@ -44,9 +44,16 @@ const BG_MAP = {
   '#e3b341': '#4a3800', '#59563B': '#4a3800',
 };
 
+function stripLargeImages(html) {
+  if (!html) return html;
+  // Remove data-img base64 blobs that make the DOM unresponsive
+  return html.replace(/data-img="data:[^"]{2000,}"/g, 'data-img=""');
+}
+
 function migrateHtml(html) {
   if (!html) return html;
-  let out = html.replace(/color:\s*(#[0-9a-fA-F]{6})/g, (m, c) => {
+  let out = stripLargeImages(html);
+  out = out.replace(/color:\s*(#[0-9a-fA-F]{6})/g, (m, c) => {
     const key = c.toLowerCase();
     const mapped = Object.entries(FG_MAP).find(([k]) => k.toLowerCase() === key);
     return mapped ? `color: ${mapped[1]}` : m;
@@ -475,6 +482,14 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
   );
 });
 
+function sanitizeNotes(notes) {
+  return notes.map(n => ({
+    ...n,
+    content: stripLargeImages(n.content || ''),
+    subNotes: (n.subNotes || []).map(s => ({ ...s, content: stripLargeImages(s.content || '') })),
+  }));
+}
+
 function Notes() {
   const [notes, setNotes] = useState(() => {
     const saved = localStorage.getItem('notes');
@@ -482,7 +497,7 @@ function Notes() {
     const parse = s => { try { return s ? JSON.parse(s) : null; } catch { return null; } };
     const a = parse(saved), b = parse(backup);
     const raw = (a && b) ? (a.length >= b.length ? a : b) : (a || b || []);
-    return raw.map(migrateNote);
+    return sanitizeNotes(raw.map(migrateNote));
   });
 
   const [selected, setSelected] = useState(null); // { noteId, subId: number|null }
