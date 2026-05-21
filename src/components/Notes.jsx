@@ -209,13 +209,13 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
     reader.onload = (ev) => {
       const imgEl = new window.Image();
       imgEl.onload = () => {
-        const maxW = 1600;
+        const maxW = 900;
         const scale = imgEl.width > maxW ? maxW / imgEl.width : 1;
         const canvas = document.createElement('canvas');
         canvas.width = Math.round(imgEl.width * scale);
         canvas.height = Math.round(imgEl.height * scale);
         canvas.getContext('2d').drawImage(imgEl, 0, 0, canvas.width, canvas.height);
-        setPendingImg({ dataUrl: canvas.toDataURL('image/png'), anchorRect });
+        setPendingImg({ dataUrl: canvas.toDataURL('image/jpeg', 0.72), anchorRect });
         setPendingTitle('Screenshot');
       };
       imgEl.src = ev.target.result;
