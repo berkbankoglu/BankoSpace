@@ -46,8 +46,8 @@ const BG_MAP = {
 
 function stripLargeImages(html) {
   if (!html) return html;
-  // Remove data-img base64 blobs that make the DOM unresponsive
-  return html.replace(/data-img="data:[^"]{2000,}"/g, 'data-img=""');
+  // Only strip images larger than ~300KB (400000 base64 chars) — crash-causing PNGs
+  return html.replace(/data-img="data:[^"]{400000,}"/g, 'data-img=""');
 }
 
 function migrateHtml(html) {
