@@ -107,6 +107,7 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
   const titleInputRef = useRef(null);
   const previewPinnedRef = useRef(false);
   const embedDeleteHoveredRef = useRef(false);
+  const lastPasteRef = useRef(0);
   const draggedEmbedRef = useRef(null);
 
   // Custom undo/redo history
@@ -163,7 +164,7 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
     span.className = 'note-img-embed';
     span.contentEditable = 'false';
     span.setAttribute('data-img', dataUrl);
-    span.textContent = '📷 ' + (title.trim() || 'Screenshot');
+    span.textContent = title.trim() || 'Screenshot';
     range.deleteContents();
     range.insertNode(span);
     const newRange = document.createRange();
@@ -179,6 +180,9 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
   };
 
   const handlePaste = (e) => {
+    const now = Date.now();
+    if (now - lastPasteRef.current < 600) return;
+    lastPasteRef.current = now;
     const items = Array.from(e.clipboardData?.items || []);
     const imageItem = items.find(item => item.type.startsWith('image/'));
     if (!imageItem) return;
@@ -403,7 +407,6 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
       {/* Title input overlay — appears at cursor right after paste */}
       {pendingImg && (
         <div className="note-img-title-overlay" style={{ top: pendingImg.anchorRect.top, left: pendingImg.anchorRect.left }}>
-          <span className="note-img-title-icon">📷</span>
           <input
             ref={titleInputRef}
             className="note-img-title-input"
@@ -813,7 +816,7 @@ function Notes() {
     tmp.innerHTML = html || '';
     tmp.querySelectorAll('.note-img-embed').forEach(span => {
       const dataUrl = span.getAttribute('data-img');
-      const label = span.textContent.replace('📷 ', '').trim();
+      const label = span.textContent.trim();
       const fig = document.createElement('figure');
       fig.style.cssText = 'margin:12px 0;';
       const img = document.createElement('img');
