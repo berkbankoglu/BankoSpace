@@ -229,13 +229,22 @@ function App({ session, onLogout }) {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       if (!s || !mounted) return;
 
-      const alreadySynced = sessionStorage.getItem('supabase_synced');
-      if (!alreadySynced) {
+      let lastSyncTime = 0;
+
+      const doSync = () => {
+        const now = Date.now();
+        if (now - lastSyncTime < 60000) return;
+        lastSyncTime = now;
         pullFromSupabase().then(pulled => {
-          sessionStorage.setItem('supabase_synced', '1');
           if (pulled) window.location.reload();
         });
-      }
+      };
+
+      // İlk açılışta hemen sync
+      doSync();
+
+      // Pencereye her odaklanıldığında sync (en fazla 60 sn'de bir)
+      window.addEventListener('focus', doSync);
 
       const debounceTimers = {};
       const pendingKeys = {};
@@ -271,6 +280,7 @@ function App({ session, onLogout }) {
 
       return () => {
         window.removeEventListener('beforeunload', flushAll);
+        window.removeEventListener('focus', doSync);
       };
     });
 
