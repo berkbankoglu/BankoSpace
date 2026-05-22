@@ -229,12 +229,11 @@ function App({ session, onLogout }) {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       if (!s || !mounted) return;
 
-      let lastSyncTime = 0;
-
       const doSync = () => {
         const now = Date.now();
-        if (now - lastSyncTime < 60000) return;
-        lastSyncTime = now;
+        const last = parseInt(sessionStorage.getItem('last_sync_time') || '0');
+        if (now - last < 60000) return;
+        sessionStorage.setItem('last_sync_time', String(now));
         pullFromSupabase().then(pulled => {
           if (pulled) window.location.reload();
         });
