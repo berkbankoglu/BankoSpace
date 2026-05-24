@@ -234,8 +234,12 @@ function App({ session, onLogout }) {
         const last = parseInt(sessionStorage.getItem('last_sync_time') || '0');
         if (now - last < 60000) return;
         sessionStorage.setItem('last_sync_time', String(now));
+        // Snapshot before pull — only reload if something actually changed
+        const before = SYNC_KEYS.map(k => localStorage.getItem(k)).join('|');
         pullFromSupabase().then(pulled => {
-          if (pulled) window.location.reload();
+          if (!pulled) return;
+          const after = SYNC_KEYS.map(k => localStorage.getItem(k)).join('|');
+          if (after !== before) window.location.reload();
         });
       };
 
