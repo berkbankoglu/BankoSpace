@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import './ProjectBid.css';
 
 function truncateBid(text, maxWords = 22) {
@@ -29,6 +29,29 @@ export default function ProjectBid() {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState(null);
 
+  // Refs for keyboard handler (avoids stale closures)
+  const analyzeRef = useRef(null);
+  const bidRef = useRef(null);
+  const resultRef = useRef('');
+  resultRef.current = result;
+
+  useEffect(() => {
+    const handler = (e) => {
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement?.isContentEditable) return;
+      if (e.key === 'a' || e.key === 'A') { e.preventDefault(); analyzeRef.current?.(); }
+      if (e.key === 'w' || e.key === 'W') { e.preventDefault(); bidRef.current?.(); }
+      if ((e.key === 'c' || e.key === 'C') && resultRef.current) {
+        e.preventDefault();
+        navigator.clipboard.writeText(resultRef.current);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
   const callApi = async (prompt, maxTokens) => {
     const key = localStorage.getItem('anthropic_api_key');
     if (!key) { setError('API key not found → Settings → AI'); return null; }
@@ -43,7 +66,7 @@ export default function ProjectBid() {
     return data.content[0].text.trim();
   };
 
-  const handleAnalyze = async () => {
+  const handleAnalyze = analyzeRef.current = async () => {
     if (!projectDetails.trim()) return;
     setLoading('analyze');
     setResult('');
@@ -56,7 +79,7 @@ export default function ProjectBid() {
     finally { setLoading(null); }
   };
 
-  const handleBid = async () => {
+  const handleBid = bidRef.current = async () => {
     if (!projectDetails.trim()) return;
     setLoading('bid');
     setResult('');
@@ -85,6 +108,9 @@ export default function ProjectBid() {
     <div className="pb-container">
       <div className="pb-header">
         <h2 className="pb-title">Project Bid</h2>
+        <div className="pb-shortcuts-hint">
+          <kbd>A</kbd> Analyze &nbsp;·&nbsp; <kbd>W</kbd> Write Bid &nbsp;·&nbsp; <kbd>C</kbd> Copy
+        </div>
       </div>
 
       <div className="pb-main-row">

@@ -420,3 +420,20 @@
   height: 10px;
   border-width: 1.5px;
 }
+
+.pb-shortcuts-hint {
+  font-size: 11px;
+  color: rgba(255,255,255,0.25);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.pb-shortcuts-hint kbd {
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: rgba(255,255,255,0.4);
+}
