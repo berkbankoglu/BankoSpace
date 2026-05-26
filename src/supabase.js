@@ -109,10 +109,20 @@ async function getUserId() {
 }
 
 // Normalize a value for semantic comparison (handles JSONB key reordering)
+// Recursively sorts object keys so PostgreSQL's alphabetical JSONB output
+// matches our original key order
+function sortKeys(v) {
+  if (Array.isArray(v)) return v.map(sortKeys);
+  if (v && typeof v === 'object') {
+    return Object.keys(v).sort().reduce((acc, k) => { acc[k] = sortKeys(v[k]); return acc; }, {});
+  }
+  return v;
+}
+
 function normalizeForCompare(val) {
   try {
     const obj = typeof val === 'string' ? JSON.parse(val) : val;
-    return JSON.stringify(obj);
+    return JSON.stringify(sortKeys(obj));
   } catch {
     return String(val ?? '');
   }
