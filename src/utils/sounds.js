@@ -37,37 +37,61 @@ export function getVolume() {
   return volume;
 }
 
-// Typing sound - soft mechanical key click
+// Typing sound - mechanical keyboard thock
 export function playTypeSound() {
   try {
     const ctx = getAudioContext();
     const dest = getMasterGain();
     const t = ctx.currentTime;
 
-    const bufferSize = ctx.sampleRate * 0.03;
-    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 8);
+    // Layer 1: deep thock — plate/body resonance (low-mid freq)
+    const thockSize = Math.floor(ctx.sampleRate * 0.05);
+    const thockBuf = ctx.createBuffer(1, thockSize, ctx.sampleRate);
+    const thockData = thockBuf.getChannelData(0);
+    for (let i = 0; i < thockSize; i++) {
+      thockData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / thockSize, 4);
     }
+    const thockSrc = ctx.createBufferSource();
+    thockSrc.buffer = thockBuf;
 
-    const source = ctx.createBufferSource();
-    source.buffer = buffer;
+    const thockFilter = ctx.createBiquadFilter();
+    thockFilter.type = 'bandpass';
+    thockFilter.frequency.value = 850 + Math.random() * 250;
+    thockFilter.Q.value = 1.8;
 
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'bandpass';
-    filter.frequency.value = 3000 + Math.random() * 1500;
-    filter.Q.value = 2;
+    const thockGain = ctx.createGain();
+    thockGain.gain.setValueAtTime(0.4, t);
+    thockGain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
 
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.15, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.03);
+    thockSrc.connect(thockFilter);
+    thockFilter.connect(thockGain);
+    thockGain.connect(dest);
+    thockSrc.start(t);
+    thockSrc.stop(t + 0.06);
 
-    source.connect(filter);
-    filter.connect(gain);
-    gain.connect(dest);
-    source.start(t);
-    source.stop(t + 0.04);
+    // Layer 2: sharp click transient — key actuation mechanism
+    const clickSize = Math.floor(ctx.sampleRate * 0.007);
+    const clickBuf = ctx.createBuffer(1, clickSize, ctx.sampleRate);
+    const clickData = clickBuf.getChannelData(0);
+    for (let i = 0; i < clickSize; i++) {
+      clickData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / clickSize, 2);
+    }
+    const clickSrc = ctx.createBufferSource();
+    clickSrc.buffer = clickBuf;
+
+    const clickFilter = ctx.createBiquadFilter();
+    clickFilter.type = 'highpass';
+    clickFilter.frequency.value = 4000;
+
+    const clickGain = ctx.createGain();
+    clickGain.gain.setValueAtTime(0.22, t);
+    clickGain.gain.exponentialRampToValueAtTime(0.001, t + 0.007);
+
+    clickSrc.connect(clickFilter);
+    clickFilter.connect(clickGain);
+    clickGain.connect(dest);
+    clickSrc.start(t);
+    clickSrc.stop(t + 0.01);
   } catch (e) { /* silent fail */ }
 }
 
