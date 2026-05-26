@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { flushSync } from 'react-dom';
 import logo from './assets/logo.svg';
 import './App.css';
-import { supabase, pullFromSupabase, pushKeyToSupabase, pushAllToSupabase, SYNC_KEYS } from './supabase';
+import { supabase, pullFromSupabase, pushKeyToSupabase, pushAllToSupabase, SYNC_KEYS, getLatestUpdateTime } from './supabase';
 import Login from './components/Login';
 import CategoryColumn from './components/CategoryColumn';
 import FlashCards from './components/FlashCards';
@@ -229,14 +229,22 @@ function App({ session, onLogout }) {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       if (!s || !mounted) return;
 
-      const doSync = () => {
+      const doSync = async () => {
         const now = Date.now();
         const last = parseInt(sessionStorage.getItem('last_sync_time') || '0');
-        if (now - last < 60000) return;
+        if (now - last < 30000) return;
         sessionStorage.setItem('last_sync_time', String(now));
-        pullFromSupabase().then(changed => {
-          if (changed) window.location.reload();
-        });
+
+        // Lightweight check first — just the latest timestamp, no data transfer
+        const latestUpdate = await getLatestUpdateTime();
+        if (!latestUpdate) return;
+        const knownUpdate = sessionStorage.getItem('last_known_update');
+        if (knownUpdate === latestUpdate) return; // nothing changed on server
+
+        // Something changed — pull data and reload if different
+        const changed = await pullFromSupabase();
+        sessionStorage.setItem('last_known_update', latestUpdate);
+        if (changed) window.location.reload();
       };
 
       // İlk açılışta hemen sync

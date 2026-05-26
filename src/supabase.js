@@ -108,6 +108,22 @@ async function getUserId() {
   return cachedUserId;
 }
 
+// Lightweight check: get the latest updated_at across all user rows
+export async function getLatestUpdateTime() {
+  try {
+    const userId = await getUserId();
+    if (!userId) return null;
+    const { data, error } = await supabase
+      .from('user_data')
+      .select('updated_at')
+      .eq('user_id', userId)
+      .order('updated_at', { ascending: false })
+      .limit(1);
+    if (error || !data?.length) return null;
+    return data[0].updated_at;
+  } catch { return null; }
+}
+
 // Normalize a value for semantic comparison (handles JSONB key reordering)
 // Recursively sorts object keys so PostgreSQL's alphabetical JSONB output
 // matches our original key order
