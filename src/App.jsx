@@ -229,29 +229,14 @@ function App({ session, onLogout }) {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       if (!s || !mounted) return;
 
-      const doSync = async () => {
-        const now = Date.now();
-        const last = parseInt(sessionStorage.getItem('last_sync_time') || '0');
-        if (now - last < 30000) return;
-        sessionStorage.setItem('last_sync_time', String(now));
-
-        // Lightweight check first — just the latest timestamp, no data transfer
-        const latestUpdate = await getLatestUpdateTime();
-        if (!latestUpdate) return;
-        const knownUpdate = sessionStorage.getItem('last_known_update');
-        if (knownUpdate === latestUpdate) return; // nothing changed on server
-
-        // Something changed — pull data and reload if different
-        const changed = await pullFromSupabase();
-        sessionStorage.setItem('last_known_update', latestUpdate);
-        if (changed) window.location.reload();
-      };
-
-      // İlk açılışta hemen sync
-      doSync();
-
-      // Pencereye her odaklanıldığında sync (en fazla 60 sn'de bir)
-      window.addEventListener('focus', doSync);
+      // Sadece açılışta bir kez sync — focus event yok, random reload yok
+      const alreadySynced = sessionStorage.getItem('supabase_synced');
+      if (!alreadySynced) {
+        sessionStorage.setItem('supabase_synced', '1');
+        pullFromSupabase().then(changed => {
+          if (changed) window.location.reload();
+        });
+      }
 
       const debounceTimers = {};
       const pendingKeys = {};
@@ -288,7 +273,6 @@ function App({ session, onLogout }) {
 
       return () => {
         window.removeEventListener('beforeunload', flushAll);
-        window.removeEventListener('focus', doSync);
       };
     });
 
