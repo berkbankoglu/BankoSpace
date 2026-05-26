@@ -108,7 +108,18 @@ async function getUserId() {
   return cachedUserId;
 }
 
+// Normalize a value for semantic comparison (handles JSONB key reordering)
+function normalizeForCompare(val) {
+  try {
+    const obj = typeof val === 'string' ? JSON.parse(val) : val;
+    return JSON.stringify(obj);
+  } catch {
+    return String(val ?? '');
+  }
+}
+
 // Pull all data from Supabase and write to localStorage
+// Returns true only if data actually changed semantically
 export async function pullFromSupabase() {
   try {
     const userId = await getUserId();
@@ -122,27 +133,41 @@ export async function pullFromSupabase() {
     if (error) throw error;
 
     if (data && data.length > 0) {
-      const pulledKeys = new Set(data.map(r => r.key));
+      // Use raw setItem to avoid triggering push-back to Supabase during pull
+      const rawSetItem = Object.getOwnPropertyDescriptor(Storage.prototype, 'setItem')?.value
+        || localStorage.__origSetItem
+        || localStorage.setItem.bind(localStorage);
+
+      let anyChanged = false;
+
       data.forEach(({ key, value }) => {
-        if (value !== null && value !== undefined) {
-          const supaStr = typeof value === 'string' ? value : JSON.stringify(value);
-          const localStr = localStorage.getItem(key);
-          // Supabase'deki değer boş obje/array ise ve localStorage'da dolu bir değer varsa, localStorage'ı koru
-          if (localStr && localStr !== 'null') {
-            try {
-              const supaVal = typeof value === 'string' ? JSON.parse(value) : value;
-              const supaEmpty =
-                supaVal === null ||
-                (Array.isArray(supaVal) && supaVal.length === 0) ||
-                (typeof supaVal === 'object' && !Array.isArray(supaVal) && Object.keys(supaVal).length === 0);
-              if (supaEmpty) return; // localStorage'daki dolu veriyi koru
-            } catch { /* parse hatası, devam et */ }
-          }
-          // String primitives (e.g. api key) must be stored raw, not double-stringified
-          localStorage.setItem(key, supaStr);
+        if (value === null || value === undefined) return;
+
+        const supaVal = typeof value === 'string' ? (() => { try { return JSON.parse(value); } catch { return value; } })() : value;
+        const supaStr = typeof value === 'string' ? value : JSON.stringify(value);
+        const localStr = localStorage.getItem(key);
+
+        // Supabase'deki değer boşsa ve localStorage doluysa, localStorage'ı koru
+        if (localStr && localStr !== 'null') {
+          const supaEmpty =
+            supaVal === null ||
+            (Array.isArray(supaVal) && supaVal.length === 0) ||
+            (typeof supaVal === 'object' && !Array.isArray(supaVal) && Object.keys(supaVal).length === 0);
+          if (supaEmpty) return;
         }
+
+        // Semantic comparison — ignore JSONB key reordering
+        const changed = normalizeForCompare(supaVal) !== normalizeForCompare(localStr);
+        if (!changed) return;
+
+        anyChanged = true;
+        // Flag to prevent overridden setItem from pushing back to Supabase
+        window.__supabasePulling = true;
+        rawSetItem.call(localStorage, key, supaStr);
+        window.__supabasePulling = false;
       });
-      return true;
+
+      return anyChanged;
     }
     return false;
   } catch (e) {
