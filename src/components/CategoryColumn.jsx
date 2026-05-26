@@ -331,7 +331,7 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
             </label>
 
             {/* Subtasks */}
-            <div className={`cc-subtasks-wrapper${expandedTodos.has(todo.id) ? ' expanded' : ''}`}>
+            <div className={`cc-subtasks-wrapper${expandedTodos.has(todo.id) ? ' expanded' : ''}`} onClick={(e) => e.stopPropagation()}>
               <div className="cc-subtasks">
                 {todo.subtasks && todo.subtasks.map((subtask, sIdx) => (
                   <div
