@@ -85,8 +85,24 @@ export default function ProjectBid() {
     setResult('');
     setResultType(null);
     try {
+      const name = clientName.trim();
+      const greeting = name ? `Absolutely! Hi ${name},` : `Absolutely!`;
       const res = await callApi(
-        `Write a short Upwork bid using this EXACT structure:\n\n[Opener: Yes!/Perfect!/Absolutely!] [1 sentence: relevant skill + do it regularly + available now — MAX 10 words] [1 sentence: CTA to send details — MAX 12 words]\n\nKind regards,\nBerk\n\n---\nProject: ${projectDetails}\nClient: ${clientName.trim() || 'not specified'}\n---\nRules: never copy words from the project text. Output only the bid.`, 80);
+        `Write a short Upwork bid. Output ONLY the bid text, nothing else.
+
+EXACT format:
+${greeting} [1 sentence MAX 10 words: confirm you do this exact thing + available now] [1 sentence MAX 12 words: CTA asking them to send details/files]
+
+Kind regards,
+Berk
+
+Rules:
+- MUST start with exactly: ${greeting}
+- Validate/confirm the client's specific need enthusiastically
+- Never copy words from the project listing
+- No lists, no headers, no extra sentences
+
+Project: ${projectDetails}`, 90);
       if (res) { setResult(truncateBid(res)); setResultType('bid'); }
     } catch (e) { setError(e.message || 'Failed to generate bid.'); }
     finally { setLoading(null); }
