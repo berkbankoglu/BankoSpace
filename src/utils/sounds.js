@@ -56,18 +56,18 @@ export function playTypeSound() {
 
     const thockFilter = ctx.createBiquadFilter();
     thockFilter.type = 'bandpass';
-    thockFilter.frequency.value = 850 + Math.random() * 250;
-    thockFilter.Q.value = 1.8;
+    thockFilter.frequency.value = 350 + Math.random() * 150;
+    thockFilter.Q.value = 1.2;
 
     const thockGain = ctx.createGain();
-    thockGain.gain.setValueAtTime(0.4, t);
-    thockGain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+    thockGain.gain.setValueAtTime(0.65, t);
+    thockGain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
 
     thockSrc.connect(thockFilter);
     thockFilter.connect(thockGain);
     thockGain.connect(dest);
     thockSrc.start(t);
-    thockSrc.stop(t + 0.06);
+    thockSrc.stop(t + 0.09);
 
     // Layer 2: sharp click transient — key actuation mechanism
     const clickSize = Math.floor(ctx.sampleRate * 0.007);

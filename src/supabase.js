@@ -67,6 +67,7 @@ export const SYNC_KEYS = [
   'kana_stats',
   'kana_prefs',
   'kana_best_score',
+  'kana_meaning_overrides',
   'kana_cell_colors',
   'ft_profile',
   'ft_goal',

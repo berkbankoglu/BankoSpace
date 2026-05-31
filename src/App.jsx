@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { flushSync } from 'react-dom';
 import logo from './assets/logo.svg';
 import './App.css';
-import { supabase, pullFromSupabase, pushKeyToSupabase, pushAllToSupabase, SYNC_KEYS, getLatestUpdateTime } from './supabase';
+import { supabase, pullFromSupabase, pushKeyToSupabase, pushAllToSupabase, SYNC_KEYS } from './supabase';
 import Login from './components/Login';
 import CategoryColumn from './components/CategoryColumn';
 import FlashCards from './components/FlashCards';
@@ -167,40 +167,6 @@ function App({ session, onLogout }) {
 
   const [showUpdateWarning, setShowUpdateWarning] = useState(false);
 
-  // WebView2 freeze fix — virtual desktop switching causes GPU occlusion freeze
-  useEffect(() => {
-    const forceRepaint = () => {
-      // Force a layout + composite cycle
-      const el = document.documentElement;
-      el.style.transform = 'translateZ(0)';
-      requestAnimationFrame(() => { el.style.transform = ''; });
-      window.dispatchEvent(new Event('resize'));
-    };
-
-    // Fire on focus regain (covers alt-tab and virtual desktop return)
-    window.addEventListener('focus', forceRepaint);
-
-    // Fire on visibility change
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') forceRepaint();
-    };
-    document.addEventListener('visibilitychange', onVisibility);
-
-    // Periodic heartbeat — keeps compositor alive, catches cases focus event misses
-    const interval = setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        const el = document.documentElement;
-        el.style.transform = 'translateZ(0)';
-        requestAnimationFrame(() => { el.style.transform = ''; });
-      }
-    }, 2000);
-
-    return () => {
-      window.removeEventListener('focus', forceRepaint);
-      document.removeEventListener('visibilitychange', onVisibility);
-      clearInterval(interval);
-    };
-  }, []);
 
   // Planner notification tap → navigate to planner
   useEffect(() => {

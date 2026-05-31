@@ -39,7 +39,7 @@ Output ONLY the final translated text. No explanations, no labels, no commentary
 Text: ${text}`;
 
       const body = JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
+        model: 'claude-opus-4-8',
         max_tokens: 2048,
         messages: [{ role: 'user', content: prompt }]
       });

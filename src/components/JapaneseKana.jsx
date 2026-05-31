@@ -1485,6 +1485,7 @@ export function PracticeTab({ selectedRows, setSelectedRows }) {
   const [includeVoiced, setIncludeVoiced] = useState(() => prefs.includeVoiced ?? false);
   const [colorFilter, setColorFilter] = useState(new Set()); // Set of active color indices
   const [practiceMode, setPracticeMode] = useState('type'); // 'type' | 'draw'
+  const [vocabMode, setVocabMode] = useState(false);
 
   const [stats, setStats] = useState(loadStats);
   const [current, setCurrent] = useState(null);
@@ -1642,6 +1643,19 @@ export function PracticeTab({ selectedRows, setSelectedRows }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Re-focus input when nothing else has focus (covers alt-tab return in WebView2)
+  useEffect(() => {
+    if (practiceMode !== 'type') return;
+    const iv = setInterval(() => {
+      if (!document.hasFocus()) return;
+      const active = document.activeElement;
+      if (!active || active === document.body || active === document.documentElement) {
+        inputRef.current?.focus();
+      }
+    }, 1000);
+    return () => clearInterval(iv);
+  }, [practiceMode]);
+
   const question =
     direction === "Kana → Romaji" ? current?.char : current?.romaji;
   const answer =
@@ -1747,12 +1761,19 @@ export function PracticeTab({ selectedRows, setSelectedRows }) {
           {["Hiragana", "Katakana", "Both"].map((m) => (
             <button
               key={m}
-              className={`toggle-btn${mode === m ? " toggle-btn--active" : ""}`}
-              onClick={() => setModeAndReset(m)}
+              className={`toggle-btn${mode === m && !vocabMode ? " toggle-btn--active" : ""}`}
+              onClick={() => { setVocabMode(false); setModeAndReset(m); }}
             >
               {m}
             </button>
           ))}
+          <button
+            className={`toggle-btn${vocabMode ? " toggle-btn--active" : ""}`}
+            style={vocabMode ? { background: '#7c3aed', borderColor: '#7c3aed', color: '#fff' } : { borderColor: '#7c3aed44', color: '#a78bfa' }}
+            onClick={() => setVocabMode(v => !v)}
+          >
+            Vocab
+          </button>
         </div>
         <button
           className={`toggle-btn${includeVoiced ? " toggle-btn--active" : ""}`}
@@ -1802,8 +1823,10 @@ export function PracticeTab({ selectedRows, setSelectedRows }) {
         </div>
       </div>
 
-      {/* Row selection — hidden when color filter active */}
-      <div className="row-select-bar" style={hasColorFilter ? { display: 'none' } : {}}>
+      {vocabMode && <VocabFoldersPractice />}
+
+      {/* Row selection — hidden when color filter active or vocab mode */}
+      <div className="row-select-bar" style={(hasColorFilter || vocabMode) ? { display: 'none' } : {}}>
         <div className="row-select-label">Practice rows:</div>
         <div className="row-select-groups">
           {visibleRowGroups.map((group) => {
@@ -1826,7 +1849,7 @@ export function PracticeTab({ selectedRows, setSelectedRows }) {
       </div>
 
       {/* Flash card / Drawing area */}
-      <div className="flashcard-area">
+      <div className="flashcard-area" style={vocabMode ? { display: 'none' } : {}}>
         {hasColorFilter && effectivePool.length === 0 ? (
           <div className="flashcard" style={{ color: 'var(--text-muted)', fontSize: 16, textAlign: 'center', padding: 32 }}>
             No kana marked with the selected color(s).<br />
@@ -1928,30 +1951,29 @@ export function PracticeTab({ selectedRows, setSelectedRows }) {
         </div>
       </div>
 
-      {/* Stats bar */}
-      <StatsBar pool={effectivePool} stats={stats} />
+      {!vocabMode && <StatsBar pool={effectivePool} stats={stats} />}
 
-      {/* Wrong analysis */}
-      <WrongAnalysis
-        pool={effectivePool}
-        stats={stats}
-        onPracticeWrong={(chars) => {
-          if (chars.length === 0) return;
-          setSelectedRows(chars);
-          localStorage.setItem('kana_selected_rows', JSON.stringify(chars));
-        }}
-        onResetWrong={() => {
-          const newStats = {};
-          Object.entries(stats).forEach(([char, s]) => {
-            newStats[char] = { ...s, wrong: 0 };
-          });
-          setStats(newStats);
-          saveStats(newStats);
-        }}
-      />
+      {!vocabMode && (
+        <WrongAnalysis
+          pool={effectivePool}
+          stats={stats}
+          onPracticeWrong={(chars) => {
+            if (chars.length === 0) return;
+            setSelectedRows(chars);
+            localStorage.setItem('kana_selected_rows', JSON.stringify(chars));
+          }}
+          onResetWrong={() => {
+            const newStats = {};
+            Object.entries(stats).forEach(([char, s]) => {
+              newStats[char] = { ...s, wrong: 0 };
+            });
+            setStats(newStats);
+            saveStats(newStats);
+          }}
+        />
+      )}
 
-      {/* Study Words section */}
-      <StudyWordsSection selectedRows={selectedRows} />
+      {!vocabMode && <StudyWordsSection selectedRows={selectedRows} />}
     </div>
   );
 }
@@ -1967,25 +1989,47 @@ function StudyWordsSection({ selectedRows }) {
   const [quiz, setQuiz] = useState(null);
   const [quizPool, setQuizPool] = useState([]);
   const quizInputRef = useRef(null);
-  // selectedWords: Set of kana strings user clicked to select for quiz
   const [selectedWords, setSelectedWords] = useState(new Set());
-  // learnedWords: Set of kana strings marked as learned, persisted
   const [learnedWords, setLearnedWords] = useState(() => {
     try { return new Set(JSON.parse(localStorage.getItem('kana_learned_words')) || []); } catch { return new Set(); }
   });
+  const [customWords, setCustomWords] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('kana_custom_words')) || []; } catch { return []; }
+  });
 
-  const filteredWords = WORD_LIST.filter(w => {
+  // Reload custom words when user adds from VocabularyTab
+  useEffect(() => {
+    const onUpdate = (e) => setCustomWords(e.detail || []);
+    window.addEventListener('kana_custom_words_updated', onUpdate);
+    return () => window.removeEventListener('kana_custom_words_updated', onUpdate);
+  }, []);
+
+  const filteredBuiltin = WORD_LIST.filter(w => {
     const chars = getWordChars(w.kana);
     if (!chars.every(c => allKanaChars.has(c))) return false;
     if (selectedRows !== null && knownChars.size > 0) {
       if (!chars.every(c => knownChars.has(c))) return false;
     }
     if (search) {
-      const s = search.toLowerCase();
-      return w.kana.includes(s) || w.romaji.includes(s) || w.meaning.toLowerCase().includes(s);
+      const tokens = search.toLowerCase().split(/\s+/).filter(Boolean);
+      const joined = tokens.join('');
+      const romaji = w.romaji.toLowerCase().replace(/\s+/g, '');
+      if (romaji.includes(joined)) return true;
+      return tokens.every(t => w.kana.includes(t) || romaji.includes(t) || w.meaning.toLowerCase().includes(t));
     }
     return true;
   });
+
+  const filteredCustom = customWords.filter(w => {
+    if (!search) return true;
+    const tokens = search.toLowerCase().split(/\s+/).filter(Boolean);
+    const joined = tokens.join('');
+    const romaji = w.romaji.toLowerCase().replace(/\s+/g, '');
+    if (romaji.includes(joined)) return true;
+    return tokens.every(t => w.kana.includes(t) || romaji.includes(t) || w.meaning.toLowerCase().includes(t) || (w.meaning_en || '').toLowerCase().includes(t));
+  }).map(w => ({ ...w, _custom: true }));
+
+  const filteredWords = [...filteredBuiltin, ...filteredCustom];
 
   function toggleWordSelect(kana, e) {
     e.stopPropagation();
@@ -2047,6 +2091,9 @@ function StudyWordsSection({ selectedRows }) {
         <span style={{ marginRight: '0.5rem' }}>{open ? '▲' : '▼'}</span>
         Study Words
         <span className="wrong-analysis-badge" style={{ marginLeft: '0.5rem' }}>{filteredWords.length}</span>
+        {filteredCustom.length > 0 && (
+          <span className="wrong-analysis-badge" style={{ marginLeft: '0.3rem', background: '#7c3aed' }}>{filteredCustom.length} özel</span>
+        )}
         {selectedWords.size > 0 && (
           <span className="wrong-analysis-badge" style={{ marginLeft: '0.3rem', background: '#2563eb' }}>{selectedWords.size} selected</span>
         )}
@@ -2067,12 +2114,12 @@ function StudyWordsSection({ selectedRows }) {
                 style={{ width: '100%', maxWidth: '100%', minHeight: 160, boxSizing: 'border-box' }}>
                 <span className="flashcard-question flashcard-question--kana" style={{ fontSize: '3.5rem' }}>{quiz.word.kana}</span>
                 <button className="speak-btn" onClick={() => speakKana(quiz.word.kana, 1.0)}>🔊</button>
-                {quiz.feedback === "correct" && <span className="feedback-icon feedback-icon--correct">✓</span>}
+                {quiz.feedback === "correct" && (<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}><span className="feedback-icon feedback-icon--correct">✓</span><div style={{ color: '#ffffff', fontSize: '1rem', fontWeight: 600 }}>{quiz.word.meaning}</div>{quiz.word.meaning_en && <div style={{ color: '#cccccc', fontSize: '0.88rem' }}>{quiz.word.meaning_en}</div>}</div>)}
                 {quiz.feedback === "wrong" && (
                   <div className="feedback-wrong">
                     <span className="feedback-icon feedback-icon--wrong">✗</span>
                     <span className="correct-answer">Correct: <strong>{quiz.answer}</strong></span>
-                    <div style={{ color: '#8b949e', fontSize: '0.85rem', marginTop: 4 }}>{quiz.word.meaning}</div>
+                    <div style={{ color: '#ffffff', fontSize: '1rem', fontWeight: 600, marginTop: 6 }}>{quiz.word.meaning}</div>
                   </div>
                 )}
               </div>
@@ -2081,7 +2128,7 @@ function StudyWordsSection({ selectedRows }) {
                   value={quiz.input}
                   onChange={e => setQuiz(q => ({ ...q, input: e.target.value }))}
                   onKeyDown={e => { if (e.key === "Enter") { if (quiz.feedback !== null) nextQuiz(); else submitQuiz(); } }}
-                  placeholder="Type romaji..." disabled={quiz.feedback !== null}
+                  placeholder="Type romaji..." readOnly={quiz.feedback !== null}
                   autoComplete="off" spellCheck={false} />
                 {quiz.feedback === null
                   ? <button className="submit-btn" onClick={submitQuiz}>Check</button>
@@ -2107,16 +2154,17 @@ function StudyWordsSection({ selectedRows }) {
                 Click card: select/deselect &nbsp;·&nbsp; ✓ mark as learned
               </div>
               <div className="words-grid">
-                {filteredWords.map(w => {
+                {filteredWords.map((w, i) => {
                   const isSel = selectedWords.has(w.kana);
                   const isLearned = learnedWords.has(w.kana);
                   return (
-                    <div key={w.kana}
-                      className={`word-card${isSel ? ' word-card--selected' : ''}${isLearned ? ' word-card--learned' : ''}`}
+                    <div key={w.kana + i}
+                      className={`word-card${isSel ? ' word-card--selected' : ''}${isLearned ? ' word-card--learned' : ''}${w._custom ? ' word-card--custom' : ''}`}
                       onClick={(e) => toggleWordSelect(w.kana, e)}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2 }}>
                         <span className="word-kana">{w.kana}</span>
-                        <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
+                        <div style={{ display: 'flex', gap: 2, flexShrink: 0, alignItems: 'center' }}>
+                          {w._custom && <span style={{ fontSize: '0.6rem', color: '#a78bfa', border: '1px solid #7c3aed', borderRadius: 3, padding: '0 3px', lineHeight: '1.4' }}>özel</span>}
                           <span className="word-learned-btn" onClick={(e) => { e.stopPropagation(); speakKana(w.kana, 1.0); }} title="Listen">🔊</span>
                           <span
                             className={`word-learned-btn${isLearned ? ' word-learned-btn--active' : ''}`}
@@ -2135,6 +2183,303 @@ function StudyWordsSection({ selectedRows }) {
                 )}
               </div>
             </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Meaning inline editor ─────────────────────────────────────────────────────
+
+function MeaningEditor({ word, editing, setEditing, inputRef, onSave }) {
+  const isEditing = editing?.kana === word.kana;
+  if (isEditing) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+        <input
+          ref={inputRef}
+          autoFocus
+          value={editing.value}
+          onChange={e => setEditing(v => ({ ...v, value: e.target.value }))}
+          onKeyDown={e => { if (e.key === 'Enter') onSave(); if (e.key === 'Escape') setEditing(null); }}
+          onBlur={onSave}
+          style={{ background: '#1e1e28', border: '1px solid #58a6ff', borderRadius: 6, color: '#fff', fontSize: '0.95rem', padding: '4px 10px', outline: 'none', width: 220 }}
+        />
+        <button onClick={onSave} style={{ background: '#58a6ff', border: 'none', borderRadius: 5, color: '#000', fontWeight: 700, fontSize: 12, padding: '4px 8px', cursor: 'pointer' }}>✓</button>
+      </div>
+    );
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, marginTop: 4 }}>
+      <div
+        style={{ color: '#ffffff', fontSize: '1rem', fontWeight: 600, cursor: 'pointer', borderBottom: '1px dashed #444', paddingBottom: 1 }}
+        title="Tıklayarak düzenle"
+        onClick={() => setEditing({ kana: word.kana, value: word.meaning })}
+      >
+        {word.meaning}
+        <span style={{ fontSize: '0.65rem', color: '#666', marginLeft: 5 }}>✏</span>
+      </div>
+      {word.meaning_en && <div style={{ color: '#cccccc', fontSize: '0.88rem' }}>{word.meaning_en}</div>}
+    </div>
+  );
+}
+
+// ── Vocab Folders Practice (inline, always open) ──────────────────────────────
+
+function VocabFoldersPractice() {
+  const [folders, setFolders] = useState(() => loadCustomFolders());
+  const [quiz, setQuiz] = useState(null);
+  const [quizPool, setQuizPool] = useState([]);
+  const [activeFolder, setActiveFolder] = useState(null);
+  const [editingMeaning, setEditingMeaning] = useState(null); // { kana, value }
+  const editMeaningRef = useRef(null);
+  const quizInputRef = useRef(null);
+
+  useEffect(() => {
+    const onUpdate = () => setFolders(loadCustomFolders());
+    window.addEventListener('kana_custom_words_updated', onUpdate);
+    return () => window.removeEventListener('kana_custom_words_updated', onUpdate);
+  }, []);
+
+  function saveMeaning() {
+    if (!editingMeaning) return;
+    saveMeaningOverride(editingMeaning.kana, editingMeaning.value, quiz?.word?.meaning_en || '');
+    if (quiz) setQuiz(q => ({ ...q, word: { ...q.word, meaning: editingMeaning.value } }));
+    setEditingMeaning(null);
+    setTimeout(() => quizInputRef.current?.focus(), 50);
+  }
+
+  function getFolderWords(folder) {
+    const all = applyOverrides([...VOCAB_ALL_BUILTIN, ...loadCustomWords()]);
+    return folder.kanas.map(k => all.find(w => w.kana === k)).filter(Boolean);
+  }
+
+  function startQuiz(folder) {
+    const words = getFolderWords(folder);
+    if (!words.length) return;
+    const pool = [...words].sort(() => Math.random() - 0.5);
+    setQuizPool(pool);
+    setQuiz({ word: pool[0], input: '', feedback: null, answer: '', idx: 0, baseWords: words });
+    setActiveFolder(folder);
+    setTimeout(() => quizInputRef.current?.focus(), 80);
+  }
+
+  function submitQuiz() {
+    if (!quiz || quiz.feedback !== null) return;
+    const correct = quiz.input.trim().toLowerCase() === quiz.word.romaji.toLowerCase();
+    setQuiz(q => ({ ...q, feedback: correct ? 'correct' : 'wrong', answer: quiz.word.romaji }));
+    if (correct) playCorrectSound(); else playWrongSound();
+  }
+
+  function nextQuiz() {
+    const nextIdx = quiz.idx + 1;
+    if (nextIdx >= quizPool.length) {
+      const pool = [...quiz.baseWords].sort(() => Math.random() - 0.5);
+      setQuizPool(pool);
+      setQuiz({ word: pool[0], input: '', feedback: null, answer: '', idx: 0, baseWords: quiz.baseWords });
+    } else {
+      setQuiz(q => ({ ...q, word: quizPool[nextIdx], input: '', feedback: null, answer: '', idx: nextIdx }));
+    }
+    setTimeout(() => quizInputRef.current?.focus(), 80);
+  }
+
+  if (folders.length === 0) return (
+    <div style={{ textAlign: 'center', color: '#6e7681', padding: '2rem', fontSize: '0.9rem' }}>
+      Henüz klasör yok — Vocabulary sekmesinden kelime ekle.
+    </div>
+  );
+
+  if (quiz && activeFolder) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: '16px 0', width: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', maxWidth: 480 }}>
+          <button className="reset-btn" onClick={() => { setQuiz(null); setActiveFolder(null); }}>← Klasörler</button>
+          <span style={{ flex: 1, fontSize: '0.88rem', fontWeight: 600, color: activeFolder.color }}>{activeFolder.name}</span>
+          <span style={{ fontSize: '0.76rem', color: '#6e7681', background: '#1e1e22', padding: '3px 9px', borderRadius: 20 }}>{quiz.idx + 1} / {quizPool.length} · ∞</span>
+        </div>
+        <div className={`flashcard${quiz.feedback ? ` flashcard--${quiz.feedback}` : ''}`}
+          style={{ width: '100%', maxWidth: '100%', minHeight: 160, boxSizing: 'border-box' }}>
+          <span className="flashcard-question flashcard-question--kana" style={{ fontSize: '3.5rem' }}>{quiz.word.kana}</span>
+          <button className="speak-btn" onClick={() => speakKana(quiz.word.kana, 1.0)}>🔊</button>
+          {quiz.feedback === 'correct' && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+              <span className="feedback-icon feedback-icon--correct">✓</span>
+              <MeaningEditor word={quiz.word} editing={editingMeaning} setEditing={setEditingMeaning} inputRef={editMeaningRef} onSave={saveMeaning} />
+            </div>
+          )}
+          {quiz.feedback === 'wrong' && (
+            <div className="feedback-wrong">
+              <span className="feedback-icon feedback-icon--wrong">✗</span>
+              <span className="correct-answer">Correct: <strong>{quiz.answer}</strong></span>
+              <MeaningEditor word={quiz.word} editing={editingMeaning} setEditing={setEditingMeaning} inputRef={editMeaningRef} onSave={saveMeaning} />
+            </div>
+          )}
+        </div>
+        <div className="input-area" style={{ justifyContent: 'center' }}>
+          <input ref={quizInputRef} className="kana-input" type="text"
+            value={quiz.input}
+            onChange={e => setQuiz(q => ({ ...q, input: e.target.value }))}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                if (editingMeaning) { saveMeaning(); return; }
+                if (quiz.feedback !== null) nextQuiz(); else submitQuiz();
+              }
+            }}
+            placeholder="Type romaji..." readOnly={quiz.feedback !== null}
+            autoComplete="off" spellCheck={false} />
+          {quiz.feedback === null
+            ? <button className="submit-btn" onClick={submitQuiz}>Check</button>
+            : <button className="submit-btn" onClick={nextQuiz}>Next →</button>}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: '16px 0', width: '100%' }}>
+      <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#6e7681', marginBottom: 10 }}>
+        Klasör seç
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {folders.map(folder => {
+          const count = getFolderWords(folder).length;
+          return (
+            <button key={folder.id}
+              style={{ background: `${folder.color}11`, border: `1px solid ${folder.color}55`, color: folder.color, borderRadius: 10, padding: '10px 16px', fontSize: '0.85rem', fontWeight: 600, cursor: count === 0 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: 8, opacity: count === 0 ? 0.4 : 1, transition: 'all .15s' }}
+              disabled={count === 0}
+              onClick={() => startQuiz(folder)}
+            >
+              <span style={{ width: 9, height: 9, borderRadius: '50%', background: folder.color, display: 'inline-block', flexShrink: 0 }} />
+              {folder.name}
+              <span style={{ fontSize: '0.72rem', opacity: 0.7, background: `${folder.color}22`, padding: '1px 7px', borderRadius: 10 }}>{count}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Vocab Folders Section (in Practice tab) ───────────────────────────────────
+
+function VocabFoldersSection() {
+  const [open, setOpen] = useState(false);
+  const [folders, setFolders] = useState(() => loadCustomFolders());
+  const [quiz, setQuiz] = useState(null);
+  const [quizPool, setQuizPool] = useState([]);
+  const [activeFolder, setActiveFolder] = useState(null);
+  const quizInputRef = useRef(null);
+
+  useEffect(() => {
+    const onUpdate = () => setFolders(loadCustomFolders());
+    window.addEventListener('kana_custom_words_updated', onUpdate);
+    return () => window.removeEventListener('kana_custom_words_updated', onUpdate);
+  }, []);
+
+  function getFolderWords(folder) {
+    const all = [...VOCAB_ALL_BUILTIN, ...loadCustomWords()];
+    return folder.kanas.map(k => all.find(w => w.kana === k)).filter(Boolean);
+  }
+
+  function startQuiz(folder) {
+    const words = getFolderWords(folder);
+    if (!words.length) return;
+    const pool = [...words].sort(() => Math.random() - 0.5);
+    setQuizPool(pool);
+    setQuiz({ word: pool[0], input: '', feedback: null, answer: '', idx: 0, baseWords: words });
+    setActiveFolder(folder);
+    setTimeout(() => quizInputRef.current?.focus(), 80);
+  }
+
+  function submitQuiz() {
+    if (!quiz || quiz.feedback !== null) return;
+    const correct = quiz.input.trim().toLowerCase() === quiz.word.romaji.toLowerCase();
+    setQuiz(q => ({ ...q, feedback: correct ? 'correct' : 'wrong', answer: quiz.word.romaji }));
+    if (correct) playCorrectSound(); else playWrongSound();
+  }
+
+  function nextQuiz() {
+    const nextIdx = quiz.idx + 1;
+    if (nextIdx >= quizPool.length) {
+      const pool = [...quiz.baseWords].sort(() => Math.random() - 0.5);
+      setQuizPool(pool);
+      setQuiz({ word: pool[0], input: '', feedback: null, answer: '', idx: 0, baseWords: quiz.baseWords });
+    } else {
+      setQuiz(q => ({ ...q, word: quizPool[nextIdx], input: '', feedback: null, answer: '', idx: nextIdx }));
+    }
+    setTimeout(() => quizInputRef.current?.focus(), 80);
+  }
+
+  if (folders.length === 0) return null;
+
+  return (
+    <div className="study-words-section">
+      <button className="study-words-toggle" onClick={() => { setOpen(o => !o); setQuiz(null); setActiveFolder(null); }}>
+        <span style={{ marginRight: '0.5rem' }}>{open ? '▲' : '▼'}</span>
+        Vocab Klasörleri
+        <span className="wrong-analysis-badge" style={{ marginLeft: '0.5rem', background: '#7c3aed' }}>{folders.length}</span>
+        <span style={{ marginLeft: 'auto', fontSize: '0.78rem', color: '#8b949e', fontWeight: 400 }}>kelime çalışma</span>
+      </button>
+
+      {open && (
+        <div className="study-words-body">
+          {quiz && activeFolder ? (
+            <div className="words-quiz">
+              <div className="words-quiz-header">
+                <button className="reset-btn" onClick={() => { setQuiz(null); setActiveFolder(null); }}>← Klasörler</button>
+                <span style={{ fontSize: '0.82rem', color: '#a78bfa', fontWeight: 600 }}>{activeFolder.name}</span>
+                <span className="words-quiz-progress">{quiz.idx + 1} / {quizPool.length} · ∞</span>
+              </div>
+              <div className={`flashcard${quiz.feedback ? ` flashcard--${quiz.feedback}` : ''}`}
+                style={{ width: '100%', maxWidth: '100%', minHeight: 160, boxSizing: 'border-box' }}>
+                <span className="flashcard-question flashcard-question--kana" style={{ fontSize: '3.5rem' }}>{quiz.word.kana}</span>
+                <button className="speak-btn" onClick={() => speakKana(quiz.word.kana, 1.0)}>🔊</button>
+                {quiz.feedback === 'correct' && <span className="feedback-icon feedback-icon--correct">✓</span>}
+                {quiz.feedback === 'wrong' && (
+                  <div className="feedback-wrong">
+                    <span className="feedback-icon feedback-icon--wrong">✗</span>
+                    <span className="correct-answer">Correct: <strong>{quiz.answer}</strong></span>
+                    <div style={{ color: '#ffffff', fontSize: '1rem', fontWeight: 600, marginTop: 6 }}>{quiz.word.meaning}</div>
+                    {quiz.word.meaning_en && <div style={{ color: '#cccccc', fontSize: '0.88rem' }}>{quiz.word.meaning_en}</div>}
+                  </div>
+                )}
+              </div>
+              <div className="input-area" style={{ justifyContent: 'center' }}>
+                <input ref={quizInputRef} className="kana-input" type="text"
+                  value={quiz.input}
+                  onChange={e => setQuiz(q => ({ ...q, input: e.target.value }))}
+                  onKeyDown={e => { if (e.key === 'Enter') { if (quiz.feedback !== null) nextQuiz(); else submitQuiz(); } }}
+                  placeholder="Type romaji..." readOnly={quiz.feedback !== null}
+                  autoComplete="off" spellCheck={false} />
+                {quiz.feedback === null
+                  ? <button className="submit-btn" onClick={submitQuiz}>Check</button>
+                  : <button className="submit-btn" onClick={nextQuiz}>Next →</button>}
+              </div>
+              {quiz.feedback !== null && (
+                <div style={{ textAlign: 'center', color: '#8b949e', fontSize: '0.9rem', marginTop: '0.5rem' }}>
+                  {quiz.word.meaning}
+                  {quiz.word.meaning_en && <span style={{ color: '#6e7681', fontSize: '0.82rem', marginLeft: 6 }}>· {quiz.word.meaning_en}</span>}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', padding: '4px 0' }}>
+              {folders.map(folder => {
+                const count = getFolderWords(folder).length;
+                return (
+                  <button key={folder.id}
+                    style={{ background: 'none', border: `1px solid ${folder.color}55`, color: folder.color, borderRadius: 8, padding: '7px 14px', fontSize: '0.82rem', fontWeight: 600, cursor: count === 0 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: 6, opacity: count === 0 ? 0.4 : 1, transition: 'all .15s' }}
+                    disabled={count === 0}
+                    onClick={() => startQuiz(folder)}
+                  >
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: folder.color, display: 'inline-block', flexShrink: 0 }} />
+                    {folder.name}
+                    <span style={{ fontSize: '0.72rem', opacity: 0.7 }}>({count})</span>
+                  </button>
+                );
+              })}
+            </div>
           )}
         </div>
       )}
@@ -2342,9 +2687,22 @@ const FOLDER_COLORS = ['#5c7cfa','#7ee787','#f85149','#d29922','#bc8cff','#ff7b7
 function loadCustomWords() {
   try { return JSON.parse(localStorage.getItem('kana_custom_words')) || []; } catch { return []; }
 }
+function loadMeaningOverrides() {
+  try { return JSON.parse(localStorage.getItem('kana_meaning_overrides')) || {}; } catch { return {}; }
+}
+function saveMeaningOverride(kana, meaning, meaning_en) {
+  const overrides = loadMeaningOverrides();
+  overrides[kana] = { meaning, meaning_en };
+  localStorage.setItem('kana_meaning_overrides', JSON.stringify(overrides));
+}
+function applyOverrides(words) {
+  const ov = loadMeaningOverrides();
+  return words.map(w => ov[w.kana] ? { ...w, ...ov[w.kana] } : w);
+}
 function saveCustomWords(words) {
   localStorage.setItem('kana_custom_words', JSON.stringify(words));
   pushKeyToSupabase('kana_custom_words', words);
+  window.dispatchEvent(new CustomEvent('kana_custom_words_updated', { detail: words }));
 }
 function loadCustomFolders() {
   try { return JSON.parse(localStorage.getItem('kana_custom_folders')) || []; } catch { return []; }
@@ -2396,6 +2754,7 @@ function VocabularyTab() {
   const [modalRomaji, setModalRomaji] = useState('');
   const [modalKana, setModalKana] = useState('');
   const [modalMeaning, setModalMeaning] = useState('');
+  const [modalMeaningEn, setModalMeaningEn] = useState('');
   const [modalCategory, setModalCategory] = useState('custom');
   const [modalLookupLoading, setModalLookupLoading] = useState(false);
   const [modalLookupError, setModalLookupError] = useState('');
@@ -2404,6 +2763,12 @@ function VocabularyTab() {
   const [newFolderName, setNewFolderName] = useState('');
   const [renamingId, setRenamingId] = useState(null);
   const [renameValue, setRenameValue] = useState('');
+
+  const [practiceWords, setPracticeWords] = useState(null);
+  const [practiceLabel, setPracticeLabel] = useState('');
+  const [quiz, setQuiz] = useState(null);
+  const [quizPool, setQuizPool] = useState([]);
+  const quizInputRef = useRef(null);
 
   function persistFolders(f) {
     setFolders(f);
@@ -2462,11 +2827,11 @@ function VocabularyTab() {
     try {
       const apiKey = localStorage.getItem('anthropic_api_key') || '';
       const body = JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
+        model: 'claude-opus-4-8',
         max_tokens: 200,
         messages: [{
           role: 'user',
-          content: `Given the Japanese romaji "${romaji}", provide:\n1. The Japanese writing (hiragana/katakana/kanji)\n2. The English meaning\n\nReply ONLY in this exact JSON format (no extra text):\n{"kana":"<japanese>","meaning":"<english meaning>"}`,
+          content: `Given the Japanese romaji "${romaji}", provide:\n1. The Japanese writing (hiragana/katakana/kanji)\n2. The Turkish meaning\n3. The English meaning\n\nReply ONLY in this exact JSON format:\n{"kana":"<japanese>","meaning_tr":"<turkish>","meaning_en":"<english>"}`,
         }],
       });
       const text = await invoke('fetch_post', {
@@ -2480,7 +2845,8 @@ function VocabularyTab() {
       if (!match) throw new Error('Yanıt alınamadı');
       const parsed = JSON.parse(match[0]);
       setModalKana(parsed.kana || '');
-      setModalMeaning(parsed.meaning || '');
+      setModalMeaning(parsed.meaning_tr || parsed.meaning || '');
+      setModalMeaningEn(parsed.meaning_en || '');
     } catch (e) {
       setModalLookupError('Arama başarısız: ' + (e.message || e));
     } finally {
@@ -2490,7 +2856,7 @@ function VocabularyTab() {
 
   function closeModal() {
     setShowAddModal(false);
-    setModalRomaji(''); setModalKana(''); setModalMeaning('');
+    setModalRomaji(''); setModalKana(''); setModalMeaning(''); setModalMeaningEn('');
     setModalCategory('custom'); setModalLookupError('');
   }
 
@@ -2499,10 +2865,50 @@ function VocabularyTab() {
     const romaji = modalRomaji.trim();
     const meaning = modalMeaning.trim();
     if (!kana || !romaji || !meaning) return;
-    const words = [...customWords, { id: Date.now().toString(), kana, romaji, meaning, category: modalCategory }];
+    const word = { id: Date.now().toString(), kana, romaji, meaning, category: modalCategory };
+    if (modalMeaningEn.trim()) word.meaning_en = modalMeaningEn.trim();
+    const words = [...customWords, word];
     setCustomWords(words);
     saveCustomWords(words);
     closeModal();
+  }
+
+  function getFolderWords(folder) {
+    const all = [...allBuiltin, ...customWords];
+    return folder.kanas.map(k => all.find(w => w.kana === k)).filter(Boolean);
+  }
+
+  function startPractice(words, label) {
+    if (!words.length) return;
+    const pool = [...words].sort(() => Math.random() - 0.5);
+    setQuizPool(pool);
+    setQuiz({ word: pool[0], input: '', feedback: null, answer: '', idx: 0, baseWords: words });
+    setPracticeWords(words);
+    setPracticeLabel(label);
+    setTimeout(() => quizInputRef.current?.focus(), 80);
+  }
+
+  function exitPractice() {
+    setPracticeWords(null); setPracticeLabel(''); setQuiz(null); setQuizPool([]);
+  }
+
+  function submitVocabQuiz() {
+    if (!quiz || quiz.feedback !== null) return;
+    const correct = quiz.input.trim().toLowerCase() === quiz.word.romaji.toLowerCase();
+    setQuiz(q => ({ ...q, feedback: correct ? 'correct' : 'wrong', answer: quiz.word.romaji }));
+    if (correct) playCorrectSound(); else playWrongSound();
+  }
+
+  function nextVocabQuiz() {
+    const nextIdx = quiz.idx + 1;
+    if (nextIdx >= quizPool.length) {
+      const pool = [...quiz.baseWords].sort(() => Math.random() - 0.5);
+      setQuizPool(pool);
+      setQuiz({ word: pool[0], input: '', feedback: null, answer: '', idx: 0, baseWords: quiz.baseWords });
+    } else {
+      setQuiz(q => ({ ...q, word: quizPool[nextIdx], input: '', feedback: null, answer: '', idx: nextIdx }));
+    }
+    setTimeout(() => quizInputRef.current?.focus(), 80);
   }
 
   function deleteCustomWord(id) {
@@ -2531,113 +2937,155 @@ function VocabularyTab() {
   }
 
   if (search.trim()) {
-    const q = search.trim().toLowerCase();
-    displayedWords = displayedWords.filter(w =>
-      w.kana.toLowerCase().includes(q) ||
-      w.romaji.toLowerCase().includes(q) ||
-      w.meaning.toLowerCase().includes(q)
-    );
+    const tokens = search.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const joined = tokens.join('');
+    displayedWords = displayedWords.filter(w => {
+      const kana = w.kana.toLowerCase();
+      const romaji = w.romaji.toLowerCase().replace(/\s+/g, '');
+      const meaning = w.meaning.toLowerCase();
+      const meaningEn = (w.meaning_en || '').toLowerCase();
+      // joined (no-space) match for romaji — "do u" → "dou"
+      if (romaji.includes(joined)) return true;
+      // all tokens must match somewhere
+      return tokens.every(t =>
+        kana.includes(t) || romaji.includes(t) || meaning.includes(t) || meaningEn.includes(t)
+      );
+    });
   }
 
   const sidebarCategories = [
     { key: 'all', label: 'Tümü' },
     ...allCategories.map(c => ({ key: c, label: CATEGORY_LABELS[c] || c })),
-    { key: 'custom', label: 'Özel Kelimeler' },
+    { key: 'custom', label: '★ Özel' },
   ];
+
+  // ── Practice mode ──
+  if (practiceWords && quiz) {
+    return (
+      <div className="vocab-tab">
+        <div className="vocab-practice-area">
+          <div className="vocab-practice-header">
+            <button className="vocab-practice-back" onClick={exitPractice}>← Çıkış</button>
+            <span className="vocab-practice-title">{practiceLabel}</span>
+            <span className="vocab-practice-progress">{quiz.idx + 1} / {quizPool.length} · ∞</span>
+          </div>
+          <div className={`flashcard${quiz.feedback ? ` flashcard--${quiz.feedback}` : ''}`}
+            style={{ maxWidth: 480, width: '100%', minHeight: 180 }}>
+            <span className="flashcard-question flashcard-question--kana" style={{ fontSize: '3.5rem' }}>{quiz.word.kana}</span>
+            <button className="speak-btn" onClick={() => speakKana(quiz.word.kana, 1.0)}>🔊</button>
+            {quiz.feedback === 'correct' && <span className="feedback-icon feedback-icon--correct">✓</span>}
+            {quiz.feedback === 'wrong' && (
+              <div className="feedback-wrong">
+                <span className="feedback-icon feedback-icon--wrong">✗</span>
+                <span className="correct-answer">Correct: <strong>{quiz.answer}</strong></span>
+                <div style={{ color: '#ffffff', fontSize: '1rem', fontWeight: 600, marginTop: 6 }}>{quiz.word.meaning}</div>
+                {quiz.word.meaning_en && <div style={{ color: '#cccccc', fontSize: '0.88rem' }}>{quiz.word.meaning_en}</div>}
+              </div>
+            )}
+          </div>
+          <div className="input-area" style={{ justifyContent: 'center' }}>
+            <input ref={quizInputRef} className="kana-input" type="text"
+              value={quiz.input}
+              onChange={e => setQuiz(q => ({ ...q, input: e.target.value }))}
+              onKeyDown={e => { if (e.key === 'Enter') { if (quiz.feedback !== null) nextVocabQuiz(); else submitVocabQuiz(); } }}
+              placeholder="Type romaji..." readOnly={quiz.feedback !== null}
+              autoComplete="off" spellCheck={false} />
+            {quiz.feedback === null
+              ? <button className="submit-btn" onClick={submitVocabQuiz}>Check</button>
+              : <button className="submit-btn" onClick={nextVocabQuiz}>Next →</button>}
+          </div>
+          {quiz.feedback !== null && (
+            <div style={{ textAlign: 'center', marginTop: '0.5rem' }}>
+              <div style={{ color: '#8b949e', fontSize: '0.9rem' }}>{quiz.word.meaning}</div>
+              {quiz.word.meaning_en && <div style={{ color: '#6e7681', fontSize: '0.82rem', marginTop: 2 }}>{quiz.word.meaning_en}</div>}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="vocab-tab">
+      {/* ── Sidebar ── */}
       <div className="vocab-sidebar">
-        {/* Categories column */}
-        <div className="vocab-sidebar-col vocab-sidebar-col--cats">
-          <div className="vocab-sidebar-section-label">Kategoriler</div>
+        {/* Folders */}
+        <div className="vocab-sb-section">
+          <div className="vocab-sb-label">
+            <span>Klasörler</span>
+            <button className="vocab-sb-add" onClick={() => setShowNewFolder(v => !v)}>+</button>
+          </div>
+          {showNewFolder && (
+            <div className="vocab-new-folder-row">
+              <input className="vocab-folder-input" placeholder="Klasör adı" value={newFolderName} autoFocus
+                onChange={e => setNewFolderName(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') addFolder(); if (e.key === 'Escape') { setShowNewFolder(false); setNewFolderName(''); } }}
+              />
+              <button className="vocab-folder-confirm" onClick={addFolder}>✓</button>
+            </div>
+          )}
+          {folders.length === 0 && !showNewFolder && (
+            <div className="vocab-empty-hint">Henüz klasör yok</div>
+          )}
+          {folders.map(folder => {
+            const isActive = activeFolderId === folder.id;
+            return (
+              <div key={folder.id} className={`vocab-folder-item${isActive ? ' vocab-folder-item--active' : ''}`}
+                onClick={() => { setActiveFolderId(folder.id); setActiveCategory(null); }}>
+                <span className="vocab-folder-dot" style={{ background: folder.color }} />
+                {renamingId === folder.id ? (
+                  <input className="vocab-folder-rename-inline" value={renameValue} autoFocus
+                    onChange={e => setRenameValue(e.target.value)}
+                    onBlur={() => confirmRename(folder.id)}
+                    onKeyDown={e => { if (e.key === 'Enter') confirmRename(folder.id); if (e.key === 'Escape') setRenamingId(null); }}
+                    onClick={e => e.stopPropagation()} />
+                ) : (
+                  <span className="vocab-folder-name" onDoubleClick={e => { e.stopPropagation(); startRename(folder); }}>{folder.name}</span>
+                )}
+                <span className="vocab-folder-count">{folder.kanas.length}</span>
+                <div className="vocab-folder-btns">
+                  <button className="vocab-folder-play" title="Çalış"
+                    onClick={e => { e.stopPropagation(); startPractice(getFolderWords(folder), folder.name); }}
+                    disabled={folder.kanas.length === 0}>▶</button>
+                  <button className="vocab-folder-del-inline" title="Sil"
+                    onClick={e => { e.stopPropagation(); deleteFolder(folder.id); }}>×</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Categories */}
+        <div className="vocab-sb-section vocab-sb-cats">
+          <div className="vocab-sb-label"><span>Kategoriler</span></div>
           {sidebarCategories.map(({ key, label }) => (
-            <button
-              key={key}
+            <button key={key}
               className={`vocab-cat-btn${activeCategory === key && !activeFolderId ? ' vocab-cat-btn--active' : ''}`}
-              onClick={() => { setActiveCategory(key); setActiveFolderId(null); }}
-            >
+              onClick={() => { setActiveCategory(key); setActiveFolderId(null); }}>
               {label}
             </button>
           ))}
         </div>
-
-        {/* Folders column */}
-        <div className="vocab-sidebar-col vocab-sidebar-col--folders">
-          <div className="vocab-sidebar-section-label">Klasörler</div>
-
-          {folders.map(folder => (
-            <div
-              key={folder.id}
-              className={`vocab-folder-row${activeFolderId === folder.id ? ' vocab-folder-row--active' : ''}`}
-              onClick={() => { setActiveFolderId(folder.id); setActiveCategory(null); }}
-            >
-              <span className="vocab-folder-icon" style={{ color: folder.color }}>▶</span>
-              {renamingId === folder.id ? (
-                <input
-                  className="vocab-folder-rename-inline"
-                  value={renameValue}
-                  autoFocus
-                  onChange={e => setRenameValue(e.target.value)}
-                  onBlur={() => confirmRename(folder.id)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') confirmRename(folder.id);
-                    if (e.key === 'Escape') setRenamingId(null);
-                  }}
-                  onClick={e => e.stopPropagation()}
-                />
-              ) : (
-                <span
-                  className="vocab-folder-label"
-                  onDoubleClick={e => { e.stopPropagation(); startRename(folder); }}
-                >
-                  {folder.name}
-                </span>
-              )}
-              <span className="vocab-folder-count">{folder.kanas.length}</span>
-              <button
-                className="vocab-folder-del-inline"
-                onClick={e => { e.stopPropagation(); deleteFolder(folder.id); }}
-                title="Klasörü sil"
-              >×</button>
-            </div>
-          ))}
-
-          {showNewFolder ? (
-            <div className="vocab-new-folder-row">
-              <input
-                className="vocab-folder-input"
-                placeholder="Klasör adı"
-                value={newFolderName}
-                autoFocus
-                onChange={e => setNewFolderName(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') addFolder();
-                  if (e.key === 'Escape') { setShowNewFolder(false); setNewFolderName(''); }
-                }}
-              />
-              <button className="vocab-folder-confirm" onClick={addFolder}>✓</button>
-            </div>
-          ) : (
-            <button className="vocab-new-folder-btn" onClick={() => setShowNewFolder(true)}>+ Klasör</button>
-          )}
-        </div>
       </div>
 
+      {/* ── Main ── */}
       <div className="vocab-main">
         <div className="vocab-toolbar">
-          <input
-            className="vocab-search"
-            placeholder="Ara... (kana, romaji, anlam)"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-          <button className="vocab-add-btn" onClick={() => setShowAddModal(true)}>+ Özel</button>
+          <input className="vocab-search" placeholder="Ara... (kana, romaji, anlam)"
+            value={search} onChange={e => setSearch(e.target.value)} />
+          {activeFolder && (
+            <button className="vocab-practice-btn"
+              onClick={() => startPractice(getFolderWords(activeFolder), activeFolder.name)}
+              disabled={activeFolder.kanas.length === 0}>
+              ▶ Çalış ({activeFolder.kanas.length})
+            </button>
+          )}
+          <button className="vocab-add-btn" onClick={() => setShowAddModal(true)}>+ Kelime</button>
         </div>
 
         {activeFolder && (
           <div className="vocab-folder-hint">
-            <span style={{ color: activeFolder.color }}>▶ {activeFolder.name}</span>
+            <span style={{ color: activeFolder.color }}>● {activeFolder.name}</span>
             {' '}— Kartlara tıklayarak klasöre ekle / çıkar
           </div>
         )}
@@ -2645,75 +3093,61 @@ function VocabularyTab() {
         <div className="vocab-grid">
           {displayedWords.map((word, i) => {
             const inFolder = activeFolder?.kanas.includes(word.kana);
+            const isLearned = learnedSet.has(word.kana);
             return (
-              <div
-                key={word.kana + i}
-                className={`vocab-card${learnedSet.has(word.kana) ? ' vocab-card--learned' : ''}${inFolder ? ' vocab-card--in-folder' : ''}`}
-                onClick={() => activeFolder ? toggleCardInFolder(word.kana) : toggleLearned(word.kana)}
-                style={{ position: 'relative' }}
-              >
-                {inFolder && <span className="vocab-in-folder-mark">✓</span>}
-                <div className="vocab-card-kana">{word.kana}</div>
+              <div key={word.kana + i}
+                className={`vocab-card${isLearned ? ' vocab-card--learned' : ''}${inFolder ? ' vocab-card--in-folder' : ''}`}
+                onClick={() => activeFolder ? toggleCardInFolder(word.kana) : toggleLearned(word.kana)}>
+                <div className="vocab-card-top">
+                  <span className="vocab-card-kana">{word.kana}</span>
+                  <div className="vocab-card-badges">
+                    {inFolder && <span className="vocab-in-folder-mark">✓</span>}
+                    {isLearned && <span className="vocab-learned-mark">★</span>}
+                    {word._custom && (
+                      <button className="vocab-card-del" onClick={e => { e.stopPropagation(); deleteCustomWord(word.id); }} title="Sil">×</button>
+                    )}
+                  </div>
+                </div>
                 <div className="vocab-card-romaji">{word.romaji}</div>
-                <div className="vocab-card-meaning">{word.meaning}</div>
+                <div className="vocab-card-meanings">
+                  <span className="vocab-meaning-tr">{word.meaning}</span>
+                  {word.meaning_en && <span className="vocab-meaning-en">{word.meaning_en}</span>}
+                </div>
                 <div className="vocab-card-cat">{CATEGORY_LABELS[word.category] || word.category}</div>
-                {word._custom && (
-                  <button
-                    className="vocab-card-del"
-                    onClick={e => { e.stopPropagation(); deleteCustomWord(word.id); }}
-                    title="Sil"
-                  >×</button>
-                )}
               </div>
             );
           })}
-          {displayedWords.length === 0 && (
-            <div className="vocab-empty">Kelime bulunamadı.</div>
-          )}
+          {displayedWords.length === 0 && <div className="vocab-empty">Kelime bulunamadı.</div>}
         </div>
       </div>
 
+      {/* ── Add modal ── */}
       {showAddModal && (
         <div className="vocab-modal-overlay" onClick={closeModal}>
           <div className="vocab-modal" onClick={e => e.stopPropagation()}>
-            <div className="vocab-modal-title">Özel Kelime Ekle</div>
+            <div className="vocab-modal-title">Kelime Ekle</div>
             <div className="vocab-modal-lookup-row">
-              <input
-                className="vocab-modal-input"
-                placeholder="Romaji (örn: tomodachi)"
-                value={modalRomaji}
-                onChange={e => setModalRomaji(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && lookupWord()}
-              />
+              <input className="vocab-modal-input" placeholder="Romaji (örn: tomodachi)"
+                value={modalRomaji} onChange={e => setModalRomaji(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && lookupWord()} autoFocus />
               <button className="vocab-lookup-btn" onClick={lookupWord} disabled={modalLookupLoading}>
                 {modalLookupLoading ? <span className="vocab-lookup-spinner" /> : 'AI Ara'}
               </button>
             </div>
             {modalLookupError && <div className="vocab-lookup-error">{modalLookupError}</div>}
-            <input
-              className="vocab-modal-input"
-              placeholder="Japonca yazılış (kana/kanji)"
-              value={modalKana}
-              onChange={e => setModalKana(e.target.value)}
-            />
-            <input
-              className="vocab-modal-input"
-              placeholder="Anlam (Türkçe veya İngilizce)"
-              value={modalMeaning}
-              onChange={e => setModalMeaning(e.target.value)}
-            />
-            <select
-              className="vocab-modal-select"
-              value={modalCategory}
-              onChange={e => setModalCategory(e.target.value)}
-            >
-              {Object.entries(CATEGORY_LABELS).map(([k, v]) => (
-                <option key={k} value={k}>{v}</option>
-              ))}
+            <input className="vocab-modal-input" placeholder="Japonca yazılış (kana/kanji)"
+              value={modalKana} onChange={e => setModalKana(e.target.value)} />
+            <input className="vocab-modal-input" placeholder="Türkçe anlam"
+              value={modalMeaning} onChange={e => setModalMeaning(e.target.value)} />
+            <input className="vocab-modal-input" placeholder="İngilizce anlam (opsiyonel)"
+              value={modalMeaningEn} onChange={e => setModalMeaningEn(e.target.value)} />
+            <select className="vocab-modal-select" value={modalCategory} onChange={e => setModalCategory(e.target.value)}>
+              {Object.entries(CATEGORY_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
             <div className="vocab-modal-actions">
               <button className="vocab-modal-cancel" onClick={closeModal}>İptal</button>
-              <button className="vocab-modal-save" onClick={saveCustomWord}>Kaydet</button>
+              <button className="vocab-modal-save" onClick={saveCustomWord}
+                disabled={!modalKana.trim() || !modalRomaji.trim() || !modalMeaning.trim()}>Kaydet</button>
             </div>
           </div>
         </div>

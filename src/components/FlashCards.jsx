@@ -226,7 +226,7 @@ function FlashCards({ fullscreen = false }) {
 
     try {
       const bodyStr = JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
+        model: 'claude-opus-4-8',
         max_tokens: 400,
         messages: [{
           role: 'user',
@@ -286,7 +286,7 @@ function FlashCards({ fullscreen = false }) {
 
     try {
       const bodyStr = JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
+        model: 'claude-opus-4-8',
         max_tokens: 2000,
         messages: [{
           role: 'user',
