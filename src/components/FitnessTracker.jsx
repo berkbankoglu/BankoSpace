@@ -1468,7 +1468,7 @@ TOOL RULES — FOLLOW EXACTLY:
       let actionTaken = false;
       for (let i = 0; i < 12; i++) {
         const body = JSON.stringify({
-          model: 'claude-sonnet-4-6',
+          model: 'claude-opus-4-8',
           max_tokens: 1024,
           system: sys,
           tools: AI_TOOLS,
@@ -1528,7 +1528,7 @@ Kurallar:
 - Görseldeki TÜM günleri ve TÜM egzersizleri ekle, hiçbirini atlama`;
 
       const body = JSON.stringify({
-        model: 'claude-sonnet-4-6',
+        model: 'claude-opus-4-8',
         max_tokens: 2048,
         messages: [{ role: 'user', content: [...imageBlocks, { type: 'text', text: parsePrompt }] }],
       });

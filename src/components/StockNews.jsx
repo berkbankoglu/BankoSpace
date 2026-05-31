@@ -354,7 +354,7 @@ async function fetchAiComment(title, tickers, description = '') {
   const tickerLabel = validTickers.length > 0 ? validTickers.join(', ') + ' stock' : 'US markets';
 
   const bodyStr = JSON.stringify({
-    model: 'claude-haiku-4-5-20251001',
+    model: 'claude-opus-4-8',
     max_tokens: 400,
     messages: [{
       role: 'user',

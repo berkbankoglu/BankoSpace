@@ -67,7 +67,7 @@ async function callAI(prompt, maxTokens = 1000) {
   const text = await invoke('fetch_post', {
     url: 'https://api.anthropic.com/v1/messages',
     headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-    body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] }),
+    body: JSON.stringify({ model: 'claude-opus-4-8', max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] }),
   });
   const data = JSON.parse(text);
   if (data.error) throw new Error(data.error.message);

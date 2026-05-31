@@ -310,6 +310,7 @@ function GroupRows({ group, quotes, activeTicker, setActiveTicker, dragState, dr
 
 export default function StockChart({ groups, saveGroups, activeTicker, setActiveTicker }) {
   const [quotes, setQuotes] = useState({});
+  const fetchBusyRef = useRef(false);
   // Picker state
   const [showPicker, setShowPicker] = useState(false);
   const [pickerGroupId, setPickerGroupId] = useState(null); // hangi gruba eklenecek
@@ -331,16 +332,24 @@ export default function StockChart({ groups, saveGroups, activeTicker, setActive
   const allTickers = [...new Set(groups.flatMap(g => g.tickers))];
 
   const loadAll = useCallback(() => {
-    allTickers.forEach(t => {
-      setQuotes(prev => {
-        const cur = prev[t];
-        const hasData = cur && cur !== 'loading' && cur !== 'error';
-        return { ...prev, [t]: hasData ? cur : 'loading' };
-      });
-      fetchQuote(t)
-        .then(q => setQuotes(prev => ({ ...prev, [t]: q })))
-        .catch(() => setQuotes(prev => ({ ...prev, [t]: 'error' })));
-    });
+    if (fetchBusyRef.current) return;
+    fetchBusyRef.current = true;
+    const tickers = [...allTickers];
+    const BATCH = 3;
+    let idx = 0;
+    const runBatch = () => {
+      if (idx >= tickers.length) { fetchBusyRef.current = false; return; }
+      const batch = tickers.slice(idx, idx + BATCH);
+      idx += BATCH;
+      Promise.allSettled(
+        batch.map(t =>
+          fetchQuote(t)
+            .then(q => setQuotes(prev => ({ ...prev, [t]: q })))
+            .catch(() => setQuotes(prev => ({ ...prev, [t]: 'error' })))
+        )
+      ).then(runBatch);
+    };
+    runBatch();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(allTickers)]);
 

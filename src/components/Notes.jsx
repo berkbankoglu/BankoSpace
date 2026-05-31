@@ -536,6 +536,7 @@ function Notes() {
   const sidebarRef = useRef(null);
   const editorRef = useRef(null);
   const savedSelectionRef = useRef(null);
+  const notesSaveTimerRef = useRef(null);
   const resizeStartXRef = useRef(0);
   const resizeStartWidthRef = useRef(0);
   const isResizingRef = useRef(false);
@@ -545,10 +546,13 @@ function Notes() {
 
   useEffect(() => {
     if (notes.length === 0) return;
-    const serialized = JSON.stringify(notes);
-    localStorage.setItem('notes', serialized);
-    localStorage.setItem('notes_local_backup', serialized);
-    pushKeyToSupabase('notes', serialized);
+    if (notesSaveTimerRef.current) clearTimeout(notesSaveTimerRef.current);
+    notesSaveTimerRef.current = setTimeout(() => {
+      const serialized = JSON.stringify(notes);
+      localStorage.setItem('notes', serialized);
+      localStorage.setItem('notes_local_backup', serialized);
+      pushKeyToSupabase('notes', serialized);
+    }, 1000);
   }, [notes]);
 
   const saveSelection = () => {
