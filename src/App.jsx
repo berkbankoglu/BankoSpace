@@ -19,6 +19,7 @@ import ProjectBid from './components/ProjectBid';
 import Planner from './components/Planner';
 import Notes from './components/Notes';
 import RefBoard from './components/RefBoard';
+import MarketResearch from './components/MarketResearch';
 import { onAction, registerActionTypes } from '@tauri-apps/plugin-notification';
 
 const QUICK_BUTTONS = [
@@ -292,7 +293,8 @@ function App({ session, onLogout }) {
       { id: 'fitness',      label: 'Fitness',          view: 'fitness',      hidden: false, icon: '◈' },
       { id: 'planner',      label: 'Planner',          view: 'planner',      hidden: false, icon: '≡' },
       { id: 'notes',        label: 'Notes',            view: 'notes',        hidden: false, icon: '✎' },
-      { id: 'refboard',    label: 'Ref Board',        view: 'refboard',     hidden: false, icon: '⊞' },
+      { id: 'refboard',     label: 'Ref Board',        view: 'refboard',      hidden: false, icon: '⊞' },
+      { id: 'marketresearch', label: 'Market Research', view: 'marketresearch', hidden: false, icon: '📊' },
     ];
     const saved = localStorage.getItem('sidebarOrder');
     if (saved) {
@@ -1710,6 +1712,13 @@ useEffect(() => {
           {activeView === 'refboard' && (
             <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
               <RefBoard />
+            </div>
+          )}
+
+          {/* Market Research */}
+          {activeView === 'marketresearch' && (
+            <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <MarketResearch />
             </div>
           )}
 
