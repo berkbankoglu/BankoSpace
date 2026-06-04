@@ -1,6 +1,9 @@
-/* ─── Terminal Font ─── */
+/* ─── Font ─── */
 .notes-container * {
-  font-family: 'JetBrains Mono', 'Consolas', 'SF Mono', 'Courier New', monospace;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+}
+.notes-container code, .notes-container pre, .notes-container kbd {
+  font-family: 'JetBrains Mono', 'Consolas', 'SF Mono', monospace;
 }
 
 .notes-container {
@@ -856,14 +859,15 @@
 .notes-content-input {
   flex: 1;
   width: 100%;
-  padding: 20px;
+  padding: 24px 28px;
   background: transparent;
   border: none;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 15.5px;
   font-family: inherit;
-  line-height: 1.7;
+  line-height: 1.8;
   resize: none;
+  letter-spacing: 0.01em;
 }
 
 .notes-content-input:focus {
@@ -1386,11 +1390,12 @@
 /* ─── Rich Text Editor ─── */
 .notebook-page-editor {
   width: 100%;
-  padding: 20px 40px 80px;
+  padding: 24px 40px 100px;
   background: transparent;
-  color: rgba(255,255,255,0.85);
-  font-size: 14px;
-  line-height: 1.8;
+  color: rgba(255,255,255,0.88);
+  font-size: 15.5px;
+  line-height: 1.85;
+  letter-spacing: 0.01em;
   font-family: inherit;
   overflow-y: visible;
   outline: none;
@@ -1428,18 +1433,25 @@
 /* Rich text formatting styles */
 .notebook-page-editor b,
 .notebook-page-editor strong {
-  font-weight: 800;
+  font-weight: 700;
+  color: rgba(255,255,255,0.96);
 }
+
+.notebook-page-editor h1 { font-size: 1.6em; font-weight: 700; margin: 0.6em 0 0.3em; color: rgba(255,255,255,0.95); }
+.notebook-page-editor h2 { font-size: 1.25em; font-weight: 700; margin: 0.6em 0 0.3em; color: rgba(255,255,255,0.92); }
+.notebook-page-editor h3 { font-size: 1.05em; font-weight: 700; margin: 0.5em 0 0.2em; color: rgba(255,255,255,0.9); }
+.notebook-page-editor p { margin: 0 0 0.5em; }
 
 /* Rich text list styles */
 .notebook-page-editor ul,
 .notebook-page-editor ol {
-  margin: 8px 0;
-  padding-left: 24px;
+  margin: 6px 0 10px;
+  padding-left: 26px;
 }
 
 .notebook-page-editor li {
-  margin: 4px 0;
+  margin: 5px 0;
+  line-height: 1.75;
 }
 
 .notebook-page-editor a {
