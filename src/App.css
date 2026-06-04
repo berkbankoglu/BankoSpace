@@ -129,6 +129,10 @@ body.color-classic .sub-tracker { background: #161b22 !important; }
 
 body {
     font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
     padding: 0;
     min-height: 100vh;
     transition: background-color 0.3s ease, color 0.3s ease;

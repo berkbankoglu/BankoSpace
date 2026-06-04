@@ -8,7 +8,7 @@
   height: 100%;
   background: var(--bg-base);
   color: var(--text-primary);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   overflow: hidden;
 }
 
@@ -858,7 +858,7 @@
   white-space: nowrap;
   box-shadow: 0 4px 20px rgba(88,166,255,0.35);
   animation: ft-ghost-in 0.1s ease;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 @keyframes ft-ghost-in {
   from { opacity: 0; transform: scale(0.8); }
