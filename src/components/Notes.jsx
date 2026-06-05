@@ -678,6 +678,39 @@ function Notes() {
     return () => container.removeEventListener('scroll', onScroll);
   }, [animKey]);
 
+  useEffect(() => {
+    let editorWasFocused = false;
+    let savedRange = null;
+
+    const onWindowBlur = () => {
+      editorWasFocused = document.activeElement === editorRef.current;
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        try { savedRange = sel.getRangeAt(0).cloneRange(); } catch (e) { savedRange = null; }
+      }
+    };
+
+    const onWindowFocus = () => {
+      if (!editorWasFocused || !editorRef.current) return;
+      setTimeout(() => {
+        try {
+          editorRef.current?.focus();
+          if (savedRange && editorRef.current?.contains(savedRange.startContainer)) {
+            const sel = window.getSelection();
+            if (sel) { sel.removeAllRanges(); sel.addRange(savedRange); }
+          }
+        } catch (e) {}
+      }, 50);
+    };
+
+    window.addEventListener('blur', onWindowBlur);
+    window.addEventListener('focus', onWindowFocus);
+    return () => {
+      window.removeEventListener('blur', onWindowBlur);
+      window.removeEventListener('focus', onWindowFocus);
+    };
+  }, []);
+
   const createNote = () => {
     const id = Date.now();
     const newNote = {

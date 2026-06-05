@@ -634,7 +634,7 @@
 }
 
 .pl-day-list-title {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text-primary);
   flex: 1;
@@ -845,7 +845,7 @@
 }
 
 .pl-qtask-drag-hint {
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text-muted);
   flex-shrink: 0;
   opacity: 0.5;

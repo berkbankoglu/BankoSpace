@@ -381,8 +381,8 @@ function App({ session, onLogout }) {
 const [todoFontSize, setTodoFontSize] = useState(() => localStorage.getItem('todoFontSize') || 'M');
   const [subtaskFontSize, setSubtaskFontSize] = useState(() => localStorage.getItem('subtaskFontSize') || 'M');
   const [fontSizeOpen, setFontSizeOpen] = useState(false);
-  const fontSizeMap = { S: '11px', M: '13px', L: '16px', XL: '20px' };
-  const subtaskFontSizeMap = { S: '11px', M: '14px', L: '17px', XL: '21px' };
+  const fontSizeMap = { S: '12px', M: '15px', L: '17px', XL: '21px' };
+  const subtaskFontSizeMap = { S: '12px', M: '15px', L: '17px', XL: '21px' };
   const [useEmoji, setUseEmoji] = useState(() => localStorage.getItem('useEmoji') !== 'false');
 const [dailyChecklistCollapsed, setDailyChecklistCollapsed] = useState(() => {
     const saved = localStorage.getItem('dailyChecklistCollapsed');
