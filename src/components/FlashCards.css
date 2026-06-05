@@ -71,7 +71,7 @@
 
 .fc-sidebar-header h2 {
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -146,7 +146,7 @@
   border: 1px solid var(--border-hover);
   border-radius: 6px;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 15px;
   outline: none;
 }
 
@@ -216,7 +216,7 @@
 }
 
 .fc-deck-item-name {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
   color: var(--text-primary);
   flex: 1;
@@ -231,7 +231,7 @@
   border: 1px solid var(--accent);
   border-radius: 4px;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
   padding: 1px 6px;
   outline: none;
@@ -561,7 +561,7 @@
   border: 1px solid var(--border-hover);
   border-radius: 6px;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 15px;
   outline: none;
   font-family: inherit;
 }
@@ -581,7 +581,7 @@
   border: none;
   border-radius: 6px;
   color: #fff;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
   cursor: pointer;
   transition: background 0.2s;
@@ -687,7 +687,7 @@
 .fc-cards-table td {
   padding: 14px 16px;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 15px;
   vertical-align: middle;
   max-width: 0;
   overflow: hidden;
@@ -786,7 +786,7 @@
   border: 1px solid var(--border-hover);
   border-radius: 6px;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
@@ -806,7 +806,7 @@
 }
 
 .fc-study-progress span {
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text-muted);
   font-weight: 500;
   white-space: nowrap;
@@ -889,7 +889,7 @@
 }
 
 .fc-study-hint {
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text-muted);
   margin-bottom: 24px;
   text-align: center;
@@ -1002,7 +1002,7 @@
 
 .fc-result-label {
   display: block;
-  font-size: 14px;
+  font-size: 15px;
   text-transform: uppercase;
   letter-spacing: 1px;
   color: var(--text-muted);
@@ -1085,7 +1085,7 @@
 }
 
 .fc-ai-panel-title {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -1278,7 +1278,7 @@
 }
 
 .fc-ai-result-explanation {
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text-primary);
   line-height: 1.7;
   margin-bottom: 24px;
@@ -1347,7 +1347,7 @@
   border: none;
   border-radius: 6px;
   color: #fff;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
   font-family: inherit;

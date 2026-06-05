@@ -1406,7 +1406,7 @@
   border: 1px solid var(--border-hover);
   background: var(--bg-surface);
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
   font-family: inherit;
   cursor: pointer;

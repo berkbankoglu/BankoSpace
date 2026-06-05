@@ -12,9 +12,9 @@
     --border:        #333333;
     --border-hover:  #444444;
 
-    --text-primary:  #ececec;
-    --text-secondary:#aaaaaa;
-    --text-muted:    #686868;
+    --text-primary:  #f0f0f0;
+    --text-secondary:#b0b0b0;
+    --text-muted:    #727272;
 
     --accent:        #909090;
     --accent-dim:    #5c5c5c;
@@ -45,9 +45,9 @@ body.color-noir {
     --border:        #333333;
     --border-hover:  #444444;
 
-    --text-primary:  #ececec;
-    --text-secondary:#aaaaaa;
-    --text-muted:    #686868;
+    --text-primary:  #f0f0f0;
+    --text-secondary:#b0b0b0;
+    --text-muted:    #727272;
 
     --accent:        #909090;
     --accent-dim:    #5c5c5c;
@@ -129,7 +129,8 @@ body.color-classic .sub-tracker { background: #161b22 !important; }
 
 body {
     font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
-    font-size: 14px;
+    font-size: 15px;
+    line-height: 1.65;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
@@ -1928,7 +1929,7 @@ h1 {
     color: var(--text-primary);
     border: none;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 15px;
     text-align: left;
     transition: all 0.2s;
     display: flex;
@@ -2140,7 +2141,7 @@ body.light .reset-btn:hover {
     border: 1px solid var(--border-hover);
     border-radius: 6px;
     cursor: pointer;
-    font-size: 13px;
+    font-size: 14px;
     line-height: 1;
     transition: all 0.15s;
 }
@@ -2248,7 +2249,7 @@ body.light .reset-btn:hover {
     background: var(--bg-base);
     border: 1px solid var(--border);
     border-radius: 6px;
-    font-size: 14px;
+    font-size: 15px;
     color: var(--text-primary);
     margin-bottom: 8px;
 }
@@ -2302,7 +2303,7 @@ body.light .reset-btn:hover {
     margin-bottom: 12px;
     padding-bottom: 12px;
     border-bottom: 1px solid var(--border);
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 600;
     color: var(--text-primary);
 }
@@ -2480,9 +2481,9 @@ body.light .reset-btn:hover {
 }
 
 .todo-text {
-    font-size: 14px;
+    font-size: 15px;
     color: var(--text-primary);
-    line-height: 1.5;
+    line-height: 1.65;
     word-wrap: break-word;
     word-break: break-word;
     overflow-wrap: break-word;
@@ -9409,14 +9410,14 @@ body.light .search-no-results {
 }
 
 .ql-label {
-  font-size: var(--todo-font-size, 12px);
+  font-size: var(--todo-font-size, 15px);
   font-weight: 500;
   color: var(--text-primary);
   line-height: 1;
 }
 
 .ql-desc {
-  font-size: calc(var(--todo-font-size, 12px) - 2px);
+  font-size: calc(var(--todo-font-size, 15px) - 2px);
   color: var(--text-secondary);
   line-height: 1;
 }
@@ -9505,10 +9506,10 @@ body.light .search-no-results {
 
 /* Font size control — tüm dashboard elementleri etkilensin */
 .dashboard-container .sub-item-name {
-  font-size: var(--todo-font-size, 14px) !important;
+  font-size: var(--todo-font-size, 15px) !important;
 }
 .dashboard-container .sub-item-price {
-  font-size: var(--todo-font-size, 14px) !important;
+  font-size: var(--todo-font-size, 15px) !important;
 }
 
 /* --- Category columns --- */

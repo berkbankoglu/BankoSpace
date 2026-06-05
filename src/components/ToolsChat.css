@@ -78,7 +78,7 @@
 }
 
 .tc-topbar-title {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text-secondary);
   flex: 1;
@@ -96,7 +96,7 @@
   border: 1px solid var(--border-hover);
   border-radius: 6px;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 15px;
   font-family: inherit;
   padding: 7px 12px;
   outline: none;
@@ -108,7 +108,7 @@
   border: 1px solid var(--border-hover);
   border-radius: 6px;
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: 15px;
   padding: 4px 8px;
   cursor: pointer;
   transition: all 0.12s;
@@ -188,7 +188,7 @@
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 14px;
+  font-size: 15px;
   padding: 0 2px;
   transition: color 0.1s;
 }
@@ -222,7 +222,7 @@
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 14px;
+  font-size: 15px;
   padding: 0;
   flex-shrink: 0;
   transition: color 0.1s;
@@ -374,7 +374,7 @@
 }
 .tc-ai-value { color: var(--text-primary); font-size: 15px; }
 .tc-ai-plain { color: var(--text-primary); font-size: 15px; margin-bottom: 3px; }
-.tc-ai-bullet { color: var(--text-secondary); font-size: 14px; padding-left: 14px; margin-bottom: 2px; }
+.tc-ai-bullet { color: var(--text-secondary); font-size: 15px; padding-left: 14px; margin-bottom: 2px; }
 
 .tc-bid-text {
   white-space: pre-wrap;
