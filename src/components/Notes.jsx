@@ -422,10 +422,12 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
         </div>
       )}
 
-      {/* Hover preview — above mouse cursor */}
+      {/* Hover preview — above cursor if space, else below */}
       {preview && (
         <div className="note-img-preview" style={{
-          bottom: window.innerHeight - preview.y + 14,
+          ...(preview.y > 450
+            ? { bottom: window.innerHeight - preview.y + 14 }
+            : { top: preview.y + 20 }),
           left: Math.min(Math.max(8, preview.x - 8), window.innerWidth - 656),
         }}>
           <img src={preview.dataUrl} className="note-img-preview-img" alt="" />
