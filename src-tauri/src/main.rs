@@ -1,9 +1,21 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::sync::OnceLock;
 use tauri::Manager;
 use tauri::{LogicalPosition, LogicalSize, WebviewUrl};
 use tauri::webview::WebviewBuilder;
+
+static HTTP_CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+
+fn get_client() -> &'static reqwest::Client {
+    HTTP_CLIENT.get_or_init(|| {
+        reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(15))
+            .build()
+            .expect("Failed to build HTTP client")
+    })
+}
 
 #[tauri::command]
 async fn create_child_webview(
@@ -110,14 +122,9 @@ fn toggle_kana_window(app: tauri::AppHandle) {
 
 #[tauri::command]
 async fn fetch_rss(url: String) -> Result<String, String> {
-    let client = reqwest::Client::builder()
-        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-        .timeout(std::time::Duration::from_secs(10))
-        .build()
-        .map_err(|e| e.to_string())?;
-
-    let response = client
+    let response = get_client()
         .get(&url)
+        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
         .send()
         .await
         .map_err(|e| e.to_string())?;
@@ -136,13 +143,9 @@ async fn fetch_tts(text: String, slow: bool) -> Result<Vec<u8>, String> {
         slow,
         urlencoding::encode(&text)
     );
-    let client = reqwest::Client::builder()
-        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-        .timeout(std::time::Duration::from_secs(10))
-        .build()
-        .map_err(|e| e.to_string())?;
-    let response = client
+    let response = get_client()
         .get(&url)
+        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
         .header("Referer", "https://translate.google.com/")
         .send()
         .await
@@ -156,16 +159,10 @@ async fn fetch_tts(text: String, slow: bool) -> Result<Vec<u8>, String> {
 
 #[tauri::command]
 async fn fetch_post(url: String, headers: std::collections::HashMap<String, String>, body: String) -> Result<String, String> {
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(60))
-        .build()
-        .map_err(|e| e.to_string())?;
-
-    let mut req = client.post(&url).body(body);
+    let mut req = get_client().post(&url).body(body);
     for (k, v) in &headers {
         req = req.header(k.as_str(), v.as_str());
     }
-
     let response = req.send().await.map_err(|e| e.to_string())?;
     let text = response.text().await.map_err(|e| e.to_string())?;
     Ok(text)
@@ -173,16 +170,10 @@ async fn fetch_post(url: String, headers: std::collections::HashMap<String, Stri
 
 #[tauri::command]
 async fn fetch_get(url: String, headers: std::collections::HashMap<String, String>) -> Result<String, String> {
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(60))
-        .build()
-        .map_err(|e| e.to_string())?;
-
-    let mut req = client.get(&url);
+    let mut req = get_client().get(&url);
     for (k, v) in &headers {
         req = req.header(k.as_str(), v.as_str());
     }
-
     let response = req.send().await.map_err(|e| e.to_string())?;
     let text = response.text().await.map_err(|e| e.to_string())?;
     Ok(text)

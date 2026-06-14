@@ -217,7 +217,7 @@ function App({ session, onLogout }) {
           debounceTimers[key] = setTimeout(() => {
             pushKeyToSupabase(key, value);
             delete pendingKeys[key];
-          }, 500);
+          }, 2000);
         }
       };
 

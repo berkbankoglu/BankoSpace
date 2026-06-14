@@ -553,8 +553,7 @@ function Notes() {
       const serialized = JSON.stringify(notes);
       localStorage.setItem('notes', serialized);
       localStorage.setItem('notes_local_backup', serialized);
-      pushKeyToSupabase('notes', serialized);
-    }, 1000);
+    }, 2000);
   }, [notes]);
 
   const saveSelection = () => {
