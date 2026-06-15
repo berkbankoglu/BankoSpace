@@ -499,7 +499,7 @@ const [dailyChecklistCollapsed, setDailyChecklistCollapsed] = useState(() => {
           });
           setDraggedSidebarItem(prev => prev ? { ...prev, index: -1 } : null);
 
-          setTimeout(() => { sidebarReorderLockRef.current = false; }, 280);
+          setTimeout(() => { sidebarReorderLockRef.current = false; }, 340);
           break;
         }
       }
@@ -531,19 +531,37 @@ const [dailyChecklistCollapsed, setDailyChecklistCollapsed] = useState(() => {
     if (Object.keys(oldPos).length === 0) return;
 
     const items = document.querySelectorAll('.sidebar-item[data-sidebar-id]');
+
+    // Invert: snap every item back to its old position instantly
     items.forEach(el => {
       const id = el.getAttribute('data-sidebar-id');
       if (!id || !oldPos[id]) return;
       const newRect = el.getBoundingClientRect();
       const deltaY = oldPos[id].top - newRect.top;
       if (Math.abs(deltaY) > 1) {
-        el.style.transform = `translateY(${deltaY}px)`;
         el.style.transition = 'none';
-        el.offsetHeight;
-        el.style.transform = '';
-        el.style.transition = 'transform 0.25s cubic-bezier(0.2, 0, 0, 1)';
+        el.style.transform = `translateY(${deltaY}px)`;
       }
     });
+
+    // Force reflow so the browser commits the "inverted" positions
+    document.body.offsetHeight;
+
+    // Play: animate each item to its real (new) position
+    requestAnimationFrame(() => {
+      items.forEach(el => {
+        const id = el.getAttribute('data-sidebar-id');
+        if (!id || !oldPos[id]) return;
+        const newRect = el.getBoundingClientRect();
+        const deltaY = oldPos[id].top - newRect.top;
+        if (Math.abs(deltaY) > 1) {
+          el.style.transition = 'transform 0.32s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+          el.style.transform = '';
+          el.addEventListener('transitionend', () => { el.style.transition = ''; }, { once: true });
+        }
+      });
+    });
+
     sidebarPositionsRef.current = {};
   }, [sidebarItems]);
 
