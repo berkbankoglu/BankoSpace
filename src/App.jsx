@@ -937,7 +937,8 @@ useEffect(() => {
         requestAnimationFrame(() => {
           document.querySelectorAll('.cc-item[data-todo-id]').forEach(el => {
             if (!el.style.transform) return;
-            el.style.transition = 'transform 0.32s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+            // smooth gliding settle (easeOutQuint) so swapped boxes flow into place
+            el.style.transition = 'transform 0.42s cubic-bezier(0.22, 1, 0.36, 1)';
             el.style.transform = '';
             const done = () => { el.style.transition = ''; el.style.transform = ''; el.removeEventListener('transitionend', done); };
             el.addEventListener('transitionend', done);
