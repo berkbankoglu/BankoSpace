@@ -1609,6 +1609,18 @@
   max-height: 420px;
   object-fit: contain;
 }
+.note-img-preview-loading {
+  width: 240px;
+  height: 160px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.09) 37%, rgba(255,255,255,0.04) 63%);
+  background-size: 400% 100%;
+  animation: note-img-shimmer 1.2s ease-in-out infinite;
+  border-radius: 6px;
+}
+@keyframes note-img-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: 0 0; }
+}
 .note-img-delete-btn {
   position: absolute;
   top: 8px;

@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom';
 import './Notes.css';
 import { playTypeSoundThrottled, playClickSound, playAddSound, playDeleteSound } from '../utils/sounds';
 import { pushKeyToSupabase } from '../supabase';
+import { putImage, getImage, resolveEmbed, newImageId } from '../utils/imageStore';
 
 function rgbToHex(rgb) {
   const m = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
@@ -114,6 +115,10 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
   const historyRef = useRef([content || '']);
   const historyIndexRef = useRef(0);
   const saveTimerRef = useRef(null);
+  // Always-current onChange so the debounced flush / unmount cleanup never
+  // syncs to a stale note.
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
 
   const pushHistory = useCallback((html) => {
     const h = historyRef.current.slice(0, historyIndexRef.current + 1);
@@ -145,16 +150,35 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
     if (pendingImg) setTimeout(() => { titleInputRef.current?.focus(); titleInputRef.current?.select(); }, 0);
   }, [pendingImg]);
 
+  // Read the editor's innerHTML (which serializes the whole note — expensive for
+  // image notes) and sync it up. Debounced so typing stays at native speed; the
+  // contenteditable is uncontrolled, so deferring the sync never lags the caret.
+  const flushInput = useCallback(() => {
+    if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; }
+    if (!editorRef.current) return;
+    const html = editorRef.current.innerHTML;
+    onChangeRef.current(html);
+    pushHistory(html);
+  }, [pushHistory]);
+
   const handleInput = () => {
     playTypeSoundThrottled();
-    if (editorRef.current) {
-      const html = editorRef.current.innerHTML;
-      setIsEmpty(!editorRef.current.textContent?.trim());
-      onChange(html);
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = setTimeout(() => pushHistory(html), 400);
-    }
+    if (!editorRef.current) return;
+    // cheap, immediate — keeps the placeholder state in sync without serializing
+    setIsEmpty(!editorRef.current.textContent?.trim());
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(flushInput, 350);
   };
+
+  // Flush any pending edit when the editor unmounts (note switch) so nothing
+  // typed within the debounce window is lost.
+  useEffect(() => () => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+      if (editorRef.current) onChangeRef.current(editorRef.current.innerHTML);
+    }
+  }, []);
 
   const insertImageEmbed = (dataUrl, title) => {
     if (!dataUrl) return; // still loading
@@ -163,7 +187,11 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
     const span = document.createElement('span');
     span.className = 'note-img-embed';
     span.contentEditable = 'false';
-    span.setAttribute('data-img', dataUrl);
+    // Store the heavy base64 in IndexedDB; keep only a tiny id in the note HTML
+    // so the serialized/synced notes payload stays small.
+    const imgId = newImageId();
+    putImage(imgId, dataUrl);
+    span.setAttribute('data-img-id', imgId);
     span.textContent = title.trim() || 'Screenshot';
     range.deleteContents();
     range.insertNode(span);
@@ -242,8 +270,12 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
       const embed = e.target.closest?.('.note-img-embed');
       if (embed) {
         previewElRef.current = embed;
-        setPreview({ dataUrl: embed.getAttribute('data-img'), x: e.clientX, y: e.clientY, el: embed });
+        setPreview({ dataUrl: null, x: e.clientX, y: e.clientY, el: embed });
         setEmbedHover({ el: embed, rect: embed.getBoundingClientRect() });
+        // resolve from IndexedDB (cached after first hover); ignore if user moved on
+        resolveEmbed(embed).then(url => {
+          setPreview(prev => (prev && prev.el === embed) ? { ...prev, dataUrl: url } : prev);
+        });
       }
     };
     const onMove = (e) => {
@@ -373,6 +405,7 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
         contentEditable
         suppressContentEditableWarning
         onInput={handleInput}
+        onBlur={flushInput}
         onPaste={handlePaste}
         onKeyDown={(e) => {
           const isUndo = (e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'z';
@@ -430,7 +463,9 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
             : { top: preview.y + 20 }),
           left: Math.min(Math.max(8, preview.x - 8), window.innerWidth - 656),
         }}>
-          <img src={preview.dataUrl} className="note-img-preview-img" alt="" />
+          {preview.dataUrl
+            ? <img src={preview.dataUrl} className="note-img-preview-img" alt="" />
+            : <div className="note-img-preview-img note-img-preview-loading" />}
           <button
             className="note-img-delete-btn"
             onMouseEnter={() => { previewPinnedRef.current = true; }}
@@ -450,7 +485,7 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
         >
           <button
             className="note-embed-chip-btn zoom"
-            onClick={(e) => { e.stopPropagation(); setLightbox({ dataUrl: embedHover.el.getAttribute('data-img') }); setLightboxZoom(1); }}
+            onClick={(e) => { e.stopPropagation(); const el = embedHover.el; resolveEmbed(el).then(url => { setLightbox({ dataUrl: url }); setLightboxZoom(1); }); }}
             title="Büyüt"
           >⤢</button>
           <button
@@ -493,6 +528,59 @@ function sanitizeNotes(notes) {
     content: stripLargeImages(n.content || ''),
     subNotes: (n.subNotes || []).map(s => ({ ...s, content: stripLargeImages(s.content || '') })),
   }));
+}
+
+// Move any inline base64 image (legacy `data-img="data:..."`) into IndexedDB and
+// leave only a `data-img-id` reference behind, so the note HTML stays tiny.
+async function externalizeImages(html) {
+  if (!html || html.indexOf('data-img="data:') === -1) return html;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  for (const span of tmp.querySelectorAll('.note-img-embed')) {
+    const legacy = span.getAttribute('data-img');
+    if (legacy && legacy.startsWith('data:')) {
+      const id = newImageId();
+      await putImage(id, legacy);
+      span.removeAttribute('data-img');
+      span.setAttribute('data-img-id', id);
+    }
+  }
+  return tmp.innerHTML;
+}
+
+async function externalizeNotes(notesArr) {
+  const out = [];
+  for (const n of notesArr) {
+    const content = await externalizeImages(n.content);
+    const subNotes = [];
+    for (const s of (n.subNotes || [])) subNotes.push({ ...s, content: await externalizeImages(s.content) });
+    out.push({ ...n, content, subNotes });
+  }
+  return out;
+}
+
+// Reverse of externalize: pull images back from IndexedDB into the HTML so an
+// exported backup file is self-contained.
+async function inlineImages(html) {
+  if (!html || html.indexOf('data-img-id="') === -1) return html;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  for (const span of tmp.querySelectorAll('.note-img-embed[data-img-id]')) {
+    const url = await getImage(span.getAttribute('data-img-id'));
+    if (url) { span.setAttribute('data-img', url); span.removeAttribute('data-img-id'); }
+  }
+  return tmp.innerHTML;
+}
+
+async function inlineNotesForExport(notesArr) {
+  const out = [];
+  for (const n of notesArr) {
+    const content = await inlineImages(n.content);
+    const subNotes = [];
+    for (const s of (n.subNotes || [])) subNotes.push({ ...s, content: await inlineImages(s.content) });
+    out.push({ ...n, content, subNotes });
+  }
+  return out;
 }
 
 function Notes() {
@@ -555,6 +643,24 @@ function Notes() {
       localStorage.setItem('notes_local_backup', serialized);
     }, 2000);
   }, [notes]);
+
+  // One-time migration: move any legacy inline base64 images into IndexedDB so
+  // the live notes payload (serialized + synced on every change) stays tiny.
+  const migratedRef = useRef(false);
+  useEffect(() => {
+    if (migratedRef.current) return;
+    migratedRef.current = true;
+    let cancelled = false;
+    (async () => {
+      const hasInline = notes.some(n =>
+        (n.content || '').indexOf('data-img="data:') !== -1 ||
+        (n.subNotes || []).some(s => (s.content || '').indexOf('data-img="data:') !== -1));
+      if (!hasInline) return;
+      const migrated = await externalizeNotes(notes);
+      if (!cancelled) setNotes(migrated);
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const saveSelection = () => {
     const sel = window.getSelection();
@@ -845,20 +951,24 @@ function Notes() {
         defaultPath: `notlar-${date}.json`,
         filters: [{ name: 'JSON', extensions: ['json'] }],
       });
-      if (filePath) await writeTextFile(filePath, JSON.stringify(notes, null, 2));
+      if (filePath) {
+        const exportable = await inlineNotesForExport(notes);
+        await writeTextFile(filePath, JSON.stringify(exportable, null, 2));
+      }
     } catch (e) { console.error('Export error:', e); }
   };
 
-  const contentToHtml = (html) => {
+  const contentToHtml = async (html) => {
     const tmp = document.createElement('div');
     tmp.innerHTML = html || '';
-    tmp.querySelectorAll('.note-img-embed').forEach(span => {
-      const dataUrl = span.getAttribute('data-img');
+    const spans = [...tmp.querySelectorAll('.note-img-embed')];
+    for (const span of spans) {
+      const dataUrl = await resolveEmbed(span);
       const label = span.textContent.trim();
       const fig = document.createElement('figure');
       fig.style.cssText = 'margin:12px 0;';
       const img = document.createElement('img');
-      img.src = dataUrl;
+      if (dataUrl) img.src = dataUrl;
       img.alt = label;
       img.style.cssText = 'max-width:100%;border-radius:6px;display:block;';
       const cap = document.createElement('figcaption');
@@ -867,7 +977,7 @@ function Notes() {
       fig.appendChild(img);
       fig.appendChild(cap);
       span.parentNode?.replaceChild(fig, span);
-    });
+    }
     return tmp.innerHTML;
   };
 
@@ -882,13 +992,16 @@ function Notes() {
       });
       if (!filePath) return;
 
-      const renderSection = (title, content, level = 2) =>
-        `<section><h${level}>${title || 'Untitled'}</h${level}><div class="content">${contentToHtml(content)}</div></section>`;
+      const renderSection = async (title, content, level = 2) =>
+        `<section><h${level}>${title || 'Untitled'}</h${level}><div class="content">${await contentToHtml(content)}</div></section>`;
 
-      const body = notes.map(n =>
-        renderSection(n.title, n.content) +
-        (n.subNotes?.length ? n.subNotes.map(s => renderSection(s.title, s.content, 3)).join('') : '')
-      ).join('<hr>');
+      const sections = [];
+      for (const n of notes) {
+        let html = await renderSection(n.title, n.content);
+        for (const s of (n.subNotes || [])) html += await renderSection(s.title, s.content, 3);
+        sections.push(html);
+      }
+      const body = sections.join('<hr>');
 
       const fullHtml = `<!DOCTYPE html>
 <html lang="tr">
@@ -924,7 +1037,10 @@ ${body}
       const text = await readTextFile(filePath);
       const imported = JSON.parse(text);
       if (!Array.isArray(imported)) { alert('Invalid file'); return; }
-      setNotes(imported.map(migrateNote));
+      // Pull any inline base64 from the backup into IndexedDB so the live
+      // payload stays small.
+      const externalized = await externalizeNotes(imported.map(migrateNote));
+      setNotes(externalized);
     } catch (e) { console.error('Import error:', e); alert('Could not read file'); }
   };
 
