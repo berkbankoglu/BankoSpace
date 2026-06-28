@@ -1,9 +1,44 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, forwardRef } from 'react';
 import ReactDOM from 'react-dom';
 import './CategoryColumn.css';
 import { playTypeSoundThrottled, playCompleteSound, playUncompleteSound, playDeleteSound } from '../utils/sounds';
 
 const TODO_COLORS = ['#667eea', '#f093fb', '#4ade80', '#60a5fa', '#fb923c', '#f87171', '#facc15', '#9ca3af'];
+
+// Single-line-looking textarea that wraps long text onto new lines and grows
+// downward instead of scrolling sideways. Plain Enter submits (handled by the
+// caller's onKeyDown); Shift+Enter inserts a newline.
+const GrowTextarea = forwardRef(function GrowTextarea({ value, onKeyDown, className, ...rest }, ref) {
+  const innerRef = useRef(null);
+  const setRefs = (el) => {
+    innerRef.current = el;
+    if (typeof ref === 'function') ref(el);
+    else if (ref) ref.current = el;
+  };
+  const resize = (el) => {
+    if (!el) return;
+    el.style.height = 'auto';
+    const max = 240;
+    const h = el.scrollHeight;
+    el.style.height = Math.min(h, max) + 'px';
+    el.style.overflowY = h > max ? 'auto' : 'hidden';
+  };
+  useEffect(() => { resize(innerRef.current); }, [value]);
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) e.preventDefault(); // submit, never insert a newline
+    onKeyDown && onKeyDown(e);
+  };
+  return (
+    <textarea
+      ref={setRefs}
+      rows={1}
+      className={className}
+      value={value}
+      onKeyDown={handleKeyDown}
+      {...rest}
+    />
+  );
+});
 
 function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDeleteTodo, onUpdateTodo, currentFilter, onRename, onAddSubtask, onToggleSubtask, onDeleteSubtask, onUpdateSubtask, onReorder, onTodoDragStart }) {
   const [inputValue, setInputValue] = useState('');
@@ -217,9 +252,8 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
       {/* Add New Task - Top */}
       <div className="cc-add-row">
         <div className="cc-add-input-wrapper">
-          <input
+          <GrowTextarea
             ref={inputRef}
-            type="text"
             className="cc-add-input"
             placeholder="Add task and press Enter..."
             value={inputValue}
@@ -298,9 +332,8 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
             {/* Bottom row: text */}
             <label className="cc-label">
               {editingTodoId === todo.id ? (
-                <input
+                <GrowTextarea
                   ref={editInputRef}
-                  type="text"
                   className="cc-edit-input"
                   value={editingTodoText}
                   onChange={(e) => { playTypeSoundThrottled(); setEditingTodoText(e.target.value); }}
@@ -352,9 +385,8 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
                       />
                       <span className="cc-checkmark small"></span>
                       {editingSubtaskId === subtask.id ? (
-                        <input
+                        <GrowTextarea
                           ref={editSubtaskInputRef}
-                          type="text"
                           className="cc-edit-input"
                           value={editingSubtaskText}
                           onChange={(e) => { playTypeSoundThrottled(); setEditingSubtaskText(e.target.value); }}
@@ -398,15 +430,13 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
                   </div>
                 ))}
                 <div className="cc-subtask-add">
-                  <input
-                    type="text"
+                  <GrowTextarea
                     className="cc-subtask-input"
                     placeholder="Add subtask..."
                     value={subtaskInputs[todo.id] || ''}
                     onChange={(e) => { playTypeSoundThrottled(); setSubtaskInputs(prev => ({ ...prev, [todo.id]: e.target.value })); }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && (subtaskInputs[todo.id] || '').trim()) {
-                        e.preventDefault();
                         handleAddSubtask(todo.id);
                       }
                     }}
