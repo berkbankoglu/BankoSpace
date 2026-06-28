@@ -785,38 +785,99 @@ function Notes() {
     return () => container.removeEventListener('scroll', onScroll);
   }, [animKey]);
 
+  // Restore caret after Alt+Tab. We keep a live copy of the caret while editing
+  // and remember whether the editor "owned" focus. The reliable trigger to put
+  // focus back is Tauri's window focus event — in WebView2 the DOM `window`
+  // 'focus' event frequently does NOT fire on Alt+Tab (which is exactly why the
+  // old version never restored). DOM 'focus' is kept only as a fallback.
   useEffect(() => {
-    let editorWasFocused = false;
+    const editor = editorRef.current;
+    if (!editor) return;
+    let editorActive = false;
     let savedRange = null;
+    let unlistenTauri = null;
+    let tauriWin = null;
+    let disposed = false;
 
-    const onWindowBlur = () => {
-      editorWasFocused = document.activeElement === editorRef.current;
+    const saveRange = () => {
       const sel = window.getSelection();
-      if (sel && sel.rangeCount > 0) {
-        try { savedRange = sel.getRangeAt(0).cloneRange(); } catch (e) { savedRange = null; }
+      if (sel && sel.rangeCount > 0 && editor.contains(sel.anchorNode)) {
+        try { savedRange = sel.getRangeAt(0).cloneRange(); } catch (e) {}
       }
     };
 
-    const onWindowFocus = () => {
-      if (!editorWasFocused || !editorRef.current) return;
+    const onEditorFocus = () => { editorActive = true; };
+
+    const onEditorBlur = () => {
+      saveRange();
+      // Keep the "was editing" intent unless focus explicitly moved to another
+      // text field (clicking a toolbar button or losing the window keeps it).
       setTimeout(() => {
+        const ae = document.activeElement;
+        const movedToField = ae && ae !== editor &&
+          (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable);
+        if (movedToField) editorActive = false;
+      }, 0);
+    };
+
+    const onSelectionChange = () => { if (document.activeElement === editor) saveRange(); };
+
+    // WebView2 ignores programmatic focus until its web content has reclaimed
+    // input focus after the window is reactivated. We retry aggressively over
+    // ~2s until the editor actually becomes the active element, and re-apply the
+    // saved caret each time. Triggered both by JS focus signals and directly by
+    // Rust (which calls window.__restoreNoteFocus after wv.set_focus()).
+    let rafId = 0;
+    const restore = () => {
+      if (disposed || (!editorActive && !savedRange)) return;
+      let attempts = 0;
+      const tryFocus = () => {
+        if (disposed || document.activeElement === editor) return;
+        attempts++;
+        try { tauriWin && tauriWin.setFocus(); } catch (e) {}
         try {
-          editorRef.current?.focus();
-          if (savedRange && editorRef.current?.contains(savedRange.startContainer)) {
+          editor.focus({ preventScroll: true });
+          if (savedRange && editor.contains(savedRange.startContainer)) {
             const sel = window.getSelection();
             if (sel) { sel.removeAllRanges(); sel.addRange(savedRange); }
           }
         } catch (e) {}
-      }, 50);
+        if (document.activeElement !== editor && attempts < 40) {
+          setTimeout(tryFocus, attempts < 12 ? 40 : 100);
+        }
+      };
+      tryFocus();
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(tryFocus);
     };
+    window.__restoreNoteFocus = restore;
 
-    window.addEventListener('blur', onWindowBlur);
-    window.addEventListener('focus', onWindowFocus);
+    editor.addEventListener('focus', onEditorFocus);
+    editor.addEventListener('blur', onEditorBlur);
+    document.addEventListener('selectionchange', onSelectionChange);
+    window.addEventListener('focus', restore);
+
+    // Primary, reliable signal in Tauri/WebView2.
+    import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
+      if (disposed) return;
+      tauriWin = getCurrentWindow();
+      tauriWin
+        .onFocusChanged(({ payload: focused }) => { if (focused) restore(); })
+        .then(un => { if (disposed) un(); else unlistenTauri = un; })
+        .catch(() => {});
+    }).catch(() => {});
+
     return () => {
-      window.removeEventListener('blur', onWindowBlur);
-      window.removeEventListener('focus', onWindowFocus);
+      disposed = true;
+      cancelAnimationFrame(rafId);
+      if (window.__restoreNoteFocus === restore) delete window.__restoreNoteFocus;
+      editor.removeEventListener('focus', onEditorFocus);
+      editor.removeEventListener('blur', onEditorBlur);
+      document.removeEventListener('selectionchange', onSelectionChange);
+      window.removeEventListener('focus', restore);
+      if (unlistenTauri) unlistenTauri();
     };
-  }, []);
+  }, [selected]);
 
   const createNote = () => {
     const id = Date.now();

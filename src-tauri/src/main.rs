@@ -231,7 +231,18 @@ toggle_kana_window,
                             let _ = child.show();
                         }
                         if let Some(wv) = app.get_webview_window("main") {
-                            let _ = wv.eval("window.dispatchEvent(new Event('resize')); window.dispatchEvent(new Event('focus'));");
+                            // Webview içeriğine klavye odağını ver — Alt+Tab sonrası
+                            // contenteditable'a JS focus()'un tutması için şart.
+                            let _ = wv.set_focus();
+                            let _ = wv.eval("window.dispatchEvent(new Event('resize')); window.dispatchEvent(new Event('focus')); if(window.__restoreNoteFocus){window.__restoreNoteFocus();}");
+                            // Pencere tam aktifleşmeden set_focus yok sayılabiliyor —
+                            // kısa gecikmeyle ikinci bir deneme yap.
+                            let wv2 = wv.clone();
+                            std::thread::spawn(move || {
+                                std::thread::sleep(std::time::Duration::from_millis(120));
+                                let _ = wv2.set_focus();
+                                let _ = wv2.eval("if(window.__restoreNoteFocus){window.__restoreNoteFocus();}");
+                            });
                         }
                     }
                 }
