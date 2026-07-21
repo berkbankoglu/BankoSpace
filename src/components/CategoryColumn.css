@@ -214,6 +214,17 @@
   background: rgba(255, 255, 255, 0.02);
 }
 
+/* While a subtask is dragged over another todo, ONLY that todo's left color
+   bar glows (in its own color, --drop-glow set from JS). Nothing else on the
+   item changes, and the glow lives on the bar so the item's own entrance
+   `animation` is never touched (no reload-looking flash on leave). */
+/* Steady glow while a subtask hovers over the todo — the bar itself lights up
+   (brightness + a tight bloom hugging its shape), no blinking, no sideways
+   spread into the rest of the todo. */
+.cc-item.cc-subtask-drop-target .cc-item-color-bar {
+  filter: brightness(1.6) drop-shadow(0 0 5px var(--drop-glow, #58a6ff));
+}
+
 .cc-item.completed {
   opacity: 0.6;
 }

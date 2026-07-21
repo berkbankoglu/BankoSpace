@@ -40,7 +40,7 @@ const GrowTextarea = forwardRef(function GrowTextarea({ value, onKeyDown, classN
   );
 });
 
-function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDeleteTodo, onUpdateTodo, currentFilter, onRename, onAddSubtask, onToggleSubtask, onDeleteSubtask, onUpdateSubtask, onReorder, onTodoDragStart }) {
+function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDeleteTodo, onUpdateTodo, currentFilter, onRename, onAddSubtask, onToggleSubtask, onDeleteSubtask, onUpdateSubtask, onReorder, onTodoDragStart, onMoveSubtask }) {
   const [inputValue, setInputValue] = useState('');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editTitleValue, setEditTitleValue] = useState(title);
@@ -169,6 +169,12 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
     e.stopPropagation();
     setPressedSubtaskId(subtaskId);
     subtaskDragRef.current = { todoId, subtaskId, index, started: false };
+    let crossTargetId = null; // id of a *different* todo the cursor is over
+    let crossEl = null;       // its highlighted DOM element
+    const clearCross = () => {
+      if (crossEl) { crossEl.classList.remove('cc-subtask-drop-target'); crossEl.style.removeProperty('--drop-glow'); crossEl = null; }
+      crossTargetId = null;
+    };
 
     const onMouseMove = (me) => {
       if (!subtaskDragRef.current) return;
@@ -176,6 +182,31 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
         subtaskDragRef.current.started = true;
         setDraggingSubtask({ todoId, subtaskId, index });
       }
+
+      // Cross-todo move: is the cursor over a DIFFERENT todo (any column)?
+      const under = document.elementFromPoint(me.clientX, me.clientY);
+      const itemEl = under && under.closest ? under.closest('.cc-item[data-todo-id]') : null;
+      const overTodoId = itemEl ? itemEl.getAttribute('data-todo-id') : null;
+      if (overTodoId && overTodoId !== String(todoId)) {
+        if (crossEl !== itemEl) {
+          clearCross();
+          crossEl = itemEl;
+          // Glow in the target todo's own color (from its left color bar)
+          const bar = itemEl.querySelector('.cc-item-color-bar');
+          const color = bar ? getComputedStyle(bar).backgroundColor : '';
+          if (color && color !== 'rgba(0, 0, 0, 0)' && color !== 'transparent') {
+            itemEl.style.setProperty('--drop-glow', color);
+          }
+          itemEl.classList.add('cc-subtask-drop-target');
+        }
+        crossTargetId = overTodoId;
+        subtaskDragOverRef.current = null;
+        setDragOverSubtask(null);
+        return;
+      }
+
+      // Otherwise: reorder within the same todo (existing behavior)
+      clearCross();
       const els = document.querySelectorAll(`.cc-subtask[data-subtask-todoid="${todoId}"]`);
       let overIdx = null;
       els.forEach((el, i) => {
@@ -191,14 +222,26 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
     const onMouseUp = () => {
       document.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('mouseup', onMouseUp);
-      if (!subtaskDragRef.current?.started) { subtaskDragRef.current = null; return; }
-      const { todoId: tid, index: fromIdx } = subtaskDragRef.current;
+      const started = subtaskDragRef.current?.started;
+      const dragged = subtaskDragRef.current || {};
+      const { todoId: tid, subtaskId: sid, index: fromIdx } = dragged;
       const toIdx = subtaskDragOverRef.current;
+      const targetTodoId = crossTargetId;
+      clearCross();
       subtaskDragRef.current = null;
       subtaskDragOverRef.current = null;
       setDraggingSubtask(null);
       setDragOverSubtask(null);
       setPressedSubtaskId(null);
+      if (!started) return;
+
+      // Dropped onto another todo → move the subtask there
+      if (targetTodoId && targetTodoId !== String(tid)) {
+        onMoveSubtask && onMoveSubtask(tid, sid, targetTodoId);
+        return;
+      }
+
+      // Reorder within the same todo
       if (toIdx !== null && toIdx !== undefined && toIdx !== fromIdx) {
         const todo = todos.find(t => t.id === tid);
         if (!todo) return;

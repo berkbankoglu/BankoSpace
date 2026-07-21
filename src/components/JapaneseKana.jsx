@@ -1662,10 +1662,13 @@ export function PracticeTab({ selectedRows, setSelectedRows }) {
     direction === "Kana → Romaji" ? current?.romaji : current?.char;
   const questionIsKana = direction === "Kana → Romaji";
 
-  function handleSubmit() {
+  function handleSubmit(rawValue) {
     if (!current || feedback !== null) return;
 
-    const trimmed = input.trim().toLowerCase();
+    // rawValue passed by the auto-check on change (state hasn't updated yet);
+    // ignore it when handleSubmit is used as a click handler (event object).
+    const val = typeof rawValue === 'string' ? rawValue : input;
+    const trimmed = val.trim().toLowerCase();
     const isCorrect = trimmed === answer?.toLowerCase();
 
     const newStats = {
@@ -1922,7 +1925,21 @@ export function PracticeTab({ selectedRows, setSelectedRows }) {
                 className="kana-input"
                 type="text"
                 value={input}
-                onChange={(e) => { setInput(e.target.value); if (e.target.value.length > input.length) playTypeSound(); }}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setInput(v);
+                  if (v.length > input.length) playTypeSound();
+                  // Auto-check without pressing Enter: as soon as the typed
+                  // romaji equals the answer → accept & advance; once at least
+                  // as many chars are typed but it's wrong → mark wrong (red).
+                  if (feedback !== null || !current || e.nativeEvent?.isComposing) return;
+                  const t = v.trim().toLowerCase();
+                  const a = (answer || "").toLowerCase();
+                  if (!a) return;
+                  const romajiAns = /^[a-z]+$/.test(a); // skip length-check for kana (IME) answers
+                  if (t === a) handleSubmit(v);
+                  else if (romajiAns && t.length >= a.length) handleSubmit(v);
+                }}
                 onKeyDown={handleKeyDown}
                 placeholder={direction === "Kana → Romaji" ? "Type romaji..." : "Type kana..."}
                 disabled={feedback !== null}
@@ -1930,7 +1947,7 @@ export function PracticeTab({ selectedRows, setSelectedRows }) {
                 spellCheck={false}
               />
               {feedback === null && (
-                <button className="submit-btn" onClick={handleSubmit}>
+                <button className="submit-btn" onClick={() => handleSubmit()}>
                   Check
                 </button>
               )}
