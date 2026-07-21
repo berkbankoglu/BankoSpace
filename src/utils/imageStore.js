@@ -14,6 +14,18 @@ const DB_VERSION = 1;
 let dbPromise = null;
 const memCache = new Map(); // id -> dataUrl, avoids repeat IDB reads on hover
 
+// LRU cap: dataUrl'ler megabaytlarca olabiliyor; sınırsız cache uzun oturumlarda
+// renderer'ı OOM'a sürükleyip beyaz ekran/çökmeye neden oluyordu. En eski girdiler
+// atılır — görsel zaten IndexedDB'de, tekrar okunur.
+const MEM_CACHE_MAX = 40;
+function cacheSet(id, dataUrl) {
+  if (memCache.has(id)) memCache.delete(id); // yeniden ekleyerek en sona taşı (LRU)
+  memCache.set(id, dataUrl);
+  while (memCache.size > MEM_CACHE_MAX) {
+    memCache.delete(memCache.keys().next().value);
+  }
+}
+
 function openDB() {
   if (dbPromise) return dbPromise;
   dbPromise = new Promise((resolve, reject) => {
@@ -42,7 +54,7 @@ export function newImageId() {
 // synchronously so reads right after a paste are instant).
 export async function putImage(id, dataUrl) {
   if (!id || !dataUrl) return;
-  memCache.set(id, dataUrl);
+  cacheSet(id, dataUrl);
   try {
     const db = await openDB();
     await new Promise((resolve, reject) => {
@@ -59,7 +71,11 @@ export async function putImage(id, dataUrl) {
 // Resolve a data URL by id (null if missing). Uses the in-memory cache first.
 export async function getImage(id) {
   if (!id) return null;
-  if (memCache.has(id)) return memCache.get(id);
+  if (memCache.has(id)) {
+    const val = memCache.get(id);
+    cacheSet(id, val); // LRU: erişileni en sona taşı
+    return val;
+  }
   try {
     const db = await openDB();
     const val = await new Promise((resolve, reject) => {
@@ -68,7 +84,7 @@ export async function getImage(id) {
       r.onsuccess = () => resolve(r.result || null);
       r.onerror = () => reject(r.error);
     });
-    if (val) memCache.set(id, val);
+    if (val) cacheSet(id, val);
     return val;
   } catch (e) {
     console.error('imageStore.getImage failed', e);

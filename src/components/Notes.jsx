@@ -822,19 +822,16 @@ function Notes() {
 
     const onSelectionChange = () => { if (document.activeElement === editor) saveRange(); };
 
-    // WebView2 ignores programmatic focus until its web content has reclaimed
-    // input focus after the window is reactivated. We retry aggressively over
-    // ~2s until the editor actually becomes the active element, and re-apply the
-    // saved caret each time. Triggered both by JS focus signals and directly by
-    // Rust (which calls window.__restoreNoteFocus after wv.set_focus()).
-    let rafId = 0;
+    // Rust already hands keyboard focus to the webview (wv.set_focus) before
+    // calling this, so here we only need to focus the editor element and restore
+    // the caret — a few light retries, no window.setFocus() IPC hammering and no
+    // rAF loop (the old aggressive version could pile up and freeze the app).
     const restore = () => {
       if (disposed || (!editorActive && !savedRange)) return;
       let attempts = 0;
       const tryFocus = () => {
         if (disposed || document.activeElement === editor) return;
         attempts++;
-        try { tauriWin && tauriWin.setFocus(); } catch (e) {}
         try {
           editor.focus({ preventScroll: true });
           if (savedRange && editor.contains(savedRange.startContainer)) {
@@ -842,13 +839,9 @@ function Notes() {
             if (sel) { sel.removeAllRanges(); sel.addRange(savedRange); }
           }
         } catch (e) {}
-        if (document.activeElement !== editor && attempts < 40) {
-          setTimeout(tryFocus, attempts < 12 ? 40 : 100);
-        }
+        if (document.activeElement !== editor && attempts < 5) setTimeout(tryFocus, 80);
       };
       tryFocus();
-      cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(tryFocus);
     };
     window.__restoreNoteFocus = restore;
 
@@ -869,7 +862,6 @@ function Notes() {
 
     return () => {
       disposed = true;
-      cancelAnimationFrame(rafId);
       if (window.__restoreNoteFocus === restore) delete window.__restoreNoteFocus;
       editor.removeEventListener('focus', onEditorFocus);
       editor.removeEventListener('blur', onEditorBlur);

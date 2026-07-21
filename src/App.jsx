@@ -207,14 +207,28 @@ function App({ session, onLogout }) {
 
       const debounceTimers = {};
       const pendingKeys = {};
+      const lastPushed = {}; // dedupe: skip re-syncing identical values
 
       localStorage.__origSetItem = origSetItem;
       localStorage.setItem = function(key, value) {
+        // Time the (synchronous) write so a slow, main-thread-blocking write
+        // surfaces in the console instead of being an invisible freeze.
+        const t0 = performance.now();
         origSetItem(key, value);
+        const dt = performance.now() - t0;
+        if (dt > 60) {
+          const msg = `SLOW setItem('${key}') ${Math.round(dt)}ms (${((value?.length || 0) / 1024).toFixed(0)}KB)`;
+          if (window.__diag) window.__diag(msg, true); else console.warn('[perf]', msg);
+        }
+
         if (!window.__supabasePulling && SYNC_KEYS.includes(key)) {
+          // Same value already pending/synced → don't schedule another push
+          // (autosave effects often re-write identical data on unrelated renders).
+          if (lastPushed[key] === value) return;
           pendingKeys[key] = value;
           clearTimeout(debounceTimers[key]);
           debounceTimers[key] = setTimeout(() => {
+            lastPushed[key] = value;
             pushKeyToSupabase(key, value);
             delete pendingKeys[key];
           }, 2000);
@@ -706,6 +720,27 @@ useEffect(() => {
     }));
   };
 
+  // Move a subtask out of one todo and into another (drag-drop across todos,
+  // possibly across category columns). Target id may arrive as a string.
+  const moveSubtaskToTodo = (fromTodoId, subtaskId, toTodoId) => {
+    if (String(fromTodoId) === String(toTodoId)) return;
+    setTodos(prev => {
+      const from = prev.find(t => String(t.id) === String(fromTodoId));
+      const sub = from?.subtasks?.find(s => String(s.id) === String(subtaskId));
+      if (!sub) return prev;
+      return prev.map(t => {
+        if (String(t.id) === String(fromTodoId)) {
+          return { ...t, subtasks: (t.subtasks || []).filter(s => String(s.id) !== String(subtaskId)) };
+        }
+        if (String(t.id) === String(toTodoId)) {
+          return { ...t, subtasks: [...(t.subtasks || []), sub] };
+        }
+        return t;
+      });
+    });
+    playClickSound();
+  };
+
   const updateSubtask = (todoId, subtaskId, newText) => {
     setTodos(todos.map(todo => {
       if (todo.id === todoId) {
@@ -1134,7 +1169,7 @@ useEffect(() => {
 
     const warning2 = window.prompt('⚠️ FINAL WARNING: This action CANNOT be undone!\n\n' +
       'All your data will be PERMANENTLY deleted.\n' +
-      'Your Firebase data will also be deleted.\n\n' +
+      'Your cloud (Supabase) data will also be deleted.\n\n' +
       'Type "RESET" to confirm:');
 
     if (warning2 !== 'RESET') {
@@ -1786,6 +1821,7 @@ useEffect(() => {
                   onUpdateSubtask={updateSubtask}
                   onReorder={reorderTodos}
                   onTodoDragStart={handleTodoDragStart}
+                  onMoveSubtask={moveSubtaskToTodo}
                 />
               </div>
               <div className="col-resize-handle" onMouseDown={e => startColResize(0, e)} onDoubleClick={() => { setColWidths(DEFAULT_COL_PX); localStorage.setItem('dashColWidths', JSON.stringify(DEFAULT_COL_PX)); }} />
@@ -1806,6 +1842,7 @@ useEffect(() => {
                   onUpdateSubtask={updateSubtask}
                   onReorder={reorderTodos}
                   onTodoDragStart={handleTodoDragStart}
+                  onMoveSubtask={moveSubtaskToTodo}
                 />
               </div>
               <div className="col-resize-handle" onMouseDown={e => startColResize(1, e)} onDoubleClick={() => { setColWidths(DEFAULT_COL_PX); localStorage.setItem('dashColWidths', JSON.stringify(DEFAULT_COL_PX)); }} />

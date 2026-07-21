@@ -97,6 +97,8 @@
             "core:window:allow-is-visible",
             "core:window:allow-set-focus",
             "core:window:allow-set-size",
+            "core:window:allow-set-decorations",
+            "core:window:allow-internal-toggle-maximize",
             "shell:allow-open",
             "deep-link:default"
           ]

@@ -17,6 +17,34 @@ fn get_client() -> &'static reqwest::Client {
     })
 }
 
+// --- Freeze/crash diagnostics --------------------------------------------
+// Appends a timeline to %USERPROFILE%\bankospace-diag.log so freezes can be
+// diagnosed after the fact. JS reports via the diag_log command; Rust logs
+// renderer-crash events directly.
+fn diag_path() -> std::path::PathBuf {
+    let base = std::env::var("USERPROFILE").unwrap_or_else(|_| ".".into());
+    std::path::Path::new(&base).join("bankospace-diag.log")
+}
+
+fn write_diag(line: &str) {
+    use std::io::Write;
+    let path = diag_path();
+    // simple rotation so the file can't grow without bound
+    if let Ok(meta) = std::fs::metadata(&path) {
+        if meta.len() > 5_000_000 {
+            let _ = std::fs::remove_file(&path);
+        }
+    }
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
+        let _ = writeln!(f, "{}", line);
+    }
+}
+
+#[tauri::command]
+fn diag_log(line: String) {
+    write_diag(&line);
+}
+
 #[tauri::command]
 async fn create_child_webview(
     app: tauri::AppHandle,
@@ -179,14 +207,65 @@ async fn fetch_get(url: String, headers: std::collections::HashMap<String, Strin
     Ok(text)
 }
 
+// Renderer/GPU process çöktüğünde veya yanıt vermez hale geldiğinde WebView2
+// sonsuza dek beyaz ekranda kalır — ProcessFailed olayını dinleyip otomatik
+// Reload ile kurtarıyoruz.
+#[cfg(windows)]
+fn install_crash_recovery(app: &tauri::App) {
+    use webview2_com::Microsoft::Web::WebView2::Win32::{
+        COREWEBVIEW2_PROCESS_FAILED_KIND, COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_EXITED,
+        COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_UNRESPONSIVE,
+    };
+    use webview2_com::ProcessFailedEventHandler;
+
+    for (_, window) in app.webview_windows() {
+        let _ = window.with_webview(|webview| unsafe {
+            let Ok(core) = webview.controller().CoreWebView2() else { return };
+            let handler = ProcessFailedEventHandler::create(Box::new(|sender, args| {
+                if let (Some(sender), Some(args)) = (sender, args) {
+                    let mut kind = COREWEBVIEW2_PROCESS_FAILED_KIND::default();
+                    let _ = args.ProcessFailedKind(&mut kind);
+                    // Renderer öldü veya kilitlendi → sayfayı yeniden yükle.
+                    // (Browser process ölümü Reload ile kurtarılamaz; GPU process
+                    // ölümünü WebView2 zaten kendisi toparlar.)
+                    if kind == COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_EXITED
+                        || kind == COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_UNRESPONSIVE
+                    {
+                        write_diag(&format!(
+                            "RUST: !!! RENDERER FAILED kind={} → Reload() (EXITED=crash/OOM, UNRESPONSIVE=hang)",
+                            kind.0
+                        ));
+                        let _ = sender.Reload();
+                    }
+                }
+                Ok(())
+            }));
+            let mut token: i64 = 0;
+            let _ = core.add_ProcessFailed(&handler, &mut token);
+        });
+    }
+}
+
 fn main() {
-    // WebView2 Alt+Tab freeze fix — arka planda renderer'ı yavaşlatma
+    // WebView2 Alt+Tab freeze fix: CalculateNativeWinOcclusion, pencere arkada
+    // kalınca render'ın yanlışlıkla durdurulmasını engeller (bilinen WebView2 bug'ı).
+    // NOT: --disable-gpu-vsync ve --disable-frame-rate-limit burada DURMAMALI —
+    // compositor'ı sınırsız FPS'e zorlayıp GPU'yu tüketiyor ve sürücü resetiyle
+    // beyaz ekran/donmaya yol açıyorlardı. --disable-hang-monitor da Chromium'un
+    // kilitlenen renderer'ı kurtarmasını engelliyordu.
     std::env::set_var(
         "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
-        "--disable-renderer-backgrounding --disable-backgrounding-occluded-windows --disable-background-timer-throttling --disable-hang-monitor --disable-features=CalculateNativeWinOcclusion --disable-gpu-vsync --disable-frame-rate-limit",
+        "--disable-features=CalculateNativeWinOcclusion --disable-renderer-backgrounding --disable-backgrounding-occluded-windows --disable-background-timer-throttling",
     );
 
+    write_diag("RUST: ===== PROCESS START =====");
+
     tauri::Builder::default()
+        .setup(|app| {
+            #[cfg(windows)]
+            install_crash_recovery(app);
+            Ok(())
+        })
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.unminimize();
@@ -211,6 +290,7 @@ toggle_kana_window,
             hide_child_webview,
             close_child_webview,
             set_child_webview_bounds,
+            diag_log,
         ])
         .on_window_event(|window, event| {
             match event {
@@ -232,17 +312,11 @@ toggle_kana_window,
                         }
                         if let Some(wv) = app.get_webview_window("main") {
                             // Webview içeriğine klavye odağını ver — Alt+Tab sonrası
-                            // contenteditable'a JS focus()'un tutması için şart.
+                            // contenteditable'a JS focus()'un tutması için. Tek çağrı:
+                            // eskiden thread + tekrarlı eval + JS setFocus döngüsü vardı,
+                            // odak titrediğinde birikip donmaya yol açabiliyordu.
                             let _ = wv.set_focus();
-                            let _ = wv.eval("window.dispatchEvent(new Event('resize')); window.dispatchEvent(new Event('focus')); if(window.__restoreNoteFocus){window.__restoreNoteFocus();}");
-                            // Pencere tam aktifleşmeden set_focus yok sayılabiliyor —
-                            // kısa gecikmeyle ikinci bir deneme yap.
-                            let wv2 = wv.clone();
-                            std::thread::spawn(move || {
-                                std::thread::sleep(std::time::Duration::from_millis(120));
-                                let _ = wv2.set_focus();
-                                let _ = wv2.eval("if(window.__restoreNoteFocus){window.__restoreNoteFocus();}");
-                            });
+                            let _ = wv.eval("window.dispatchEvent(new Event('resize')); if(window.__restoreNoteFocus){window.__restoreNoteFocus();}");
                         }
                     }
                 }
