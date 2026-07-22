@@ -311,12 +311,7 @@ toggle_kana_window,
                             let _ = child.show();
                         }
                         if let Some(wv) = app.get_webview_window("main") {
-                            // Webview içeriğine klavye odağını ver — Alt+Tab sonrası
-                            // contenteditable'a JS focus()'un tutması için. Tek çağrı:
-                            // eskiden thread + tekrarlı eval + JS setFocus döngüsü vardı,
-                            // odak titrediğinde birikip donmaya yol açabiliyordu.
-                            let _ = wv.set_focus();
-                            let _ = wv.eval("window.dispatchEvent(new Event('resize')); if(window.__restoreNoteFocus){window.__restoreNoteFocus();}");
+                            let _ = wv.eval("window.dispatchEvent(new Event('resize')); window.dispatchEvent(new Event('focus'));");
                         }
                     }
                 }
