@@ -78,7 +78,8 @@ export function initDiag() {
     const now = performance.now();
     const gap = now - last;
     last = now;
-    if (gap > 3500) diag(`FREEZE gap=${Math.round(gap)}ms (UI was blocked ~${Math.round(gap - 2000)}ms)${mem()}`, true);
+    if (gap > 120000) diag(`SUSPEND gap=${Math.round(gap / 1000)}s (uyku/arka plan — donma değil)${mem()}`);
+    else if (gap > 3500) diag(`FREEZE gap=${Math.round(gap)}ms (UI was blocked ~${Math.round(gap - 2000)}ms)${mem()}`, true);
     else if (++tick % 15 === 0) diag(`hb${mem()}`);
   }, 2000);
 
