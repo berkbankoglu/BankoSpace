@@ -92,7 +92,7 @@ function QuickLaunchPanel() {
 import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, setVolume, getVolume } from './utils/sounds';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
-const APP_VERSION = '4.1.3';
+const APP_VERSION = '4.2.0';
 const MIN_COL_PX = 220;
 const DEFAULT_COL_PX = [null, null, null]; // [dailyPx, weeklyPx, monthlyPx] — null = auto (flex:1)
 
