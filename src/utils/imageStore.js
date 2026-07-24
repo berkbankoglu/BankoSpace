@@ -100,3 +100,40 @@ export async function resolveEmbed(el) {
   if (legacy && legacy.startsWith('data:')) return legacy;
   return getImage(el.getAttribute('data-img-id'));
 }
+
+// ── Annotation strokes ──────────────────────────────────────────────────
+// Freehand drawings made over a canvas image, stored next to the image bytes
+// under 'strokes_<imgId>'. Vector data (normalized 0..1 coords) so it scales
+// to any display size; tiny compared to the image itself. Not memcached —
+// the LRU cache assumes dataUrl strings.
+
+export async function putStrokes(id, strokes) {
+  if (!id) return;
+  try {
+    const db = await openDB();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).put(strokes, 'strokes_' + id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (e) {
+    console.error('imageStore.putStrokes failed', e);
+  }
+}
+
+export async function getStrokes(id) {
+  if (!id) return null;
+  try {
+    const db = await openDB();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readonly');
+      const r = tx.objectStore(STORE).get('strokes_' + id);
+      r.onsuccess = () => resolve(r.result || null);
+      r.onerror = () => reject(r.error);
+    });
+  } catch (e) {
+    console.error('imageStore.getStrokes failed', e);
+    return null;
+  }
+}

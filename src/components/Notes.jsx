@@ -3,7 +3,25 @@ import ReactDOM from 'react-dom';
 import './Notes.css';
 import { playTypeSoundThrottled, playClickSound, playAddSound, playDeleteSound } from '../utils/sounds';
 import { pushKeyToSupabase } from '../supabase';
-import { putImage, getImage, resolveEmbed, newImageId } from '../utils/imageStore';
+import { putImage, getImage, resolveEmbed, newImageId, putStrokes, getStrokes } from '../utils/imageStore';
+
+// Render annotation strokes (normalized 0..1 coords) onto a 2D context of
+// css-pixel size W×H. Used by both the note thumbnail and the lightbox.
+function drawStrokesOn(ctx, strokes, W, H) {
+  if (!strokes || !strokes.length) return;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  for (const st of strokes) {
+    const pts = st.pts;
+    if (!pts || pts.length < 2) continue;
+    ctx.strokeStyle = st.c;
+    ctx.lineWidth = Math.max(0.75, st.s * W);
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0] * W, pts[0][1] * H);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0] * W, pts[i][1] * H);
+    ctx.stroke();
+  }
+}
 
 function rgbToHex(rgb) {
   const m = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
@@ -95,7 +113,7 @@ function migrateNote(note) {
   };
 }
 
-const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, ref) => {
+const RichTextEditor = forwardRef(({ content, placeholder, onChange, style, onPasteImage }, ref) => {
   const editorRef = useRef(null);
   const [isEmpty, setIsEmpty] = useState(!content);
   const [pendingImg, setPendingImg] = useState(null); // { dataUrl, anchorRect }
@@ -207,6 +225,8 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
     if (editorRef.current) { setIsEmpty(false); const html = editorRef.current.innerHTML; onChange(html); pushHistory(html); }
   };
 
+  // Pasted images become free-floating canvas items (draggable anywhere over
+  // the note) instead of inline chips in the text.
   const handlePaste = (e) => {
     const now = Date.now();
     if (now - lastPasteRef.current < 600) return;
@@ -216,46 +236,19 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style }, re
     if (!imageItem) return;
     e.preventDefault();
     const file = imageItem.getAsFile();
-    if (!file) return;
-
-    const sel = window.getSelection();
-    pendingRangeRef.current = sel?.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
-
-    // Measure cursor position using a hidden anchor span (synchronous — no paint between insert and remove)
-    let anchorRect = { top: 120, left: 200 };
-    if (pendingRangeRef.current) {
-      const anchor = document.createElement('span');
-      anchor.style.cssText = 'visibility:hidden;font-size:0;line-height:0;';
-      anchor.textContent = '|';
-      pendingRangeRef.current.insertNode(anchor);
-      const r = anchor.getBoundingClientRect();
-      if (r.width > 0 || r.height > 0) {
-        anchorRect = { top: r.bottom + 6, left: r.left };
-      } else if (editorRef.current) {
-        // anchor had no size — use its parent line position
-        const parent = anchor.parentElement;
-        const pr = parent ? parent.getBoundingClientRect() : editorRef.current.getBoundingClientRect();
-        anchorRect = { top: pr.bottom + 6, left: pr.left + 20 };
-      }
-      anchor.remove();
-      // Re-save range after DOM mutation
-      pendingRangeRef.current = window.getSelection()?.rangeCount > 0
-        ? window.getSelection().getRangeAt(0).cloneRange()
-        : null;
-    }
+    if (!file || !onPasteImage) return;
 
     const reader = new FileReader();
     reader.onload = (ev) => {
       const imgEl = new window.Image();
       imgEl.onload = () => {
-        const maxW = 900;
+        const maxW = 1280;
         const scale = imgEl.width > maxW ? maxW / imgEl.width : 1;
         const canvas = document.createElement('canvas');
         canvas.width = Math.round(imgEl.width * scale);
         canvas.height = Math.round(imgEl.height * scale);
         canvas.getContext('2d').drawImage(imgEl, 0, 0, canvas.width, canvas.height);
-        setPendingImg({ dataUrl: canvas.toDataURL('image/jpeg', 0.72), anchorRect });
-        setPendingTitle('Screenshot');
+        onPasteImage(canvas.toDataURL('image/jpeg', 0.75));
       };
       imgEl.src = ev.target.result;
     };
@@ -548,13 +541,32 @@ async function externalizeImages(html) {
   return tmp.innerHTML;
 }
 
+// Canvas images: strip inline dataUrl/strokes (from an imported backup) into IndexedDB
+async function externalizeCanvasImages(arr) {
+  if (!Array.isArray(arr)) return arr;
+  const out = [];
+  for (const ci of arr) {
+    if (ci && (ci.dataUrl || ci.strokes)) {
+      const imgId = ci.imgId || newImageId();
+      if (ci.dataUrl) await putImage(imgId, ci.dataUrl);
+      if (ci.strokes) await putStrokes(imgId, ci.strokes);
+      const { dataUrl, strokes, ...rest } = ci;
+      out.push({ ...rest, imgId });
+    } else out.push(ci);
+  }
+  return out;
+}
+
 async function externalizeNotes(notesArr) {
   const out = [];
   for (const n of notesArr) {
     const content = await externalizeImages(n.content);
+    const canvasImages = await externalizeCanvasImages(n.canvasImages);
     const subNotes = [];
-    for (const s of (n.subNotes || [])) subNotes.push({ ...s, content: await externalizeImages(s.content) });
-    out.push({ ...n, content, subNotes });
+    for (const s of (n.subNotes || [])) {
+      subNotes.push({ ...s, content: await externalizeImages(s.content), canvasImages: await externalizeCanvasImages(s.canvasImages) });
+    }
+    out.push({ ...n, content, subNotes, ...(canvasImages ? { canvasImages } : {}) });
   }
   return out;
 }
@@ -572,15 +584,315 @@ async function inlineImages(html) {
   return tmp.innerHTML;
 }
 
+// Canvas images: pull dataUrl + strokes back from IndexedDB so the backup is self-contained
+async function inlineCanvasImages(arr) {
+  if (!Array.isArray(arr)) return arr;
+  const out = [];
+  for (const ci of arr) {
+    const dataUrl = ci?.imgId ? await getImage(ci.imgId) : null;
+    const strokes = ci?.imgId ? await getStrokes(ci.imgId) : null;
+    out.push({ ...ci, ...(dataUrl ? { dataUrl } : {}), ...(strokes && strokes.length ? { strokes } : {}) });
+  }
+  return out;
+}
+
 async function inlineNotesForExport(notesArr) {
   const out = [];
   for (const n of notesArr) {
     const content = await inlineImages(n.content);
+    const canvasImages = await inlineCanvasImages(n.canvasImages);
     const subNotes = [];
-    for (const s of (n.subNotes || [])) subNotes.push({ ...s, content: await inlineImages(s.content) });
-    out.push({ ...n, content, subNotes });
+    for (const s of (n.subNotes || [])) {
+      subNotes.push({ ...s, content: await inlineImages(s.content), canvasImages: await inlineCanvasImages(s.canvasImages) });
+    }
+    out.push({ ...n, content, subNotes, ...(canvasImages ? { canvasImages } : {}) });
   }
   return out;
+}
+
+// A screenshot pasted onto the note canvas: freely positioned, draggable,
+// resizable from the corner, deletable, double-click to zoom. Image bytes live
+// in IndexedDB (imageStore); the note only stores { id, imgId, x, y, w }.
+function CanvasImage({ img, onCommit, onDelete, onOpen, strokesVersion }) {
+  const [src, setSrc] = useState(null);
+  const [loaded, setLoaded] = useState(false);
+  const [strokes, setStrokes] = useState([]);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const elRef = useRef(null);
+  const overlayRef = useRef(null);
+
+  useEffect(() => {
+    let alive = true;
+    getImage(img.imgId).then(u => { if (alive) setSrc(u); });
+    return () => { alive = false; };
+  }, [img.imgId]);
+
+  // Annotations made in the lightbox; re-read when it closes (strokesVersion)
+  useEffect(() => {
+    let alive = true;
+    getStrokes(img.imgId).then(s => { if (alive) setStrokes(s || []); });
+    return () => { alive = false; };
+  }, [img.imgId, strokesVersion]);
+
+  // Paint the annotations over the thumbnail at its current display size
+  useEffect(() => {
+    const el = elRef.current, cv = overlayRef.current;
+    if (!el || !cv || !loaded) return;
+    const raf = requestAnimationFrame(() => {
+      const W = el.clientWidth, H = el.clientHeight;
+      if (!W || !H) return;
+      const dpr = window.devicePixelRatio || 1;
+      cv.width = Math.round(W * dpr);
+      cv.height = Math.round(H * dpr);
+      const ctx = cv.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+      drawStrokesOn(ctx, strokes, W, H);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [loaded, strokes, img.w]);
+
+  const startDrag = (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const el = elRef.current;
+    const startX = e.clientX, startY = e.clientY;
+    const origX = img.x, origY = img.y;
+    let moved = false;
+    const onMove = (me) => {
+      const dx = me.clientX - startX, dy = me.clientY - startY;
+      if (!moved && Math.abs(dx) < 3 && Math.abs(dy) < 3) return;
+      moved = true;
+      el.classList.add('dragging');
+      el.style.left = Math.max(0, origX + dx) + 'px';
+      el.style.top = Math.max(0, origY + dy) + 'px';
+    };
+    const onUp = (me) => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      el.classList.remove('dragging');
+      if (moved) onCommit({ x: Math.max(0, origX + (me.clientX - startX)), y: Math.max(0, origY + (me.clientY - startY)) });
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  };
+
+  const startResize = (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const el = elRef.current;
+    const startX = e.clientX;
+    const origW = img.w || 340;
+    const clampW = (w) => Math.min(1400, Math.max(120, w));
+    const onMove = (me) => { el.style.width = clampW(origW + (me.clientX - startX)) + 'px'; };
+    const onUp = (me) => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      onCommit({ w: clampW(origW + (me.clientX - startX)) });
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  };
+
+  return (
+    <div
+      ref={elRef}
+      className="note-canvas-img"
+      style={{ left: img.x, top: img.y, width: img.w || 340 }}
+      onMouseDown={startDrag}
+      onDoubleClick={() => src && onOpen({ imgId: img.imgId, src })}
+    >
+      {src ? <img src={src} draggable={false} alt="" onLoad={() => setLoaded(true)} /> : <div className="nci-loading" />}
+      <canvas ref={overlayRef} className="nci-overlay" />
+      <button className="nci-delete" title="Sil" onMouseDown={e => e.stopPropagation()} onClick={onDelete}>×</button>
+      <div className="nci-resize" title="Boyutlandır" onMouseDown={startResize} />
+      {/* Alt başlık şeridi: varsa hep görünür; yoksa hover'da "+ başlık" */}
+      <div
+        className={`nci-titlebar${img.title ? '' : ' nci-empty'}`}
+        onMouseDown={e => e.stopPropagation()}
+        onDoubleClick={e => e.stopPropagation()}
+      >
+        {editingTitle ? (
+          <input
+            className="nci-title-input"
+            autoFocus
+            defaultValue={img.title || ''}
+            placeholder="Başlık yaz..."
+            onKeyDown={e => {
+              if (e.key === 'Enter') { onCommit({ title: e.target.value.trim() }); setEditingTitle(false); }
+              if (e.key === 'Escape') setEditingTitle(false);
+            }}
+            onBlur={e => { onCommit({ title: e.target.value.trim() }); setEditingTitle(false); }}
+          />
+        ) : (
+          <span className="nci-title-text" onClick={() => setEditingTitle(true)} title="Başlığı düzenle">
+            {img.title || '+ başlık'}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const DRAW_COLORS = ['#ff4d4f', '#ffd666', '#52c41a', '#40a9ff', '#ffffff'];
+
+// Zoomed view of a canvas image with a freehand annotation layer. Strokes are
+// saved to IndexedDB next to the image (normalized coords), so they persist and
+// can be continued on the next open. Clicking anywhere outside the image closes.
+function CanvasLightbox({ imgId, src, onClose }) {
+  const [imgDim, setImgDim] = useState(null); // natural size
+  const [zoom, setZoom] = useState(1);
+  const [color, setColor] = useState(DRAW_COLORS[0]);
+  const [, forceRender] = useState(0);
+  const canvasRef = useRef(null);
+  const strokesRef = useRef([]);
+  const colorRef = useRef(color);
+  colorRef.current = color;
+
+  useEffect(() => {
+    let alive = true;
+    getStrokes(imgId).then(s => {
+      if (!alive) return;
+      strokesRef.current = s || [];
+      forceRender(v => v + 1);
+    });
+    return () => { alive = false; };
+  }, [imgId]);
+
+  useEffect(() => {
+    const im = new window.Image();
+    im.onload = () => setImgDim({ w: im.naturalWidth, h: im.naturalHeight });
+    im.src = src;
+  }, [src]);
+
+  // Fit to viewport, then apply zoom
+  let W = 0, H = 0;
+  if (imgDim) {
+    const fit = Math.min((window.innerWidth * 0.86) / imgDim.w, (window.innerHeight * 0.8) / imgDim.h, 1);
+    W = Math.round(imgDim.w * fit * zoom);
+    H = Math.round(imgDim.h * fit * zoom);
+  }
+
+  const redraw = useCallback(() => {
+    const cv = canvasRef.current;
+    if (!cv || !W) return;
+    const dpr = window.devicePixelRatio || 1;
+    cv.width = Math.round(W * dpr);
+    cv.height = Math.round(H * dpr);
+    const ctx = cv.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    drawStrokesOn(ctx, strokesRef.current, W, H);
+  }, [W, H]);
+
+  useEffect(() => { redraw(); });
+
+  const persist = () => { putStrokes(imgId, strokesRef.current); };
+
+  const startStroke = (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const cv = canvasRef.current;
+    const rect = cv.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const toNorm = (ev) => [
+      Math.min(1, Math.max(0, (ev.clientX - rect.left) / rect.width)),
+      Math.min(1, Math.max(0, (ev.clientY - rect.top) / rect.height)),
+    ];
+    const stroke = { c: colorRef.current, s: 3 / (rect.width / zoom), pts: [toNorm(e)] };
+    const ctx = cv.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = stroke.c;
+    ctx.lineWidth = Math.max(0.75, stroke.s * rect.width);
+
+    const onMove = (me) => {
+      const p = toNorm(me);
+      const prev = stroke.pts[stroke.pts.length - 1];
+      stroke.pts.push(p);
+      ctx.beginPath();
+      ctx.moveTo(prev[0] * rect.width, prev[1] * rect.height);
+      ctx.lineTo(p[0] * rect.width, p[1] * rect.height);
+      ctx.stroke();
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      if (stroke.pts.length >= 2) {
+        strokesRef.current = [...strokesRef.current, stroke];
+        persist();
+      }
+      redraw();
+      forceRender(v => v + 1); // Geri al butonu hemen aktifleşsin
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  };
+
+  const undo = useCallback(() => {
+    strokesRef.current = strokesRef.current.slice(0, -1);
+    putStrokes(imgId, strokesRef.current);
+    redraw();
+    forceRender(v => v + 1);
+  }, [imgId, redraw]);
+
+  // Ctrl+Z → son çizgiyi geri al
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault();
+        undo();
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [undo]);
+  const clearAll = () => {
+    strokesRef.current = [];
+    persist();
+    redraw();
+    forceRender(v => v + 1);
+  };
+
+  return (
+    <div
+      className="note-img-lightbox ncl-root"
+      onClick={onClose}
+      onWheel={e => { e.preventDefault(); setZoom(z => Math.min(6, Math.max(0.25, z - e.deltaY * 0.001))); }}
+    >
+      <div className="ncl-toolbar" onClick={e => e.stopPropagation()}>
+        {DRAW_COLORS.map(c => (
+          <button
+            key={c}
+            className={`ncl-color${color === c ? ' active' : ''}`}
+            style={{ background: c }}
+            onClick={() => setColor(c)}
+          />
+        ))}
+        <span className="ncl-sep" />
+        <button className="ncl-btn" onClick={undo} disabled={!strokesRef.current.length}>↶ Geri al</button>
+        <button className="ncl-btn" onClick={clearAll} disabled={!strokesRef.current.length}>Temizle</button>
+        <span className="ncl-sep" />
+        <span className="ncl-zoom">{Math.round(zoom * 100)}%</span>
+        <button className="ncl-btn" onClick={onClose}>✕</button>
+      </div>
+      {imgDim && (
+        <div className="ncl-stage" style={{ width: W, height: H }} onClick={e => e.stopPropagation()}>
+          <img src={src} width={W} height={H} draggable={false} alt="" />
+          <canvas
+            ref={canvasRef}
+            style={{ width: W, height: H }}
+            className="ncl-draw"
+            onMouseDown={startStroke}
+          />
+        </div>
+      )}
+    </div>
+  );
 }
 
 function Notes() {
@@ -611,6 +923,7 @@ function Notes() {
   });
   const [hoveredPresetIdx, setHoveredPresetIdx] = useState(null);
   const [shortcutToast, setShortcutToast] = useState(null);
+  const [canvasBg, setCanvasBg] = useState(() => localStorage.getItem('notesCanvasBg') || 'none');
   const [lineSpacing, setLineSpacing] = useState(() => {
     const v = parseFloat(localStorage.getItem('notesLineSpacing') || '1.7');
     return Math.round(v * 10) / 10;
@@ -1026,6 +1339,47 @@ ${body}
     : null;
   const selectedTitle = selectedSub ? selectedSub.title : selectedNote?.title;
   const selectedContent = selectedSub ? selectedSub.content : selectedNote?.content;
+  const selectedCanvasImages = (selectedSub ? selectedSub.canvasImages : selectedNote?.canvasImages) || [];
+
+  // Apply fn to the selected note/subnote's canvasImages array
+  const patchSelectedCanvas = (fn) => {
+    if (!selected) return;
+    setNotes(prev => prev.map(n => {
+      if (n.id !== selected.noteId) return n;
+      if (selected.subId === null) return { ...n, canvasImages: fn(n.canvasImages || []), updatedAt: new Date().toISOString() };
+      return {
+        ...n,
+        subNotes: n.subNotes.map(s => s.id === selected.subId ? { ...s, canvasImages: fn(s.canvasImages || []) } : s),
+        updatedAt: new Date().toISOString(),
+      };
+    }));
+  };
+
+  // Pasted screenshot → store bytes in IndexedDB, drop a floating item onto the
+  // canvas near the current scroll position (slight cascade so they don't stack).
+  const addCanvasImage = async (dataUrl) => {
+    const imgId = newImageId();
+    await putImage(imgId, dataUrl);
+    const scrollTop = editorScrollRef.current?.scrollTop || 0;
+    const count = selectedCanvasImages.length;
+    patchSelectedCanvas(arr => [...arr, {
+      id: Date.now(),
+      imgId,
+      x: 60 + (count % 6) * 32,
+      y: scrollTop + 60 + (count % 6) * 32,
+      w: 340,
+    }]);
+  };
+
+  const [canvasLightbox, setCanvasLightbox] = useState(null); // { imgId, src } | null
+  const [strokesVersion, setStrokesVersion] = useState(0);
+  useEffect(() => {
+    // Lightbox kapanınca küçük görseller çizimleri yeniden yüklesin
+    if (!canvasLightbox) { setStrokesVersion(v => v + 1); return; }
+    const onKey = (e) => { if (e.key === 'Escape') setCanvasLightbox(null); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [canvasLightbox]);
 
   const updateSelectedContent = (content) => {
     if (!selected) return;
@@ -1326,6 +1680,26 @@ ${body}
               <div className="toolbar-divider" />
 
               <div className="toolbar-group">
+                <select
+                  className="toolbar-select"
+                  onMouseDown={e => e.stopPropagation()}
+                  value={canvasBg}
+                  onChange={e => {
+                    setCanvasBg(e.target.value);
+                    localStorage.setItem('notesCanvasBg', e.target.value);
+                  }}
+                  title="Canvas arka planı"
+                >
+                  <option value="none">Düz</option>
+                  <option value="lines">Çizgili</option>
+                  <option value="dots">Noktalı</option>
+                  <option value="grid">Damalı</option>
+                </select>
+              </div>
+
+              <div className="toolbar-divider" />
+
+              <div className="toolbar-group">
                 <button className={`toolbar-btn ${activeFormats.justifyLeft ? 'active' : ''}`} onMouseDown={e => { e.preventDefault(); execFormat('justifyLeft'); }} title="Align Left">⫷</button>
                 <button className={`toolbar-btn ${activeFormats.justifyCenter ? 'active' : ''}`} onMouseDown={e => { e.preventDefault(); execFormat('justifyCenter'); }} title="Align Center">⫶</button>
                 <button className={`toolbar-btn ${activeFormats.justifyRight ? 'active' : ''}`} onMouseDown={e => { e.preventDefault(); execFormat('justifyRight'); }} title="Align Right">⫸</button>
@@ -1405,8 +1779,16 @@ ${body}
               </div>
             </div>
 
-            {/* Single full-width editor */}
-            <div className="notes-notebook" onClick={() => { showColorPresets && setShowColorPresets(false); showShortcuts && setShowShortcuts(false); }}>
+            {/* Single full-width editor — also the canvas for floating images */}
+            <div
+              className={`notes-notebook nb-bg-${canvasBg}`}
+              style={{
+                // Desenler metnin gerçek satır yüksekliğiyle hizalanır (editör font 15.5px)
+                '--nb-line-h': `${(15.5 * lineSpacing).toFixed(2)}px`,
+                ...(selectedCanvasImages.length ? { minHeight: Math.max(...selectedCanvasImages.map(ci => ci.y)) + 480 } : {}),
+              }}
+              onClick={() => { showColorPresets && setShowColorPresets(false); showShortcuts && setShowShortcuts(false); }}
+            >
               <RichTextEditor
                 key={`${selected.noteId}-${selected.subId}`}
                 ref={editorRef}
@@ -1414,7 +1796,18 @@ ${body}
                 placeholder="Start writing..."
                 style={{ lineHeight: lineSpacing }}
                 onChange={updateSelectedContent}
+                onPasteImage={addCanvasImage}
               />
+              {selectedCanvasImages.map(ci => (
+                <CanvasImage
+                  key={ci.id}
+                  img={ci}
+                  strokesVersion={strokesVersion}
+                  onCommit={patch => patchSelectedCanvas(arr => arr.map(c => c.id === ci.id ? { ...c, ...patch } : c))}
+                  onDelete={() => patchSelectedCanvas(arr => arr.filter(c => c.id !== ci.id))}
+                  onOpen={info => setCanvasLightbox(info)}
+                />
+              ))}
             </div>
           </div>
         ) : (
@@ -1424,6 +1817,16 @@ ${body}
           </div>
         )}
       </div>
+
+      {/* Canvas image lightbox: double-click to open, draw with the mouse,
+          click anywhere outside the image (or Esc) to close */}
+      {canvasLightbox && (
+        <CanvasLightbox
+          imgId={canvasLightbox.imgId}
+          src={canvasLightbox.src}
+          onClose={() => setCanvasLightbox(null)}
+        />
+      )}
     </div>
   );
 }
