@@ -8533,13 +8533,6 @@ body.light .references-header {
   overflow: hidden;
 }
 
-/* Calendar Full Screen */
-.calendar-fullscreen {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-
 /* Kolon drop glow — sürükleme sırasında imlecin altındaki kolon */
 .category-column-v2.col-drop-glow {
   outline: 2px solid rgba(200,200,200,0.4) !important;

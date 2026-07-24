@@ -9,7 +9,6 @@ import FlashCards from './components/FlashCards';
 import DailyChecklist from './components/DailyChecklist';
 import IncomeTracker from './components/IncomeTracker';
 import FitnessTracker from './components/FitnessTracker';
-import Calendar from './components/Calendar';
 import JapaneseKana from './components/JapaneseKana';
 import ToolsChat from './components/ToolsChat';
 import SubscriptionTracker, { SubscriptionWidget, SubscriptionPopup } from './components/SubscriptionTracker';
@@ -18,8 +17,6 @@ import Translate from './components/Translate';
 import ProjectBid from './components/ProjectBid';
 import Planner from './components/Planner';
 import Notes from './components/Notes';
-import RefBoard from './components/RefBoard';
-import MarketResearch from './components/MarketResearch';
 import { onAction, registerActionTypes } from '@tauri-apps/plugin-notification';
 
 const QUICK_BUTTONS = [
@@ -298,7 +295,6 @@ function App({ session, onLogout }) {
   const [sidebarItems, setSidebarItems] = useState(() => {
     const defaults = [
       { id: 'dashboard',    label: 'Dashboard',      view: 'dashboard',    hidden: false, icon: '⊞' },
-      { id: 'calendar',     label: 'Calendar',        view: 'calendar',     hidden: false, icon: '◻' },
       { id: 'flashcards',   label: 'Flash Cards',     view: 'flashcards',   hidden: false, icon: '⧉' },
       { id: 'checklists',   label: 'Checklists',      view: 'checklists',   hidden: false, icon: '✓' },
       { id: 'income',       label: 'Income Tracker',  view: 'income',       hidden: false, icon: '$' },
@@ -307,8 +303,6 @@ function App({ session, onLogout }) {
       { id: 'fitness',      label: 'Fitness',          view: 'fitness',      hidden: false, icon: '◈' },
       { id: 'planner',      label: 'Planner',          view: 'planner',      hidden: false, icon: '≡' },
       { id: 'notes',        label: 'Notes',            view: 'notes',        hidden: false, icon: '✎' },
-      { id: 'refboard',     label: 'Ref Board',        view: 'refboard',      hidden: false, icon: '⊞' },
-      { id: 'marketresearch', label: 'Market Research', view: 'marketresearch', hidden: false, icon: '📊' },
     ];
     const saved = localStorage.getItem('sidebarOrder');
     if (saved) {
@@ -1762,31 +1756,6 @@ useEffect(() => {
             </div>
           )}
 
-          {/* Ref Board */}
-          {activeView === 'refboard' && (
-            <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-              <RefBoard />
-            </div>
-          )}
-
-          {/* Market Research */}
-          {activeView === 'marketresearch' && (
-            <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-              <MarketResearch />
-            </div>
-          )}
-
-          {/* Calendar Full Screen View */}
-          {activeView === 'calendar' && (
-            <div className="calendar-fullscreen">
-              <Calendar
-                todos={todos}
-                onToggleTodo={toggleTodo}
-                onUpdateTodo={updateTodo}
-              />
-            </div>
-          )}
-
           {/* Tools View: Project Bid + Translate */}
           {activeView === 'tools' && (
             <ToolsView />
@@ -1945,24 +1914,21 @@ function AppWrapper() {
   useEffect(() => {
     try { getCurrentWindow().maximize(); } catch {}
 
+    // NOT: setDecorations çağrılmıyor — uygulamanın kendi başlık çubuğu var;
+    // native Windows çubuğu açılırsa ekranda İKİ başlık çubuğu oluşuyor.
     supabase.auth.getSession().then(({ data: { session } }) => {
       setInitialSession(session);
       setLoggedIn(!!session);
-      try {
-        const win = getCurrentWindow();
-        win.setDecorations(!!session);
-        win.maximize();
-      } catch {}
+      try { getCurrentWindow().maximize(); } catch {}
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
         setLoggedIn(false);
-        try { getCurrentWindow().setDecorations(false); } catch {}
       } else if (event === 'SIGNED_IN' && session) {
         setInitialSession(session);
         setLoggedIn(true);
-        try { const win = getCurrentWindow(); win.setDecorations(true); win.maximize(); } catch {}
+        try { getCurrentWindow().maximize(); } catch {}
       }
       // TOKEN_REFRESHED, USER_UPDATED, INITIAL_SESSION etc. are intentionally ignored
       // to prevent re-renders that break the layout
