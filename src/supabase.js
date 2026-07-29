@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { invoke } from '@tauri-apps/api/core';
 
-const SUPABASE_URL = 'https://fzbjqztfdsquinnpgzir.supabase.co';
-const SUPABASE_KEY = 'REDACTED_SUPABASE_ANON_KEY';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY;
 
 // Rust backend üzerinden fetch — WebView2 CSP/network kısıtlamalarını aşar
 async function tauriFetch(input, init) {
