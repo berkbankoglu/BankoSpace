@@ -347,6 +347,7 @@ fn main() {
                 let my_pid = Pid::from_u32(std::process::id());
                 let mut sys = System::new_all();
                 let mut last_recovery_attempt: u64 = 0;
+                let mut last_restart_attempt: u64 = 0;
                 loop {
                     std::thread::sleep(std::time::Duration::from_secs(10));
                     let n = inflight_counter().load(std::sync::atomic::Ordering::SeqCst);
@@ -375,9 +376,39 @@ fn main() {
                         n, my_cpu, wv_cpu, wv_count, ping_age
                     ));
 
-                    // JS ping should land every ~2s. Past 40s with no ping and no
-                    // recovery attempt in the last 90s, force a native reload.
-                    if ping_age > 40 && now.saturating_sub(last_recovery_attempt) > 90 {
+                    // Escalation ladder. Confirmed by observing a real freeze: a stale
+                    // ping past 100s (i.e. Reload() already had ~2 chances and the ping
+                    // never resumed) means the renderer's own message/IPC queue is stuck
+                    // deeply enough that even a native COM Reload() request never gets
+                    // processed — Reload() returning ok=true only means WebView2 ACCEPTED
+                    // the request, not that the renderer acted on it. The only recovery
+                    // that reliably works at that point (matches what manual
+                    // kill+relaunch has done every single time this session) is killing
+                    // the whole process and starting a fresh one — that sidesteps
+                    // whatever internal deadlock caused this, rather than asking the
+                    // stuck process to fix itself.
+                    if ping_age > 100 && now.saturating_sub(last_restart_attempt) > 60 {
+                        last_restart_attempt = now;
+                        write_diag(&format!(
+                            "RUST: !!! js_ping still stale ({}s) after Reload attempt(s) -> restarting the whole process",
+                            ping_age
+                        ));
+                        if let Ok(exe) = std::env::current_exe() {
+                            let exe_str = exe.to_string_lossy().to_string();
+                            // Relaunch via a short-delayed detached helper so our
+                            // single-instance mutex is fully released (by this process
+                            // exiting below) before the new instance tries to claim it.
+                            let cmd_str = format!("ping 127.0.0.1 -n 3 >nul & start \"\" \"{}\"", exe_str);
+                            let spawned = std::process::Command::new("cmd").args(["/C", &cmd_str]).spawn();
+                            write_diag(&format!("RUST: relaunch scheduled ok={}", spawned.is_ok()));
+                        }
+                        std::thread::sleep(std::time::Duration::from_millis(200));
+                        std::process::exit(1);
+                    } else if ping_age > 40 && now.saturating_sub(last_recovery_attempt) > 90 {
+                        // JS ping should land every ~2s. Past 40s with no ping and no
+                        // recovery attempt in the last 90s, first try the cheaper fix:
+                        // a native reload (works for lighter freezes; see escalation
+                        // above for when it doesn't).
                         last_recovery_attempt = now;
                         write_diag(&format!("RUST: !!! js_ping stale for {}s -> forcing native Reload()", ping_age));
                         if let Some(window) = app_handle.get_webview_window("main") {
