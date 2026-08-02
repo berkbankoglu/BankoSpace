@@ -6,6 +6,15 @@ import { playClickSound, playAddSound, playDeleteSound } from '../utils/sounds';
 
 function today() { return new Date().toISOString().slice(0, 10); }
 
+// Tauri invoke() rejections are often plain strings (Rust's Err(String)), not
+// Error objects — `e.message` is then undefined and errors silently show as
+// "Unknown". Handle every shape so the real cause is always visible.
+function errMsg(e) {
+  if (typeof e === 'string') return e;
+  if (e?.message) return e.message;
+  try { return JSON.stringify(e); } catch { return String(e); }
+}
+
 function DatePicker({ value, onChange, minDate }) {
   const [open, setOpen] = useState(false);
   const [viewYear, setViewYear] = useState(() => {
@@ -799,16 +808,12 @@ export default function FitnessTracker() {
   const [editWaist, setEditWaist]     = useState('');
   const [editNeck, setEditNeck]       = useState('');
 
-  // Templates: date-independent, [ { id, name, items:[{...}] } ]
-  const [menuTemplates, setMenuTemplates] = useState(() => load('ft_menu_templates', []));
-  const [newTplName, setNewTplName]       = useState('');
-  const [editingTplId, setEditingTplId]   = useState(null);
-  const [editingTplName, setEditingTplName] = useState('');
-  const [expandedTplId, setExpandedTplId] = useState(null);
-  // Yiyecek paneli modu: 'template' | 'log'
-  const [foodPanelMode, setFoodPanelMode] = useState('log');
-  // Hangi şablon seçili (yiyecek panelinde eklenecek hedef)
-  const [targetTplId, setTargetTplId]     = useState(null);
+  // Menu presets ("hazır öğün"): reusable saved meals, date-independent, [ { id, name, items:[{...}] } ]
+  // Storage key stays 'ft_menu_templates' (unchanged) so existing saved data isn't lost.
+  const [menuPresets, setMenuPresets] = useState(() => load('ft_menu_templates', []));
+  const [editingPresetId, setEditingPresetId] = useState(null);
+  const [editingPresetName, setEditingPresetName] = useState('');
+  const [expandedPresetId, setExpandedPresetId] = useState(null);
 
   // Günlük Log: { [date]: [ { id, name, items:[{id,name,qty,unit,kcal,p,c,f}], kcal,p,c,f } ] }
   const [meals, setMeals]             = useState(() => load('ft_meals', {}));
@@ -872,6 +877,10 @@ export default function FitnessTracker() {
   const [customFoodName, setCustomFoodName] = useState('');
   const [customFoodKcal, setCustomFoodKcal] = useState('');
 
+  // AI'ın tahmin edip kaydettiği yemekler — FOOD_DB'ye ek, kalıcı ve yeniden kullanılabilir
+  const [customFoods, setCustomFoods] = useState(() => load('ft_custom_foods', []));
+  const customFoodsRef = useRef(customFoods);
+
 
 
   // Resize handles: panel dividers
@@ -897,7 +906,7 @@ export default function FitnessTracker() {
 
   useEffect(() => { aiBottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [aiMessages]);
 
-  useEffect(() => { save('ft_menu_templates', menuTemplates); }, [menuTemplates]);
+  useEffect(() => { save('ft_menu_templates', menuPresets); }, [menuPresets]);
   useEffect(() => { save('ft_profile',    profile);   }, [profile]);
   useEffect(() => { save('ft_goal',       goal);      }, [goal]);
   useEffect(() => { save('ft_weight_log', weightLog); }, [weightLog]);
@@ -913,6 +922,7 @@ export default function FitnessTracker() {
     });
   }, [meals, mealDate]);
   useEffect(() => { if (Array.isArray(workouts)) { workoutsRef.current = workouts; save('ft_workouts', workouts); } }, [workouts]);
+  useEffect(() => { customFoodsRef.current = customFoods; save('ft_custom_foods', customFoods); }, [customFoods]);
 
   // meals'i history'ye kaydederek güncelle
   function updateMeals(updater) {
@@ -1099,14 +1109,19 @@ export default function FitnessTracker() {
     },
     {
       name: 'add_food_to_menu',
-      description: 'Add food to an existing menu. First call get_fitness_data with food_database and meals to get menu IDs and available foods.',
+      description: 'Add food to an existing menu. First call get_fitness_data with food_database and meals to get menu IDs and available foods. If food_name is NOT in food_database, estimate its macros yourself from general nutrition knowledge (per 100g, or per piece for countable foods) and pass them via estimate_kcal/estimate_p/estimate_c/estimate_f/estimate_unit in this SAME call — do not ask the user for macros, just estimate confidently. Estimated foods are saved permanently for reuse.',
       input_schema: {
         type: 'object',
         properties: {
           menu_id: { type: 'number' },
-          food_name: { type: 'string', description: 'Exact name from food_database.' },
-          quantity: { type: 'number', description: 'Grams or pieces.' },
+          food_name: { type: 'string', description: 'Food name. Match an existing food_database entry if possible.' },
+          quantity: { type: 'number', description: 'Grams, or piece count if unit is "adet".' },
           date: { type: 'string' },
+          estimate_kcal: { type: 'number', description: 'Only when food_name is not found: estimated kcal per 100g (or per piece if estimate_unit is "adet").' },
+          estimate_p: { type: 'number', description: 'Estimated protein (g) per 100g/piece.' },
+          estimate_c: { type: 'number', description: 'Estimated carbs (g) per 100g/piece.' },
+          estimate_f: { type: 'number', description: 'Estimated fat (g) per 100g/piece.' },
+          estimate_unit: { type: 'string', enum: ['g', 'adet'], description: 'Basis for the estimate. Default "g".' },
         },
         required: ['menu_id', 'food_name', 'quantity'],
       },
@@ -1245,7 +1260,7 @@ export default function FitnessTracker() {
           result.today_macros = { date: d, ...totals, tdee, bmr, goal_kcal: goalKcal };
         }
         if (inc.includes('food_database')) {
-          result.food_database = FOOD_DB.map(f => ({ name: f.name, kcal: f.kcal, p: f.p, c: f.c, f: f.f, unit: f.unit }));
+          result.food_database = [...FOOD_DB, ...customFoodsRef.current].map(f => ({ name: f.name, kcal: f.kcal, p: f.p, c: f.c, f: f.f, unit: f.unit }));
         }
         if (inc.includes('workouts')) {
           const snap = JSON.parse(localStorage.getItem('ft_workouts') || '[]');
@@ -1270,9 +1285,23 @@ export default function FitnessTracker() {
       }
       case 'add_food_to_menu': {
         const d = input.date || today();
-        const food = FOOD_DB.find(f => f.name.toLowerCase() === input.food_name.toLowerCase())
-          || FOOD_DB.find(f => f.name.toLowerCase().includes(input.food_name.toLowerCase()));
-        if (!food) return { success: false, message: `Food "${input.food_name}" not found in database.` };
+        const allFoods = [...FOOD_DB, ...customFoodsRef.current];
+        let food = allFoods.find(f => f.name.toLowerCase() === input.food_name.toLowerCase())
+          || allFoods.find(f => f.name.toLowerCase().includes(input.food_name.toLowerCase()));
+        let estimated = false;
+        if (!food && input.estimate_kcal != null) {
+          food = {
+            name: input.food_name,
+            kcal: Number(input.estimate_kcal) || 0,
+            p: Number(input.estimate_p) || 0,
+            c: Number(input.estimate_c) || 0,
+            f: Number(input.estimate_f) || 0,
+            unit: input.estimate_unit === 'adet' ? 'adet' : 'g',
+          };
+          estimated = true;
+          setCustomFoods(prev => [...prev.filter(cf => cf.name.toLowerCase() !== food.name.toLowerCase()), food]);
+        }
+        if (!food) return { success: false, message: `Food "${input.food_name}" not found. Provide estimate_kcal/estimate_p/estimate_c/estimate_f to add it as a new estimated food.` };
         const qty = input.quantity;
         const ratio = food.unit === 'adet' ? qty : qty / 100;
         const item = {
@@ -1292,7 +1321,7 @@ export default function FitnessTracker() {
             return { ...m, items, kcal: Math.round(items.reduce((s,i)=>s+i.kcal,0)), p: Math.round(items.reduce((s,i)=>s+i.p,0)*10)/10, c: Math.round(items.reduce((s,i)=>s+i.c,0)*10)/10, f: Math.round(items.reduce((s,i)=>s+i.f,0)*10)/10 };
           }),
         }));
-        return { success: true, message: `Added ${qty}${food.unit} ${food.name} to menu (${item.kcal} kcal)` };
+        return { success: true, message: `Added ${qty}${food.unit} ${food.name} to menu (${item.kcal} kcal)${estimated ? ' [AI-estimated macros, saved for reuse]' : ''}` };
       }
       case 'remove_food_from_menu': {
         const d = input.date || today();
@@ -1319,7 +1348,9 @@ export default function FitnessTracker() {
           ...(input.target_weight_kg !== undefined && { targetWeight: String(input.target_weight_kg) }),
           ...(input.start_date !== undefined && { startDate: input.start_date }),
           ...(input.end_date !== undefined && { endDate: input.end_date }),
-          ...(input.daily_kcal !== undefined && { dailyKcal: String(input.daily_kcal) }),
+          // customKcal (not dailyKcal) is what calcGoalKcal() actually reads — this field
+          // name previously mismatched, so AI-set daily calorie targets silently had no effect.
+          ...(input.daily_kcal !== undefined && { customKcal: String(input.daily_kcal) }),
         }));
         return { success: true, message: 'Goal updated.' };
       }
@@ -1458,7 +1489,8 @@ TOOL RULES — FOLLOW EXACTLY:
 2. When an image shows a workout list: process it COMPLETELY — add every single exercise shown, one add_exercise call per exercise. Do NOT stop partway through.
 3. Do NOT call get_fitness_data for workouts — current plan is already above.
 4. DO NOT ask for confirmation. Act immediately, confirm after.
-5. Reply in same language as user. After finishing, list what was added (1 line each).`;
+5. Reply in same language as user. After finishing, list what was added (1 line each).
+6. add_food_to_menu: if food_name isn't in food_database (check via get_fitness_data first), estimate its macros yourself from general nutrition knowledge (kcal/protein/carbs/fat per 100g, or per piece for countable foods) and pass estimate_kcal/estimate_p/estimate_c/estimate_f/estimate_unit in the SAME call. Never ask the user for macros — estimate confidently, mention it was an estimate in your reply.`;
     }
 
     // Agentic loop helper — system + messages → {text, actionTaken}
@@ -1588,7 +1620,7 @@ Kurallar:
       const { text, actionTaken } = await runAiLoop(buildSystem(), history);
       setAiMessages(p => [...p, { role: 'assistant', content: text || (actionTaken ? '✓ Done.' : '...') }]);
     } catch (e) {
-      setAiMessages(p => [...p, { role: 'assistant', content: 'Hata: ' + (e?.message || 'Unknown') }]);
+      setAiMessages(p => [...p, { role: 'assistant', content: 'Hata: ' + errMsg(e) }]);
     } finally {
       setAiLoading(false);
       setTimeout(() => aiInputRef.current?.focus(), 50);
@@ -1599,7 +1631,7 @@ Kurallar:
 
   // Arama sonuçları — boşken liste gösterme
   const searchResults = searchQ.trim()
-    ? FOOD_DB.filter(f => f.name.toLowerCase().includes(searchQ.toLowerCase()))
+    ? [...FOOD_DB, ...customFoods].filter(f => f.name.toLowerCase().includes(searchQ.toLowerCase()))
     : [];
 
 
@@ -1680,72 +1712,42 @@ Kurallar:
     setEditingMenuId(null);
   }
 
-  // ── Şablon CRUD ──
-  function createTemplate() {
+  // ── Menu preset CRUD ("hazır öğün") ──
+  // Presets are captured wholesale from an already-logged meal (see "Save as
+  // Menu" button on a meal's header) instead of built through a separate
+  // food-adding panel — one simple way in, one simple way to reuse.
+  function createPresetFromMenu(menu) {
+    if (!menu.items.length) return;
     playAddSound();
-    const name = newTplName.trim() || 'Template';
-    const tpl = { id: Date.now(), name, items: [] };
-    setMenuTemplates(prev => [...prev, tpl]);
-    setTargetTplId(tpl.id);
-    setNewTplName('');
-  }
-
-  function removeTemplate(id) {
-    playDeleteSound();
-    setMenuTemplates(prev => prev.filter(t => t.id !== id));
-    if (targetTplId === id) setTargetTplId(null);
-  }
-
-  function renameTemplate(id, name) {
-    setMenuTemplates(prev => prev.map(t => t.id === id ? { ...t, name: name.trim() || t.name } : t));
-    setEditingTplId(null);
-  }
-
-  function addFoodToTemplate(tplId, food, qty) {
-    playAddSound();
-    const ratio = food.unit === 'adet' ? qty : qty / 100;
-    const item = {
-      id: Date.now() + Math.random(),
-      name: food.name, qty,
-      unit: food.unit || 'g',
-      baseKcal: food.kcal, baseP: food.p, baseC: food.c, baseF: food.f,
-      kcal: Math.round(food.kcal * ratio),
-      p: Math.round(food.p * ratio * 10) / 10,
-      c: Math.round(food.c * ratio * 10) / 10,
-      f: Math.round(food.f * ratio * 10) / 10,
+    const preset = {
+      id: Date.now(),
+      name: menu.name,
+      items: menu.items.map(i => ({ ...i, id: Date.now() + Math.random() })),
     };
-    setMenuTemplates(prev => prev.map(t => t.id === tplId ? { ...t, items: [...t.items, item] } : t));
+    setMenuPresets(prev => [...prev, preset]);
   }
 
-  function removeFoodFromTemplate(tplId, itemId) {
+  function removePreset(id) {
     playDeleteSound();
-    setMenuTemplates(prev => prev.map(t => t.id === tplId ? { ...t, items: t.items.filter(i => i.id !== itemId) } : t));
+    setMenuPresets(prev => prev.filter(t => t.id !== id));
   }
 
-  function updateTemplateItemQty(tplId, itemId, newQty) {
-    const qty = parseFloat(newQty);
-    if (!qty || qty <= 0) return;
-    setMenuTemplates(prev => prev.map(t => {
-      if (t.id !== tplId) return t;
-      return { ...t, items: t.items.map(i => {
-        if (i.id !== itemId) return i;
-        const ratio = i.unit === 'adet' ? qty : qty / 100;
-        return { ...i, qty, kcal: Math.round(i.baseKcal*ratio), p: Math.round(i.baseP*ratio*10)/10, c: Math.round(i.baseC*ratio*10)/10, f: Math.round(i.baseF*ratio*10)/10 };
-      })};
-    }));
+  function renamePreset(id, name) {
+    setMenuPresets(prev => prev.map(t => t.id === id ? { ...t, name: name.trim() || t.name } : t));
+    setEditingPresetId(null);
   }
 
-  // Şablonu günlük log'a uygula (deep copy, yeni id'lerle)
-  function applyTemplateToDay(tpl) {
+  // Preset'i günlük log'a uygula (deep copy, yeni id'lerle) — "hazır olarak ekle"
+  function applyPresetToDay(preset) {
     playAddSound();
     const newMenu = {
-      ...tpl,
+      ...preset,
       id: Date.now() + Math.random(),
-      items: tpl.items.map(i => ({ ...i, id: Date.now() + Math.random() })),
-      kcal: tpl.items.reduce((s, i) => s + i.kcal, 0),
-      p: tpl.items.reduce((s, i) => s + i.p, 0),
-      c: tpl.items.reduce((s, i) => s + i.c, 0),
-      f: tpl.items.reduce((s, i) => s + i.f, 0),
+      items: preset.items.map(i => ({ ...i, id: Date.now() + Math.random() })),
+      kcal: preset.items.reduce((s, i) => s + i.kcal, 0),
+      p: preset.items.reduce((s, i) => s + i.p, 0),
+      c: preset.items.reduce((s, i) => s + i.c, 0),
+      f: preset.items.reduce((s, i) => s + i.f, 0),
     };
     updateMeals(prev => ({ ...prev, [mealDate]: [...(prev[mealDate] || []), newMenu] }));
     setSelectedMenuIds(prev => [...prev, newMenu.id]);
@@ -1756,26 +1758,20 @@ Kurallar:
     if (!customFoodName.trim() || !kcal || kcal <= 0) return;
     playAddSound();
     const item = { id: Date.now()+Math.random(), name: customFoodName.trim(), qty: kcal, unit: 'kcal', baseKcal: kcal, baseP: 0, baseC: 0, baseF: 0, kcal, p: 0, c: 0, f: 0 };
-    if (foodPanelMode === 'template') {
-      if (targetTplId) {
-        setMenuTemplates(prev => prev.map(t => t.id === targetTplId ? { ...t, items: [...t.items, item] } : t));
-      }
+    const existingId = selectedMenuIds[selectedMenuIds.length - 1] ?? dayMenus[0]?.id ?? null;
+    if (existingId) {
+      updateMeals(prev => ({
+        ...prev,
+        [mealDate]: (prev[mealDate] || []).map(m => {
+          if (m.id !== existingId) return m;
+          const items = [...m.items, item];
+          return { ...m, items, kcal: items.reduce((s,i)=>s+i.kcal,0), p: 0, c: 0, f: 0 };
+        })
+      }));
     } else {
-      const existingId = selectedMenuIds[selectedMenuIds.length - 1] ?? dayMenus[0]?.id ?? null;
-      if (existingId) {
-        updateMeals(prev => ({
-          ...prev,
-          [mealDate]: (prev[mealDate] || []).map(m => {
-            if (m.id !== existingId) return m;
-            const items = [...m.items, item];
-            return { ...m, items, kcal: items.reduce((s,i)=>s+i.kcal,0), p: 0, c: 0, f: 0 };
-          })
-        }));
-      } else {
-        const newMenu = { id: Date.now(), name: 'Meal', items: [item], kcal, p: 0, c: 0, f: 0 };
-        updateMeals(prev => ({ ...prev, [mealDate]: [...(prev[mealDate]||[]), newMenu] }));
-        setSelectedMenuIds([newMenu.id]);
-      }
+      const newMenu = { id: Date.now(), name: 'Meal', items: [item], kcal, p: 0, c: 0, f: 0 };
+      updateMeals(prev => ({ ...prev, [mealDate]: [...(prev[mealDate]||[]), newMenu] }));
+      setSelectedMenuIds([newMenu.id]);
     }
     setCustomFoodName(''); setCustomFoodKcal('');
   }
@@ -2344,18 +2340,6 @@ Kurallar:
               </div>
 
               <div className="ft-ai-messages">
-                {aiMessages.length === 0 && (
-                  <div className="ft-ai-suggestions">
-                    {[
-                      'How many calories did I eat today?',
-                      'Analyze my today\'s workout',
-                      'Analyze my weight chart',
-                      'Add a push day workout',
-                    ].map((q, i) => (
-                      <button key={i} className="ft-ai-suggestion-btn" onClick={() => sendAiMessage(q)}>{q}</button>
-                    ))}
-                  </div>
-                )}
                 {aiMessages.map((m, i) => (
                   <div key={i} className={`ft-ai-msg ft-ai-msg--${m.role}`}>
                     <span className="ft-ai-msg-label">{m.role === 'user' ? 'You' : 'AI'}</span>
@@ -2447,81 +2431,54 @@ Kurallar:
                     }}
                   />
 
-                  {/* ── Şablon Menüler ── */}
-                  <div className="ft-sidebar-section-label">Templates</div>
-                  <div className="ft-new-menu-row">
-                    <input
-                      className="ft-input"
-                      style={{ fontSize: 12, padding: '5px 8px' }}
-                      placeholder="Template name..."
-                      value={newTplName}
-                      onChange={e => setNewTplName(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') createTemplate(); }}
-                    />
-                    <button className="ft-btn-sm" style={{ padding: '5px 8px', fontSize: 13 }} onClick={createTemplate}>+</button>
-                  </div>
-                  {menuTemplates.length === 0 && (
-                    <div className="ft-empty" style={{ fontSize: 11, padding: '4px 4px 8px' }}>Create a template</div>
+                  {/* ── Menu (hazır öğünler) ── */}
+                  <div className="ft-sidebar-section-label">Menu</div>
+                  {menuPresets.length === 0 && (
+                    <div className="ft-empty" style={{ fontSize: 11, padding: '4px 4px 8px' }}>
+                      Log a meal, then "Save as Menu" to reuse it
+                    </div>
                   )}
-                  {menuTemplates.map(tpl => {
-                    const isTarget = targetTplId === tpl.id;
-                    const isExpanded = expandedTplId === tpl.id;
-                    const tplKcal = tpl.items.reduce((s, i) => s + i.kcal, 0);
+                  {menuPresets.map(preset => {
+                    const isExpanded = expandedPresetId === preset.id;
+                    const presetKcal = preset.items.reduce((s, i) => s + i.kcal, 0);
                     return (
-                      <div key={tpl.id}>
-                        {/* Şablon başlık satırı */}
-                        <div className={`ft-menu-item${isTarget ? ' ft-menu-selected' : ''}`}
-                          onClick={() => {
-                            setTargetTplId(tpl.id);
-                            setFoodPanelMode('template');
-                            setExpandedTplId(isExpanded ? null : tpl.id);
-                          }}>
+                      <div key={preset.id}>
+                        {/* Preset başlık satırı */}
+                        <div className="ft-menu-item"
+                          onClick={() => setExpandedPresetId(isExpanded ? null : preset.id)}>
                           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginRight: 2 }}>{isExpanded ? '▾' : '▸'}</div>
                           <div className="ft-menu-info">
-                            {editingTplId === tpl.id ? (
+                            {editingPresetId === preset.id ? (
                               <input className="ft-input" style={{ fontSize:12, padding:'2px 6px', width:'100%' }} autoFocus
-                                value={editingTplName}
-                                onChange={e => setEditingTplName(e.target.value)}
-                                onBlur={() => renameTemplate(tpl.id, editingTplName)}
-                                onKeyDown={e => { if (e.key === 'Enter') renameTemplate(tpl.id, editingTplName); if (e.key === 'Escape') setEditingTplId(null); }}
+                                value={editingPresetName}
+                                onChange={e => setEditingPresetName(e.target.value)}
+                                onBlur={() => renamePreset(preset.id, editingPresetName)}
+                                onKeyDown={e => { if (e.key === 'Enter') renamePreset(preset.id, editingPresetName); if (e.key === 'Escape') setEditingPresetId(null); }}
                                 onClick={e => e.stopPropagation()}
                               />
                             ) : (
-                              <span className="ft-menu-name">{tpl.name}</span>
+                              <span className="ft-menu-name">{preset.name}</span>
                             )}
-                            <span className="ft-menu-kcal">{tplKcal} kcal</span>
+                            <span className="ft-menu-kcal">{presetKcal} kcal</span>
                           </div>
                           <button className="ft-del-btn" title="Rename" style={{ fontSize: 12 }}
-                            onClick={e => { e.stopPropagation(); setEditingTplId(tpl.id); setEditingTplName(tpl.name); }}>✎</button>
-                          <button className="ft-del-btn" title="Apply today" style={{ fontSize: 13 }}
-                            onClick={e => { e.stopPropagation(); applyTemplateToDay(tpl); }}>▶</button>
+                            onClick={e => { e.stopPropagation(); setEditingPresetId(preset.id); setEditingPresetName(preset.name); }}>✎</button>
+                          <button className="ft-del-btn" title="Add to today" style={{ fontSize: 13 }}
+                            onClick={e => { e.stopPropagation(); applyPresetToDay(preset); }}>▶</button>
                           <button className="ft-del-btn"
-                            onClick={e => { e.stopPropagation(); removeTemplate(tpl.id); }}>×</button>
+                            onClick={e => { e.stopPropagation(); removePreset(preset.id); }}>×</button>
                         </div>
 
-                        {/* Expand: yiyecek listesi */}
+                        {/* Expand: yiyecek listesi (salt okunur — sadeleştirme için düzenlenemiyor) */}
                         {isExpanded && (
                           <div style={{ paddingLeft: 8, paddingBottom: 4 }}>
-                            {tpl.items.length === 0
-                              ? <div className="ft-empty" style={{ fontSize: 11 }}>No food yet</div>
-                              : tpl.items.map(item => (
-                                <div key={item.id} style={{ display:'flex', alignItems:'center', gap:4, padding:'4px 0', borderBottom:'1px solid #21262d44', fontSize:12 }}>
-                                  <span style={{ flex:1, color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.name}</span>
-                                  <input
-                                    className="ft-input"
-                                    type="number" min="0.5"
-                                    step={item.unit === 'adet' ? 1 : 10}
-                                    value={item.qty}
-                                    style={{ width:52, textAlign:'center', padding:'2px 4px', fontSize:11 }}
-                                    onChange={e => updateTemplateItemQty(tpl.id, item.id, e.target.value)}
-                                    onClick={e => e.stopPropagation()}
-                                  />
-                                  <span style={{ color:'#6e7681', fontSize:11 }}>{item.unit}</span>
-                                  <button className="ft-del-btn" style={{ fontSize:12 }}
-                                    onClick={e => { e.stopPropagation(); removeFoodFromTemplate(tpl.id, item.id); }}>×</button>
-                                </div>
-                              ))
-                            }
+                            {preset.items.map(item => (
+                              <div key={item.id} style={{ display:'flex', alignItems:'center', gap:4, padding:'4px 0', borderBottom:'1px solid #21262d44', fontSize:12 }}>
+                                <span style={{ flex:1, color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.name}</span>
+                                <span style={{ color:'#6e7681', fontSize:11 }}>{item.qty}{item.unit}</span>
+                                <span style={{ color:'var(--text-secondary)', fontSize:11 }}>{item.kcal} kcal</span>
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>
@@ -2548,7 +2505,9 @@ Kurallar:
                         <div className="ft-menu-section-header">
                           <span className="ft-menu-section-name">{menu.name}</span>
                           <span className="ft-menu-section-kcal">{menuKcal} kcal</span>
-                          <button className="ft-del-btn" title="Delete menu" style={{ marginLeft: 4 }} onClick={() => removeMenu(menu.id)}>×</button>
+                          <button className="ft-del-btn" title="Save as Menu — reuse this meal later" style={{ marginLeft: 4, fontSize: 12 }}
+                            onClick={() => createPresetFromMenu(menu)} disabled={menu.items.length === 0}>📌</button>
+                          <button className="ft-del-btn" title="Delete menu" onClick={() => removeMenu(menu.id)}>×</button>
                         </div>
 
                         {/* Drop zone */}
@@ -2748,55 +2707,6 @@ Kurallar:
           <div className="ft-resizable-col" style={{ width: w1, minWidth: 160, flexShrink: 0 }}>
             <div className="ft-card ft-search-card" style={{ height: '100%', boxSizing: 'border-box', display:'flex', flexDirection:'column', paddingTop: 8 }}>
 
-              {/* Mod toggle */}
-              <div className="ft-food-panel-header">
-                <button
-                  className={`ft-food-mode-btn${foodPanelMode === 'log' ? ' ft-food-mode-active' : ''}`}
-                  onClick={() => setFoodPanelMode('log')}
-                >Daily Log</button>
-                <button
-                  className={`ft-food-mode-btn${foodPanelMode === 'template' ? ' ft-food-mode-active' : ''}`}
-                  onClick={() => setFoodPanelMode('template')}
-                >Add to Template</button>
-              </div>
-
-              {/* Şablon modu: hedef şablon seçici + içerik */}
-              {foodPanelMode === 'template' && (() => {
-                const tpl = menuTemplates.find(t => t.id === targetTplId);
-                const tplKcal = tpl ? tpl.items.reduce((s,i) => s+i.kcal, 0) : 0;
-                return (
-                  <div style={{ padding:'0 8px 6px' }}>
-                    <div className="ft-menu-section-header" style={{ marginBottom: 0 }}>
-                      <select style={{ background:'transparent', border:'none', color:'var(--text-primary)', fontSize:13, fontWeight:700, fontFamily:'inherit', cursor:'pointer', flex:1, outline:'none', minWidth:0 }}
-                        value={targetTplId ?? ''}
-                        onChange={e => setTargetTplId(Number(e.target.value) || null)}>
-                        <option value="">-- Select template --</option>
-                        {menuTemplates.map(t => <option key={t.id} value={t.id} style={{ background:'#161b22' }}>{t.name}</option>)}
-                      </select>
-                      <span className="ft-menu-section-kcal">{tplKcal} kcal</span>
-                    </div>
-                    {tpl && (tpl.items.length === 0
-                      ? <div className="ft-empty" style={{ fontSize:11 }}>No food yet — add from below</div>
-                      : <div className="ft-menu-dropzone" style={{ padding:0 }}>
-                          {tpl.items.map(item => (
-                            <div key={item.id} className="ft-menu-food-row">
-                              <span className="ft-list-name">{item.name}</span>
-                              <input className="ft-input ft-qty-input" type="number" min="0.5"
-                                step={item.unit === 'adet' ? 1 : 10}
-                                value={item.qty}
-                                onChange={e => updateTemplateItemQty(targetTplId, item.id, e.target.value)}
-                              />
-                              <span className="ft-list-sub">{item.unit}</span>
-                              <span style={{ color:'#e8e8e8', fontWeight:700, fontSize:13, whiteSpace:'nowrap' }}>{item.kcal} kcal</span>
-                              <button className="ft-del-btn" onClick={() => removeFoodFromTemplate(targetTplId, item.id)}>×</button>
-                            </div>
-                          ))}
-                        </div>
-                    )}
-                  </div>
-                );
-              })()}
-
               <input
                 className="ft-input"
                 style={{ margin:'4px 8px', fontSize:13, padding:'7px 10px' }}
@@ -2832,7 +2742,7 @@ Kurallar:
                 {searchQ.trim() === '' ? (
                   <div className="ft-food-empty-hint">
                     <div style={{ fontSize:28, opacity:0.2 }}>🔍</div>
-                    <div>{foodPanelMode === 'template' ? 'Search to add to template' : 'Search to add to daily log'}</div>
+                    <div>Search to add to daily log</div>
                   </div>
                 ) : searchResults.length === 0 ? (
                   <div className="ft-food-empty-hint">
@@ -2865,29 +2775,17 @@ Kurallar:
                         />
                         <span className="ft-food-unit">{isAdet ? 'pcs' : 'g'}</span>
                         <button className="ft-btn-sm" onClick={() => {
-                          if (foodPanelMode === 'template') {
-                            if (!targetTplId) {
-                              // Şablon yoksa ilk önce oluştur
-                              const tpl = { id: Date.now(), name: 'Template', items: [] };
-                              setMenuTemplates(prev => [...prev, tpl]);
-                              setTargetTplId(tpl.id);
-                              addFoodToTemplate(tpl.id, food, qty);
-                            } else {
-                              addFoodToTemplate(targetTplId, food, qty);
-                            }
+                          // Her zaman doğrudan günlük log'a ekle — tek, sade akış
+                          const existingId = selectedMenuIds[selectedMenuIds.length - 1] ?? dayMenus[0]?.id ?? null;
+                          if (existingId) {
+                            setSelectedMenuIds(prev => prev.includes(existingId) ? prev : [...prev, existingId]);
+                            addFoodToMenu(existingId, food, qty);
                           } else {
-                            // Günlük log'a ekle
-                            const existingId = selectedMenuIds[selectedMenuIds.length - 1] ?? dayMenus[0]?.id ?? null;
-                            if (existingId) {
-                              setSelectedMenuIds(prev => prev.includes(existingId) ? prev : [...prev, existingId]);
-                              addFoodToMenu(existingId, food, qty);
-                            } else {
-                              const ratio2 = food.unit === 'adet' ? qty : qty / 100;
-                              const item = { id: Date.now()+Math.random(), name:food.name, qty, unit:food.unit||'g', baseKcal:food.kcal, baseP:food.p, baseC:food.c, baseF:food.f, kcal:Math.round(food.kcal*ratio2), p:Math.round(food.p*ratio2*10)/10, c:Math.round(food.c*ratio2*10)/10, f:Math.round(food.f*ratio2*10)/10 };
-                              const newMenu = { id: Date.now(), name: 'Meal', items: [item], kcal: item.kcal, p: item.p, c: item.c, f: item.f };
-                              updateMeals(prev => ({ ...prev, [mealDate]: [...(prev[mealDate]||[]), newMenu] }));
-                              setSelectedMenuIds([newMenu.id]);
-                            }
+                            const ratio2 = food.unit === 'adet' ? qty : qty / 100;
+                            const item = { id: Date.now()+Math.random(), name:food.name, qty, unit:food.unit||'g', baseKcal:food.kcal, baseP:food.p, baseC:food.c, baseF:food.f, kcal:Math.round(food.kcal*ratio2), p:Math.round(food.p*ratio2*10)/10, c:Math.round(food.c*ratio2*10)/10, f:Math.round(food.f*ratio2*10)/10 };
+                            const newMenu = { id: Date.now(), name: 'Meal', items: [item], kcal: item.kcal, p: item.p, c: item.c, f: item.f };
+                            updateMeals(prev => ({ ...prev, [mealDate]: [...(prev[mealDate]||[]), newMenu] }));
+                            setSelectedMenuIds([newMenu.id]);
                           }
                         }}>+</button>
                       </div>
@@ -2904,3 +2802,4 @@ Kurallar:
     </div>
   );
 }
+

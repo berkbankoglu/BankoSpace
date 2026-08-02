@@ -78,6 +78,7 @@ export const SYNC_KEYS = [
   'ft_meals',
   'ft_workouts',
   'ft_measurements',
+  'ft_custom_foods',
   'sidebarOrder',
   'todoFontSize',
   'subtaskFontSize',
