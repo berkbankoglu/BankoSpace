@@ -11,7 +11,12 @@ static HTTP_CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
 fn get_client() -> &'static reqwest::Client {
     HTTP_CLIENT.get_or_init(|| {
         reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(15))
+            // 15s was too tight for Anthropic completions that use tools/images (e.g. the
+            // Fitness AI assistant's agentic loop) — those can legitimately take 20-40s+.
+            // The freeze this timeout originally guarded against was actually caused by
+            // creating a NEW reqwest::Client per request (fixed below via the shared
+            // OnceLock client), not by timeout length, so raising it back is safe.
+            .timeout(std::time::Duration::from_secs(45))
             .build()
             .expect("Failed to build HTTP client")
     })
@@ -185,26 +190,77 @@ async fn fetch_tts(text: String, slow: bool) -> Result<Vec<u8>, String> {
     Ok(bytes.to_vec())
 }
 
+// Host part of the URL only (no query string/tokens) — safe to log.
+fn url_host(url: &str) -> String {
+    url.split('/').nth(2).unwrap_or(url).to_string()
+}
+
+static INFLIGHT: OnceLock<std::sync::atomic::AtomicU64> = OnceLock::new();
+fn inflight_counter() -> &'static std::sync::atomic::AtomicU64 {
+    INFLIGHT.get_or_init(|| std::sync::atomic::AtomicU64::new(0))
+}
+
+fn now_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+// Updated every ~2s by the JS side (see diag.js). This is the most reliable
+// liveness signal we have: a background-frozen WebView2 page (Chromium page
+// freezing, not a crash) stops running ALL JS timers — including this ping —
+// while staying at ~0% CPU and never firing WebView2's own ProcessFailed event,
+// so install_crash_recovery() never triggers for this case. Tracking the ping
+// natively lets us force-recover even when JS itself can never run again.
+static LAST_JS_PING: OnceLock<std::sync::atomic::AtomicU64> = OnceLock::new();
+fn last_js_ping() -> &'static std::sync::atomic::AtomicU64 {
+    LAST_JS_PING.get_or_init(|| std::sync::atomic::AtomicU64::new(now_secs()))
+}
+
+#[tauri::command]
+fn js_ping() {
+    last_js_ping().store(now_secs(), std::sync::atomic::Ordering::SeqCst);
+}
+
 #[tauri::command]
 async fn fetch_post(url: String, headers: std::collections::HashMap<String, String>, body: String) -> Result<String, String> {
+    use std::sync::atomic::Ordering;
+    let host = url_host(&url);
+    let n = inflight_counter().fetch_add(1, Ordering::SeqCst) + 1;
+    write_diag(&format!("RUST: fetch_post START -> {} (inflight={})", host, n));
+    let t0 = std::time::Instant::now();
     let mut req = get_client().post(&url).body(body);
     for (k, v) in &headers {
         req = req.header(k.as_str(), v.as_str());
     }
-    let response = req.send().await.map_err(|e| e.to_string())?;
-    let text = response.text().await.map_err(|e| e.to_string())?;
-    Ok(text)
+    let result = async {
+        let response = req.send().await.map_err(|e| e.to_string())?;
+        response.text().await.map_err(|e| e.to_string())
+    }.await;
+    let n2 = inflight_counter().fetch_sub(1, Ordering::SeqCst) - 1;
+    write_diag(&format!("RUST: fetch_post END -> {} {}ms ok={} (inflight={})", host, t0.elapsed().as_millis(), result.is_ok(), n2));
+    result
 }
 
 #[tauri::command]
 async fn fetch_get(url: String, headers: std::collections::HashMap<String, String>) -> Result<String, String> {
+    use std::sync::atomic::Ordering;
+    let host = url_host(&url);
+    let n = inflight_counter().fetch_add(1, Ordering::SeqCst) + 1;
+    write_diag(&format!("RUST: fetch_get START -> {} (inflight={})", host, n));
+    let t0 = std::time::Instant::now();
     let mut req = get_client().get(&url);
     for (k, v) in &headers {
         req = req.header(k.as_str(), v.as_str());
     }
-    let response = req.send().await.map_err(|e| e.to_string())?;
-    let text = response.text().await.map_err(|e| e.to_string())?;
-    Ok(text)
+    let result = async {
+        let response = req.send().await.map_err(|e| e.to_string())?;
+        response.text().await.map_err(|e| e.to_string())
+    }.await;
+    let n2 = inflight_counter().fetch_sub(1, Ordering::SeqCst) - 1;
+    write_diag(&format!("RUST: fetch_get END -> {} {}ms ok={} (inflight={})", host, t0.elapsed().as_millis(), result.is_ok(), n2));
+    result
 }
 
 // Renderer/GPU process çöktüğünde veya yanıt vermez hale geldiğinde WebView2
@@ -264,6 +320,83 @@ fn main() {
         .setup(|app| {
             #[cfg(windows)]
             install_crash_recovery(app);
+
+            // Independent heartbeat on its own OS thread — completely decoupled from
+            // the main window event loop and from any Tauri IPC/webview activity. If
+            // this keeps ticking while the JS-side ping (js_ping, called every ~2s)
+            // goes silent, the freeze is in the JS/webview layer, not Rust's main
+            // thread. Also samples CPU% of our own process AND of the
+            // msedgewebview2.exe process(es) that actually run the JS/renderer (a
+            // separate OS process — WebView2 uses a Chromium-style multi-process
+            // model), which tells us whether JS was stuck spinning (high CPU) or
+            // genuinely blocked/waiting (near-zero CPU).
+            //
+            // Confirmed pattern from real freezes: host_cpu and webview_cpu BOTH stay
+            // near 0% the entire time (not a spin), no HTTP call is ever in flight,
+            // and WebView2's own ProcessFailed event never fires (so
+            // install_crash_recovery never triggers) — this matches Chromium's page
+            // freezing for backgrounded/occluded content, which can suspend ALL JS
+            // timers indefinitely. Since JS can't be relied on to escape this itself
+            // (an eval()'d reload would sit in the same stuck queue), once js_ping
+            // goes stale past a threshold we force a NATIVE reload via
+            // ICoreWebView2::Reload() — the same COM-level call the crash-recovery
+            // path uses — which doesn't require the frozen JS thread's cooperation.
+            let app_handle = app.handle().clone();
+            std::thread::spawn(move || {
+                use sysinfo::{Pid, System};
+                let my_pid = Pid::from_u32(std::process::id());
+                let mut sys = System::new_all();
+                let mut last_recovery_attempt: u64 = 0;
+                loop {
+                    std::thread::sleep(std::time::Duration::from_secs(10));
+                    let n = inflight_counter().load(std::sync::atomic::Ordering::SeqCst);
+                    sys.refresh_all();
+
+                    let my_cpu = sys.process(my_pid).map(|p| p.cpu_usage()).unwrap_or(-1.0);
+
+                    // Sum CPU of every msedgewebview2.exe whose ancestor chain leads back
+                    // to us (walk up to 6 hops: renderer -> ... -> WebView2 browser -> us).
+                    let mut wv_cpu = 0.0f32;
+                    let mut wv_count = 0;
+                    for (pid, proc_) in sys.processes() {
+                        if !proc_.name().to_string_lossy().eq_ignore_ascii_case("msedgewebview2.exe") { continue; }
+                        let mut cur = Some(*pid);
+                        for _ in 0..6 {
+                            let Some(cur_pid) = cur else { break };
+                            if cur_pid == my_pid { wv_cpu += proc_.cpu_usage(); wv_count += 1; break; }
+                            cur = sys.process(cur_pid).and_then(|p| p.parent());
+                        }
+                    }
+
+                    let now = now_secs();
+                    let ping_age = now.saturating_sub(last_js_ping().load(std::sync::atomic::Ordering::SeqCst));
+                    write_diag(&format!(
+                        "RUST-HB alive (inflight_http={}, host_cpu={:.1}%, webview_cpu={:.1}% across {} proc, js_ping_age={}s)",
+                        n, my_cpu, wv_cpu, wv_count, ping_age
+                    ));
+
+                    // JS ping should land every ~2s. Past 40s with no ping and no
+                    // recovery attempt in the last 90s, force a native reload.
+                    if ping_age > 40 && now.saturating_sub(last_recovery_attempt) > 90 {
+                        last_recovery_attempt = now;
+                        write_diag(&format!("RUST: !!! js_ping stale for {}s -> forcing native Reload()", ping_age));
+                        if let Some(window) = app_handle.get_webview_window("main") {
+                            #[cfg(windows)]
+                            {
+                                let ok = window.with_webview(|webview| unsafe {
+                                    if let Ok(core) = webview.controller().CoreWebView2() {
+                                        let _ = core.Reload();
+                                    }
+                                });
+                                write_diag(&format!("RUST: forced Reload() dispatched ok={}", ok.is_ok()));
+                            }
+                        } else {
+                            write_diag("RUST: forced Reload() failed — main window not found");
+                        }
+                    }
+                }
+            });
+
             Ok(())
         })
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
@@ -291,6 +424,7 @@ toggle_kana_window,
             close_child_webview,
             set_child_webview_bounds,
             diag_log,
+            js_ping,
         ])
         .on_window_event(|window, event| {
             match event {

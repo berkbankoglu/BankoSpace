@@ -75,6 +75,12 @@ export function initDiag() {
   let last = performance.now();
   let tick = 0;
   setInterval(() => {
+    // Rust-side liveness signal — independent of the diag_log batch/flush path.
+    // Lets main.rs force a native WebView2 Reload() if this ever stops landing
+    // (e.g. Chromium page-freezing suspends all JS timers in the background;
+    // an eval()'d reload would be stuck in the same queue, so recovery has to
+    // come from the native side watching this ping go stale).
+    invoke('js_ping').catch(() => {});
     const now = performance.now();
     const gap = now - last;
     last = now;

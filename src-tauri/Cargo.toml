@@ -21,6 +21,7 @@ url = "2"
 tauri-plugin-shell = "2.0"
 tauri-plugin-deep-link = "2"
 tauri-plugin-single-instance = "2"
+sysinfo = "0.32"
 
 # WebView2 renderer çökmesinden otomatik kurtarma (ProcessFailed → Reload).
 # Sürüm, tauri'nin kullandığı wry ile aynı webview2-com sürümü olmalı (Cargo.lock: 0.38).
