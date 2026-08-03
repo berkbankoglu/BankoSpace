@@ -89,7 +89,7 @@ function QuickLaunchPanel() {
 import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, setVolume, getVolume } from './utils/sounds';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
-const APP_VERSION = '4.2.4';
+const APP_VERSION = '4.2.5';
 const MIN_COL_PX = 220;
 const DEFAULT_COL_PX = [null, null, null]; // [dailyPx, weeklyPx, monthlyPx] — null = auto (flex:1)
 
@@ -1678,13 +1678,13 @@ useEffect(() => {
                     <span className="sidebar-drag-handle">⠿</span>
                   </div>
 
-                  {/* Fitness'a tıklayınca açılan alt sekme: Antrenman */}
-                  {item.id === 'fitness' && activeView === 'fitness' && (
+                  {/* Fitness altında her zaman görünen alt sekme: Antrenman */}
+                  {item.id === 'fitness' && (
                     <div
-                      className={`sidebar-subitem ${fitnessView === 'workout' ? 'active' : ''}`}
-                      onClick={() => { playNavSound(); setFitnessView('workout'); }}
+                      className={`sidebar-subitem ${activeView === 'fitness' && fitnessView === 'workout' ? 'active' : ''}`}
+                      onClick={() => { playNavSound(); setFitnessView('workout'); setActiveView('fitness'); }}
                     >
-                      <span className="item-name">Antrenman</span>
+                      <span className="item-name">«Antrenman»</span>
                     </div>
                   )}
                 </div>
