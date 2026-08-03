@@ -398,9 +398,25 @@ fn main() {
                             // Relaunch via a short-delayed detached helper so our
                             // single-instance mutex is fully released (by this process
                             // exiting below) before the new instance tries to claim it.
-                            let cmd_str = format!("ping 127.0.0.1 -n 3 >nul & start \"\" \"{}\"", exe_str);
-                            let spawned = std::process::Command::new("cmd").args(["/C", &cmd_str]).spawn();
-                            write_diag(&format!("RUST: relaunch scheduled ok={}", spawned.is_ok()));
+                            //
+                            // IMPORTANT: cmd.exe has its own quirky quoting rules that do
+                            // NOT match how Rust's Command::args() escapes arguments for
+                            // CreateProcess — passing this as a normal .arg() mangles the
+                            // embedded quotes into literal backslash-quote sequences that
+                            // cmd.exe can't parse, leaving the helper hung forever (a real
+                            // hang we hit: the app exited but nothing ever relaunched).
+                            // raw_arg() bypasses Rust's escaping so cmd.exe gets exactly
+                            // the text it expects.
+                            #[cfg(windows)]
+                            {
+                                use std::os::windows::process::CommandExt;
+                                let cmd_str = format!("ping 127.0.0.1 -n 3 >nul & start \"\" \"{}\"", exe_str);
+                                let spawned = std::process::Command::new("cmd")
+                                    .arg("/C")
+                                    .raw_arg(&cmd_str)
+                                    .spawn();
+                                write_diag(&format!("RUST: relaunch scheduled ok={}", spawned.is_ok()));
+                            }
                         }
                         std::thread::sleep(std::time::Duration::from_millis(200));
                         std::process::exit(1);
