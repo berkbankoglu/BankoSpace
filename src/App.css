@@ -8124,7 +8124,7 @@ body.light .sidebar-settings-version {
 .sidebar-subitem {
   display: flex;
   align-items: center;
-  padding: 5px 10px 5px 42px;
+  padding: 5px 10px 5px 50px;
   margin: 1px 6px;
   cursor: pointer;
   color: var(--text-muted);
