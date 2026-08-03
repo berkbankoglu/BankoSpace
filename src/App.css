@@ -8120,6 +8120,28 @@ body.light .sidebar-settings-version {
   border: 1px dashed var(--accent);
 }
 
+/* Fitness altında açılan alt sekme (Antrenman) */
+.sidebar-subitem {
+  display: flex;
+  align-items: center;
+  padding: 5px 10px 5px 32px;
+  margin: 1px 6px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  border-radius: 6px;
+  transition: background 0.12s, color 0.12s;
+  user-select: none;
+}
+.sidebar-subitem:hover {
+  background: rgba(255,255,255,0.05);
+  color: var(--text-primary);
+}
+.sidebar-subitem.active {
+  background: rgba(88,166,255,0.15);
+  color: var(--accent);
+}
+
 /* Board list under References in sidebar */
 .sidebar-boards {
   margin: 2px 8px 6px;

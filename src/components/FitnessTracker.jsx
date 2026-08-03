@@ -786,7 +786,7 @@ function useResize(initialPx, min, max, storageKey, inverted = false) {
   return [size, onMouseDown];
 }
 
-export default function FitnessTracker() {
+export default function FitnessTracker({ view = 'overview' } = {}) {
   const [profile, setProfile]               = useState(() => load('ft_profile', EMPTY_PROFILE));
   const [goal, setGoal]                     = useState(() => load('ft_goal', EMPTY_GOAL));
   const [editingProfile, setEditingProfile] = useState(false);
@@ -890,10 +890,9 @@ export default function FitnessTracker() {
   const [menuSideW, onMenuSideDown] = useResize(160, 70, 320, 'ft_panel_menu_side_v3');
   // Antrenman tab sidebar iç resize
   const [workoutSideW, onWorkoutSideDown] = useResize(170, 100, 320, 'ft_panel_workout_side_v1');
-  // Menü ↕ Antrenman dikey resize
-  const [menuH, onMenuVDown] = useResizeV(460, 120, 900, 'ft_panel_menu_h_v3');
   // Weight ↕ AI dikey resize
   const [weightH, onWeightVDown] = useResizeV(320, 100, 700, 'ft_panel_weight_h_v1');
+
 
   // ── AI Fitness Assistant state ──
   const [aiMessages, setAiMessages] = useState([]);
@@ -2225,6 +2224,8 @@ Kurallar:
         {/* ══ ANA LAYOUT: 4 panel + 3 resize handle ══ */}
         <div className="ft-main-layout">
 
+          {view !== 'overview' ? null : (
+          <>
           {/* ── Sol Kolon: Kilo Takibi + AI ── */}
           <div className="ft-resizable-col" style={{ width: w0, gap: 0 }}>
             <div className="ft-card" style={{ height: weightH, flexShrink: 0, boxSizing: 'border-box', overflow: 'auto' }}>
@@ -2408,9 +2409,9 @@ Kurallar:
           {/* Handle 1: kilo | menü */}
           <div className="ft-resize-handle" onMouseDown={onDown0} />
 
-          {/* ── Menü + Antrenman ── */}
+          {/* ── Menü (Antrenman ayrı sekmeye taşındı — tam yükseklik) ── */}
           <div className="ft-resizable-col" style={{ flex: 1, minWidth: 160, gap: 0 }}>
-            <div className="ft-card ft-log-card" style={{ height: menuH, flexShrink: 0, overflow: 'hidden' }}>
+            <div className="ft-card ft-log-card" style={{ flex: 1, overflow: 'hidden' }}>
               <div className="ft-card-header">
                 <div className="ft-card-label">Menu</div>
                 <span style={{ fontSize: 12, color: '#6e7681' }}>{mealDate}</span>
@@ -2572,132 +2573,6 @@ Kurallar:
               </div>
             </div>
 
-            {/* Dikey resize handle: menü ↕ antrenman */}
-            <div className="ft-resize-handle-v" onMouseDown={onMenuVDown} />
-
-            {/* ── Antrenman Planı (tab'lar) ── */}
-            {(() => {
-              const activeDay = workouts.find(d => d.id === expandedDay) || workouts[0] || null;
-              return (
-                <div className="ft-card ft-workout-card">
-                  {/* Tab bar */}
-                  <div className="ft-workout-tabs" style={{ width: workoutSideW, minWidth: workoutSideW }}>
-                    {workouts.map(day => {
-                      const isActive = activeDay?.id === day.id;
-                      const isRenaming = renamingDay === day.id;
-                      return (
-                        <div
-                          key={day.id}
-                          className={`ft-workout-tab${isActive ? ' ft-workout-tab--active' : ''}`}
-                          onClick={() => { setExpandedDay(day.id); setRenamingDay(null); }}
-                        >
-                          {isRenaming ? (
-                            <input
-                              className="ft-workout-tab-name ft-workout-tab-name--editing"
-                              value={day.name}
-                              autoFocus
-                              onClick={e => e.stopPropagation()}
-                              onChange={e => renamDay(day.id, e.target.value)}
-                              onBlur={() => setRenamingDay(null)}
-                              onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') setRenamingDay(null); }}
-                            />
-                          ) : (
-                            <span className="ft-workout-tab-name">{day.name}</span>
-                          )}
-                          {!isRenaming && (
-                            <button
-                              className="ft-workout-tab-edit"
-                              title="Yeniden adlandır"
-                              onClick={e => { e.stopPropagation(); setExpandedDay(day.id); setRenamingDay(day.id); }}
-                            >✎</button>
-                          )}
-                          <button
-                            className="ft-workout-tab-del"
-                            title="Günü sil"
-                            onMouseDown={e => { e.stopPropagation(); e.preventDefault(); removeDay(day.id); }}
-                          >×</button>
-                        </div>
-                      );
-                    })}
-                    <button className="ft-workout-tab-add" onClick={() => addDay(`Gün ${workouts.length + 1}`)} title="Gün ekle">+</button>
-                  </div>
-
-                  {/* Resize handle */}
-                  <div className="ft-resize-handle ft-resize-handle-inner" onMouseDown={onWorkoutSideDown} />
-
-                  {/* İçerik */}
-                  <div className="ft-workout-content">
-                    {workouts.length === 0 && <div className="ft-empty">+ ile gün ekle</div>}
-                    {activeDay && (
-                      <>
-                        <div className="ft-workout-ex-add-row">
-                          <input
-                            className="ft-input"
-                            style={{ flex: 1, fontSize: 12, padding: '5px 8px' }}
-                            placeholder="Egzersiz adı..."
-                            value={newExName}
-                            onChange={e => setNewExName(e.target.value)}
-                            onKeyDown={e => { if (e.key === 'Enter' && newExName.trim()) { addExercise(activeDay.id, newExName); setNewExName(''); } }}
-                          />
-                          <button className="ft-btn-sm" style={{ padding: '5px 10px' }} onClick={() => { if (newExName.trim()) { addExercise(activeDay.id, newExName); setNewExName(''); } }}>+</button>
-                        </div>
-
-                        {activeDay.exercises.length === 0
-                          ? <div className="ft-empty">Egzersiz ekle veya AI'dan iste</div>
-                          : (
-                            <table className="ft-workout-table">
-                              <thead>
-                                <tr>
-                                  <th>Hareket</th>
-                                  <th>Set</th>
-                                  <th>×</th>
-                                  <th>Tekrar</th>
-                                  <th></th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {activeDay.exercises.map(ex => (
-                                  <tr key={ex.id} className="ft-workout-tr">
-                                    <td className="ft-workout-td-name">{ex.name}</td>
-                                    <td>
-                                      <input
-                                        className="ft-input ft-workout-num-input"
-                                        type="number" min="1" max="20"
-                                        value={ex.sets}
-                                        onChange={e => updateExercise(activeDay.id, ex.id, { sets: Math.max(1, Number(e.target.value) || 1) })}
-                                      />
-                                    </td>
-                                    <td className="ft-workout-td-x">×</td>
-                                    <td>
-                                      {ex.isMax
-                                        ? <span className="ft-workout-max-badge">MAX</span>
-                                        : <input
-                                            className="ft-input ft-workout-num-input"
-                                            type="number" min="1" max="100"
-                                            value={ex.reps}
-                                            onChange={e => updateExercise(activeDay.id, ex.id, { reps: Math.max(1, Number(e.target.value) || 1) })}
-                                          />
-                                      }
-                                    </td>
-                                    <td className="ft-workout-td-actions">
-                                      <button
-                                        className={`ft-workout-max-btn${ex.isMax ? ' active' : ''}`}
-                                        onClick={() => updateExercise(activeDay.id, ex.id, { isMax: !ex.isMax })}
-                                      >max</button>
-                                      <button className="ft-del-btn" onClick={() => removeExercise(activeDay.id, ex.id)}>×</button>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          )
-                        }
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })()}
           </div>
 
           {/* Handle 2: menü | arama */}
@@ -2795,6 +2670,136 @@ Kurallar:
               </div>
             </div>
           </div>
+          </>
+          )}
+
+          {view !== 'workout' ? null : (
+            <div className="ft-resizable-col" style={{ flex: 1, minWidth: 160 }}>
+              {/* ── Antrenman Planı (tab'lar) — ayrı sekme ── */}
+              {(() => {
+                const activeDay = workouts.find(d => d.id === expandedDay) || workouts[0] || null;
+                return (
+                  <div className="ft-card ft-workout-card">
+                    {/* Tab bar */}
+                    <div className="ft-workout-tabs" style={{ width: workoutSideW, minWidth: workoutSideW }}>
+                      {workouts.map(day => {
+                        const isActive = activeDay?.id === day.id;
+                        const isRenaming = renamingDay === day.id;
+                        return (
+                          <div
+                            key={day.id}
+                            className={`ft-workout-tab${isActive ? ' ft-workout-tab--active' : ''}`}
+                            onClick={() => { setExpandedDay(day.id); setRenamingDay(null); }}
+                          >
+                            {isRenaming ? (
+                              <input
+                                className="ft-workout-tab-name ft-workout-tab-name--editing"
+                                value={day.name}
+                                autoFocus
+                                onClick={e => e.stopPropagation()}
+                                onChange={e => renamDay(day.id, e.target.value)}
+                                onBlur={() => setRenamingDay(null)}
+                                onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') setRenamingDay(null); }}
+                              />
+                            ) : (
+                              <span className="ft-workout-tab-name">{day.name}</span>
+                            )}
+                            {!isRenaming && (
+                              <button
+                                className="ft-workout-tab-edit"
+                                title="Yeniden adlandır"
+                                onClick={e => { e.stopPropagation(); setExpandedDay(day.id); setRenamingDay(day.id); }}
+                              >✎</button>
+                            )}
+                            <button
+                              className="ft-workout-tab-del"
+                              title="Günü sil"
+                              onMouseDown={e => { e.stopPropagation(); e.preventDefault(); removeDay(day.id); }}
+                            >×</button>
+                          </div>
+                        );
+                      })}
+                      <button className="ft-workout-tab-add" onClick={() => addDay(`Gün ${workouts.length + 1}`)} title="Gün ekle">+</button>
+                    </div>
+
+                    {/* Resize handle */}
+                    <div className="ft-resize-handle ft-resize-handle-inner" onMouseDown={onWorkoutSideDown} />
+
+                    {/* İçerik */}
+                    <div className="ft-workout-content">
+                      {workouts.length === 0 && <div className="ft-empty">+ ile gün ekle</div>}
+                      {activeDay && (
+                        <>
+                          <div className="ft-workout-ex-add-row">
+                            <input
+                              className="ft-input"
+                              style={{ flex: 1, fontSize: 12, padding: '5px 8px' }}
+                              placeholder="Egzersiz adı..."
+                              value={newExName}
+                              onChange={e => setNewExName(e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Enter' && newExName.trim()) { addExercise(activeDay.id, newExName); setNewExName(''); } }}
+                            />
+                            <button className="ft-btn-sm" style={{ padding: '5px 10px' }} onClick={() => { if (newExName.trim()) { addExercise(activeDay.id, newExName); setNewExName(''); } }}>+</button>
+                          </div>
+
+                          {activeDay.exercises.length === 0
+                            ? <div className="ft-empty">Egzersiz ekle veya AI'dan iste</div>
+                            : (
+                              <table className="ft-workout-table">
+                                <thead>
+                                  <tr>
+                                    <th>Hareket</th>
+                                    <th>Set</th>
+                                    <th>×</th>
+                                    <th>Tekrar</th>
+                                    <th></th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {activeDay.exercises.map(ex => (
+                                    <tr key={ex.id} className="ft-workout-tr">
+                                      <td className="ft-workout-td-name">{ex.name}</td>
+                                      <td>
+                                        <input
+                                          className="ft-input ft-workout-num-input"
+                                          type="number" min="1" max="20"
+                                          value={ex.sets}
+                                          onChange={e => updateExercise(activeDay.id, ex.id, { sets: Math.max(1, Number(e.target.value) || 1) })}
+                                        />
+                                      </td>
+                                      <td className="ft-workout-td-x">×</td>
+                                      <td>
+                                        {ex.isMax
+                                          ? <span className="ft-workout-max-badge">MAX</span>
+                                          : <input
+                                              className="ft-input ft-workout-num-input"
+                                              type="number" min="1" max="100"
+                                              value={ex.reps}
+                                              onChange={e => updateExercise(activeDay.id, ex.id, { reps: Math.max(1, Number(e.target.value) || 1) })}
+                                            />
+                                        }
+                                      </td>
+                                      <td className="ft-workout-td-actions">
+                                        <button
+                                          className={`ft-workout-max-btn${ex.isMax ? ' active' : ''}`}
+                                          onClick={() => updateExercise(activeDay.id, ex.id, { isMax: !ex.isMax })}
+                                        >max</button>
+                                        <button className="ft-del-btn" onClick={() => removeExercise(activeDay.id, ex.id)}>×</button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            )
+                          }
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
 
         </div>
 

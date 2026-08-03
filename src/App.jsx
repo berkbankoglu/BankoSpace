@@ -291,6 +291,9 @@ function App({ session, onLogout }) {
   const [selectedExportSections, setSelectedExportSections] = useState([]);
   const [soundVolume, setSoundVolume] = useState(() => getVolume());
   const [activeView, setActiveView] = useState('dashboard');
+  // Fitness'ın sol sidebar altındaki alt sekmesi: 'overview' | 'workout'
+  const [fitnessView, setFitnessView] = useState(() => localStorage.getItem('ft_view') || 'overview');
+  useEffect(() => { localStorage.setItem('ft_view', fitnessView); }, [fitnessView]);
 
   const [sidebarItems, setSidebarItems] = useState(() => {
     const defaults = [
@@ -1654,24 +1657,36 @@ useEffect(() => {
             <div className="sidebar-content">
               {/* Draggable Sidebar Items */}
               {sidebarItems.filter(item => !item.hidden).map((item, index) => (
-                <div
-                  key={item.id}
-                  data-sidebar-id={item.id}
-                  className={`sidebar-item ${item.id === 'dashboard' ? 'main-item' : ''} ${activeView === item.view ? 'active' : ''} ${draggedSidebarItem?.item.id === item.id ? 'sidebar-dragging' : ''}`}
-                  onMouseDown={(e) => handleSidebarDragStart(e, item, index)}
-                  onClick={() => {
-                    if (draggedSidebarItem) return;
-                    playNavSound();
-                    if (item.id === 'japanesekana') {
-                      setActiveView('japanesekana');
-                      return;
-                    }
-                    setActiveView(item.view);
-                  }}
-                >
-                  <span className="sidebar-item-icon">{item.icon}</span>
-                  <span className="item-name">{item.label}</span>
-                  <span className="sidebar-drag-handle">⠿</span>
+                <div key={item.id}>
+                  <div
+                    data-sidebar-id={item.id}
+                    className={`sidebar-item ${item.id === 'dashboard' ? 'main-item' : ''} ${activeView === item.view ? 'active' : ''} ${draggedSidebarItem?.item.id === item.id ? 'sidebar-dragging' : ''}`}
+                    onMouseDown={(e) => handleSidebarDragStart(e, item, index)}
+                    onClick={() => {
+                      if (draggedSidebarItem) return;
+                      playNavSound();
+                      if (item.id === 'japanesekana') {
+                        setActiveView('japanesekana');
+                        return;
+                      }
+                      if (item.id === 'fitness') setFitnessView('overview');
+                      setActiveView(item.view);
+                    }}
+                  >
+                    <span className="sidebar-item-icon">{item.icon}</span>
+                    <span className="item-name">{item.label}</span>
+                    <span className="sidebar-drag-handle">⠿</span>
+                  </div>
+
+                  {/* Fitness'a tıklayınca açılan alt sekme: Antrenman */}
+                  {item.id === 'fitness' && activeView === 'fitness' && (
+                    <div
+                      className={`sidebar-subitem ${fitnessView === 'workout' ? 'active' : ''}`}
+                      onClick={() => { playNavSound(); setFitnessView('workout'); }}
+                    >
+                      <span className="item-name">Antrenman</span>
+                    </div>
+                  )}
                 </div>
               ))}
 
@@ -1737,7 +1752,7 @@ useEffect(() => {
           {/* Fitness Tracker */}
           {activeView === 'fitness' && (
             <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-              <FitnessTracker />
+              <FitnessTracker view={fitnessView} />
             </div>
           )}
 
