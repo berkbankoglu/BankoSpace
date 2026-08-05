@@ -182,6 +182,8 @@
   white-space: nowrap;
 }
 .ft-btn-ghost:hover { border-color: var(--accent); color: var(--text-primary); }
+.ft-btn-ghost--active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.ft-btn-ghost--active:hover { color: #fff; }
 
 .ft-btn-sm {
   padding: 6px 12px;
@@ -227,8 +229,10 @@
   gap: 6px;
   margin-bottom: 8px;
 }
-.ft-weight-input-row .ft-date-sm {
+.ft-weight-input-row .ft-weight-date-label {
   grid-column: 1 / -1;
+}
+.ft-weight-input-row .ft-date-sm {
   width: 100% !important;
 }
 .ft-weight-input-row .ft-btn-accent {
@@ -247,9 +251,34 @@
   border: 1px solid var(--border);
 }
 
+/* Grafikler sekmesi: tüm grafikler sekmeyle geçiş yapmadan aynı anda,
+   yan yana (geniş ekranda) veya alt alta (dar ekranda) */
+.ft-charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 14px;
+  margin: 10px 0 14px;
+}
+
+.ft-chart-tile {
+  background: var(--bg-hover)33;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px 4px;
+}
+
+.ft-chart-tile-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
 .ft-wlog-header {
   display: grid;
-  grid-template-columns: 1fr 80px 60px 16px;
+  grid-template-columns: 1fr 70px 60px 60px 60px 70px 60px 60px 16px;
   gap: 4px;
   padding: 5px 4px 5px 4px;
   font-size: 12px;
@@ -263,7 +292,7 @@
 
 .ft-wlog-row {
   display: grid;
-  grid-template-columns: 1fr 80px 60px 16px;
+  grid-template-columns: 1fr 70px 60px 60px 60px 70px 60px 60px 16px;
   gap: 4px;
   align-items: center;
   padding: 7px 4px;
@@ -356,14 +385,15 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
+  padding: 10px 12px;
   border-radius: 8px;
   cursor: pointer;
-  border: 1px solid transparent;
+  border: 1px solid var(--border);
+  background: var(--bg-hover)55;
   transition: background 0.15s, border-color 0.15s;
   user-select: none;
 }
-.ft-menu-item:hover { background: var(--border); }
+.ft-menu-item:hover { background: var(--bg-hover); border-color: var(--border-hover); }
 .ft-menu-selected { background: var(--bg-hover) !important; border-color: var(--accent)44 !important; }
 
 .ft-menu-check {
@@ -392,8 +422,8 @@
   flex: 1;
   overflow: hidden;
 }
-.ft-menu-name { font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ft-menu-kcal { font-size: 11px; color: #e8e8e8; }
+.ft-menu-name { font-size: 15px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ft-menu-kcal { font-size: 15px; color: #e8e8e8; }
 
 .ft-menu-tag {
   font-size: 10px;
@@ -422,7 +452,7 @@
   border-bottom: 1px solid var(--border);
 }
 .ft-log-kcal   { font-size: 22px; font-weight: 800; line-height: 1; color: #e8e8e8; }
-.ft-log-macros { font-size: 13px; color: var(--text-muted); }
+.ft-log-macros { font-size: 15px; color: var(--text-muted); }
 
 .ft-meal-group { margin-bottom: 4px; }
 .ft-group-label {
@@ -753,7 +783,7 @@
   border-bottom: 1px solid var(--border-hover);
 }
 .ft-menu-section-name {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text-primary);
   white-space: nowrap;
@@ -784,7 +814,7 @@
 }
 
 .ft-menu-drop-hint {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-muted);
   text-align: center;
   padding: 12px 0;
@@ -799,10 +829,10 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 6px;
+  padding: 7px 8px;
   border-radius: 6px;
   background: var(--bg-card);
-  font-size: 12px;
+  font-size: 15px;
   transition: background 0.1s;
   animation: ft-row-in 0.18s ease;
 }

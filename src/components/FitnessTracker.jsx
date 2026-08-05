@@ -165,6 +165,63 @@ function calcBMI(w, h) {
   return Math.round((w / Math.pow(h / 100, 2)) * 10) / 10;
 }
 
+function calcLeanMass(weight, bodyFatPct) {
+  if (!weight || bodyFatPct == null) return null;
+  return Math.round(weight * (1 - bodyFatPct / 100) * 10) / 10;
+}
+
+// FFMI (Fat-Free Mass Index) — height-normalized versiyon
+function calcFFMI(leanMassKg, heightCm) {
+  if (!leanMassKg || !heightCm) return null;
+  const hM = heightCm / 100;
+  const v = leanMassKg / (hM * hM) + 6.1 * (1.8 - hM);
+  return Math.round(v * 10) / 10;
+}
+
+function calcShoulderWaistRatio(shoulder, waist) {
+  if (!shoulder || !waist) return null;
+  return Math.round((shoulder / waist) * 100) / 100;
+}
+
+// Son ~30 günlük (yetersizse elimizdeki son 10 kayıt) kilo verisinden
+// gerçek haftalık değişim hızı — günlük dalgalanmayı (su tutması vb.)
+// filtrelemek için tek tük son iki nokta yerine bir aralık kullanır.
+function calcWeeklyRate(entries) {
+  if (!entries || entries.length < 2) return null;
+  const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date));
+  const lastDate = new Date(sorted[sorted.length - 1].date);
+  const cutoff = new Date(lastDate);
+  cutoff.setDate(cutoff.getDate() - 30);
+  let usable = sorted.filter(e => new Date(e.date) >= cutoff);
+  if (usable.length < 2) usable = sorted.slice(-Math.min(sorted.length, 10));
+  if (usable.length < 2) return null;
+  const first = usable[0], last = usable[usable.length - 1];
+  const days = (new Date(last.date) - new Date(first.date)) / 86400000;
+  if (days < 1) return null;
+  return Math.round(((last.value - first.value) / days) * 7 * 100) / 100;
+}
+
+// Mevcut haftalık hızla hedefe kaç gün kaldığı — hız hedefle aynı yönde
+// ilerlemiyorsa (ör. kilo alıyor ama hedef kilo vermekse) anlamsız bir
+// sayı göstermek yerine null döner.
+function calcEtaDays(currentWeight, targetWeight, weeklyRate) {
+  if (currentWeight == null || !targetWeight || weeklyRate == null) return null;
+  const diff = targetWeight - currentWeight;
+  if (Math.abs(diff) < 0.1) return 0;
+  if (Math.abs(weeklyRate) < 0.05 || Math.sign(weeklyRate) !== Math.sign(diff)) return null;
+  return Math.round((diff / weeklyRate) * 7);
+}
+
+// 'adet' bazlı bir yemeği (kcal/p/c/f per piece + perUnit gram) gram-bazlı
+// eşdeğerine (per 100g) çevirir — böylece "gram gir" moduna geçildiğinde mevcut
+// ratio=qty/100 hesaplaması hiç değişmeden doğru sonucu verir (köfte gibi
+// adet yemeklerde gramaja göre kalori istendiğinde kullanılıyor).
+function toGramBasis(food) {
+  if (food.unit !== 'adet' || !food.perUnit) return food;
+  const f = 100 / food.perUnit;
+  return { ...food, unit: 'g', kcal: food.kcal * f, p: food.p * f, c: food.c * f, f: food.f * f };
+}
+
 function bmiInfo(bmi) {
   if (!bmi) return null;
   if (bmi < 18.5) return { text: 'Underweight', color: 'var(--accent)' };
@@ -341,7 +398,7 @@ const FOOD_DB = [
   { name: 'İmam bayıldı (porsiyon)', kcal: 280, p: 3, c: 25,  f: 18,  unit: 'adet', perUnit: 200 },
   { name: 'Dolma (yaprak)',         kcal: 70,  p: 2.5, c: 8,   f: 3,   unit: 'adet', perUnit: 40 },
   { name: 'Sarma',                 kcal: 70,  p: 2.5, c: 8,   f: 3,   unit: 'adet', perUnit: 40 },
-  { name: 'Köfte',                 kcal: 150, p: 12,  c: 3,   f: 9,   unit: 'adet', perUnit: 60 },
+  { name: 'Köfte',                 kcal: 150, p: 12,  c: 3,   f: 9,   unit: 'adet', perUnit: 60, defaultUnit: 'g' },
   { name: 'Kuru fasulye',          kcal: 127, p: 8.7, c: 23,  f: 0.5, unit: 'g' },
   { name: 'Pilav (pirinç)',        kcal: 130, p: 2.7, c: 28,  f: 0.3, unit: 'g' },
   { name: 'Su böreği (dilim)',     kcal: 200, p: 6,   c: 20,  f: 10,  unit: 'adet', perUnit: 80 },
@@ -507,6 +564,115 @@ function WeightChart({ entries, targetWeight, profile }) {
               %{calcBodyFat({ ...profile, weight: hovered.value, waist: hovered.waist, neck: hovered.neck }) ?? '?'} fat
             </span>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Genel amaçlı çizgi grafiği: yağ oranı / FFMI / omuz-bel oranı gibi
+// weightLog'dan türetilen serileri çizmek için (WeightChart'ın hedef-çizgisi
+// ve kilo-özel tooltip'i olmayan sade versiyonu) ──
+function MetricChart({ entries, color = '#5c7cfa', unit = '' }) {
+  const [hoverIdx, setHoverIdx] = useState(null);
+  const containerRef = useRef(null);
+  const [cW, setCW] = useState(220);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const ro = new ResizeObserver(([e]) => setCW(e.contentRect.width));
+    ro.observe(containerRef.current);
+    setCW(containerRef.current.offsetWidth);
+    return () => ro.disconnect();
+  }, []);
+
+  if (!entries || entries.length === 0) return null;
+
+  const PAD = { top: 20, right: 12, bottom: 32, left: 44 };
+  const H = 180;
+  const iW = Math.max(1, cW - PAD.left - PAD.right);
+  const iH = H - PAD.top - PAD.bottom;
+
+  const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date));
+  const vals = sorted.map(e => e.value);
+  const span = Math.max(...vals) - Math.min(...vals);
+  const pad = Math.max(0.5, span * 0.15);
+  const minV = Math.min(...vals) - pad;
+  const maxV = Math.max(...vals) + pad;
+
+  const n = sorted.length;
+  const px = i => PAD.left + (n === 1 ? iW / 2 : (i / (n - 1)) * iW);
+  const py = v => PAD.top + iH - ((v - minV) / (maxV - minV || 1)) * iH;
+
+  const pts = sorted.map((e, i) => `${px(i)},${py(e.value)}`).join(' ');
+  const area = n > 1 ? `${px(0)},${PAD.top + iH} ${pts} ${px(n - 1)},${PAD.top + iH}` : null;
+
+  const gridLines = Array.from({ length: 4 }, (_, i) => {
+    const v = minV + ((maxV - minV) * i) / 3;
+    return { y: py(v), label: v.toFixed(1) };
+  });
+
+  const xLabelIdxs = new Set([0, n - 1]);
+  for (let i = Math.max(1, Math.floor(n / 4)); i < n - 1; i += Math.max(1, Math.floor(n / 4))) xLabelIdxs.add(i);
+  const xLabels = [...xLabelIdxs].map(i => ({ x: px(i), label: sorted[i].date.slice(5) }));
+
+  const hovered = hoverIdx !== null ? sorted[hoverIdx] : null;
+  const gradId = `mc-grad-${color.replace('#', '')}`;
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
+      <svg width={cW} height={H} style={{ display: 'block', overflow: 'visible' }} onMouseLeave={() => setHoverIdx(null)}>
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.3" />
+            <stop offset="100%" stopColor={color} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+
+        {gridLines.map((g, i) => (
+          <g key={i}>
+            <line x1={PAD.left} y1={g.y} x2={PAD.left + iW} y2={g.y} stroke="#30363d" strokeWidth="1" />
+            <text x={PAD.left - 6} y={g.y + 4} textAnchor="end" fontSize="12" fill="#8b949e" fontFamily="monospace">{g.label}</text>
+          </g>
+        ))}
+
+        {xLabels.map((l, i) => (
+          <text key={i} x={l.x} y={H - 6} textAnchor="middle" fontSize="12" fill="#8b949e">{l.label}</text>
+        ))}
+
+        {area && <polygon points={area} fill={`url(#${gradId})`} />}
+        {n > 1 && (
+          <polyline points={pts} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+        )}
+
+        {hoverIdx !== null && (
+          <line x1={px(hoverIdx)} y1={PAD.top} x2={px(hoverIdx)} y2={PAD.top + iH} stroke="#8b949e" strokeWidth="1" strokeDasharray="3 2" />
+        )}
+
+        {sorted.map((e, i) => {
+          const isLast = i === n - 1;
+          const isHov = hoverIdx === i;
+          return (
+            <circle key={i}
+              cx={px(i)} cy={py(e.value)}
+              r={isHov ? 7 : isLast ? 6 : 4}
+              fill={isLast ? '#e8e8e8' : color} stroke="#0d1117" strokeWidth="2"
+              style={{ cursor: 'pointer' }}
+              onMouseEnter={() => setHoverIdx(i)}
+            />
+          );
+        })}
+      </svg>
+
+      {hovered && (
+        <div style={{
+          position: 'absolute', top: 6, left: '50%', transform: 'translateX(-50%)',
+          background: '#1c2128', border: '1px solid #444c56', borderRadius: 8,
+          padding: '6px 14px', fontSize: 13, color: '#e6edf3', pointerEvents: 'none',
+          whiteSpace: 'nowrap', zIndex: 10, boxShadow: '0 4px 12px #0006',
+        }}>
+          <b style={{ color: '#e8e8e8' }}>{hovered.value}{unit}</b>
+          <span style={{ color: '#8b949e', marginLeft: 8 }}>{hovered.date}</span>
         </div>
       )}
     </div>
@@ -704,7 +870,7 @@ function MiniCalendar({ meals, selectedDate, onSelect }) {
   );
 }
 
-const EMPTY_PROFILE = { gender: 'male', age: '', weight: '', height: '', waist: '', neck: '', hip: '', activity: 'light' };
+const EMPTY_PROFILE = { gender: 'male', age: '', weight: '', height: '', waist: '', neck: '', hip: '', shoulder: '', activity: 'light' };
 const EMPTY_GOAL    = { type: 'maintain', currentWeight: '', targetWeight: '', startDate: '', endDate: '' }; // type: cut | maintain | bulk
 
 // Dikey resize hook (menü ↕ antrenman)
@@ -793,20 +959,24 @@ export default function FitnessTracker({ view = 'overview' } = {}) {
   const [editingGoal, setEditingGoal]       = useState(false);
   const [draft, setDraft]                   = useState(profile);
   const [goalDraft, setGoalDraft]           = useState(goal);
+  const [heroMode, setHeroMode]             = useState('main'); // 'main' | 'karne' — üst istatistik şeridi
+
+
 
   // Kilo takibi
   const [weightLog, setWeightLog]     = useState(() => load('ft_weight_log', []));
   const [showWeightForm, setShowWeightForm] = useState(false);
-  const [chartTab, setChartTab]       = useState('weight');
   const [weightInput, setWeightInput] = useState('');
   const [waistInput, setWaistInput]   = useState('');
   const [neckInput, setNeckInput]     = useState('');
+  const [shoulderInput, setShoulderInput] = useState('');
   const [addDate, setAddDate]         = useState(today());
   const [editingIdx, setEditingIdx]   = useState(null);
   const [editDate, setEditDate]       = useState('');
   const [editVal, setEditVal]         = useState('');
   const [editWaist, setEditWaist]     = useState('');
   const [editNeck, setEditNeck]       = useState('');
+  const [editShoulder, setEditShoulder] = useState('');
 
   // Menu presets ("hazır öğün"): reusable saved meals, date-independent, [ { id, name, items:[{...}] } ]
   // Storage key stays 'ft_menu_templates' (unchanged) so existing saved data isn't lost.
@@ -872,6 +1042,8 @@ export default function FitnessTracker({ view = 'overview' } = {}) {
   // Arama
   const [searchQ, setSearchQ] = useState('');
   const [foodQty, setFoodQty] = useState({});   // { [food.name]: qty string }
+  const [foodUnitMode, setFoodUnitMode] = useState({}); // { [food.name]: 'adet' | 'g' } — adet yemekleri gram bazında da girilebilsin
+  const [presetAddFoodQ, setPresetAddFoodQ] = useState(''); // Genişletilmiş preset'e yemek ekleme arama kutusu
 
   // Manuel kalori ekleme
   const [customFoodName, setCustomFoodName] = useState('');
@@ -891,7 +1063,6 @@ export default function FitnessTracker({ view = 'overview' } = {}) {
   // Antrenman tab sidebar iç resize
   const [workoutSideW, onWorkoutSideDown] = useResize(170, 100, 320, 'ft_panel_workout_side_v1');
   // Weight ↕ AI dikey resize
-  const [weightH, onWeightVDown] = useResizeV(320, 100, 700, 'ft_panel_weight_h_v1');
 
 
   // ── AI Fitness Assistant state ──
@@ -991,6 +1162,40 @@ export default function FitnessTracker({ view = 'overview' } = {}) {
   };
   const bodyFat  = calcBodyFat(bodyFatProfile);
   const hasProfile = profile.weight && profile.height && profile.age;
+
+  // ── Vücut kompozisyonu (Grafikler sekmesi) ──
+  const currentShoulder = lastEntry?.shoulder || profile.shoulder;
+  const currentWaist    = lastEntry?.waist    || profile.waist;
+  const leanMass          = calcLeanMass(lastWeight, bodyFat);
+  const ffmi              = calcFFMI(leanMass, profile.height);
+  const shoulderWaistRatio = calcShoulderWaistRatio(currentShoulder, currentWaist);
+
+  // Zaman içindeki yağ oranı / FFMI / omuz-bel oranı — her weightLog girdisinden türetilir
+  const bodyFatSeries = weightLog
+    .filter(e => e.waist && e.neck && profile.height)
+    .map(e => ({ date: e.date, value: calcBodyFat({ ...profile, weight: e.value, waist: e.waist, neck: e.neck }) }))
+    .filter(e => e.value != null);
+
+  const ffmiSeries = weightLog
+    .filter(e => e.waist && e.neck && profile.height)
+    .map(e => {
+      const bf = calcBodyFat({ ...profile, weight: e.value, waist: e.waist, neck: e.neck });
+      const lean = calcLeanMass(e.value, bf);
+      return { date: e.date, value: calcFFMI(lean, profile.height) };
+    })
+    .filter(e => e.value != null);
+
+  const ratioSeries = weightLog
+    .filter(e => e.shoulder && e.waist)
+    .map(e => ({ date: e.date, value: calcShoulderWaistRatio(e.shoulder, e.waist) }))
+    .filter(e => e.value != null);
+
+  const waistSeries = weightLog.filter(e => e.waist).map(e => ({ date: e.date, value: e.waist }));
+  const neckSeries   = weightLog.filter(e => e.neck).map(e => ({ date: e.date, value: e.neck }));
+
+  // Hedefe kalan gün tahmini — son ~30 günün gerçek gidişatına göre
+  const weeklyRate = calcWeeklyRate(weightLog);
+  const etaDays = goal.targetWeight ? calcEtaDays(lastWeight, parseFloat(goal.targetWeight), weeklyRate) : null;
 
   // İki tarih arası gün sayısı
   function daysBetween(s, e) {
@@ -1712,9 +1917,9 @@ Kurallar:
   }
 
   // ── Menu preset CRUD ("hazır öğün") ──
-  // Presets are captured wholesale from an already-logged meal (see "Save as
-  // Menu" button on a meal's header) instead of built through a separate
-  // food-adding panel — one simple way in, one simple way to reuse.
+  // Presets can be captured wholesale from an already-logged meal (see "Save
+  // as Menu" on a meal's header), or built up food-by-food via the search box
+  // above the Menu list (addFoodToActivePreset).
   function createPresetFromMenu(menu) {
     if (!menu.items.length) return;
     playAddSound();
@@ -1724,6 +1929,21 @@ Kurallar:
       items: menu.items.map(i => ({ ...i, id: Date.now() + Math.random() })),
     };
     setMenuPresets(prev => [...prev, preset]);
+  }
+
+  // Menu üstündeki arama kutusundan yemek eklerken hedef preset: genişletilmiş
+  // (açık) preset varsa oraya, yoksa yeni bir preset oluşturup ona ekler.
+  function addFoodToActivePreset(food, qty) {
+    if (expandedPresetId != null) {
+      addFoodToPreset(expandedPresetId, food, qty);
+      return;
+    }
+    const newId = Date.now();
+    setMenuPresets(prev => [...prev, { id: newId, name: 'Yeni Menü', items: [] }]);
+    setExpandedPresetId(newId);
+    // Fonksiyonel updater'lar sırayla uygulanır, bu yüzden yukarıdaki preset
+    // React state'ine eklendikten sonra bu güvenle çalışır (setTimeout gerekmez).
+    addFoodToPreset(newId, food, qty);
   }
 
   function removePreset(id) {
@@ -1750,6 +1970,53 @@ Kurallar:
     };
     updateMeals(prev => ({ ...prev, [mealDate]: [...(prev[mealDate] || []), newMenu] }));
     setSelectedMenuIds(prev => [...prev, newMenu.id]);
+  }
+
+  // Bir preset'e (hazır öğüne) yeni yemek ekle/çıkar/miktar düzenle — genişletilmiş
+  // preset görünümünde kullanılıyor, "yumurta ekleyebilmek" için.
+  function addFoodToPreset(presetId, food, qty) {
+    playAddSound();
+    const ratio = food.unit === 'adet' ? qty : qty / 100;
+    const item = {
+      id: Date.now() + Math.random(),
+      name: food.name, qty,
+      unit: food.unit || 'g',
+      baseKcal: food.kcal, baseP: food.p, baseC: food.c, baseF: food.f,
+      kcal: Math.round(food.kcal * ratio),
+      p: Math.round(food.p * ratio * 10) / 10,
+      c: Math.round(food.c * ratio * 10) / 10,
+      f: Math.round(food.f * ratio * 10) / 10,
+    };
+    setMenuPresets(prev => prev.map(t => t.id === presetId ? { ...t, items: [...t.items, item] } : t));
+  }
+
+  function removeFoodFromPreset(presetId, itemId) {
+    playDeleteSound();
+    setMenuPresets(prev => prev.map(t => t.id === presetId ? { ...t, items: t.items.filter(i => i.id !== itemId) } : t));
+  }
+
+  function updatePresetItemQty(presetId, itemId, newQty) {
+    const qty = parseFloat(newQty);
+    if (!qty || qty <= 0) return;
+    setMenuPresets(prev => prev.map(t => {
+      if (t.id !== presetId) return t;
+      return { ...t, items: t.items.map(i => {
+        if (i.id !== itemId) return i;
+        const ratio = i.unit === 'adet' ? qty : qty / 100;
+        return { ...i, qty, kcal: Math.round(i.baseKcal*ratio), p: Math.round(i.baseP*ratio*10)/10, c: Math.round(i.baseC*ratio*10)/10, f: Math.round(i.baseF*ratio*10)/10 };
+      })};
+    }));
+  }
+
+  // Kaloriyi doğrudan elle düzenle — gramdan bağımsız, tam custom (örn. gerçek
+  // ürünün paketindeki değer veritabanındaki tahminden farklıysa).
+  function updatePresetItemKcal(presetId, itemId, newKcal) {
+    const kcal = Math.round(parseFloat(newKcal));
+    if (!kcal || kcal < 0) return;
+    setMenuPresets(prev => prev.map(t => {
+      if (t.id !== presetId) return t;
+      return { ...t, items: t.items.map(i => i.id === itemId ? { ...i, kcal } : i) };
+    }));
   }
 
   function addCustomKcal() {
@@ -1858,17 +2125,20 @@ Kurallar:
     if (!v) return;
     playAddSound();
     const entry = { date: addDate, value: v };
-    if (waistInput) entry.waist = parseFloat(waistInput);
-    if (neckInput)  entry.neck  = parseFloat(neckInput);
+    if (waistInput)    entry.waist    = parseFloat(waistInput);
+    if (neckInput)      entry.neck    = parseFloat(neckInput);
+    if (shoulderInput)  entry.shoulder = parseFloat(shoulderInput);
     setWeightLog(prev => [...prev.filter(e => e.date !== addDate), entry].sort((a, b) => a.date.localeCompare(b.date)));
     setWeightInput('');
     setWaistInput('');
     setNeckInput('');
+    setShoulderInput('');
     setShowWeightForm(false);
     // Profilde de güncelle (yağ oranı hesabı için)
     const profileUpdate = { weight: v };
-    if (entry.waist) profileUpdate.waist = entry.waist;
-    if (entry.neck)  profileUpdate.neck  = entry.neck;
+    if (entry.waist)    profileUpdate.waist    = entry.waist;
+    if (entry.neck)      profileUpdate.neck    = entry.neck;
+    if (entry.shoulder)  profileUpdate.shoulder = entry.shoulder;
     setProfile(p => ({ ...p, ...profileUpdate }));
     setDraft(p => ({ ...p, ...profileUpdate }));
   }
@@ -1879,14 +2149,16 @@ Kurallar:
     setEditVal(String(entry.value));
     setEditWaist(entry.waist ? String(entry.waist) : '');
     setEditNeck(entry.neck  ? String(entry.neck)  : '');
+    setEditShoulder(entry.shoulder ? String(entry.shoulder) : '');
   }
 
   function saveEdit(originalDate) {
     const v = parseFloat(editVal);
     if (!v || !editDate) { setEditingIdx(null); return; }
     const entry = { date: editDate, value: v };
-    if (editWaist) entry.waist = parseFloat(editWaist);
-    if (editNeck)  entry.neck  = parseFloat(editNeck);
+    if (editWaist)     entry.waist    = parseFloat(editWaist);
+    if (editNeck)       entry.neck    = parseFloat(editNeck);
+    if (editShoulder)   entry.shoulder = parseFloat(editShoulder);
     setWeightLog(prev => [...prev.filter(e => e.date !== originalDate), entry].sort((a, b) => a.date.localeCompare(b.date)));
     setEditingIdx(null);
   }
@@ -1899,52 +2171,85 @@ Kurallar:
 
         {/* ══ HERO ══ */}
         <div className="ft-hero">
-          <div className="ft-hero-stats">
-            <div className="ft-hstat">
-              <div className="ft-hstat-val" style={{ color: lastWeight && goal.targetWeight ? (lastWeight > goal.targetWeight ? '#e8e8e8' : '#3fb950') : '#e8e8e8' }}>{lastWeight ?? '—'}</div>
-              <div className="ft-hstat-unit">kg</div>
-              <div className="ft-hstat-label">Current Weight</div>
-            </div>
-            <div className="ft-hstat-sep" />
-            <div className="ft-hstat">
-              <div className="ft-hstat-val" style={{ color: bodyFat == null ? 'var(--text-muted)' : bodyFat > 25 ? '#e8e8e8' : bodyFat > 15 ? '#e8a838' : '#3fb950' }}>
-                {bodyFat != null ? `%${bodyFat}` : '—'}
+          {heroMode === 'main' ? (
+            <div className="ft-hero-stats">
+              <div className="ft-hstat">
+                <div className="ft-hstat-val" style={{ color: lastWeight && goal.targetWeight ? (lastWeight > goal.targetWeight ? '#e8e8e8' : '#3fb950') : '#e8e8e8' }}>{lastWeight ?? '—'}</div>
+                <div className="ft-hstat-unit">kg</div>
+                <div className="ft-hstat-label">Current Weight</div>
               </div>
-              <div className="ft-hstat-unit">fat</div>
-              <div className="ft-hstat-label">Body Fat %</div>
-            </div>
-            <div className="ft-hstat-sep" />
-            <div className="ft-hstat">
-              <div className="ft-hstat-val" style={{ color: '#e8e8e8' }}>{hasProfile ? goalKcal : '—'}</div>
-              <div className="ft-hstat-unit">kcal</div>
-              <div className="ft-hstat-label">Daily Target</div>
-            </div>
-            {minKcal && <>
               <div className="ft-hstat-sep" />
               <div className="ft-hstat">
-                <div className="ft-hstat-val" style={{ color: '#f85149' }}>{minKcal}</div>
+                <div className="ft-hstat-val" style={{ color: bodyFat == null ? 'var(--text-muted)' : bodyFat > 25 ? '#e8e8e8' : bodyFat > 15 ? '#e8a838' : '#3fb950' }}>
+                  {bodyFat != null ? `%${bodyFat}` : '—'}
+                </div>
+                <div className="ft-hstat-unit">fat</div>
+                <div className="ft-hstat-label">Body Fat %</div>
+              </div>
+              <div className="ft-hstat-sep" />
+              <div className="ft-hstat">
+                <div className="ft-hstat-val" style={{ color: '#e8e8e8' }}>{hasProfile ? goalKcal : '—'}</div>
                 <div className="ft-hstat-unit">kcal</div>
-                <div className="ft-hstat-label">Min. (muscle prot.)</div>
+                <div className="ft-hstat-label">Daily Target</div>
               </div>
-            </>}
-            {bmi && <>
+              {minKcal && <>
+                <div className="ft-hstat-sep" />
+                <div className="ft-hstat">
+                  <div className="ft-hstat-val" style={{ color: '#f85149' }}>{minKcal}</div>
+                  <div className="ft-hstat-unit">kcal</div>
+                  <div className="ft-hstat-label">Min. (muscle prot.)</div>
+                </div>
+              </>}
+              {bmi && <>
+                <div className="ft-hstat-sep" />
+                <div className="ft-hstat">
+                  <div className="ft-hstat-val" style={{ color: bmiData?.color }}>{bmi}</div>
+                  <div className="ft-hstat-unit">bmi</div>
+                  <div className="ft-hstat-label">{bmiData?.text}</div>
+                </div>
+              </>}
+              {hasProfile && <>
+                <div className="ft-hstat-sep" />
+                <div className="ft-hstat">
+                  <div className="ft-hstat-val" style={{ color: '#e8e8e8' }}>{tdee}</div>
+                  <div className="ft-hstat-unit">kcal</div>
+                  <div className="ft-hstat-label">TDEE</div>
+                </div>
+              </>}
+            </div>
+          ) : (
+            <div className="ft-hero-stats">
+              <div className="ft-hstat">
+                <div className="ft-hstat-val" style={{ color: bodyFat == null ? 'var(--text-muted)' : bodyFat > 25 ? '#e8e8e8' : bodyFat > 15 ? '#e8a838' : '#3fb950' }}>
+                  {bodyFat != null ? `%${bodyFat}` : '—'}
+                </div>
+                <div className="ft-hstat-unit">fat</div>
+                <div className="ft-hstat-label">Vücut Yağ Oranı</div>
+              </div>
               <div className="ft-hstat-sep" />
               <div className="ft-hstat">
-                <div className="ft-hstat-val" style={{ color: bmiData?.color }}>{bmi}</div>
-                <div className="ft-hstat-unit">bmi</div>
-                <div className="ft-hstat-label">{bmiData?.text}</div>
+                <div className="ft-hstat-val" style={{ color: '#e8e8e8' }}>{leanMass ?? '—'}</div>
+                <div className="ft-hstat-unit">kg</div>
+                <div className="ft-hstat-label">Yağsız Kütle</div>
               </div>
-            </>}
-            {hasProfile && <>
               <div className="ft-hstat-sep" />
               <div className="ft-hstat">
-                <div className="ft-hstat-val" style={{ color: '#e8e8e8' }}>{tdee}</div>
-                <div className="ft-hstat-unit">kcal</div>
-                <div className="ft-hstat-label">TDEE</div>
+                <div className="ft-hstat-val" style={{ color: '#e8e8e8' }}>{shoulderWaistRatio ?? '—'}</div>
+                <div className="ft-hstat-unit">oran</div>
+                <div className="ft-hstat-label">Omuz / Bel Oranı</div>
               </div>
-            </>}
-          </div>
+              <div className="ft-hstat-sep" />
+              <div className="ft-hstat">
+                <div className="ft-hstat-val" style={{ color: '#e8e8e8' }}>{ffmi ?? '—'}</div>
+                <div className="ft-hstat-unit">ffmi</div>
+                <div className="ft-hstat-label">FFMI Endeksi</div>
+              </div>
+            </div>
+          )}
           <div className="ft-hero-actions">
+            <button className={`ft-btn-ghost${heroMode === 'karne' ? ' ft-btn-ghost--active' : ''}`} onClick={() => setHeroMode(m => m === 'main' ? 'karne' : 'main')}>
+              {heroMode === 'main' ? 'Karne' : 'Genel'}
+            </button>
             <button className="ft-btn-ghost" onClick={() => { setGoalDraft(goal); setEditingGoal(true); }}>
               Goal
             </button>
@@ -1970,6 +2275,7 @@ Kurallar:
                   { key: 'weight', label: 'Weight (kg)',  type: 'number', ph: '75' },
                   { key: 'waist',  label: 'Waist (cm)',   type: 'number', ph: '85' },
                   { key: 'neck',   label: 'Neck (cm)',    type: 'number', ph: '38' },
+                  { key: 'shoulder', label: 'Shoulder (cm)', type: 'number', ph: '110' },
                   ...(draft.gender === 'female' ? [{ key: 'hip', label: 'Hip (cm)', type: 'number', ph: '95' }] : []),
                 ].map(f => (
                   <label key={f.key} className="ft-label">
@@ -2226,110 +2532,8 @@ Kurallar:
 
           {view !== 'overview' ? null : (
           <>
-          {/* ── Sol Kolon: Kilo Takibi + AI ── */}
+          {/* ── Sol Kolon: AI (Kilo Takibi Grafikler sekmesine taşındı) ── */}
           <div className="ft-resizable-col" style={{ width: w0, gap: 0 }}>
-            <div className="ft-card" style={{ height: weightH, flexShrink: 0, boxSizing: 'border-box', overflow: 'auto' }}>
-              <div className="ft-card-header">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div className="ft-card-label">Weight Tracking</div>
-                  <div className="ft-chart-tabs">
-                    <button className={`ft-chart-tab${chartTab === 'weight' ? ' ft-chart-tab--active' : ''}`} onClick={() => setChartTab('weight')}>Weight</button>
-                    <button className={`ft-chart-tab${chartTab === 'kcal' ? ' ft-chart-tab--active' : ''}`} onClick={() => setChartTab('kcal')}>Calories</button>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                  {lastWeight && goal.targetWeight &&
-                    <span className="ft-badge">{(lastWeight - parseFloat(goal.targetWeight)).toFixed(1)} kg remaining</span>}
-                  {chartTab === 'weight' && <button
-                    className="ft-btn-sm"
-                    style={{ padding: '3px 10px', fontSize: 16, lineHeight: 1 }}
-                    onClick={() => { setShowWeightForm(v => !v); setAddDate(today()); }}
-                  >{showWeightForm ? '−' : '+'}</button>}
-                </div>
-              </div>
-
-              {/* Giriş formu — sadece showWeightForm açıkken */}
-              {showWeightForm && (
-                <div className="ft-weight-input-row">
-                  <input type="date" className="ft-input ft-date-sm" value={addDate} onChange={e => setAddDate(e.target.value)} />
-                  <input className="ft-input" type="number" step="0.1" placeholder="Weight kg"
-                    value={weightInput} onChange={e => setWeightInput(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') addWeight(); }} />
-                  <input className="ft-input" type="number" step="0.5" placeholder="Waist cm"
-                    value={waistInput} onChange={e => setWaistInput(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') addWeight(); }} />
-                  <input className="ft-input" type="number" step="0.5" placeholder="Neck cm"
-                    value={neckInput} onChange={e => setNeckInput(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') addWeight(); }} />
-                  <button className="ft-btn-accent" onClick={addWeight}>Save</button>
-                </div>
-              )}
-
-              {chartTab === 'weight' && weightLog.length === 0 && <div className="ft-empty">No records yet</div>}
-
-              {chartTab === 'weight' && weightLog.length >= 1 && (
-                <div className="ft-chart-wrap">
-                  <WeightChart
-                    entries={weightLog.slice(-60)}
-                    targetWeight={goal.targetWeight}
-                    profile={profile}
-                  />
-                </div>
-              )}
-
-              {chartTab === 'kcal' && (
-                <div className="ft-chart-wrap">
-                  <KaloriChart meals={meals} goalKcal={goalKcal} />
-                </div>
-              )}
-
-              {/* Sütun başlıkları */}
-              {chartTab === 'weight' && weightLog.length > 0 && (
-                <div className="ft-wlog-header">
-                  <span>Date</span>
-                  <span>Weight</span>
-                  <span>Fat %</span>
-                  <span></span>
-                </div>
-              )}
-
-              <div className="ft-weight-list" style={{ display: chartTab === 'kcal' ? 'none' : undefined }}>
-                {[...weightLog].reverse().slice(0, 10).map((e, i) => (
-                  editingIdx === i ? (
-                    <div key={i} className="ft-list-row ft-list-editing">
-                      <input type="date" className="ft-input ft-edit-input" value={editDate} onChange={ev => setEditDate(ev.target.value)} />
-                      <input type="number" step="0.1" className="ft-input ft-edit-input" placeholder="kg" value={editVal}
-                        onChange={ev => setEditVal(ev.target.value)}
-                        onKeyDown={ev => { if (ev.key === 'Enter') saveEdit(e.date); if (ev.key === 'Escape') setEditingIdx(null); }} />
-                      <input type="number" step="0.5" className="ft-input ft-edit-input" placeholder="bel" value={editWaist}
-                        onChange={ev => setEditWaist(ev.target.value)} />
-                      <input type="number" step="0.5" className="ft-input ft-edit-input" placeholder="boyun" value={editNeck}
-                        onChange={ev => setEditNeck(ev.target.value)} />
-                      <button className="ft-btn-accent ft-edit-save" onClick={() => saveEdit(e.date)}>✓</button>
-                      <button className="ft-del-btn" onClick={() => deleteEntry(e.date)}>×</button>
-                      <button className="ft-btn-ghost ft-edit-cancel" onClick={() => setEditingIdx(null)}>Cancel</button>
-                    </div>
-                  ) : (
-                    <div key={i} className="ft-wlog-row" onClick={() => startEdit(i, e)}>
-                      <span className="ft-wlog-date">{e.date}</span>
-                      <span className="ft-wlog-kg">{e.value} kg</span>
-                      <span className="ft-wlog-fat">
-                        {(() => {
-                          if (!e.waist || !e.neck || !profile.height) return <span style={{ color: 'var(--text-muted)' }}>—</span>;
-                          const bf = calcBodyFat({ ...profile, weight: e.value, waist: e.waist, neck: e.neck });
-                          return bf != null ? <span style={{ color: '#e8e8e8' }}>%{bf}</span> : <span style={{ color: 'var(--text-muted)' }}>—</span>;
-                        })()}
-                      </span>
-                      <span className="ft-list-edit-hint">✎</span>
-                    </div>
-                  )
-                ))}
-              </div>
-            </div>
-
-            {/* Weight ↕ AI dikey resize handle */}
-            <div className="ft-resize-handle-v" onMouseDown={onWeightVDown} />
-
             {/* ── AI Fitness Assistant ── */}
             <div className="ft-card ft-ai-box" style={{ flex: 1, minHeight: 0 }}>
               <div className="ft-card-header">
@@ -2434,8 +2638,92 @@ Kurallar:
 
                   {/* ── Menu (hazır öğünler) ── */}
                   <div className="ft-sidebar-section-label">Menu</div>
+
+                  {/* Sağdaki "Search food" ile aynı mantık — ama eklenen yemek
+                      bugünün log'una değil, açık olan (veya yeni oluşturulan)
+                      Menu preset'ine gider. */}
+                  <div style={{ margin: '0 4px 8px' }}>
+                    <input
+                      className="ft-input"
+                      style={{ width: '100%', boxSizing: 'border-box', fontSize: 15, padding: '7px 10px' }}
+                      placeholder="Search food to add to menu..."
+                      value={presetAddFoodQ}
+                      onChange={e => setPresetAddFoodQ(e.target.value)}
+                    />
+                    {presetAddFoodQ.trim() && (() => {
+                      const results = [...FOOD_DB, ...customFoods]
+                        .filter(f => f.name.toLowerCase().includes(presetAddFoodQ.trim().toLowerCase()))
+                        .slice(0, 8);
+                      if (results.length === 0) {
+                        return <div className="ft-empty" style={{ fontSize: 13, padding: '6px 0' }}>Not found</div>;
+                      }
+                      return (
+                        <div style={{
+                          marginTop: 6,
+                          border: '1px solid var(--border-hover)',
+                          borderRadius: 8,
+                          background: 'var(--bg-surface)',
+                          padding: '4px 8px',
+                        }}>
+                          {results.map((food, i) => {
+                            // 'adet' yemeklerde (köfte gibi) gram-adet arasında geçiş —
+                            // perUnit sayesinde gram girilince de doğru kalori hesaplanır.
+                            const canGram = food.unit === 'adet' && food.perUnit;
+                            const mode = canGram ? (foodUnitMode[food.name] || food.defaultUnit || 'adet') : (food.unit || 'g');
+                            const effectiveFood = mode === 'g' && food.unit === 'adet' ? toGramBasis(food) : food;
+                            const defaultQty = mode === 'adet' ? 1 : 100;
+                            const qty = parseFloat(foodQty[food.name]) || defaultQty;
+                            const ratio = effectiveFood.unit === 'adet' ? qty : qty / 100;
+                            const previewKcal = Math.round(effectiveFood.kcal * ratio);
+                            return (
+                              <div key={i} style={{ padding: '8px 0', borderBottom: i < results.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                                <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                                  <span style={{ flex:1, fontSize:15, color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{food.name}</span>
+                                  <span style={{ color:'var(--text-secondary)', fontSize:15, fontWeight:600 }}>{previewKcal} kcal</span>
+                                </div>
+                                <div style={{ display:'flex', alignItems:'center', gap:6, marginTop: 6 }}>
+                                  {canGram && (
+                                    <div style={{ display:'flex', border:'1px solid var(--border-hover)', borderRadius:4, overflow:'hidden', flexShrink:0 }}>
+                                      <button
+                                        style={{
+                                          padding:'3px 8px', fontSize:12, border:'none', cursor:'pointer',
+                                          background: mode === 'adet' ? 'var(--accent)' : 'transparent',
+                                          color: mode === 'adet' ? '#fff' : 'var(--text-muted)',
+                                        }}
+                                        onClick={() => { setFoodUnitMode(prev => ({ ...prev, [food.name]: 'adet' })); setFoodQty(prev => ({ ...prev, [food.name]: '1' })); }}
+                                      >adet</button>
+                                      <button
+                                        style={{
+                                          padding:'3px 8px', fontSize:12, border:'none', cursor:'pointer',
+                                          background: mode === 'g' ? 'var(--accent)' : 'transparent',
+                                          color: mode === 'g' ? '#fff' : 'var(--text-muted)',
+                                        }}
+                                        onClick={() => { setFoodUnitMode(prev => ({ ...prev, [food.name]: 'g' })); setFoodQty(prev => ({ ...prev, [food.name]: String(food.perUnit) })); }}
+                                      >g</button>
+                                    </div>
+                                  )}
+                                  <input
+                                    className="ft-input"
+                                    type="number" min="0.5"
+                                    step={mode === 'adet' ? 1 : 10}
+                                    value={foodQty[food.name] ?? defaultQty}
+                                    style={{ width:62, textAlign:'center', padding:'3px 4px', fontSize:15 }}
+                                    onChange={e => setFoodQty(prev => ({ ...prev, [food.name]: e.target.value }))}
+                                  />
+                                  <span style={{ color:'#8b949e', fontSize:15, minWidth: 20 }}>{mode === 'adet' ? 'pcs' : 'g'}</span>
+                                  <button className="ft-btn-sm" style={{ padding: '3px 10px', fontSize: 14, marginLeft: 'auto' }}
+                                    onClick={() => addFoodToActivePreset(effectiveFood, qty)}>+</button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
                   {menuPresets.length === 0 && (
-                    <div className="ft-empty" style={{ fontSize: 11, padding: '4px 4px 8px' }}>
+                    <div className="ft-empty" style={{ fontSize: 13, padding: '4px 4px 8px' }}>
                       Log a meal, then "Save as Menu" to reuse it
                     </div>
                   )}
@@ -2443,14 +2731,14 @@ Kurallar:
                     const isExpanded = expandedPresetId === preset.id;
                     const presetKcal = preset.items.reduce((s, i) => s + i.kcal, 0);
                     return (
-                      <div key={preset.id}>
+                      <div key={preset.id} style={{ marginBottom: 6 }}>
                         {/* Preset başlık satırı */}
                         <div className="ft-menu-item"
-                          onClick={() => setExpandedPresetId(isExpanded ? null : preset.id)}>
-                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginRight: 2 }}>{isExpanded ? '▾' : '▸'}</div>
+                          onClick={() => { setExpandedPresetId(isExpanded ? null : preset.id); setPresetAddFoodQ(''); }}>
+                          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginRight: 2 }}>{isExpanded ? '▾' : '▸'}</div>
                           <div className="ft-menu-info">
                             {editingPresetId === preset.id ? (
-                              <input className="ft-input" style={{ fontSize:12, padding:'2px 6px', width:'100%' }} autoFocus
+                              <input className="ft-input" style={{ fontSize:14, padding:'3px 8px', width:'100%' }} autoFocus
                                 value={editingPresetName}
                                 onChange={e => setEditingPresetName(e.target.value)}
                                 onBlur={() => renamePreset(preset.id, editingPresetName)}
@@ -2462,24 +2750,46 @@ Kurallar:
                             )}
                             <span className="ft-menu-kcal">{presetKcal} kcal</span>
                           </div>
-                          <button className="ft-del-btn" title="Rename" style={{ fontSize: 12 }}
+                          <button className="ft-del-btn" title="Rename" style={{ fontSize: 14 }}
                             onClick={e => { e.stopPropagation(); setEditingPresetId(preset.id); setEditingPresetName(preset.name); }}>✎</button>
-                          <button className="ft-del-btn" title="Add to today" style={{ fontSize: 13 }}
+                          <button className="ft-del-btn" title="Add to today" style={{ fontSize: 15 }}
                             onClick={e => { e.stopPropagation(); applyPresetToDay(preset); }}>▶</button>
-                          <button className="ft-del-btn"
+                          <button className="ft-del-btn" style={{ fontSize: 15 }}
                             onClick={e => { e.stopPropagation(); removePreset(preset.id); }}>×</button>
                         </div>
 
-                        {/* Expand: yiyecek listesi (salt okunur — sadeleştirme için düzenlenemiyor) */}
+                        {/* Expand: içindeki yemekler — gram VE kalori bağımsız olarak custom düzenlenebilir */}
                         {isExpanded && (
-                          <div style={{ paddingLeft: 8, paddingBottom: 4 }}>
-                            {preset.items.map(item => (
-                              <div key={item.id} style={{ display:'flex', alignItems:'center', gap:4, padding:'4px 0', borderBottom:'1px solid #21262d44', fontSize:12 }}>
-                                <span style={{ flex:1, color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.name}</span>
-                                <span style={{ color:'#6e7681', fontSize:11 }}>{item.qty}{item.unit}</span>
-                                <span style={{ color:'var(--text-secondary)', fontSize:11 }}>{item.kcal} kcal</span>
-                              </div>
-                            ))}
+                          <div style={{ paddingLeft: 8, paddingRight: 4, paddingTop: 6, paddingBottom: 6 }} onClick={e => e.stopPropagation()}>
+                            {preset.items.length === 0
+                              ? <div className="ft-empty" style={{ fontSize: 13 }}>No food yet — search above to add</div>
+                              : preset.items.map(item => (
+                                <div key={item.id} style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 0', borderBottom:'1px solid #21262d44', fontSize:15 }}>
+                                  <span style={{ flex:1, color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.name}</span>
+                                  <input
+                                    className="ft-input"
+                                    type="number" min="0.5"
+                                    step={item.unit === 'adet' ? 1 : 10}
+                                    value={item.qty}
+                                    title="Miktar (değiştirince kalori otomatik yeniden hesaplanır)"
+                                    style={{ width:54, textAlign:'center', padding:'3px 4px', fontSize:15 }}
+                                    onChange={e => updatePresetItemQty(preset.id, item.id, e.target.value)}
+                                  />
+                                  <span style={{ color:'#8b949e', fontSize:15 }}>{item.unit}</span>
+                                  <input
+                                    className="ft-input"
+                                    type="number" min="0"
+                                    value={item.kcal}
+                                    title="Kaloriyi elle düzenle (formülden bağımsız, custom)"
+                                    style={{ width:58, textAlign:'center', padding:'3px 4px', fontSize:15 }}
+                                    onChange={e => updatePresetItemKcal(preset.id, item.id, e.target.value)}
+                                  />
+                                  <span style={{ color:'#8b949e', fontSize:15 }}>kcal</span>
+                                  <button className="ft-del-btn" style={{ fontSize:14 }}
+                                    onClick={() => removeFoodFromPreset(preset.id, item.id)}>×</button>
+                                </div>
+                              ))
+                            }
                           </div>
                         )}
                       </div>
@@ -2537,7 +2847,7 @@ Kurallar:
                                   onClick={e => e.stopPropagation()}
                                 />
                                 <span className="ft-list-sub">{item.unit}</span>
-                                <span style={{ color: '#e8e8e8', fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap' }}>{item.kcal} kcal</span>
+                                <span style={{ color: '#e8e8e8', fontWeight: 700, fontSize: 15, whiteSpace: 'nowrap' }}>{item.kcal} kcal</span>
                                 <button className="ft-del-btn" onClick={e => { e.stopPropagation(); removeFoodFromMenu(menu.id, item.id); }}>×</button>
                               </div>
                               );
@@ -2625,39 +2935,63 @@ Kurallar:
                     <div>Not found</div>
                   </div>
                 ) : searchResults.map((food, i) => {
-                  const isAdet = food.unit === 'adet';
-                  const defaultQty = isAdet ? 1 : 100;
+                  // 'adet' yemeklerde (köfte gibi) gram-adet arasında geçiş —
+                  // Menu arama kutusuyla aynı mantık (toGramBasis + foodUnitMode).
+                  const canGram = food.unit === 'adet' && food.perUnit;
+                  const mode = canGram ? (foodUnitMode[food.name] || food.defaultUnit || 'adet') : (food.unit || 'g');
+                  const effectiveFood = mode === 'g' && food.unit === 'adet' ? toGramBasis(food) : food;
+                  const defaultQty = mode === 'adet' ? 1 : 100;
                   const qty = parseFloat(foodQty[food.name]) || defaultQty;
-                  const ratio = isAdet ? qty : qty / 100;
+                  const ratio = effectiveFood.unit === 'adet' ? qty : qty / 100;
                   return (
                     <div key={i} className="ft-food-item">
                       <div className="ft-food-info">
                         <span className="ft-food-name">{food.name}</span>
-                        <span className="ft-food-kcal">{Math.round(food.kcal * ratio)} kcal</span>
+                        <span className="ft-food-kcal">{Math.round(effectiveFood.kcal * ratio)} kcal</span>
                       </div>
                       <div className="ft-food-macros">
-                        <span style={{ color:'#f85149' }}>P {Math.round(food.p * ratio * 10)/10}g</span>
-                        <span style={{ color:'#e8e8e8' }}>C {Math.round(food.c * ratio * 10)/10}g</span>
-                        <span style={{ color:'#3fb950' }}>F {Math.round(food.f * ratio * 10)/10}g</span>
+                        <span style={{ color:'#f85149' }}>P {Math.round(effectiveFood.p * ratio * 10)/10}g</span>
+                        <span style={{ color:'#e8e8e8' }}>C {Math.round(effectiveFood.c * ratio * 10)/10}g</span>
+                        <span style={{ color:'#3fb950' }}>F {Math.round(effectiveFood.f * ratio * 10)/10}g</span>
                       </div>
                       <div className="ft-food-actions">
+                        {canGram && (
+                          <div style={{ display:'flex', border:'1px solid var(--border-hover)', borderRadius:4, overflow:'hidden', flexShrink:0 }}>
+                            <button
+                              style={{
+                                padding:'5px 8px', fontSize:12, border:'none', cursor:'pointer',
+                                background: mode === 'adet' ? 'var(--accent)' : 'transparent',
+                                color: mode === 'adet' ? '#fff' : 'var(--text-muted)',
+                              }}
+                              onClick={() => { setFoodUnitMode(prev => ({ ...prev, [food.name]: 'adet' })); setFoodQty(prev => ({ ...prev, [food.name]: '1' })); }}
+                            >adet</button>
+                            <button
+                              style={{
+                                padding:'5px 8px', fontSize:12, border:'none', cursor:'pointer',
+                                background: mode === 'g' ? 'var(--accent)' : 'transparent',
+                                color: mode === 'g' ? '#fff' : 'var(--text-muted)',
+                              }}
+                              onClick={() => { setFoodUnitMode(prev => ({ ...prev, [food.name]: 'g' })); setFoodQty(prev => ({ ...prev, [food.name]: String(food.perUnit) })); }}
+                            >g</button>
+                          </div>
+                        )}
                         <input
                           className="ft-input ft-qty-input"
                           type="number" min="0.5"
-                          step={isAdet ? 1 : 10}
+                          step={mode === 'adet' ? 1 : 10}
                           value={foodQty[food.name] ?? defaultQty}
                           onChange={e => setFoodQty(prev => ({ ...prev, [food.name]: e.target.value }))}
                         />
-                        <span className="ft-food-unit">{isAdet ? 'pcs' : 'g'}</span>
+                        <span className="ft-food-unit">{mode === 'adet' ? 'pcs' : 'g'}</span>
                         <button className="ft-btn-sm" onClick={() => {
                           // Her zaman doğrudan günlük log'a ekle — tek, sade akış
                           const existingId = selectedMenuIds[selectedMenuIds.length - 1] ?? dayMenus[0]?.id ?? null;
                           if (existingId) {
                             setSelectedMenuIds(prev => prev.includes(existingId) ? prev : [...prev, existingId]);
-                            addFoodToMenu(existingId, food, qty);
+                            addFoodToMenu(existingId, effectiveFood, qty);
                           } else {
-                            const ratio2 = food.unit === 'adet' ? qty : qty / 100;
-                            const item = { id: Date.now()+Math.random(), name:food.name, qty, unit:food.unit||'g', baseKcal:food.kcal, baseP:food.p, baseC:food.c, baseF:food.f, kcal:Math.round(food.kcal*ratio2), p:Math.round(food.p*ratio2*10)/10, c:Math.round(food.c*ratio2*10)/10, f:Math.round(food.f*ratio2*10)/10 };
+                            const ratio2 = effectiveFood.unit === 'adet' ? qty : qty / 100;
+                            const item = { id: Date.now()+Math.random(), name:effectiveFood.name, qty, unit:effectiveFood.unit||'g', baseKcal:effectiveFood.kcal, baseP:effectiveFood.p, baseC:effectiveFood.c, baseF:effectiveFood.f, kcal:Math.round(effectiveFood.kcal*ratio2), p:Math.round(effectiveFood.p*ratio2*10)/10, c:Math.round(effectiveFood.c*ratio2*10)/10, f:Math.round(effectiveFood.f*ratio2*10)/10 };
                             const newMenu = { id: Date.now(), name: 'Meal', items: [item], kcal: item.kcal, p: item.p, c: item.c, f: item.f };
                             updateMeals(prev => ({ ...prev, [mealDate]: [...(prev[mealDate]||[]), newMenu] }));
                             setSelectedMenuIds([newMenu.id]);
@@ -2798,6 +3132,190 @@ Kurallar:
                   </div>
                 );
               })()}
+            </div>
+          )}
+
+          {view !== 'charts' ? null : (
+            <div className="ft-resizable-col" style={{ flex: 1, minWidth: 160, gap: 12 }}>
+
+              {/* ── Kilo + ölçüm takibi (Overview'den taşındı) — tüm grafikler aynı anda, sekme yok.
+                   Karne istatistikleri artık üstteki HERO şeridinde ("Karne" butonu) ── */}
+              <div className="ft-card" style={{ flex: 1, minHeight: 0, boxSizing: 'border-box', overflow: 'auto' }}>
+                <div className="ft-card-header">
+                  <div className="ft-card-label">Weight Tracking</div>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    {lastWeight && goal.targetWeight && (
+                      <span className="ft-badge">
+                        {(lastWeight - parseFloat(goal.targetWeight)).toFixed(1)} kg remaining
+                        {weeklyRate != null && ` · ${weeklyRate > 0 ? '+' : ''}${weeklyRate} kg/hafta`}
+                        {etaDays != null && (etaDays === 0 ? ' · hedefte' : ` · ~${etaDays} gün`)}
+                      </span>
+                    )}
+                    <button
+                      className="ft-btn-sm"
+                      style={{ padding: '3px 10px', fontSize: 16, lineHeight: 1 }}
+                      onClick={() => {
+                        setShowWeightForm(v => {
+                          const next = !v;
+                          if (next) {
+                            // Formu son girilen değerlerle önden doldur — kullanıcı
+                            // sadece değişeni düzeltsin, hepsini yeniden yazmasın.
+                            setAddDate(today());
+                            setWeightInput(lastEntry?.value != null ? String(lastEntry.value) : '');
+                            const w = lastEntry?.waist    ?? profile.waist;
+                            const n = lastEntry?.neck     ?? profile.neck;
+                            const s = lastEntry?.shoulder ?? profile.shoulder;
+                            setWaistInput(w ? String(w) : '');
+                            setNeckInput(n ? String(n) : '');
+                            setShoulderInput(s ? String(s) : '');
+                          }
+                          return next;
+                        });
+                      }}
+                    >{showWeightForm ? '−' : '+'}</button>
+                  </div>
+                </div>
+
+                {/* Giriş formu — sadece showWeightForm açıkken */}
+                {showWeightForm && (
+                  <div className="ft-weight-input-row">
+                    <label className="ft-label ft-weight-date-label">Date
+                      <input type="date" className="ft-input ft-date-sm" value={addDate} onChange={e => setAddDate(e.target.value)} />
+                    </label>
+                    <label className="ft-label">Weight (kg)
+                      <input className="ft-input" type="number" step="0.1" placeholder="kg"
+                        value={weightInput} onChange={e => setWeightInput(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') addWeight(); }} />
+                    </label>
+                    <label className="ft-label">Waist (cm)
+                      <input className="ft-input" type="number" step="0.5" placeholder="cm"
+                        value={waistInput} onChange={e => setWaistInput(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') addWeight(); }} />
+                    </label>
+                    <label className="ft-label">Neck (cm)
+                      <input className="ft-input" type="number" step="0.5" placeholder="cm"
+                        value={neckInput} onChange={e => setNeckInput(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') addWeight(); }} />
+                    </label>
+                    <label className="ft-label">Shoulder (cm)
+                      <input className="ft-input" type="number" step="0.5" placeholder="cm"
+                        value={shoulderInput} onChange={e => setShoulderInput(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') addWeight(); }} />
+                    </label>
+                    <button className="ft-btn-accent" onClick={addWeight}>Save</button>
+                  </div>
+                )}
+
+                {/* Grafikler: sekmeyle geçiş yok, hepsi aynı anda yan yana/üst üste (grid) */}
+                <div className="ft-charts-grid">
+                  <div className="ft-chart-tile">
+                    <div className="ft-chart-tile-title">Weight</div>
+                    {weightLog.length === 0
+                      ? <div className="ft-empty">No records yet</div>
+                      : <div className="ft-chart-wrap">
+                          <WeightChart entries={weightLog.slice(-60)} targetWeight={goal.targetWeight} profile={profile} />
+                        </div>}
+                  </div>
+
+                  <div className="ft-chart-tile">
+                    <div className="ft-chart-tile-title">Calories</div>
+                    <div className="ft-chart-wrap">
+                      <KaloriChart meals={meals} goalKcal={goalKcal} />
+                    </div>
+                  </div>
+
+                  <div className="ft-chart-tile">
+                    <div className="ft-chart-tile-title">Body Fat</div>
+                    {bodyFatSeries.length === 0
+                      ? <div className="ft-empty">Boy + bel + boyun girildiğinde burada görünür</div>
+                      : <div className="ft-chart-wrap"><MetricChart entries={bodyFatSeries.slice(-60)} color="#e8a838" unit="%" /></div>}
+                  </div>
+
+                  <div className="ft-chart-tile">
+                    <div className="ft-chart-tile-title">FFMI</div>
+                    {ffmiSeries.length === 0
+                      ? <div className="ft-empty">Boy + bel + boyun girildiğinde burada görünür</div>
+                      : <div className="ft-chart-wrap"><MetricChart entries={ffmiSeries.slice(-60)} color="#58a6ff" unit="" /></div>}
+                  </div>
+
+                  <div className="ft-chart-tile">
+                    <div className="ft-chart-tile-title">Omuz / Bel</div>
+                    {ratioSeries.length === 0
+                      ? <div className="ft-empty">Omuz + bel girildiğinde burada görünür</div>
+                      : <div className="ft-chart-wrap"><MetricChart entries={ratioSeries.slice(-60)} color="#3fb950" unit="" /></div>}
+                  </div>
+
+                  <div className="ft-chart-tile">
+                    <div className="ft-chart-tile-title">Waist</div>
+                    {waistSeries.length === 0
+                      ? <div className="ft-empty">Bel ölçüsü girildiğinde burada görünür</div>
+                      : <div className="ft-chart-wrap"><MetricChart entries={waistSeries.slice(-60)} color="#bc8cff" unit=" cm" /></div>}
+                  </div>
+
+                  <div className="ft-chart-tile">
+                    <div className="ft-chart-tile-title">Neck</div>
+                    {neckSeries.length === 0
+                      ? <div className="ft-empty">Boyun ölçüsü girildiğinde burada görünür</div>
+                      : <div className="ft-chart-wrap"><MetricChart entries={neckSeries.slice(-60)} color="#ff7b72" unit=" cm" /></div>}
+                  </div>
+                </div>
+
+                {/* Sütun başlıkları */}
+                {weightLog.length > 0 && (
+                  <div className="ft-wlog-header">
+                    <span>Date</span>
+                    <span>Weight</span>
+                    <span>Fat %</span>
+                    <span>Waist</span>
+                    <span>Neck</span>
+                    <span>Shoulder</span>
+                    <span>FFMI</span>
+                    <span>O/B</span>
+                    <span></span>
+                  </div>
+                )}
+
+                <div className="ft-weight-list">
+                  {[...weightLog].reverse().slice(0, 10).map((e, i) => (
+                    editingIdx === i ? (
+                      <div key={i} className="ft-list-row ft-list-editing">
+                        <input type="date" className="ft-input ft-edit-input" value={editDate} onChange={ev => setEditDate(ev.target.value)} />
+                        <input type="number" step="0.1" className="ft-input ft-edit-input" placeholder="kg" value={editVal}
+                          onChange={ev => setEditVal(ev.target.value)}
+                          onKeyDown={ev => { if (ev.key === 'Enter') saveEdit(e.date); if (ev.key === 'Escape') setEditingIdx(null); }} />
+                        <input type="number" step="0.5" className="ft-input ft-edit-input" placeholder="bel" value={editWaist}
+                          onChange={ev => setEditWaist(ev.target.value)} />
+                        <input type="number" step="0.5" className="ft-input ft-edit-input" placeholder="boyun" value={editNeck}
+                          onChange={ev => setEditNeck(ev.target.value)} />
+                        <input type="number" step="0.5" className="ft-input ft-edit-input" placeholder="omuz" value={editShoulder}
+                          onChange={ev => setEditShoulder(ev.target.value)} />
+                        <button className="ft-btn-accent ft-edit-save" onClick={() => saveEdit(e.date)}>✓</button>
+                        <button className="ft-del-btn" onClick={() => deleteEntry(e.date)}>×</button>
+                        <button className="ft-btn-ghost ft-edit-cancel" onClick={() => setEditingIdx(null)}>Cancel</button>
+                      </div>
+                    ) : (() => {
+                      const canBf = e.waist && e.neck && profile.height;
+                      const bf = canBf ? calcBodyFat({ ...profile, weight: e.value, waist: e.waist, neck: e.neck }) : null;
+                      const lean = bf != null ? calcLeanMass(e.value, bf) : null;
+                      const rowFfmi = lean != null ? calcFFMI(lean, profile.height) : null;
+                      const rowRatio = e.shoulder && e.waist ? calcShoulderWaistRatio(e.shoulder, e.waist) : null;
+                      return (
+                        <div key={i} className="ft-wlog-row" onClick={() => startEdit(i, e)}>
+                          <span className="ft-wlog-date">{e.date}</span>
+                          <span className="ft-wlog-kg">{e.value} kg</span>
+                          <span className="ft-wlog-fat">{bf != null ? `%${bf}` : <span style={{ color: 'var(--text-muted)' }}>—</span>}</span>
+                          <span className="ft-wlog-fat">{e.waist ?? <span style={{ color: 'var(--text-muted)' }}>—</span>}</span>
+                          <span className="ft-wlog-fat">{e.neck ?? <span style={{ color: 'var(--text-muted)' }}>—</span>}</span>
+                          <span className="ft-wlog-fat">{e.shoulder ?? <span style={{ color: 'var(--text-muted)' }}>—</span>}</span>
+                          <span className="ft-wlog-fat">{rowFfmi ?? <span style={{ color: 'var(--text-muted)' }}>—</span>}</span>
+                          <span className="ft-wlog-fat">{rowRatio ?? <span style={{ color: 'var(--text-muted)' }}>—</span>}</span>
+                          <span className="ft-list-edit-hint">✎</span>
+                        </div>
+                      );
+                    })()
+                  ))}
+                </div>
+              </div>
             </div>
           )}
 

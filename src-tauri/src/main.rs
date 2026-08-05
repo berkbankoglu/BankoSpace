@@ -302,16 +302,72 @@ fn install_crash_recovery(app: &tauri::App) {
     }
 }
 
+// Canlı testte donma anında yakalandı: 3ds Max arka planda tek başına
+// makinedeki ~20 çekirdeğin neredeyse tamamını tüketiyordu (CPU örneklemesiyle
+// doğrulandı — GPU 3D engine kullanımı da aynı anda sıçradı) ve BankoSpace'in
+// WebView2 renderer'ı bu sırada CPU zaman dilimi bulamayıp js_ping'in (2sn'lik
+// JS timer) 60-100sn boyunca hiç tetiklenememesine yol açtı. Bu bir WebView2/
+// occlusion hatası değil, gerçek OS seviyesinde CPU açlığı — ne WebView2 flag'i
+// ne de IsVisible zorlaması bunu çözebilir. Süreç önceliğini ABOVE_NORMAL'a
+// çekmek, zamanlayıcının BankoSpace'in kısa/seyrek JS tick'lerini NORMAL
+// öncelikli ağır arka plan işlerinin (render/simülasyon) önüne almasını sağlar.
+#[cfg(windows)]
+fn boost_process_priority() {
+    #[link(name = "kernel32")]
+    extern "system" {
+        fn GetCurrentProcess() -> isize;
+        fn SetPriorityClass(process: isize, priority_class: u32) -> i32;
+    }
+    const ABOVE_NORMAL_PRIORITY_CLASS: u32 = 0x0000_8000;
+    unsafe {
+        let h = GetCurrentProcess();
+        let ok = SetPriorityClass(h, ABOVE_NORMAL_PRIORITY_CLASS);
+        write_diag(&format!("RUST: SetPriorityClass(ABOVE_NORMAL) ok={}", ok != 0));
+    }
+}
+
+// boost_process_priority() sadece todo-app.exe'nin kendi önceliğini yükseltiyor —
+// ama gerçek JS çalıştırma işi msedgewebview2.exe'nin AYRI bir alt sürecinde
+// (--type=renderer) oluyor ve Windows child process'lere parent'ın öncelik
+// sınıfını OTOMATİK miras bırakmıyor. Canlı ölçümde doğrulandı: donma sırasında
+// renderer PID'leri hâlâ "Normal" öncelikteydi. Bu, her heartbeat tick'inde
+// ilgili webview2 alt süreçlerini (renderer dahil) de ABOVE_NORMAL'a çekiyor.
+#[cfg(windows)]
+fn boost_pid_priority(pid: u32) {
+    #[link(name = "kernel32")]
+    extern "system" {
+        fn OpenProcess(desired_access: u32, inherit_handle: i32, process_id: u32) -> isize;
+        fn SetPriorityClass(process: isize, priority_class: u32) -> i32;
+        fn CloseHandle(object: isize) -> i32;
+    }
+    const PROCESS_SET_INFORMATION: u32 = 0x0200;
+    const ABOVE_NORMAL_PRIORITY_CLASS: u32 = 0x0000_8000;
+    unsafe {
+        let h = OpenProcess(PROCESS_SET_INFORMATION, 0, pid);
+        if h != 0 {
+            SetPriorityClass(h, ABOVE_NORMAL_PRIORITY_CLASS);
+            CloseHandle(h);
+        }
+    }
+}
+
 fn main() {
+    #[cfg(windows)]
+    boost_process_priority();
+
     // WebView2 Alt+Tab freeze fix: CalculateNativeWinOcclusion, pencere arkada
     // kalınca render'ın yanlışlıkla durdurulmasını engeller (bilinen WebView2 bug'ı).
     // NOT: --disable-gpu-vsync ve --disable-frame-rate-limit burada DURMAMALI —
     // compositor'ı sınırsız FPS'e zorlayıp GPU'yu tüketiyor ve sürücü resetiyle
     // beyaz ekran/donmaya yol açıyorlardı. --disable-hang-monitor da Chromium'un
     // kilitlenen renderer'ı kurtarmasını engelliyordu.
+    // IntensiveWakeUpThrottling: Chromium'un arka planda kalan sayfalarda
+    // setTimeout/setInterval'ı ~1/dk'ya kısan ayrı bir mekanizması —
+    // js_ping (2sn'lik setInterval) tam olarak bunun kurbanı olabilir,
+    // yukarıdaki background-timer-throttling flag'inden bağımsız bir özellik.
     std::env::set_var(
         "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
-        "--disable-features=CalculateNativeWinOcclusion --disable-renderer-backgrounding --disable-backgrounding-occluded-windows --disable-background-timer-throttling",
+        "--disable-features=CalculateNativeWinOcclusion,IntensiveWakeUpThrottling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows --disable-background-timer-throttling",
     );
 
     write_diag("RUST: ===== PROCESS START =====");
@@ -350,6 +406,22 @@ fn main() {
                 let mut last_restart_attempt: u64 = 0;
                 loop {
                     std::thread::sleep(std::time::Duration::from_secs(10));
+
+                    // WebView2 host API'si, pencere odağı/görünürlüğü değiştiğinde
+                    // (occlusion, Alt+Tab, arka planda kalma) kendi kararıyla
+                    // renderer'ı IsVisible=false yapıp JS'i tamamen durdurabiliyor —
+                    // bu, ProcessFailed hiç tetiklenmeden (renderer "çökmüş" değil,
+                    // sadece dondurulmuş sayılıyor) ve --disable-backgrounding-*
+                    // Chromium flag'lerinden bağımsız, WebView2'nin kendi occlusion
+                    // takibi. Her tick'te IsVisible=true'yu zorla yeniden dayatmak
+                    // bunu önlemeye çalışan ucuz, önleyici bir tedbir.
+                    #[cfg(windows)]
+                    if let Some(window) = app_handle.get_webview_window("main") {
+                        let _ = window.with_webview(|webview| unsafe {
+                            let _ = webview.controller().SetIsVisible(true);
+                        });
+                    }
+
                     let n = inflight_counter().load(std::sync::atomic::Ordering::SeqCst);
                     sys.refresh_all();
 
@@ -364,7 +436,13 @@ fn main() {
                         let mut cur = Some(*pid);
                         for _ in 0..6 {
                             let Some(cur_pid) = cur else { break };
-                            if cur_pid == my_pid { wv_cpu += proc_.cpu_usage(); wv_count += 1; break; }
+                            if cur_pid == my_pid {
+                                wv_cpu += proc_.cpu_usage();
+                                wv_count += 1;
+                                #[cfg(windows)]
+                                boost_pid_priority(pid.as_u32());
+                                break;
+                            }
                             cur = sys.process(cur_pid).and_then(|p| p.parent());
                         }
                     }
@@ -410,7 +488,11 @@ fn main() {
                             #[cfg(windows)]
                             {
                                 use std::os::windows::process::CommandExt;
-                                let cmd_str = format!("ping 127.0.0.1 -n 3 >nul & start \"\" \"{}\"", exe_str);
+                                // -n 6 ≈ 5s bekleme — eskiden -n 3 (≈2s) kullanılıyordu ama
+                                // canlı testte bu bazen çok kısa çıktı: yeni süreç, eskisi
+                                // (ve onun single-instance kilidi/OS handle'ları) tam
+                                // temizlenmeden başlayınca kısa süre sonra kapanabiliyordu.
+                                let cmd_str = format!("ping 127.0.0.1 -n 6 >nul & start \"\" \"{}\"", exe_str);
                                 let spawned = std::process::Command::new("cmd")
                                     .arg("/C")
                                     .raw_arg(&cmd_str)

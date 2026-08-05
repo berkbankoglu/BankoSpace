@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { flushSync } from 'react-dom';
+import { invoke } from '@tauri-apps/api/core';
 import logo from './assets/logo.svg';
 import './App.css';
 import { supabase, pullFromSupabase, pushKeyToSupabase, pushAllToSupabase, SYNC_KEYS } from './supabase';
@@ -13,77 +14,209 @@ import JapaneseKana from './components/JapaneseKana';
 import ToolsChat from './components/ToolsChat';
 import SubscriptionTracker, { SubscriptionWidget, SubscriptionPopup } from './components/SubscriptionTracker';
 import StockNews from './components/StockNews';
-import Translate from './components/Translate';
-import ProjectBid from './components/ProjectBid';
 import Planner from './components/Planner';
 import Notes from './components/Notes';
 import { onAction, registerActionTypes } from '@tauri-apps/plugin-notification';
 
-const QUICK_BUTTONS = [
-  { id: 'translate',  label: 'Translate',   desc: 'T' },
-  { id: 'bid',        label: 'AI Generate', desc: 'W' },
-];
+function toDayKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
 
-function QuickLaunchPanel() {
-  const [activePopup, setActivePopup] = useState(null);
+const CG_WEEKS = 53; // ~1 yıl, GitHub gibi — dar alanda yatay scroll ile gezilir
+const CG_MONTH_NAMES = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
+const CG_DOW_LABELS = ['', 'Mon', '', 'Wed', '', 'Fri', '']; // d=0 Paz .. d=6 Cmt, GitHub gibi seyrek etiket
+const GH_USERNAME = 'berkbankoglu';
+const GH_CACHE_KEY = 'gh_contributions_cache_v1';
+const GH_CACHE_TTL = 60 * 60 * 1000; // 1 saat — gereksiz sık scrape önler
 
-  const openPopup = (id) => setActivePopup(id);
-  const closePopup = () => setActivePopup(null);
+// GitHub ve BankoSpace grafikleri aynı hafta/gün ızgarasını paylaşıyor —
+// valueForKey(dayKey) o günün seviyesini (0-4) döndürür, gelecekteki günler
+// için null (boş hücre).
+function buildContributionWeeks(valueForKey) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayDow = today.getDay(); // 0=Paz .. 6=Cmt
+  const gridEnd = new Date(today);
+  gridEnd.setDate(gridEnd.getDate() + (6 - todayDow));
+  const gridStart = new Date(gridEnd);
+  gridStart.setDate(gridStart.getDate() - (CG_WEEKS * 7 - 1));
 
-  useEffect(() => {
-    const handler = (e) => {
-      if (e.key === 'Escape') { closePopup(); return; }
-      if (activePopup) return;
-      const tag = document.activeElement?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement?.isContentEditable) return;
-      if (e.key === 't' || e.key === 'T') { e.preventDefault(); openPopup('translate'); }
-      if (e.key === 'w' || e.key === 'W') { e.preventDefault(); openPopup('bid'); }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [activePopup]);
-
-  const renderPopupContent = () => {
-    switch (activePopup) {
-      case 'translate': return <Translate />;
-      case 'bid': return <ProjectBid />;
-      default: return null;
+  const weeks = [];
+  for (let w = 0; w < CG_WEEKS; w++) {
+    const week = [];
+    for (let d = 0; d < 7; d++) {
+      const date = new Date(gridStart);
+      date.setDate(date.getDate() + w * 7 + d);
+      const isFuture = date > today;
+      const key = toDayKey(date);
+      week.push({ date, key, level: isFuture ? null : valueForKey(key) });
     }
-  };
+    weeks.push(week);
+  }
+  return weeks;
+}
 
-  const getPopupTitle = () => {
-    const btn = QUICK_BUTTONS.find(b => b.id === activePopup);
-    return btn?.label || '';
-  };
+function taskContributionLevel(count) {
+  if (count <= 0) return 0;
+  if (count === 1) return 1;
+  if (count <= 3) return 2;
+  if (count <= 5) return 3;
+  return 4;
+}
 
+// Grafik gövdesi (gün etiketleri + kaydırılabilir ay/hafta ızgarası) — hem
+// GitHub hem BankoSpace grafiği bunu kullanır.
+function ContributionGrid({ weeks, scrollRef }) {
   return (
-    <>
-      <div className="ql-panel">
-        <div className="ql-title">Quick Launch</div>
-        <div className="ql-grid">
-          {QUICK_BUTTONS.map((btn, idx) => (
-            <button key={btn.id} className="ql-btn" style={{ animationDelay: `${idx * 0.22}s` }} onClick={() => openPopup(btn.id)}>
-              <span className="ql-label">{btn.label}</span>
-              <span className="ql-desc">{btn.desc}</span>
-            </button>
+    <div className="cg-body">
+      <div className="cg-dow-col">
+        {CG_DOW_LABELS.map((label, i) => <div key={i} className="cg-dow-slot">{label}</div>)}
+      </div>
+      <div className="cg-scroll" ref={scrollRef}>
+        <div className="cg-months">
+          {weeks.map((week, wi) => {
+            const showLabel = wi === 0 || week[0].date.getMonth() !== weeks[wi - 1][0].date.getMonth();
+            return <div key={wi} className="cg-month-label">{showLabel ? CG_MONTH_NAMES[week[0].date.getMonth()] : ''}</div>;
+          })}
+        </div>
+        <div className="cg-grid">
+          {weeks.map((week, wi) => (
+            <div key={wi} className="cg-week">
+              {week.map((day, di) => (
+                day.level == null
+                  ? <div key={di} className="cg-day cg-empty" />
+                  : <div key={di} className={`cg-day cg-level-${day.level}`} title={day.key} />
+              ))}
+            </div>
           ))}
         </div>
       </div>
+    </div>
+  );
+}
 
-      {activePopup && renderPopupContent() && (
-        <div className="ql-popup-overlay" onClick={closePopup}>
-          <div className="ql-popup-modal" onClick={e => e.stopPropagation()}>
-            <div className="ql-popup-header">
-              <span className="ql-popup-title">{getPopupTitle()}</span>
-              <button className="ql-popup-close" onClick={closePopup}>✕</button>
-            </div>
-            <div className="ql-popup-body">
-              {renderPopupContent()}
-            </div>
-          </div>
-        </div>
-      )}
-    </>
+function ContributionLegend() {
+  return (
+    <div className="cg-legend">
+      <span>Az</span>
+      <div className="cg-day cg-level-0" />
+      <div className="cg-day cg-level-1" />
+      <div className="cg-day cg-level-2" />
+      <div className="cg-day cg-level-3" />
+      <div className="cg-day cg-level-4" />
+      <span>Çok</span>
+    </div>
+  );
+}
+
+// github.com/users/{username}/contributions herkese açık, oturumsuz bir HTML
+// parçası döner (profil sayfasındaki widget'ın aynısı) — data-date/data-level
+// attribute'lu <td> hücreleri var. CORS'u aşmak için Rust'taki genel fetch_get
+// komutu üzerinden çekiliyor (supabase.js'deki tauriFetch ile aynı desen).
+async function fetchGithubContributions() {
+  const html = await invoke('fetch_get', {
+    url: `https://github.com/users/${GH_USERNAME}/contributions`,
+    headers: {},
+  });
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const map = {};
+  doc.querySelectorAll('td[data-date]').forEach(td => {
+    const date = td.getAttribute('data-date');
+    const level = parseInt(td.getAttribute('data-level') ?? '0', 10);
+    if (date) map[date] = level;
+  });
+  const totalMatch = html.match(/([\d,]+)\s+contributions?\s+in the last year/i);
+  const total = totalMatch ? parseInt(totalMatch[1].replace(/,/g, ''), 10) : null;
+  return { map, total };
+}
+
+// Quick Launch'ın yerini aldı — gerçek github.com/berkbankoglu profilindeki
+// commit/PR/issue aktivitesini gösterir (BankoSpace içi bir şey değil).
+function GithubContributionGraph() {
+  const scrollRef = useRef(null);
+  const [levelMap, setLevelMap] = useState(null);
+  const [total, setTotal] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const load = useCallback(async (force) => {
+    if (!force) {
+      try {
+        const cached = JSON.parse(localStorage.getItem(GH_CACHE_KEY) || 'null');
+        if (cached) {
+          setLevelMap(cached.map);
+          setTotal(cached.total);
+          setLoading(false);
+          if (Date.now() - cached.fetchedAt < GH_CACHE_TTL) return; // yeterince taze, arka planda tazelemeye gerek yok
+        }
+      } catch {}
+    }
+    try {
+      const { map, total } = await fetchGithubContributions();
+      setLevelMap(map);
+      setTotal(total);
+      setError(null);
+      localStorage.setItem(GH_CACHE_KEY, JSON.stringify({ map, total, fetchedAt: Date.now() }));
+    } catch (e) {
+      setError(e?.message || String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(false); }, [load]);
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
+  }, [levelMap]);
+
+  const weeks = buildContributionWeeks(key => levelMap?.[key] ?? 0);
+
+  return (
+    <div className="cg-panel">
+      <div className="cg-header">
+        <span className="cg-title">
+          {error && !levelMap
+            ? 'GitHub verisi alınamadı'
+            : loading && !levelMap
+              ? 'Yükleniyor…'
+              : <>GitHub · Son 1 yılda <b>{total ?? '—'}</b> katkı</>}
+        </span>
+        <button className="cg-refresh" title="Yenile" onClick={() => { setLoading(true); load(true); }}>↻</button>
+      </div>
+      <ContributionGrid weeks={weeks} scrollRef={scrollRef} />
+      <ContributionLegend />
+    </div>
+  );
+}
+
+// BankoSpace içi görev tamamlama aktivitesi — her gün işaretlediğin görev
+// sayısına göre yeşilleniyor, günlük düzenli kullanım/streak göstergesi.
+function TaskContributionGraph({ todos, contributionLog }) {
+  const scrollRef = useRef(null);
+
+  const counts = {};
+  todos.forEach(t => {
+    if (!t.completed || !t.completedAt) return;
+    const key = toDayKey(new Date(t.completedAt));
+    counts[key] = (counts[key] || 0) + 1;
+  });
+  // Subtask tamamlama/silme gibi completedAt'i olmayan olaylar — kalıcı log'dan
+  contributionLog.forEach(key => { counts[key] = (counts[key] || 0) + 1; });
+  const totalCompleted = Object.values(counts).reduce((s, c) => s + c, 0);
+  const weeks = buildContributionWeeks(key => taskContributionLevel(counts[key] || 0));
+
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
+  }, []);
+
+  return (
+    <div className="cg-panel">
+      <div className="cg-header">
+        <span className="cg-title">BankoSpace · Son 1 yılda <b>{totalCompleted}</b> görev</span>
+      </div>
+      <ContributionGrid weeks={weeks} scrollRef={scrollRef} />
+      <ContributionLegend />
+    </div>
   );
 }
 import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, setVolume, getVolume } from './utils/sounds';
@@ -616,6 +749,19 @@ useEffect(() => {
     localStorage.setItem('streakData', JSON.stringify(streakData));
   }, [streakData]);
 
+  // Contribution grafiği için: alt görev (subtask) tamamlama/silme gibi
+  // completedAt'i olmayan olayları günlük anahtarla kalıcı olarak kaydeder.
+  // Append-only — bir şeyi geri alsan bile o günkü katkı geçmişten silinmez
+  // (gerçek bir contribution grafiğinin davranışı bu).
+  const [contributionLog, setContributionLog] = useState(() => {
+    const saved = localStorage.getItem('bs_contribution_log');
+    return saved ? JSON.parse(saved) : [];
+  });
+  useEffect(() => {
+    localStorage.setItem('bs_contribution_log', JSON.stringify(contributionLog));
+  }, [contributionLog]);
+  const logContribution = () => setContributionLog(prev => [...prev, toDayKey(new Date())]);
+
   // Check and update streak on component mount
   useEffect(() => {
     updateStreak();
@@ -693,6 +839,9 @@ useEffect(() => {
 
   const toggleSubtask = (todoId, subtaskId) => {
     pushHistory(todos);
+    const parentTodo = todos.find(t => t.id === todoId);
+    const subtask = parentTodo?.subtasks?.find(st => st.id === subtaskId);
+    const willComplete = subtask ? !subtask.completed : false;
     setTodos(todos.map(todo => {
       if (todo.id === todoId) {
         const updatedSubtasks = (todo.subtasks || []).map(st =>
@@ -702,6 +851,7 @@ useEffect(() => {
       }
       return todo;
     }));
+    if (willComplete) logContribution();
   };
 
   const deleteSubtask = (todoId, subtaskId) => {
@@ -715,6 +865,7 @@ useEffect(() => {
       }
       return todo;
     }));
+    logContribution();
   };
 
   // Move a subtask out of one todo and into another (drag-drop across todos,
@@ -1678,14 +1829,22 @@ useEffect(() => {
                     <span className="sidebar-drag-handle">⠿</span>
                   </div>
 
-                  {/* Fitness altında her zaman görünen alt sekme: Antrenman */}
+                  {/* Fitness altında her zaman görünen alt sekmeler: Antrenman, Grafikler */}
                   {item.id === 'fitness' && (
-                    <div
-                      className={`sidebar-subitem ${activeView === 'fitness' && fitnessView === 'workout' ? 'active' : ''}`}
-                      onClick={() => { playNavSound(); setFitnessView('workout'); setActiveView('fitness'); }}
-                    >
-                      <span className="item-name">- Antrenman</span>
-                    </div>
+                    <>
+                      <div
+                        className={`sidebar-subitem ${activeView === 'fitness' && fitnessView === 'workout' ? 'active' : ''}`}
+                        onClick={() => { playNavSound(); setFitnessView('workout'); setActiveView('fitness'); }}
+                      >
+                        <span className="item-name">- Antrenman</span>
+                      </div>
+                      <div
+                        className={`sidebar-subitem ${activeView === 'fitness' && fitnessView === 'charts' ? 'active' : ''}`}
+                        onClick={() => { playNavSound(); setFitnessView('charts'); setActiveView('fitness'); }}
+                      >
+                        <span className="item-name">- Grafikler</span>
+                      </div>
+                    </>
                   )}
                 </div>
               ))}
@@ -1831,7 +1990,7 @@ useEffect(() => {
               </div>
               <div className="col-resize-handle" onMouseDown={e => startColResize(1, e)} onDoubleClick={() => { setColWidths(DEFAULT_COL_PX); localStorage.setItem('dashColWidths', JSON.stringify(DEFAULT_COL_PX)); }} />
               <div className="todo-col-wrapper" style={colWidths[2] ? { flex: `1 1 ${colWidths[2]}px`, minWidth: 0 } : { flex: 1, minWidth: 0 }}>
-                <DashRightCol />
+                <DashRightCol todos={todos} contributionLog={contributionLog} />
               </div>
             </div>
           </div>
@@ -1877,7 +2036,7 @@ useEffect(() => {
 
 
 
-function DashRightCol() {
+function DashRightCol({ todos, contributionLog }) {
   const [topPct, setTopPct] = useState(() => {
     const saved = localStorage.getItem('dashRightSplit');
     return saved ? Number(saved) : 60;
@@ -1911,7 +2070,10 @@ function DashRightCol() {
       </div>
       <div className="dash-right-resize-handle" onMouseDown={onMouseDown} />
       <div className="dash-right-bottom" style={{ flex: 1 }}>
-        <QuickLaunchPanel />
+        <div className="cg-stack">
+          <GithubContributionGraph />
+          <TaskContributionGraph todos={todos} contributionLog={contributionLog} />
+        </div>
       </div>
     </div>
   );
