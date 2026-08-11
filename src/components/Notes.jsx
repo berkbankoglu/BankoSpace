@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, forwardRef } from 'react';
-import ReactDOM from 'react-dom';
+import ReactDOM, { flushSync } from 'react-dom';
 import './Notes.css';
 import { playTypeSoundThrottled, playClickSound, playAddSound, playDeleteSound } from '../utils/sounds';
 import { pushKeyToSupabase } from '../supabase';
@@ -21,6 +21,30 @@ function drawStrokesOn(ctx, strokes, W, H) {
     for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0] * W, pts[i][1] * H);
     ctx.stroke();
   }
+}
+
+// Plain-text bullet marker used by the "- " autoformat below: two
+// non-breaking spaces (regular spaces at the start of a line get collapsed
+// away by normal HTML whitespace rules) plus the bullet glyph and a space.
+const BULLET_PREFIX = '  • ';
+
+// "- " at the start of an otherwise-empty line autoformats into a bullet list
+// (Notion/Bear-style). Returns the text from the start of the current block
+// up to the caret, so the caller can check it's EXACTLY "-" — never fires
+// mid-sentence (e.g. "5 - 3" or "well - actually") since a dash anywhere but
+// the very first character of the line fails that check.
+function getLineTextBeforeCaret(range, editorEl) {
+  let block = range.startContainer.nodeType === Node.TEXT_NODE ? range.startContainer.parentElement : range.startContainer;
+  while (block && block !== editorEl) {
+    const display = window.getComputedStyle(block).display;
+    if (display === 'block' || display === 'list-item') break;
+    block = block.parentElement;
+  }
+  if (!block) block = editorEl;
+  const preRange = document.createRange();
+  preRange.selectNodeContents(block);
+  preRange.setEnd(range.startContainer, range.startOffset);
+  return preRange.toString();
 }
 
 function rgbToHex(rgb) {
@@ -128,6 +152,10 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style, onPa
   const embedDeleteHoveredRef = useRef(false);
   const lastPasteRef = useRef(0);
   const draggedEmbedRef = useRef(null);
+  // Set by onKeyDown when Enter is pressed on a bullet line, consumed by the
+  // very next onInput once the browser's own native Enter has finished
+  // creating the new line — see the bullet-continuation comment below.
+  const pendingBulletRef = useRef(false);
 
   // Custom undo/redo history
   const historyRef = useRef([content || '']);
@@ -182,6 +210,43 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style, onPa
   const handleInput = () => {
     playTypeSoundThrottled();
     if (!editorRef.current) return;
+    // The browser just finished its own native Enter (new line created,
+    // caret already inside it) — now it's safe to type the bullet marker
+    // into that line. Doing this here (vs. building the line by hand in
+    // onKeyDown) means the actual line-splitting is 100% native browser
+    // behavior, identical to every other Enter press in this editor.
+    // Uses plain Range/Text DOM calls, not execCommand('insertText') — that
+    // worked for the FIRST continued line but silently did nothing for the
+    // second one onward, the same class of execCommand unreliability as
+    // insertUnorderedList earlier. Direct DOM calls have been reliable every
+    // time (see the dash-to-bullet swap above), so this uses those instead.
+    if (pendingBulletRef.current) {
+      pendingBulletRef.current = false;
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount && sel.isCollapsed) {
+        const range = sel.getRangeAt(0);
+        const node = range.startContainer;
+        let textNode, caretOffset;
+        if (node.nodeType === Node.TEXT_NODE) {
+          node.insertData(range.startOffset, BULLET_PREFIX);
+          textNode = node;
+          caretOffset = range.startOffset + BULLET_PREFIX.length;
+        } else {
+          // Caret sits at an element position — a freshly created empty line
+          // is usually just <div><br></div>, caret at (div, 0).
+          textNode = document.createTextNode(BULLET_PREFIX);
+          const refNode = node.childNodes[range.startOffset] || null;
+          node.insertBefore(textNode, refNode);
+          if (refNode && refNode.nodeName === 'BR') refNode.remove();
+          caretOffset = BULLET_PREFIX.length;
+        }
+        const caret = document.createRange();
+        caret.setStart(textNode, caretOffset);
+        caret.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(caret);
+      }
+    }
     // cheap, immediate — keeps the placeholder state in sync without serializing
     setIsEmpty(!editorRef.current.textContent?.trim());
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -423,6 +488,87 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style, onPa
               setIsEmpty(!editorRef.current.textContent?.trim());
               onChange(html);
               moveCursorToEnd();
+            }
+          } else if (e.key === ' ' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            const sel = window.getSelection();
+            if (!sel || !sel.rangeCount || !sel.isCollapsed || !editorRef.current) return;
+            const range = sel.getRangeAt(0);
+            const container = range.startContainer;
+            if (container.nodeType !== Node.TEXT_NODE || range.startOffset < 1) return;
+            if (container.textContent[range.startOffset - 1] !== '-') return;
+            if (getLineTextBeforeCaret(range, editorRef.current) !== '-') return;
+            e.preventDefault();
+
+            // Swap just the "-" character for an indented bullet glyph, in
+            // place, inside the SAME text node — nothing else in the note is
+            // read, restructured, or touched. (An earlier version rebuilt the
+            // line as a real <ul><li>, but finding "the line's container" to
+            // replace was unreliable across this editor's varied DOM shapes
+            // and once wiped out several preceding lines — this can't do that,
+            // since it's a single in-place character edit.)
+            const dashOffset = range.startOffset - 1;
+            container.replaceData(dashOffset, 1, BULLET_PREFIX);
+            const caret = document.createRange();
+            caret.setStart(container, dashOffset + BULLET_PREFIX.length);
+            caret.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(caret);
+
+            flushInput();
+          } else if (e.key === '-' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            // 4+ dashes in a row on their own line become a horizontal rule
+            // (paragraph divider). Triggers the moment the 4th dash would
+            // land, same "whole line so far must be exactly this pattern"
+            // safety as the bullet swap above.
+            const sel = window.getSelection();
+            if (!sel || !sel.rangeCount || !sel.isCollapsed || !editorRef.current) return;
+            const range = sel.getRangeAt(0);
+            const container = range.startContainer;
+            if (container.nodeType !== Node.TEXT_NODE) return;
+            const editorEl = editorRef.current;
+            const lineText = getLineTextBeforeCaret(range, editorEl);
+            if (!/^-{3,}$/.test(lineText)) return;
+            const dashStart = range.startOffset - lineText.length;
+            if (dashStart < 0 || container.textContent.slice(dashStart, range.startOffset) !== lineText) return;
+            e.preventDefault();
+
+            // Remove just the dash run from this text node — same surgical,
+            // single-node edit as the bullet swap, so nothing else in the
+            // note is ever touched. The <hr> is only ever INSERTED next to
+            // the (now empty) line, never replacing or removing it, so it
+            // can't wipe out neighboring content the way an early attempt at
+            // the bullet feature once did.
+            container.deleteData(dashStart, lineText.length);
+            let block = container.parentElement;
+            while (block && block !== editorEl) {
+              const display = window.getComputedStyle(block).display;
+              if (display === 'block' || display === 'list-item') break;
+              block = block.parentElement;
+            }
+            const hr = document.createElement('hr');
+            if (!block || block === editorEl) editorEl.insertBefore(hr, container);
+            else block.before(hr);
+
+            const caret = document.createRange();
+            caret.setStart(container, dashStart);
+            caret.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(caret);
+
+            flushInput();
+          } else if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            // Continue the bullet on the next line, same as Notion/Bear. Two
+            // hand-built approaches (a manual <ul><li> rebuild, then a manual
+            // <div> line) each broke in different ways across this editor's
+            // varied DOM shapes. This no longer builds anything by hand: it
+            // just flags the line and lets the browser's own native Enter
+            // create the new line exactly as it always does; handleInput
+            // (below) types the bullet marker into it right after.
+            const sel = window.getSelection();
+            if (sel && sel.rangeCount && sel.isCollapsed && editorRef.current) {
+              const range = sel.getRangeAt(0);
+              const lineText = getLineTextBeforeCaret(range, editorRef.current);
+              if (lineText.startsWith(BULLET_PREFIX)) pendingBulletRef.current = true;
             }
           }
         }}
@@ -895,6 +1041,45 @@ function CanvasLightbox({ imgId, src, onClose }) {
   );
 }
 
+// FLIP animation (First-Last-Invert-Play) so a drag-reorder glides rows into
+// their new spot instead of snapping — same technique the todo list drag uses.
+// Captures every tree row's position, applies the reorder synchronously
+// (flushSync so the DOM is already updated when we measure "after"), then
+// animates from the old position to the new one.
+function flipAnimateRows(mutateFn) {
+  const rowKey = (el) => el.hasAttribute('data-sub-id')
+    ? `s${el.getAttribute('data-sub-id')}`
+    : `n${el.getAttribute('data-note-id')}`;
+
+  const before = {};
+  document.querySelectorAll('.notes-tree-row[data-note-id], .notes-tree-row[data-sub-id]').forEach(el => {
+    before[rowKey(el)] = el.getBoundingClientRect();
+  });
+
+  flushSync(mutateFn);
+
+  document.querySelectorAll('.notes-tree-row[data-note-id], .notes-tree-row[data-sub-id]').forEach(el => {
+    const b = before[rowKey(el)];
+    if (!b) return;
+    const after = el.getBoundingClientRect();
+    const dy = b.top - after.top;
+    const dx = b.left - after.left;
+    if (Math.abs(dy) < 1 && Math.abs(dx) < 1) return;
+    el.style.transition = 'none';
+    el.style.transform = `translate(${dx}px, ${dy}px)`;
+  });
+
+  requestAnimationFrame(() => {
+    document.querySelectorAll('.notes-tree-row[data-note-id], .notes-tree-row[data-sub-id]').forEach(el => {
+      if (!el.style.transform) return;
+      el.style.transition = 'transform 0.32s cubic-bezier(0.22, 1, 0.36, 1)';
+      el.style.transform = '';
+      const done = () => { el.style.transition = ''; el.style.transform = ''; el.removeEventListener('transitionend', done); };
+      el.addEventListener('transitionend', done);
+    });
+  });
+}
+
 function Notes() {
   const [notes, setNotes] = useState(() => {
     const saved = localStorage.getItem('notes');
@@ -1139,6 +1324,103 @@ function Notes() {
       else next.add(noteId);
       return next;
     });
+  };
+
+  // Reordering only ever moves entries within their own array (splice out,
+  // splice back in) — every note/subNote object passes through untouched, so
+  // titles/content/images can never be altered or lost by a drag.
+  const moveNote = (draggedId, targetId) => {
+    if (draggedId === targetId) return;
+    setNotes(prev => {
+      const fromIdx = prev.findIndex(n => n.id === draggedId);
+      const toIdx = prev.findIndex(n => n.id === targetId);
+      if (fromIdx === -1 || toIdx === -1) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, moved);
+      return next;
+    });
+  };
+
+  const moveSubNote = (noteId, draggedSubId, targetSubId) => {
+    if (draggedSubId === targetSubId) return;
+    setNotes(prev => prev.map(n => {
+      if (n.id !== noteId) return n;
+      const subs = n.subNotes || [];
+      const fromIdx = subs.findIndex(s => s.id === draggedSubId);
+      const toIdx = subs.findIndex(s => s.id === targetSubId);
+      if (fromIdx === -1 || toIdx === -1) return n;
+      const nextSubs = [...subs];
+      const [moved] = nextSubs.splice(fromIdx, 1);
+      nextSubs.splice(toIdx, 0, moved);
+      return { ...n, subNotes: nextSubs };
+    }));
+  };
+
+  // Custom mouse-based drag (HTML5 drag API is unreliable in this WebView2
+  // app — same reasoning as the image-embed drag above): grabbing the handle
+  // only reorders among rows of the same kind/parent, so a note can never be
+  // dropped into another note's sub-list by accident.
+  const startTreeDrag = (e, kind, id, parentNoteId) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const rowEl = e.currentTarget.closest('.notes-tree-row');
+    if (!rowEl) return;
+    const startX = e.clientX, startY = e.clientY;
+    let moved = false;
+    let overEl = null;
+
+    const onMove = (ev) => {
+      if (!moved) {
+        if (Math.abs(ev.clientX - startX) < 4 && Math.abs(ev.clientY - startY) < 4) return;
+        moved = true;
+        rowEl.classList.add('notes-row-dragging');
+        document.body.style.cursor = 'grabbing';
+        document.body.style.userSelect = 'none';
+      }
+      const el = document.elementFromPoint(ev.clientX, ev.clientY);
+      const targetRow = el?.closest(kind === 'note' ? '.notes-tree-row[data-note-id]' : '.notes-tree-row[data-sub-id]');
+      let valid = null;
+      if (targetRow && targetRow !== rowEl) {
+        if (kind === 'note') {
+          const targetId = Number(targetRow.getAttribute('data-note-id'));
+          if (targetId !== id) valid = targetRow;
+        } else {
+          const targetParent = Number(targetRow.getAttribute('data-parent-id'));
+          const targetId = Number(targetRow.getAttribute('data-sub-id'));
+          if (targetParent === parentNoteId && targetId !== id) valid = targetRow;
+        }
+      }
+      if (overEl !== valid) {
+        if (overEl) overEl.classList.remove('notes-row-drop-target');
+        if (valid) valid.classList.add('notes-row-drop-target');
+        overEl = valid;
+      }
+    };
+
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      rowEl.classList.remove('notes-row-dragging');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      if (overEl) {
+        overEl.classList.remove('notes-row-drop-target');
+        const targetId = kind === 'note'
+          ? Number(overEl.getAttribute('data-note-id'))
+          : Number(overEl.getAttribute('data-sub-id'));
+        flipAnimateRows(() => {
+          if (kind === 'note') moveNote(id, targetId);
+          else moveSubNote(parentNoteId, id, targetId);
+        });
+        playClickSound();
+      }
+      overEl = null;
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
   };
 
   const startDeleteNote = (noteId, subId, e) => {
@@ -1504,8 +1786,15 @@ ${body}
                 <div
                   className={`notes-tree-row${selected?.noteId === note.id && selected?.subId == null ? ' active' : ''}`}
                   style={{ '--note-color': note.color || '#667eea' }}
+                  data-note-id={note.id}
                   onClick={() => setSelected({ noteId: note.id, subId: null })}
                 >
+                  <span
+                    className="notes-tree-drag-handle"
+                    title="Sürükle - sırayı değiştir"
+                    onMouseDown={e => startTreeDrag(e, 'note', note.id, null)}
+                    onClick={e => e.stopPropagation()}
+                  >⠿</span>
                   <span className="notes-tree-bar" style={{ background: note.color || '#667eea' }} />
                   <button
                     className="notes-expand-btn"
@@ -1578,8 +1867,16 @@ ${body}
                     key={sub.id}
                     className={`notes-tree-row notes-sub-row${selected?.noteId === note.id && selected?.subId === sub.id ? ' active' : ''}`}
                     style={{ '--note-color': note.color || '#667eea' }}
+                    data-sub-id={sub.id}
+                    data-parent-id={note.id}
                     onClick={() => setSelected({ noteId: note.id, subId: sub.id })}
                   >
+                    <span
+                      className="notes-tree-drag-handle"
+                      title="Sürükle - sırayı değiştir"
+                      onMouseDown={e => startTreeDrag(e, 'sub', sub.id, note.id)}
+                      onClick={e => e.stopPropagation()}
+                    >⠿</span>
                     <span className="notes-tree-bar" style={{ background: note.color || '#667eea', opacity: 0.55 }} />
                     {editingTitle?.noteId === note.id && editingTitle?.subId === sub.id ? (
                       <input

@@ -179,15 +179,15 @@
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 8px 12px;
+  padding: 8px 14px;
   cursor: pointer;
   border-radius: 7px;
-  margin: 3px 10px;
+  margin: 4px 16px;
   min-height: 34px;
   position: relative;
   background: #2a2a2a;
   border: 1px solid #3a3a3a;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s, opacity 0.15s;
 }
 
 .notes-tree-row:hover {
@@ -202,11 +202,50 @@
 }
 
 .notes-sub-row {
-  margin-left: 24px;
-  margin-right: 10px;
+  margin-left: 30px;
+  margin-right: 16px;
   margin-top: 4px;
-  padding: 6px 12px;
+  padding: 6px 14px;
   min-height: 30px;
+}
+
+/* ─── Sidebar row drag-to-reorder ─── */
+.notes-tree-drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 20px;
+  flex-shrink: 0;
+  color: rgba(255,255,255,0.25);
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+  font-size: 13px;
+  line-height: 1;
+  user-select: none;
+}
+
+.notes-tree-row:hover .notes-tree-drag-handle {
+  opacity: 1;
+}
+
+.notes-tree-drag-handle:hover {
+  color: rgba(255,255,255,0.75);
+}
+
+.notes-tree-drag-handle:active {
+  cursor: grabbing;
+}
+
+.notes-tree-row.notes-row-dragging {
+  opacity: 0.45;
+  border-style: dashed;
+}
+
+.notes-tree-row.notes-row-drop-target {
+  border-color: var(--accent, #58a6ff);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, #58a6ff) 40%, transparent);
 }
 
 .notes-sub-row::before {
@@ -1654,11 +1693,25 @@ body.light .notes-notebook.nb-bg-grid {
 .notebook-page-editor h3 { font-size: 1.05em; font-weight: 700; margin: 0.5em 0 0.2em; color: rgba(255,255,255,0.9); }
 .notebook-page-editor p { margin: 0 0 0.5em; }
 
+.notebook-page-editor hr {
+  border: none;
+  border-top: 1px solid rgba(255,255,255,0.14);
+  margin: 18px 0;
+}
+body.light .notebook-page-editor hr {
+  border-top-color: rgba(0,0,0,0.14);
+}
+
 /* Rich text list styles */
 .notebook-page-editor ul,
 .notebook-page-editor ol {
   margin: 6px 0 10px;
-  padding-left: 26px;
+  padding-left: 38px;
+  list-style-position: outside;
+}
+
+.notebook-page-editor ul {
+  list-style-type: disc;
 }
 
 .notebook-page-editor li {

@@ -1,7 +1,8 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::sync::OnceLock;
+use std::collections::VecDeque;
+use std::sync::{Mutex, OnceLock};
 use tauri::Manager;
 use tauri::{LogicalPosition, LogicalSize, WebviewUrl};
 use tauri::webview::WebviewBuilder;
@@ -48,6 +49,158 @@ fn write_diag(line: &str) {
 #[tauri::command]
 fn diag_log(line: String) {
     write_diag(&line);
+}
+
+// --- Freeze incident recorder --------------------------------------------
+// bankospace-diag.log tells us THAT a freeze happened (js_ping went stale),
+// but not WHY — answering "why" previously required manually sampling CPU/GPU
+// live while a freeze was happening (that's how the 3ds Max CPU-starvation
+// root cause was found last time). This makes that automatic: the instant a
+// freeze is detected (well before the 40s/100s auto-Reload/restart
+// thresholds below, so even freezes that self-resolve in 15-35s and never
+// trigger recovery still get captured), it dumps a full system snapshot —
+// system-wide top CPU/RAM consumers, our own + webview2's disk I/O, GPU 3D
+// engine utilization per process, and any recent display-driver-timeout
+// (TDR) or unexpected-shutdown events from the Windows Event Log — plus the
+// last 2 minutes of heartbeat history leading up to it, to a dedicated log
+// file separate from the noisier general diag log.
+fn incident_path() -> std::path::PathBuf {
+    let base = std::env::var("USERPROFILE").unwrap_or_else(|_| ".".into());
+    std::path::Path::new(&base).join("bankospace-freeze-incidents.log")
+}
+
+fn write_incident(line: &str) {
+    use std::io::Write;
+    let path = incident_path();
+    if let Ok(meta) = std::fs::metadata(&path) {
+        if meta.len() > 8_000_000 {
+            let _ = std::fs::remove_file(&path);
+        }
+    }
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
+        let _ = writeln!(f, "{}", line);
+    }
+}
+
+fn local_time_string() -> String {
+    #[cfg(windows)]
+    {
+        #[repr(C)]
+        #[allow(non_snake_case)]
+        struct SYSTEMTIME {
+            wYear: u16, wMonth: u16, wDayOfWeek: u16, wDay: u16,
+            wHour: u16, wMinute: u16, wSecond: u16, wMilliseconds: u16,
+        }
+        #[link(name = "kernel32")]
+        extern "system" {
+            fn GetLocalTime(t: *mut SYSTEMTIME);
+        }
+        unsafe {
+            let mut st: SYSTEMTIME = std::mem::zeroed();
+            GetLocalTime(&mut st);
+            format!("{:04}-{:02}-{:02} {:02}:{:02}:{:02}", st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond)
+        }
+    }
+    #[cfg(not(windows))]
+    { format!("t={}", now_secs()) }
+}
+
+fn top_by_cpu(sys: &sysinfo::System, n: usize) -> String {
+    let mut v: Vec<_> = sys.processes().iter().collect();
+    v.sort_by(|a, b| b.1.cpu_usage().partial_cmp(&a.1.cpu_usage()).unwrap_or(std::cmp::Ordering::Equal));
+    v.into_iter()
+        .take(n)
+        .map(|(pid, p)| format!("{}({}) cpu={:.1}% mem={}MB", p.name().to_string_lossy(), pid, p.cpu_usage(), p.memory() / 1_048_576))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn top_by_mem(sys: &sysinfo::System, n: usize) -> String {
+    let mut v: Vec<_> = sys.processes().iter().collect();
+    v.sort_by(|a, b| b.1.memory().cmp(&a.1.memory()));
+    v.into_iter()
+        .take(n)
+        .map(|(pid, p)| format!("{}({}) mem={}MB cpu={:.1}%", p.name().to_string_lossy(), pid, p.memory() / 1_048_576, p.cpu_usage()))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn mem_summary(sys: &sysinfo::System) -> String {
+    let total = sys.total_memory() / 1_048_576;
+    let avail = sys.available_memory() / 1_048_576;
+    let used_pct = if total > 0 { 100.0 * (total.saturating_sub(avail)) as f64 / total as f64 } else { 0.0 };
+    format!("system RAM: {}MB/{}MB used ({:.0}%)", total.saturating_sub(avail), total, used_pct)
+}
+
+fn own_disk_io(sys: &sysinfo::System, my_pid: sysinfo::Pid) -> String {
+    sys.process(my_pid).map(|p| {
+        let d = p.disk_usage();
+        format!("host disk I/O since start: read={}MB written={}MB", d.total_read_bytes / 1_048_576, d.total_written_bytes / 1_048_576)
+    }).unwrap_or_default()
+}
+
+// Last ~2 minutes of heartbeat samples, so an incident dump shows what led up
+// to the freeze, not just the instant it was noticed.
+static HB_HISTORY: OnceLock<Mutex<VecDeque<String>>> = OnceLock::new();
+fn hb_history() -> &'static Mutex<VecDeque<String>> {
+    HB_HISTORY.get_or_init(|| Mutex::new(VecDeque::with_capacity(13)))
+}
+fn push_history(line: String) {
+    if let Ok(mut h) = hb_history().lock() {
+        h.push_back(line);
+        if h.len() > 12 { h.pop_front(); }
+    }
+}
+fn dump_history() -> String {
+    hb_history().lock().map(|h| h.iter().cloned().collect::<Vec<_>>().join("\n")).unwrap_or_default()
+}
+
+// GPU utilization isn't available via sysinfo — shelling out to Get-Counter
+// is the only cheap way to get it on Windows. Run on its own detached thread
+// (never awaited/joined) so a slow or hung powershell.exe can never stall the
+// watchdog loop that's busy trying to recover from the freeze itself.
+fn spawn_gpu_snapshot(incident_id: u64) {
+    std::thread::spawn(move || {
+        let out = std::process::Command::new("powershell")
+            .args([
+                "-NoProfile", "-NonInteractive", "-Command",
+                "Get-Counter '\\GPU Engine(*engtype_3D)\\Utilization Percentage' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty CounterSamples | Where-Object { $_.CookedValue -gt 1 } | Sort-Object CookedValue -Descending | Select-Object -First 8 -Property Path,CookedValue | Format-Table -AutoSize | Out-String -Width 300",
+            ])
+            .output();
+        match out {
+            Ok(o) if !o.stdout.is_empty() => {
+                write_incident(&format!("[{}] GPU 3D engine usage (top consumers):\n{}", incident_id, String::from_utf8_lossy(&o.stdout).trim()));
+            }
+            Ok(_) => write_incident(&format!("[{}] GPU snapshot: no engines above 1% (not GPU-bound)", incident_id)),
+            Err(e) => write_incident(&format!("[{}] GPU snapshot unavailable: {}", incident_id, e)),
+        }
+    });
+}
+
+// TDR (display driver timeout/reset) and unexpected-shutdown events are the
+// clearest OS-level signal of a GPU-driver-caused freeze; check the last few
+// minutes of the System event log whenever an incident starts.
+fn spawn_eventlog_snapshot(incident_id: u64) {
+    std::thread::spawn(move || {
+        let out = std::process::Command::new("wevtutil")
+            .args([
+                "qe", "System",
+                "/q:*[System[(EventID=4101 or EventID=41 or EventID=6008)]]",
+                "/rd:true", "/c:5", "/f:text",
+            ])
+            .output();
+        match out {
+            Ok(o) => {
+                let text = String::from_utf8_lossy(&o.stdout);
+                if text.trim().is_empty() {
+                    write_incident(&format!("[{}] Event log: no recent TDR/unexpected-shutdown events", incident_id));
+                } else {
+                    write_incident(&format!("[{}] Event log (TDR/power/shutdown):\n{}", incident_id, text.trim()));
+                }
+            }
+            Err(e) => write_incident(&format!("[{}] Event log query unavailable: {}", incident_id, e)),
+        }
+    });
 }
 
 #[tauri::command]
@@ -404,6 +557,10 @@ fn main() {
                 let mut sys = System::new_all();
                 let mut last_recovery_attempt: u64 = 0;
                 let mut last_restart_attempt: u64 = 0;
+                let mut incident_active = false;
+                let mut incident_start: u64 = 0;
+                let mut incident_id: u64 = 0;
+                let mut incident_peak_ping: u64 = 0;
                 loop {
                     std::thread::sleep(std::time::Duration::from_secs(10));
 
@@ -454,6 +611,53 @@ fn main() {
                         n, my_cpu, wv_cpu, wv_count, ping_age
                     ));
 
+                    push_history(format!(
+                        "[{}] host_cpu={:.1}% webview_cpu={:.1}% js_ping_age={}s top_cpu=[{}] {}",
+                        local_time_string(), my_cpu, wv_cpu, ping_age, top_by_cpu(&sys, 3), mem_summary(&sys)
+                    ));
+
+                    // Freeze incident recorder — fires at 12s stale (well before the
+                    // 40s/100s escalation below) so short freezes that resolve on their
+                    // own still get a full diagnostic dump, not just self-recovering
+                    // silently and leaving no trace of what caused them.
+                    const FREEZE_INCIDENT_THRESHOLD: u64 = 12;
+                    if ping_age > FREEZE_INCIDENT_THRESHOLD {
+                        if !incident_active {
+                            incident_active = true;
+                            incident_start = now;
+                            incident_id = now;
+                            incident_peak_ping = ping_age;
+                            write_diag(&format!(
+                                "RUST: !!! FREEZE INCIDENT #{} started (ping_age={}s) -> see bankospace-freeze-incidents.log",
+                                incident_id, ping_age
+                            ));
+                            write_incident(&format!(
+                                "\n========== FREEZE INCIDENT #{} START {} ==========\nping_age={}s host_cpu={:.1}% webview_cpu={:.1}% across {} webview proc\n{}\n-- last ~2 min before freeze --\n{}\n-- top CPU system-wide --\n{}\n-- top RAM system-wide --\n{}\n-- {}",
+                                incident_id, local_time_string(), ping_age, my_cpu, wv_cpu, wv_count,
+                                mem_summary(&sys), dump_history(), top_by_cpu(&sys, 10), top_by_mem(&sys, 5), own_disk_io(&sys, my_pid)
+                            ));
+                            spawn_gpu_snapshot(incident_id);
+                            spawn_eventlog_snapshot(incident_id);
+                        } else {
+                            incident_peak_ping = incident_peak_ping.max(ping_age);
+                            write_incident(&format!(
+                                "[{}] +{}s ping_age={}s host_cpu={:.1}% webview_cpu={:.1}% top=[{}]",
+                                incident_id, now.saturating_sub(incident_start), ping_age, my_cpu, wv_cpu, top_by_cpu(&sys, 3)
+                            ));
+                        }
+                    } else if incident_active {
+                        incident_active = false;
+                        let dur = now.saturating_sub(incident_start);
+                        write_diag(&format!(
+                            "RUST: FREEZE INCIDENT #{} ended after {}s (peak ping_age={}s)",
+                            incident_id, dur, incident_peak_ping
+                        ));
+                        write_incident(&format!(
+                            "========== FREEZE INCIDENT #{} END duration={}s peak_ping_age={}s ==========\n",
+                            incident_id, dur, incident_peak_ping
+                        ));
+                    }
+
                     // Escalation ladder. Confirmed by observing a real freeze: a stale
                     // ping past 100s (i.e. Reload() already had ~2 chances and the ping
                     // never resumed) means the renderer's own message/IPC queue is stuck
@@ -471,6 +675,9 @@ fn main() {
                             "RUST: !!! js_ping still stale ({}s) after Reload attempt(s) -> restarting the whole process",
                             ping_age
                         ));
+                        if incident_active {
+                            write_incident(&format!("[{}] recovery: full process restart triggered (ping_age={}s)", incident_id, ping_age));
+                        }
                         if let Ok(exe) = std::env::current_exe() {
                             let exe_str = exe.to_string_lossy().to_string();
                             // Relaunch via a short-delayed detached helper so our
@@ -509,6 +716,9 @@ fn main() {
                         // above for when it doesn't).
                         last_recovery_attempt = now;
                         write_diag(&format!("RUST: !!! js_ping stale for {}s -> forcing native Reload()", ping_age));
+                        if incident_active {
+                            write_incident(&format!("[{}] recovery: native Reload() forced (ping_age={}s)", incident_id, ping_age));
+                        }
                         if let Some(window) = app_handle.get_webview_window("main") {
                             #[cfg(windows)]
                             {

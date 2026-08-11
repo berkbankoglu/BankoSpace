@@ -6,6 +6,21 @@ import { playClickSound, playAddSound, playDeleteSound } from '../utils/sounds';
 
 function today() { return new Date().toISOString().slice(0, 10); }
 
+// Deterministic per-name color (same name -> always the same color, e.g. every
+// "Yumurta" entry matches) so the Menu list and day-log meal sections are
+// visually scannable without needing a manual color picker per item.
+const FT_ITEM_COLORS = [
+  '#3b82f6', '#22c55e', '#f59e0b', '#ef4444',
+  '#a855f7', '#ec4899', '#14b8a6', '#f97316',
+  '#667eea', '#06b6d4', '#84cc16', '#eab308',
+];
+function hashColorFor(name) {
+  const str = String(name || '');
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) hash = (hash * 31 + str.charCodeAt(i)) | 0;
+  return FT_ITEM_COLORS[Math.abs(hash) % FT_ITEM_COLORS.length];
+}
+
 // Tauri invoke() rejections are often plain strings (Rust's Err(String)), not
 // Error objects — `e.message` is then undefined and errors silently show as
 // "Unknown". Handle every shape so the real cause is always visible.
@@ -2734,6 +2749,7 @@ Kurallar:
                       <div key={preset.id} style={{ marginBottom: 6 }}>
                         {/* Preset başlık satırı */}
                         <div className="ft-menu-item"
+                          style={{ '--item-color': hashColorFor(preset.name) }}
                           onClick={() => { setExpandedPresetId(isExpanded ? null : preset.id); setPresetAddFoodQ(''); }}>
                           <div style={{ fontSize: 13, color: 'var(--text-muted)', marginRight: 2 }}>{isExpanded ? '▾' : '▸'}</div>
                           <div className="ft-menu-info">
@@ -2811,7 +2827,7 @@ Kurallar:
                     const isOver = false; // DOM class ile yönetiliyor
                     const menuKcal = menu.items.reduce((s, i) => s + i.kcal, 0);
                     return (
-                      <div key={menu.id} className="ft-menu-section">
+                      <div key={menu.id} className="ft-menu-section" style={{ '--item-color': hashColorFor(menu.name) }}>
                         {/* Menü başlığı */}
                         <div className="ft-menu-section-header">
                           <span className="ft-menu-section-name">{menu.name}</span>

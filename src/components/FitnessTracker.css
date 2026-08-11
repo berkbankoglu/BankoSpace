@@ -368,6 +368,8 @@
   gap: 4px;
   flex-shrink: 0;
   overflow-y: auto;
+  padding-right: 10px;
+  box-sizing: border-box;
 }
 
 .ft-resize-handle-inner {
@@ -389,6 +391,7 @@
   border-radius: 8px;
   cursor: pointer;
   border: 1px solid var(--border);
+  border-left: 3px solid var(--item-color, var(--border));
   background: var(--bg-hover)55;
   transition: background 0.15s, border-color 0.15s;
   user-select: none;
@@ -422,7 +425,7 @@
   flex: 1;
   overflow: hidden;
 }
-.ft-menu-name { font-size: 15px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ft-menu-name { font-size: 15px; font-weight: 600; color: var(--item-color, var(--text-primary)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ft-menu-kcal { font-size: 15px; color: #e8e8e8; }
 
 .ft-menu-tag {
@@ -769,6 +772,7 @@
 .ft-menu-section {
   margin-bottom: 8px;
   border: 1px solid var(--border-hover);
+  border-left: 4px solid var(--item-color, var(--border-hover));
   border-radius: 8px;
   overflow: hidden;
   background: var(--bg-surface);
@@ -785,7 +789,7 @@
 .ft-menu-section-name {
   font-size: 15px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--item-color, var(--text-primary));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
