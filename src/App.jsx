@@ -232,13 +232,16 @@ function App({ session, onLogout }) {
   const [currentPlatform, setCurrentPlatform] = useState('macos'); // Default to macos while detecting
 
   useEffect(() => {
-    platform().then(p => {
-      console.log('Detected platform:', p);
-      setCurrentPlatform(p);
-    }).catch(err => {
+    // platform() is synchronous in @tauri-apps/plugin-os v2 (returns the
+    // string directly, not a Promise) — calling .then() on it threw on every
+    // launch and left currentPlatform stuck on the 'macos' fallback even on
+    // Windows.
+    try {
+      setCurrentPlatform(platform());
+    } catch (err) {
       console.error('Platform detection failed:', err);
       setCurrentPlatform('macos'); // Fallback
-    });
+    }
   }, []);
 
   // Check if this is a popup window
