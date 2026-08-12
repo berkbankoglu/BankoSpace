@@ -343,6 +343,82 @@ body {
     color: #fff;
 }
 
+/* macOS Traffic Lights */
+.titlebar-controls-mac {
+    display: flex;
+    gap: 8px;
+    padding: 0 12px;
+    -webkit-app-region: no-drag;
+    pointer-events: all;
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.traffic-light {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0;
+    color: transparent;
+    transition: all 0.15s ease;
+    padding: 0;
+    position: relative;
+}
+
+.traffic-light svg {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.titlebar-controls-mac:hover .traffic-light svg {
+    opacity: 1;
+}
+
+.traffic-light.close {
+    background: #ff5f56;
+}
+
+.traffic-light.minimize {
+    background: #ffbd2e;
+}
+
+.traffic-light.maximize {
+    background: #27c93f;
+}
+
+.traffic-light.close:hover {
+    background: #ff4136;
+}
+
+.traffic-light.minimize:hover {
+    background: #ffb700;
+}
+
+.traffic-light.maximize:hover {
+    background: #1fb830;
+}
+
+.traffic-light svg {
+    color: rgba(0, 0, 0, 0.7);
+}
+
+/* macOS titlebar adjustments */
+.titlebar-macos .titlebar-workspace {
+    margin-left: 0;
+}
+
+/* Windows titlebar - keep existing styles */
+.titlebar-windows .titlebar-controls {
+    /* existing styles apply */
+}
+
 .titlebar-workspace {
     display: flex;
     align-items: center;

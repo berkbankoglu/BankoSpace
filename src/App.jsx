@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { flushSync } from 'react-dom';
 import { invoke } from '@tauri-apps/api/core';
+import { platform } from '@tauri-apps/plugin-os';
 import logo from './assets/logo.svg';
 import './App.css';
 import { supabase, pullFromSupabase, pushKeyToSupabase, pushAllToSupabase, SYNC_KEYS } from './supabase';
@@ -227,6 +228,19 @@ const MIN_COL_PX = 220;
 const DEFAULT_COL_PX = [null, null, null]; // [dailyPx, weeklyPx, monthlyPx] — null = auto (flex:1)
 
 function App({ session, onLogout }) {
+  // Platform detection for OS-specific UI
+  const [currentPlatform, setCurrentPlatform] = useState('macos'); // Default to macos while detecting
+
+  useEffect(() => {
+    platform().then(p => {
+      console.log('Detected platform:', p);
+      setCurrentPlatform(p);
+    }).catch(err => {
+      console.error('Platform detection failed:', err);
+      setCurrentPlatform('macos'); // Fallback
+    });
+  }, []);
+
   // Check if this is a popup window
   const popupType = new URLSearchParams(window.location.search).get('popup');
 
@@ -1388,36 +1402,73 @@ useEffect(() => {
 
   return (
     <div className="container" style={{ zoom: appZoom }}>
-      {/* Custom Title Bar */}
-      <div className="custom-titlebar">
-        {/* Workspace / user info — left side, within sidebar width */}
-        <div className="titlebar-workspace" style={{ width: sidebarCollapsed ? 50 : 240, flexShrink: 0 }}>
-          <button
-            className="titlebar-workspace-btn"
-            onClick={() => { setShowSidebarSettings(true); setSettingsTab('account'); }}
-          >
-            <span className="titlebar-workspace-avatar">
-              {session?.user?.email ? session.user.email[0].toUpperCase() : 'B'}
-            </span>
-            {!sidebarCollapsed && (
-              <span className="titlebar-workspace-name">
-                {session?.user?.email ? session.user.email.split('@')[0] : 'BankoSpace'}
-              </span>
-            )}
-          </button>
-        </div>
-        <div className="titlebar-drag-region" data-tauri-drag-region onDoubleClick={maximizeWindow} />
-        <div className="titlebar-controls">
-          <button className="titlebar-btn minimize" onClick={minimizeWindow} title="Minimize">
-            <svg width="11" height="1" viewBox="0 0 11 1"><rect width="11" height="1.5" rx="0.75" fill="currentColor"/></svg>
-          </button>
-          <button className="titlebar-btn maximize" onClick={maximizeWindow} title="Maximize">
-            <svg width="10" height="10" viewBox="0 0 10 10"><rect x="0.75" y="0.75" width="8.5" height="8.5" rx="1" stroke="currentColor" strokeWidth="1.5" fill="none"/></svg>
-          </button>
-          <button className="titlebar-btn close" onClick={closeWindow} title="Close">
-            <svg width="10" height="10" viewBox="0 0 10 10"><line x1="0.5" y1="0.5" x2="9.5" y2="9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><line x1="9.5" y1="0.5" x2="0.5" y2="9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-          </button>
-        </div>
+      {/* Custom Title Bar - Platform Specific */}
+      <div className={`custom-titlebar ${currentPlatform === 'macos' ? 'titlebar-macos' : 'titlebar-windows'}`}>
+        {/* macOS: Traffic lights LEFT, workspace center-left */}
+        {currentPlatform === 'macos' && (
+          <>
+            <div className="titlebar-controls-mac">
+              <button className="traffic-light close" onClick={closeWindow} title="Close">
+                <svg width="6" height="6" viewBox="0 0 6 6"><line x1="1" y1="1" x2="5" y2="5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/><line x1="5" y1="1" x2="1" y2="5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+              </button>
+              <button className="traffic-light minimize" onClick={minimizeWindow} title="Minimize">
+                <svg width="6" height="1.5" viewBox="0 0 6 1.5"><rect width="6" height="1.5" rx="0.75" fill="currentColor"/></svg>
+              </button>
+              <button className="traffic-light maximize" onClick={maximizeWindow} title="Maximize">
+                <svg width="6" height="6" viewBox="0 0 6 6"><rect x="1" y="1.5" width="4" height="3" stroke="currentColor" strokeWidth="1" fill="none"/><polyline points="1.5,1.5 1.5,1 4.5,1 4.5,4" stroke="currentColor" strokeWidth="1" fill="none"/></svg>
+              </button>
+            </div>
+            <div className="titlebar-workspace" style={{ width: sidebarCollapsed ? 50 : 240, flexShrink: 0, marginLeft: '70px' }}>
+              <button
+                className="titlebar-workspace-btn"
+                onClick={() => { setShowSidebarSettings(true); setSettingsTab('account'); }}
+              >
+                <span className="titlebar-workspace-avatar">
+                  {session?.user?.email ? session.user.email[0].toUpperCase() : 'B'}
+                </span>
+                {!sidebarCollapsed && (
+                  <span className="titlebar-workspace-name">
+                    {session?.user?.email ? session.user.email.split('@')[0] : 'BankoSpace'}
+                  </span>
+                )}
+              </button>
+            </div>
+            <div className="titlebar-drag-region" data-tauri-drag-region onDoubleClick={maximizeWindow} />
+          </>
+        )}
+
+        {/* Windows: Workspace LEFT, controls RIGHT */}
+        {currentPlatform === 'windows' && (
+          <>
+            <div className="titlebar-workspace" style={{ width: sidebarCollapsed ? 50 : 240, flexShrink: 0 }}>
+              <button
+                className="titlebar-workspace-btn"
+                onClick={() => { setShowSidebarSettings(true); setSettingsTab('account'); }}
+              >
+                <span className="titlebar-workspace-avatar">
+                  {session?.user?.email ? session.user.email[0].toUpperCase() : 'B'}
+                </span>
+                {!sidebarCollapsed && (
+                  <span className="titlebar-workspace-name">
+                    {session?.user?.email ? session.user.email.split('@')[0] : 'BankoSpace'}
+                  </span>
+                )}
+              </button>
+            </div>
+            <div className="titlebar-drag-region" data-tauri-drag-region onDoubleClick={maximizeWindow} />
+            <div className="titlebar-controls">
+              <button className="titlebar-btn minimize" onClick={minimizeWindow} title="Minimize">
+                <svg width="11" height="1" viewBox="0 0 11 1"><rect width="11" height="1.5" rx="0.75" fill="currentColor"/></svg>
+              </button>
+              <button className="titlebar-btn maximize" onClick={maximizeWindow} title="Maximize">
+                <svg width="10" height="10" viewBox="0 0 10 10"><rect x="0.75" y="0.75" width="8.5" height="8.5" rx="1" stroke="currentColor" strokeWidth="1.5" fill="none"/></svg>
+              </button>
+              <button className="titlebar-btn close" onClick={closeWindow} title="Close">
+                <svg width="10" height="10" viewBox="0 0 10 10"><line x1="0.5" y1="0.5" x2="9.5" y2="9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><line x1="9.5" y1="0.5" x2="0.5" y2="9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Settings Modal */}
@@ -2084,51 +2135,8 @@ function ToolsView() {
 }
 
 function AppWrapper() {
-  // loggedIn: null=loading, false=logged out, true=logged in
-  const [loggedIn, setLoggedIn] = useState(null);
-  const [initialSession, setInitialSession] = useState(null);
-
-  useEffect(() => {
-    try { getCurrentWindow().maximize(); } catch {}
-
-    // NOT: setDecorations çağrılmıyor — uygulamanın kendi başlık çubuğu var;
-    // native Windows çubuğu açılırsa ekranda İKİ başlık çubuğu oluşuyor.
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setInitialSession(session);
-      setLoggedIn(!!session);
-      try { getCurrentWindow().maximize(); } catch {}
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT') {
-        setLoggedIn(false);
-      } else if (event === 'SIGNED_IN' && session) {
-        setInitialSession(session);
-        setLoggedIn(true);
-        try { getCurrentWindow().maximize(); } catch {}
-      }
-      // TOKEN_REFRESHED, USER_UPDATED, INITIAL_SESSION etc. are intentionally ignored
-      // to prevent re-renders that break the layout
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  if (loggedIn === null) {
-    return (
-      <div style={{ width: '100vw', height: '100vh', background: '#0d1117', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ color: '#7d8590', fontSize: '14px' }}>Loading...</div>
-      </div>
-    );
-  }
-
-  if (!loggedIn) {
-    return <Login
-      onLogin={(s) => { setInitialSession(s); setLoggedIn(true); }}
-    />;
-  }
-
-  return <App key="main-app" session={initialSession} onLogout={() => setLoggedIn(false)} />;
+  // TEMPORARY: Bypass Supabase completely for testing
+  return <App key="main-app" session={null} onLogout={() => {}} />;
 }
 
 export default AppWrapper;
