@@ -1,6 +1,6 @@
 [package]
 name = "todo-app"
-version = "4.2.6"
+version = "4.2.7"
 description = "BankoSpace - Modern productivity application"
 authors = ["berkbankoglu"]
 edition = "2021"
@@ -22,6 +22,8 @@ url = "2"
 tauri-plugin-shell = "2.0"
 tauri-plugin-deep-link = "2"
 tauri-plugin-single-instance = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
 sysinfo = "0.32"
 
 # WebView2 renderer çökmesinden otomatik kurtarma (ProcessFailed → Reload).

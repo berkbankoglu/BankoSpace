@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { flushSync } from 'react-dom';
 import { invoke } from '@tauri-apps/api/core';
 import { platform } from '@tauri-apps/plugin-os';
+import { check as checkForUpdate } from '@tauri-apps/plugin-updater';
+import { relaunch } from '@tauri-apps/plugin-process';
 import logo from './assets/logo.svg';
 import './App.css';
 import { supabase, pullFromSupabase, pushKeyToSupabase, pushAllToSupabase, SYNC_KEYS } from './supabase';
@@ -223,7 +225,7 @@ function TaskContributionGraph({ todos, contributionLog }) {
 import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, setVolume, getVolume } from './utils/sounds';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
-const APP_VERSION = '4.2.6';
+const APP_VERSION = '4.2.7';
 const MIN_COL_PX = 220;
 const DEFAULT_COL_PX = [null, null, null]; // [dailyPx, weeklyPx, monthlyPx] — null = auto (flex:1)
 
@@ -427,6 +429,30 @@ function App({ session, onLogout }) {
     localStorage.setItem('appVersion', APP_VERSION);
   }, []);
 
+
+  // Native auto-updater: açılıştan birkaç saniye sonra sessizce kontrol eder,
+  // güncelleme varsa kullanıcı onayı olmadan indirme/kurulum başlamaz.
+  const [appUpdate, setAppUpdate] = useState(null);
+  const [updateStatus, setUpdateStatus] = useState('idle'); // idle | downloading | error
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      checkForUpdate().then(update => {
+        if (update?.available) setAppUpdate(update);
+      }).catch(err => console.error('Update check failed:', err));
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, []);
+  const applyUpdate = useCallback(async () => {
+    if (!appUpdate) return;
+    setUpdateStatus('downloading');
+    try {
+      await appUpdate.downloadAndInstall();
+      await relaunch();
+    } catch (err) {
+      console.error('Update install failed:', err);
+      setUpdateStatus('error');
+    }
+  }, [appUpdate]);
 
   const [plannerToasts, setPlannerToasts] = useState([]);
   const showPlannerToast = useCallback((title, body) => {
@@ -2081,6 +2107,53 @@ useEffect(() => {
               <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 4 }}>Click to open Planner</div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Native App Update Banner */}
+      {appUpdate && (
+        <div style={{
+          position: 'fixed', bottom: 24, right: 24, zIndex: 9999,
+          background: 'var(--bg-surface)',
+          border: '1px solid var(--border)',
+          borderLeft: '4px solid var(--accent)',
+          borderRadius: 8,
+          padding: '14px 16px',
+          minWidth: 260,
+          maxWidth: 320,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+        }}>
+          <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)', marginBottom: 4 }}>
+            Yeni sürüm hazır: v{appUpdate.version}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 10 }}>
+            {updateStatus === 'downloading' ? 'İndiriliyor ve kuruluyor…' : updateStatus === 'error' ? 'Güncelleme başarısız oldu, tekrar dene.' : 'İndirip yeniden başlatarak kurabilirsin.'}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={applyUpdate}
+              disabled={updateStatus === 'downloading'}
+              style={{
+                background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6,
+                padding: '6px 12px', fontSize: 12, fontWeight: 600,
+                cursor: updateStatus === 'downloading' ? 'default' : 'pointer',
+                opacity: updateStatus === 'downloading' ? 0.6 : 1,
+              }}
+            >
+              {updateStatus === 'downloading' ? 'Güncelleniyor…' : 'Şimdi Güncelle'}
+            </button>
+            {updateStatus !== 'downloading' && (
+              <button
+                onClick={() => setAppUpdate(null)}
+                style={{
+                  background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border)',
+                  borderRadius: 6, padding: '6px 12px', fontSize: 12, cursor: 'pointer',
+                }}
+              >
+                Sonra
+              </button>
+            )}
+          </div>
         </div>
       )}
 

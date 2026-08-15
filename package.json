@@ -1,6 +1,6 @@
 {
   "name": "bankospace",
-  "version": "4.2.6",
+  "version": "4.2.7",
   "description": "BankoSpace - Modern productivity application with task management, references, and flashcards",
   "main": "index.js",
   "type": "module",
@@ -28,7 +28,9 @@
     "@tauri-apps/plugin-fs": "^2.4.4",
     "@tauri-apps/plugin-notification": "^2.3.3",
     "@tauri-apps/plugin-os": "^2.3.2",
+    "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-shell": "^2.3.3",
+    "@tauri-apps/plugin-updater": "^2.10.1",
     "lightweight-charts": "^5.1.0",
     "pdfjs-dist": "^5.4.530",
     "react": "^19.2.0",
