@@ -242,38 +242,195 @@
 
 .ft-sparkline-wrap { border-radius: 6px; overflow: hidden; margin-bottom: 6px; }
 
+/* No separate background/border here on purpose — the tile card
+   (.ft-chart-tile) is the only frame. A second nested box here read as two
+   stacked layers. */
 .ft-chart-wrap {
-  border-radius: 8px;
   overflow: visible;
-  margin-bottom: 6px;
-  padding: 4px 2px 0;
-  background: var(--bg-base);
-  border: 1px solid var(--border);
 }
 
-/* Grafikler sekmesi: tüm grafikler sekmeyle geçiş yapmadan aynı anda,
-   yan yana (geniş ekranda) veya alt alta (dar ekranda) */
-.ft-charts-grid {
+/* Grafikler sekmesi: iki panel yan yana, her biri kendi sekmesinden bağımsız
+   olarak hangi metriği gösterdiğini seçer. */
+.ft-chart-panels {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-  gap: 14px;
-  margin: 10px 0 14px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 18px;
+  margin: 12px 0 16px;
+}
+
+.ft-chart-panel {
+  min-width: 0;
+}
+
+.ft-chart-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 10px;
+}
+
+.ft-chart-tab {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.ft-chart-tab:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+.ft-chart-tab.active {
+  background: var(--accent)22;
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .ft-chart-tile {
-  background: var(--bg-hover)33;
+  background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 12px 4px;
+  border-radius: 12px;
+  padding: 16px 18px 12px;
 }
 
-.ft-chart-tile-title {
-  font-size: 12px;
+.ft-chart-tile-single {
+  margin-bottom: 16px;
+}
+.ft-chart-tile-single .sc-value { font-size: 26px; }
+
+/* ── SeriesChart: headline stat + expand button (mini tile) ── */
+.sc-root { display: flex; flex-direction: column; }
+
+.sc-headline {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 2px 2px 6px;
+}
+
+.sc-value {
+  font-size: 20px;
   font-weight: 700;
+  color: #e8e8e8;
+  font-variant-numeric: proportional-nums;
+}
+
+.sc-value-lg { font-size: 28px; }
+
+.sc-delta {
+  font-size: 13px;
+  color: #8b949e;
+  white-space: nowrap;
+}
+
+.sc-expand-btn {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.sc-expand-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-hover);
+}
+
+/* ── SeriesChart: fullscreen lightbox ── */
+.sc-lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.82);
+  z-index: 20000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.sc-lightbox {
+  background: #14181f;
+  border: 1px solid #30363d;
+  border-radius: 12px;
+  width: min(1080px, 94vw);
+  max-height: 90vh;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  padding: 16px 20px 20px;
+}
+
+.sc-lightbox-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sc-lightbox-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+.sc-lightbox-hint {
+  font-size: 12px;
   color: var(--text-muted);
-  margin-bottom: 4px;
+}
+
+.sc-reset-btn {
+  margin-left: auto;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-hover);
+  color: var(--text-primary);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.sc-reset-btn:hover { background: var(--border-hover); }
+
+.sc-lightbox-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  cursor: pointer;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.sc-lightbox-close:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+.sc-lightbox-headline {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 14px 4px 4px;
+}
+
+.sc-lightbox-chart {
+  flex: 1;
+  padding-top: 8px;
 }
 
 .ft-wlog-header {

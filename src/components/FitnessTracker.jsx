@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { invoke } from '@tauri-apps/api/core';
 import './FitnessTracker.css';
 import { pushKeyToSupabase } from '../supabase';
@@ -443,7 +444,35 @@ const FOOD_DB = [
 
 const MEAL_TYPES = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
 
-function WeightChart({ entries, targetWeight, profile }) {
+const CHART_TABS = [
+  { key: 'weight', label: 'Weight' },
+  { key: 'calories', label: 'Calories' },
+  { key: 'bodyfat', label: 'Body Fat' },
+  { key: 'ffmi', label: 'FFMI' },
+  { key: 'ratio', label: 'Omuz / Bel' },
+  { key: 'waist', label: 'Waist' },
+  { key: 'neck', label: 'Neck' },
+];
+
+// Straight segments between points — deliberately NOT spline-smoothed.
+// Catmull-Rom smoothing was tried first but overshoots into ugly loops on
+// step-like data (body fat, waist, neck jump then hold flat for days), and
+// it fights real spikes instead of showing them — a sharp polyline reads
+// the data honestly, same as the reference charts this was matched against.
+function straightPath(pts) {
+  if (pts.length === 0) return '';
+  return 'M' + pts.map(p => `${p[0]},${p[1]}`).join(' L');
+}
+
+// Shared line-chart renderer used by every metric chart (mini tile AND the
+// fullscreen lightbox — same component, just a different size/zoom window).
+// Mark specs follow the dataviz skill: 2px line, ≥8px markers with a 2px
+// surface ring, ~15% area wash, hairline recessive gridlines, no more than a
+// handful of x labels.
+function ChartBody({
+  sorted, color, unit, targetLine, pointColorFn, formatValue,
+  height, dense, zoomable, zoomRange, onZoomChange,
+}) {
   const [hoverIdx, setHoverIdx] = useState(null);
   const containerRef = useRef(null);
   const [cW, setCW] = useState(220);
@@ -456,258 +485,275 @@ function WeightChart({ entries, targetWeight, profile }) {
     return () => ro.disconnect();
   }, []);
 
-  if (!entries || entries.length === 0) return null;
+  const n0 = sorted.length;
+  const [zStart, zEnd] = zoomRange || [0, 1];
 
-  const PAD = { top: 20, right: 12, bottom: 32, left: 44 };
-  const H = 180;
+  // Native, non-passive wheel listener — React's onWheel is passive by
+  // default, so e.preventDefault() inside it silently no-ops and the page
+  // scrolls instead of the chart zooming.
+  useEffect(() => {
+    if (!zoomable || !containerRef.current) return;
+    const el = containerRef.current;
+    const onWheelNative = (e) => {
+      e.preventDefault();
+      const center = (zStart + zEnd) / 2;
+      const curSpan = zEnd - zStart;
+      const factor = e.deltaY < 0 ? 0.8 : 1.25;
+      const newSpan = Math.min(1, Math.max(0.04, curSpan * factor));
+      let ns = center - newSpan / 2;
+      let ne = center + newSpan / 2;
+      if (ns < 0) { ne -= ns; ns = 0; }
+      if (ne > 1) { ns -= (ne - 1); ne = 1; }
+      onZoomChange([Math.max(0, ns), Math.min(1, ne)]);
+    };
+    el.addEventListener('wheel', onWheelNative, { passive: false });
+    return () => el.removeEventListener('wheel', onWheelNative);
+  }, [zoomable, zStart, zEnd, onZoomChange]);
+
+  const iStart = n0 > 1 ? Math.max(0, Math.round(zStart * (n0 - 1))) : 0;
+  const iEnd = n0 > 1 ? Math.min(n0 - 1, Math.round(zEnd * (n0 - 1))) : n0 - 1;
+  const view = n0 > 1 ? sorted.slice(iStart, Math.max(iStart + 1, iEnd + 1)) : sorted;
+
+  const PAD = { top: 18, right: dense ? 14 : 20, bottom: 30, left: dense ? 46 : 54 };
+  const H = height;
   const iW = Math.max(1, cW - PAD.left - PAD.right);
   const iH = H - PAD.top - PAD.bottom;
 
-  const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date));
-  const vals = sorted.map(e => e.value);
-  const target = targetWeight ? parseFloat(targetWeight) : null;
-  const allVals = target ? [...vals, target] : vals;
-  const minV = Math.min(...allVals) - 1;
-  const maxV = Math.max(...allVals) + 1;
+  const vals = view.map(e => e.value);
+  const allVals = targetLine ? [...vals, targetLine.value] : vals;
+  const span = Math.max(...allVals) - Math.min(...allVals);
+  const padV = Math.max(span * 0.15, 0.5);
+  const minV = Math.min(...allVals) - padV;
+  const maxV = Math.max(...allVals) + padV;
 
-  const n = sorted.length;
+  const n = view.length;
   const px = i => PAD.left + (n === 1 ? iW / 2 : (i / (n - 1)) * iW);
-  const py = v => PAD.top + iH - ((v - minV) / (maxV - minV)) * iH;
+  const py = v => PAD.top + iH - ((v - minV) / (maxV - minV || 1)) * iH;
 
-  const pts = sorted.map((e, i) => `${px(i)},${py(e.value)}`).join(' ');
-  const area = n > 1 ? `${px(0)},${PAD.top + iH} ${pts} ${px(n - 1)},${PAD.top + iH}` : null;
+  const pts = view.map((e, i) => [px(i), py(e.value)]);
+  const linePath = n > 1 ? straightPath(pts) : '';
+  const areaPath = n > 1 ? `${linePath} L${px(n - 1)},${PAD.top + iH} L${px(0)},${PAD.top + iH} Z` : null;
 
-  const gridLines = Array.from({ length: 4 }, (_, i) => {
-    const v = minV + ((maxV - minV) * i) / 3;
-    return { y: py(v), label: v.toFixed(1) };
-  });
+  // Only the top/bottom of the range — no gridlines cutting across the plot.
+  const yLabels = [
+    { y: PAD.top + 2, label: formatValue(maxV - padV) },
+    { y: PAD.top + iH, label: formatValue(minV + padV) },
+  ];
 
   const xLabelIdxs = new Set([0, n - 1]);
-  for (let i = Math.max(1, Math.floor(n / 4)); i < n - 1; i += Math.max(1, Math.floor(n / 4))) xLabelIdxs.add(i);
-  const xLabels = [...xLabelIdxs].map(i => ({ x: px(i), label: sorted[i].date.slice(5) }));
+  const step = Math.max(1, Math.floor(n / (dense ? 3 : 6)));
+  for (let i = step; i < n - 1; i += step) xLabelIdxs.add(i);
+  const xLabels = [...xLabelIdxs].sort((a, b) => a - b).map(i => ({ x: px(i), label: view[i].date.slice(5) }));
 
-  const hovered = hoverIdx !== null ? sorted[hoverIdx] : null;
+  const hovered = hoverIdx !== null ? view[hoverIdx] : null;
+  const gradId = `sc-grad-${color.replace('#', '')}-${dense ? 'm' : 'f'}`;
+
+  // Drag-to-pan — plain mousedown + document listeners, same pattern already
+  // used elsewhere in this file (no passive-event issue for mouse events).
+  const dragRef = useRef(null);
+  const startPan = (e) => {
+    if (!zoomable || e.button !== 0) return;
+    e.preventDefault();
+    dragRef.current = { startX: e.clientX, zStart, zEnd };
+    const onMove = (me) => {
+      if (!dragRef.current) return;
+      const dxFrac = ((me.clientX - dragRef.current.startX) / iW) * (dragRef.current.zEnd - dragRef.current.zStart);
+      let ns = dragRef.current.zStart - dxFrac;
+      let ne = dragRef.current.zEnd - dxFrac;
+      if (ns < 0) { ne -= ns; ns = 0; }
+      if (ne > 1) { ns -= (ne - 1); ne = 1; }
+      onZoomChange([Math.max(0, ns), Math.min(1, ne)]);
+    };
+    const onUp = () => {
+      dragRef.current = null;
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  };
 
   return (
-    <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
+    <div ref={containerRef} style={{ position: 'relative', width: '100%', cursor: zoomable ? 'grab' : 'default' }}>
       <svg
         width={cW} height={H}
-        style={{ display: 'block', overflow: 'visible' }}
+        style={{ display: 'block', overflow: 'visible', cursor: zoomable ? 'grab' : 'crosshair' }}
+        onMouseMove={(e) => {
+          if (n === 0) return;
+          const rect = e.currentTarget.getBoundingClientRect();
+          const relX = Math.min(1, Math.max(0, (e.clientX - rect.left - PAD.left) / iW));
+          setHoverIdx(n > 1 ? Math.round(relX * (n - 1)) : 0);
+        }}
         onMouseLeave={() => setHoverIdx(null)}
+        onMouseDown={startPan}
       >
         <defs>
-          <linearGradient id="wc-grad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#5c7cfa" stopOpacity="0.3" />
-            <stop offset="100%" stopColor="#5c7cfa" stopOpacity="0" />
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.28" />
+            <stop offset="100%" stopColor={color} stopOpacity="0" />
           </linearGradient>
         </defs>
 
-        {/* Y grid + labels */}
-        {gridLines.map((g, i) => (
-          <g key={i}>
-            <line x1={PAD.left} y1={g.y} x2={PAD.left + iW} y2={g.y}
-              stroke="#30363d" strokeWidth="1" />
-            <text x={PAD.left - 6} y={g.y + 4} textAnchor="end"
-              fontSize="12" fill="#8b949e" fontFamily="monospace">{g.label}</text>
-          </g>
+        {/* No gridlines cutting across the plot — just the range's edges. */}
+        {yLabels.map((g, i) => (
+          <text key={i} x={PAD.left - 8} y={g.y + (i === 0 ? 4 : 0)} textAnchor="end" fontSize={dense ? 12 : 13} fill="#6e7681">{g.label}</text>
         ))}
 
-        {/* X labels */}
         {xLabels.map((l, i) => (
-          <text key={i} x={l.x} y={H - 6} textAnchor="middle"
-            fontSize="12" fill="#8b949e">{l.label}</text>
+          <text key={i} x={l.x} y={H - 8} textAnchor="middle" fontSize={dense ? 12 : 13} fill="#8b949e">{l.label}</text>
         ))}
 
-        {/* Hedef çizgisi */}
-        {target && (
+        {targetLine && (
           <g>
-            <line x1={PAD.left} y1={py(target)} x2={PAD.left + iW} y2={py(target)}
-              stroke="#3fb950" strokeWidth="1.5" strokeDasharray="6 3" />
-            <text x={PAD.left + 4} y={py(target) - 5}
-              fontSize="11" fill="#3fb950">target {target}kg</text>
+            <line x1={PAD.left} y1={py(targetLine.value)} x2={PAD.left + iW} y2={py(targetLine.value)}
+              stroke={targetLine.color} strokeWidth="1.5" strokeDasharray="6 3" opacity="0.7" />
+            <text x={PAD.left + 4} y={py(targetLine.value) - 6} fontSize={dense ? 11 : 12} fill={targetLine.color}>{targetLine.label}</text>
           </g>
         )}
 
-        {/* Alan dolgusu */}
-        {area && <polygon points={area} fill="url(#wc-grad)" />}
+        {areaPath && <path d={areaPath} fill={`url(#${gradId})`} />}
+        {linePath && <path d={linePath} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />}
 
-        {/* Çizgi */}
-        {n > 1 && (
-          <polyline points={pts} fill="none" stroke="#5c7cfa" strokeWidth="2.5"
-            strokeLinejoin="round" strokeLinecap="round" />
+        {/* Crosshair — the only thing that marks "in-between" points; keeps the
+            line itself clean instead of a dot on every single day. */}
+        {hoverIdx !== null && hoverIdx !== n - 1 && (
+          <line x1={px(hoverIdx)} y1={PAD.top} x2={px(hoverIdx)} y2={PAD.top + iH} stroke="#4b5259" strokeWidth="1" strokeDasharray="3 3" />
         )}
 
-        {/* Hover dikey çizgi */}
-        {hoverIdx !== null && (
-          <line x1={px(hoverIdx)} y1={PAD.top} x2={px(hoverIdx)} y2={PAD.top + iH}
-            stroke="#8b949e" strokeWidth="1" strokeDasharray="3 2" />
+        {/* Only the current value stays permanently marked. */}
+        {n > 0 && (
+          <circle
+            cx={px(n - 1)} cy={py(view[n - 1].value)}
+            r={hoverIdx === n - 1 ? 6.5 : 5}
+            fill={pointColorFn ? pointColorFn(view[n - 1], true) : '#e8e8e8'}
+            stroke="#0d1117" strokeWidth="2"
+          />
         )}
 
-        {/* Noktalar */}
-        {sorted.map((e, i) => {
-          const t = n === 1 ? 1 : i / (n - 1);
-          const isLast = i === n - 1;
-          const isHov = hoverIdx === i;
-          const r2 = Math.round(110 - 53 * t);   // 110→57
-          const g2 = Math.round(58  + 150 * t);   // 58→208
-          const b2 = Math.round(158 + 82  * t);   // 158→240
-          const color = isLast ? '#e8e8e8' : `rgb(${r2},${g2},${b2})`;
-          return (
-            <circle key={i}
-              cx={px(i)} cy={py(e.value)}
-              r={isHov ? 7 : isLast ? 6 : 4}
-              fill={color} stroke="#0d1117" strokeWidth="2"
-              style={{ cursor: 'pointer' }}
-              onMouseEnter={() => setHoverIdx(i)}
-            />
-          );
-        })}
+        {/* The hovered point lights up on demand, wherever the pointer is. */}
+        {hoverIdx !== null && hoverIdx !== n - 1 && (
+          <circle
+            cx={px(hoverIdx)} cy={py(view[hoverIdx].value)} r={6}
+            fill={pointColorFn ? pointColorFn(view[hoverIdx], false) : color}
+            stroke="#0d1117" strokeWidth="2"
+          />
+        )}
       </svg>
 
-      {/* Tooltip */}
       {hovered && (
         <div style={{
-          position: 'absolute', top: 6, left: '50%', transform: 'translateX(-50%)',
+          position: 'absolute', top: 4, left: '50%', transform: 'translateX(-50%)',
           background: '#1c2128', border: '1px solid #444c56', borderRadius: 8,
           padding: '6px 14px', fontSize: 13, color: '#e6edf3', pointerEvents: 'none',
           whiteSpace: 'nowrap', zIndex: 10, boxShadow: '0 4px 12px #0006',
         }}>
-          <b style={{ color: '#e8e8e8' }}>{hovered.value} kg</b>
+          <b style={{ color: '#e8e8e8' }}>{formatValue(hovered.value)}</b>
           <span style={{ color: '#8b949e', marginLeft: 8 }}>{hovered.date}</span>
-          {hovered.waist && hovered.neck && profile?.height && (
-            <span style={{ color: '#e8e8e8', marginLeft: 8 }}>
-              %{calcBodyFat({ ...profile, weight: hovered.value, waist: hovered.waist, neck: hovered.neck }) ?? '?'} fat
-            </span>
-          )}
+          {hovered.extra && <span style={{ color: '#8b949e', marginLeft: 8 }}>{hovered.extra}</span>}
         </div>
       )}
     </div>
+  );
+}
+
+// Stateful wrapper: headline stat (current value + change vs previous — reads
+// at a glance without hovering), an expand button that opens the same chart
+// full-screen via a portal, and — only in that fullscreen view — scroll-to-
+// zoom / drag-to-pan over the date range.
+function SeriesChart({ entries, color = '#5c7cfa', unit = '', targetLine = null, pointColorFn = null, formatValue: fmtProp, title = '', emptyLabel = 'No records yet', height = 190 }) {
+  const [fullscreen, setFullscreen] = useState(false);
+  const [zoomRange, setZoomRange] = useState([0, 1]);
+
+  if (!entries || entries.length === 0) return <div className="ft-empty">{emptyLabel}</div>;
+
+  const formatValue = fmtProp || ((v) => `${Number.isInteger(v) ? v : v.toFixed(1)}${unit}`);
+  const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date));
+  const last = sorted[sorted.length - 1];
+  const prev = sorted.length > 1 ? sorted[sorted.length - 2] : null;
+  const delta = prev ? last.value - prev.value : null;
+
+  const openFullscreen = () => { setZoomRange([0, 1]); setFullscreen(true); };
+  const closeFullscreen = () => setFullscreen(false);
+
+  return (
+    <div className="sc-root">
+      <div className="sc-headline">
+        <span className="sc-value">{formatValue(last.value)}</span>
+        {delta !== null && Math.abs(delta) > 0.001 && (
+          <span className="sc-delta">{delta > 0 ? '▲' : '▼'} {formatValue(Math.abs(delta))} vs last</span>
+        )}
+        <button className="sc-expand-btn" title="Büyüt / zoom" onClick={openFullscreen}>⤢</button>
+      </div>
+      <ChartBody
+        sorted={sorted} color={color} unit={unit} targetLine={targetLine}
+        pointColorFn={pointColorFn} formatValue={formatValue}
+        height={height} dense={height <= 220} zoomable={false} zoomRange={[0, 1]} onZoomChange={() => {}}
+      />
+
+      {fullscreen && createPortal(
+        <div className="sc-lightbox-overlay" onClick={closeFullscreen}>
+          <div className="sc-lightbox" onClick={e => e.stopPropagation()}>
+            <div className="sc-lightbox-header">
+              <span className="sc-lightbox-title">{title}</span>
+              <span className="sc-lightbox-hint">Scroll to zoom · drag to pan</span>
+              {(zoomRange[0] > 0.001 || zoomRange[1] < 0.999) && (
+                <button className="sc-reset-btn" onClick={() => setZoomRange([0, 1])}>Reset zoom</button>
+              )}
+              <button className="sc-lightbox-close" onClick={closeFullscreen}>✕</button>
+            </div>
+            <div className="sc-lightbox-headline">
+              <span className="sc-value sc-value-lg">{formatValue(last.value)}</span>
+              {delta !== null && Math.abs(delta) > 0.001 && (
+                <span className="sc-delta">{delta > 0 ? '▲' : '▼'} {formatValue(Math.abs(delta))} vs last</span>
+              )}
+            </div>
+            <div className="sc-lightbox-chart">
+              <ChartBody
+                sorted={sorted} color={color} unit={unit} targetLine={targetLine}
+                pointColorFn={pointColorFn} formatValue={formatValue}
+                height={440} dense={false} zoomable zoomRange={zoomRange} onZoomChange={setZoomRange}
+              />
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+}
+
+function WeightChart({ entries, targetWeight, profile, height }) {
+  if (!entries || entries.length === 0) return null;
+  const target = targetWeight ? parseFloat(targetWeight) : null;
+  const withExtra = entries.map(e => {
+    if (e.waist && e.neck && profile?.height) {
+      const bf = calcBodyFat({ ...profile, weight: e.value, waist: e.waist, neck: e.neck });
+      return { ...e, extra: bf != null ? `%${bf} fat` : null };
+    }
+    return e;
+  });
+  return (
+    <SeriesChart
+      entries={withExtra}
+      color="#5c7cfa"
+      title="Weight"
+      formatValue={v => `${v.toFixed(1)} kg`}
+      targetLine={target ? { value: target, label: `target ${target}kg`, color: '#3fb950' } : null}
+      height={height}
+    />
   );
 }
 
 // ── Genel amaçlı çizgi grafiği: yağ oranı / FFMI / omuz-bel oranı gibi
 // weightLog'dan türetilen serileri çizmek için (WeightChart'ın hedef-çizgisi
 // ve kilo-özel tooltip'i olmayan sade versiyonu) ──
-function MetricChart({ entries, color = '#5c7cfa', unit = '' }) {
-  const [hoverIdx, setHoverIdx] = useState(null);
-  const containerRef = useRef(null);
-  const [cW, setCW] = useState(220);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-    const ro = new ResizeObserver(([e]) => setCW(e.contentRect.width));
-    ro.observe(containerRef.current);
-    setCW(containerRef.current.offsetWidth);
-    return () => ro.disconnect();
-  }, []);
-
+function MetricChart({ entries, color = '#5c7cfa', unit = '', title = '', height }) {
   if (!entries || entries.length === 0) return null;
-
-  const PAD = { top: 20, right: 12, bottom: 32, left: 44 };
-  const H = 180;
-  const iW = Math.max(1, cW - PAD.left - PAD.right);
-  const iH = H - PAD.top - PAD.bottom;
-
-  const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date));
-  const vals = sorted.map(e => e.value);
-  const span = Math.max(...vals) - Math.min(...vals);
-  const pad = Math.max(0.5, span * 0.15);
-  const minV = Math.min(...vals) - pad;
-  const maxV = Math.max(...vals) + pad;
-
-  const n = sorted.length;
-  const px = i => PAD.left + (n === 1 ? iW / 2 : (i / (n - 1)) * iW);
-  const py = v => PAD.top + iH - ((v - minV) / (maxV - minV || 1)) * iH;
-
-  const pts = sorted.map((e, i) => `${px(i)},${py(e.value)}`).join(' ');
-  const area = n > 1 ? `${px(0)},${PAD.top + iH} ${pts} ${px(n - 1)},${PAD.top + iH}` : null;
-
-  const gridLines = Array.from({ length: 4 }, (_, i) => {
-    const v = minV + ((maxV - minV) * i) / 3;
-    return { y: py(v), label: v.toFixed(1) };
-  });
-
-  const xLabelIdxs = new Set([0, n - 1]);
-  for (let i = Math.max(1, Math.floor(n / 4)); i < n - 1; i += Math.max(1, Math.floor(n / 4))) xLabelIdxs.add(i);
-  const xLabels = [...xLabelIdxs].map(i => ({ x: px(i), label: sorted[i].date.slice(5) }));
-
-  const hovered = hoverIdx !== null ? sorted[hoverIdx] : null;
-  const gradId = `mc-grad-${color.replace('#', '')}`;
-
-  return (
-    <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
-      <svg width={cW} height={H} style={{ display: 'block', overflow: 'visible' }} onMouseLeave={() => setHoverIdx(null)}>
-        <defs>
-          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity="0.3" />
-            <stop offset="100%" stopColor={color} stopOpacity="0" />
-          </linearGradient>
-        </defs>
-
-        {gridLines.map((g, i) => (
-          <g key={i}>
-            <line x1={PAD.left} y1={g.y} x2={PAD.left + iW} y2={g.y} stroke="#30363d" strokeWidth="1" />
-            <text x={PAD.left - 6} y={g.y + 4} textAnchor="end" fontSize="12" fill="#8b949e" fontFamily="monospace">{g.label}</text>
-          </g>
-        ))}
-
-        {xLabels.map((l, i) => (
-          <text key={i} x={l.x} y={H - 6} textAnchor="middle" fontSize="12" fill="#8b949e">{l.label}</text>
-        ))}
-
-        {area && <polygon points={area} fill={`url(#${gradId})`} />}
-        {n > 1 && (
-          <polyline points={pts} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
-        )}
-
-        {hoverIdx !== null && (
-          <line x1={px(hoverIdx)} y1={PAD.top} x2={px(hoverIdx)} y2={PAD.top + iH} stroke="#8b949e" strokeWidth="1" strokeDasharray="3 2" />
-        )}
-
-        {sorted.map((e, i) => {
-          const isLast = i === n - 1;
-          const isHov = hoverIdx === i;
-          return (
-            <circle key={i}
-              cx={px(i)} cy={py(e.value)}
-              r={isHov ? 7 : isLast ? 6 : 4}
-              fill={isLast ? '#e8e8e8' : color} stroke="#0d1117" strokeWidth="2"
-              style={{ cursor: 'pointer' }}
-              onMouseEnter={() => setHoverIdx(i)}
-            />
-          );
-        })}
-      </svg>
-
-      {hovered && (
-        <div style={{
-          position: 'absolute', top: 6, left: '50%', transform: 'translateX(-50%)',
-          background: '#1c2128', border: '1px solid #444c56', borderRadius: 8,
-          padding: '6px 14px', fontSize: 13, color: '#e6edf3', pointerEvents: 'none',
-          whiteSpace: 'nowrap', zIndex: 10, boxShadow: '0 4px 12px #0006',
-        }}>
-          <b style={{ color: '#e8e8e8' }}>{hovered.value}{unit}</b>
-          <span style={{ color: '#8b949e', marginLeft: 8 }}>{hovered.date}</span>
-        </div>
-      )}
-    </div>
-  );
+  return <SeriesChart entries={entries} color={color} unit={unit} title={title} height={height} />;
 }
 
 // ── Kalori Grafiği ──
-function KaloriChart({ meals, goalKcal }) {
-  const containerRef = useRef(null);
-  const [cW, setCW] = useState(220);
-  const [hoverIdx, setHoverIdx] = useState(null);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-    const ro = new ResizeObserver(([e]) => setCW(e.contentRect.width));
-    ro.observe(containerRef.current);
-    setCW(containerRef.current.offsetWidth);
-    return () => ro.disconnect();
-  }, []);
-
+function KaloriChart({ meals, goalKcal, height }) {
   // Son 30 günün kalori toplamlarını hesapla
   const entries = (() => {
     const result = [];
@@ -724,87 +770,16 @@ function KaloriChart({ meals, goalKcal }) {
 
   if (entries.length === 0) return <div className="ft-empty">No calorie records yet</div>;
 
-  const PAD = { top: 20, right: 12, bottom: 32, left: 48 };
-  const H = 180;
-  const iW = Math.max(1, cW - PAD.left - PAD.right);
-  const iH = H - PAD.top - PAD.bottom;
-  const n = entries.length;
-  const vals = entries.map(e => e.value);
-  const minV = Math.max(0, Math.min(...vals) - 200);
-  const maxV = Math.max(...vals) + 200;
-  const px = i => PAD.left + (n === 1 ? iW / 2 : (i / (n - 1)) * iW);
-  const py = v => PAD.top + iH - ((v - minV) / (maxV - minV)) * iH;
-
-  const pts = entries.map((e, i) => `${px(i)},${py(e.value)}`).join(' ');
-  const area = n > 1 ? `${px(0)},${PAD.top + iH} ${pts} ${px(n - 1)},${PAD.top + iH}` : null;
-  const gridLines = Array.from({ length: 4 }, (_, i) => {
-    const v = minV + ((maxV - minV) * i) / 3;
-    return { y: py(v), label: Math.round(v) };
-  });
-  const xLabelIdxs = new Set([0, n - 1]);
-  for (let i = Math.max(1, Math.floor(n / 4)); i < n - 1; i += Math.max(1, Math.floor(n / 4))) xLabelIdxs.add(i);
-  const xLabels = [...xLabelIdxs].map(i => ({ x: px(i), label: entries[i].date.slice(5) }));
-  const hovered = hoverIdx !== null ? entries[hoverIdx] : null;
-  const goalY = goalKcal ? py(goalKcal) : null;
-
   return (
-    <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
-      <svg width={cW} height={H} style={{ display: 'block', overflow: 'visible' }}
-        onMouseLeave={() => setHoverIdx(null)}>
-        <defs>
-          <linearGradient id="kc-grad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#3fb950" stopOpacity="0.3" />
-            <stop offset="100%" stopColor="#3fb950" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        {gridLines.map((g, i) => (
-          <g key={i}>
-            <line x1={PAD.left} y1={g.y} x2={PAD.left + iW} y2={g.y} stroke="#30363d" strokeWidth="1" />
-            <text x={PAD.left - 6} y={g.y + 4} textAnchor="end" fontSize="11" fill="#8b949e" fontFamily="monospace">{g.label}</text>
-          </g>
-        ))}
-        {xLabels.map((l, i) => (
-          <text key={i} x={l.x} y={H - 6} textAnchor="middle" fontSize="11" fill="#8b949e">{l.label}</text>
-        ))}
-        {goalY !== null && (
-          <g>
-            <line x1={PAD.left} y1={goalY} x2={PAD.left + iW} y2={goalY}
-              stroke="#5c7cfa" strokeWidth="1.5" strokeDasharray="6 3" />
-            <text x={PAD.left + 4} y={goalY - 5} fontSize="10" fill="#5c7cfa">target {goalKcal} kcal</text>
-          </g>
-        )}
-        {area && <polygon points={area} fill="url(#kc-grad)" />}
-        {n > 1 && <polyline points={pts} fill="none" stroke="#3fb950" strokeWidth="2.5"
-          strokeLinejoin="round" strokeLinecap="round" />}
-        {hoverIdx !== null && (
-          <line x1={px(hoverIdx)} y1={PAD.top} x2={px(hoverIdx)} y2={PAD.top + iH}
-            stroke="#8b949e" strokeWidth="1" strokeDasharray="3 2" />
-        )}
-        {entries.map((e, i) => {
-          const overGoal = goalKcal && e.value > goalKcal;
-          const color = overGoal ? '#f85149' : '#3fb950';
-          return (
-            <circle key={i} cx={px(i)} cy={py(e.value)} r={hoverIdx === i ? 7 : 4}
-              fill={color} stroke="#0d1117" strokeWidth="2" style={{ cursor: 'pointer' }}
-              onMouseEnter={() => setHoverIdx(i)} />
-          );
-        })}
-      </svg>
-      {hovered && (
-        <div style={{
-          position: 'absolute', top: 6, left: '50%', transform: 'translateX(-50%)',
-          background: '#1c2128', border: '1px solid #444c56', borderRadius: 8,
-          padding: '6px 14px', fontSize: 13, color: '#e6edf3', pointerEvents: 'none',
-          whiteSpace: 'nowrap', zIndex: 10, boxShadow: '0 4px 12px #0006',
-        }}>
-          <b style={{ color: goalKcal && hovered.value > goalKcal ? '#f85149' : '#3fb950' }}>{hovered.value} kcal</b>
-          <span style={{ color: '#8b949e', marginLeft: 8 }}>{hovered.date}</span>
-          {goalKcal && <span style={{ color: '#8b949e', marginLeft: 8 }}>
-            {hovered.value > goalKcal ? `+${hovered.value - goalKcal}` : `-${goalKcal - hovered.value}`} from target
-          </span>}
-        </div>
-      )}
-    </div>
+    <SeriesChart
+      entries={entries}
+      color="#3fb950"
+      title="Calories"
+      formatValue={v => `${Math.round(v)} kcal`}
+      targetLine={goalKcal ? { value: goalKcal, label: `target ${goalKcal} kcal`, color: '#5c7cfa' } : null}
+      pointColorFn={(e, isLast) => (goalKcal && e.value > goalKcal) ? '#f85149' : (isLast ? '#e8e8e8' : '#3fb950')}
+      height={height}
+    />
   );
 }
 
@@ -977,6 +952,10 @@ export default function FitnessTracker({ view = 'overview' } = {}) {
   const [heroMode, setHeroMode]             = useState('main'); // 'main' | 'karne' — üst istatistik şeridi
 
 
+
+  // Grafikler: tek seferde tek grafik, üstteki sekmeden seçilir
+  const [chartTabA, setChartTabA] = useState('weight');
+  const [chartTabB, setChartTabB] = useState('calories');
 
   // Kilo takibi
   const [weightLog, setWeightLog]     = useState(() => load('ft_weight_log', []));
@@ -1709,7 +1688,8 @@ TOOL RULES — FOLLOW EXACTLY:
 3. Do NOT call get_fitness_data for workouts — current plan is already above.
 4. DO NOT ask for confirmation. Act immediately, confirm after.
 5. Reply in same language as user. After finishing, list what was added (1 line each).
-6. add_food_to_menu: if food_name isn't in food_database (check via get_fitness_data first), estimate its macros yourself from general nutrition knowledge (kcal/protein/carbs/fat per 100g, or per piece for countable foods) and pass estimate_kcal/estimate_p/estimate_c/estimate_f/estimate_unit in the SAME call. Never ask the user for macros — estimate confidently, mention it was an estimate in your reply.`;
+6. add_food_to_menu: if food_name isn't in food_database (check via get_fitness_data first), estimate its macros yourself from general nutrition knowledge (kcal/protein/carbs/fat per 100g, or per piece for countable foods) and pass estimate_kcal/estimate_p/estimate_c/estimate_f/estimate_unit in the SAME call. Never ask the user for macros — estimate confidently, mention it was an estimate in your reply.
+7. Be fast and direct. Keep replies to 1-3 short sentences unless the user explicitly asks for more detail. No filler, no restating the question, no long caveats — just the answer or the confirmation.`;
     }
 
     // Agentic loop helper — system + messages → {text, actionTaken}
@@ -1719,11 +1699,12 @@ TOOL RULES — FOLLOW EXACTLY:
       let actionTaken = false;
       for (let i = 0; i < 12; i++) {
         const body = JSON.stringify({
-          model: 'claude-opus-4-8',
+          model: 'claude-opus-5',
           max_tokens: 1024,
           system: sys,
           tools: AI_TOOLS,
           messages: loopMsgs,
+          output_config: { effort: 'low' },
         });
         const result = await invoke('fetch_post', {
           url: 'https://api.anthropic.com/v1/messages',
@@ -1779,8 +1760,9 @@ Kurallar:
 - Görseldeki TÜM günleri ve TÜM egzersizleri ekle, hiçbirini atlama`;
 
       const body = JSON.stringify({
-        model: 'claude-opus-4-8',
+        model: 'claude-opus-5',
         max_tokens: 2048,
+        output_config: { effort: 'low' },
         messages: [{ role: 'user', content: [...imageBlocks, { type: 'text', text: parsePrompt }] }],
       });
       const result = await invoke('fetch_post', {
@@ -3222,58 +3204,65 @@ Kurallar:
                   </div>
                 )}
 
-                {/* Grafikler: sekmeyle geçiş yok, hepsi aynı anda yan yana/üst üste (grid) */}
-                <div className="ft-charts-grid">
-                  <div className="ft-chart-tile">
-                    <div className="ft-chart-tile-title">Weight</div>
-                    {weightLog.length === 0
-                      ? <div className="ft-empty">No records yet</div>
-                      : <div className="ft-chart-wrap">
-                          <WeightChart entries={weightLog.slice(-60)} targetWeight={goal.targetWeight} profile={profile} />
-                        </div>}
-                  </div>
+                {/* Grafikler: iki panel yan yana, her biri kendi sekmesinden
+                    bağımsız olarak hangi metriği göstereceğini seçer. */}
+                <div className="ft-chart-panels">
+                  {[
+                    { tab: chartTabA, setTab: setChartTabA },
+                    { tab: chartTabB, setTab: setChartTabB },
+                  ].map((slot, slotIdx) => (
+                    <div className="ft-chart-panel" key={slotIdx}>
+                      <div className="ft-chart-tabs">
+                        {CHART_TABS.map(t => (
+                          <button
+                            key={t.key}
+                            className={`ft-chart-tab${slot.tab === t.key ? ' active' : ''}`}
+                            onClick={() => slot.setTab(t.key)}
+                          >{t.label}</button>
+                        ))}
+                      </div>
 
-                  <div className="ft-chart-tile">
-                    <div className="ft-chart-tile-title">Calories</div>
-                    <div className="ft-chart-wrap">
-                      <KaloriChart meals={meals} goalKcal={goalKcal} />
+                      <div className="ft-chart-tile ft-chart-tile-single">
+                        {slot.tab === 'weight' && (
+                          weightLog.length === 0
+                            ? <div className="ft-empty">No records yet</div>
+                            : <div className="ft-chart-wrap">
+                                <WeightChart entries={weightLog.slice(-60)} targetWeight={goal.targetWeight} profile={profile} height={280} />
+                              </div>
+                        )}
+                        {slot.tab === 'calories' && (
+                          <div className="ft-chart-wrap">
+                            <KaloriChart meals={meals} goalKcal={goalKcal} height={280} />
+                          </div>
+                        )}
+                        {slot.tab === 'bodyfat' && (
+                          bodyFatSeries.length === 0
+                            ? <div className="ft-empty">Boy + bel + boyun girildiğinde burada görünür</div>
+                            : <div className="ft-chart-wrap"><MetricChart entries={bodyFatSeries.slice(-60)} color="#e8a838" unit="%" title="Body Fat" height={280} /></div>
+                        )}
+                        {slot.tab === 'ffmi' && (
+                          ffmiSeries.length === 0
+                            ? <div className="ft-empty">Boy + bel + boyun girildiğinde burada görünür</div>
+                            : <div className="ft-chart-wrap"><MetricChart entries={ffmiSeries.slice(-60)} color="#58a6ff" unit="" title="FFMI" height={280} /></div>
+                        )}
+                        {slot.tab === 'ratio' && (
+                          ratioSeries.length === 0
+                            ? <div className="ft-empty">Omuz + bel girildiğinde burada görünür</div>
+                            : <div className="ft-chart-wrap"><MetricChart entries={ratioSeries.slice(-60)} color="#3fb950" unit="" title="Omuz / Bel" height={280} /></div>
+                        )}
+                        {slot.tab === 'waist' && (
+                          waistSeries.length === 0
+                            ? <div className="ft-empty">Bel ölçüsü girildiğinde burada görünür</div>
+                            : <div className="ft-chart-wrap"><MetricChart entries={waistSeries.slice(-60)} color="#bc8cff" unit=" cm" title="Waist" height={280} /></div>
+                        )}
+                        {slot.tab === 'neck' && (
+                          neckSeries.length === 0
+                            ? <div className="ft-empty">Boyun ölçüsü girildiğinde burada görünür</div>
+                            : <div className="ft-chart-wrap"><MetricChart entries={neckSeries.slice(-60)} color="#ff7b72" unit=" cm" title="Neck" height={280} /></div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-
-                  <div className="ft-chart-tile">
-                    <div className="ft-chart-tile-title">Body Fat</div>
-                    {bodyFatSeries.length === 0
-                      ? <div className="ft-empty">Boy + bel + boyun girildiğinde burada görünür</div>
-                      : <div className="ft-chart-wrap"><MetricChart entries={bodyFatSeries.slice(-60)} color="#e8a838" unit="%" /></div>}
-                  </div>
-
-                  <div className="ft-chart-tile">
-                    <div className="ft-chart-tile-title">FFMI</div>
-                    {ffmiSeries.length === 0
-                      ? <div className="ft-empty">Boy + bel + boyun girildiğinde burada görünür</div>
-                      : <div className="ft-chart-wrap"><MetricChart entries={ffmiSeries.slice(-60)} color="#58a6ff" unit="" /></div>}
-                  </div>
-
-                  <div className="ft-chart-tile">
-                    <div className="ft-chart-tile-title">Omuz / Bel</div>
-                    {ratioSeries.length === 0
-                      ? <div className="ft-empty">Omuz + bel girildiğinde burada görünür</div>
-                      : <div className="ft-chart-wrap"><MetricChart entries={ratioSeries.slice(-60)} color="#3fb950" unit="" /></div>}
-                  </div>
-
-                  <div className="ft-chart-tile">
-                    <div className="ft-chart-tile-title">Waist</div>
-                    {waistSeries.length === 0
-                      ? <div className="ft-empty">Bel ölçüsü girildiğinde burada görünür</div>
-                      : <div className="ft-chart-wrap"><MetricChart entries={waistSeries.slice(-60)} color="#bc8cff" unit=" cm" /></div>}
-                  </div>
-
-                  <div className="ft-chart-tile">
-                    <div className="ft-chart-tile-title">Neck</div>
-                    {neckSeries.length === 0
-                      ? <div className="ft-empty">Boyun ölçüsü girildiğinde burada görünür</div>
-                      : <div className="ft-chart-wrap"><MetricChart entries={neckSeries.slice(-60)} color="#ff7b72" unit=" cm" /></div>}
-                  </div>
+                  ))}
                 </div>
 
                 {/* Sütun başlıkları */}
