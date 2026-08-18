@@ -230,7 +230,7 @@ const APP_VERSION = '4.2.7';
 // gerçek build sürümünden (APP_VERSION) BAĞIMSIZ. O sayı auto-updater'ın semver
 // karşılaştırması için geriye gitmemeli; bu ise her push'ta elle +0.1 artan,
 // kullanıcının takip ettiği kozmetik bir sayaç. 3.0'a geçilmez, kullanıcı isteyene kadar.
-const DISPLAY_VERSION = '2.1';
+const DISPLAY_VERSION = '2.2';
 const MIN_COL_PX = 220;
 const DEFAULT_COL_PX = [null, null, null]; // [dailyPx, weeklyPx, monthlyPx] — null = auto (flex:1)
 

@@ -47,6 +47,25 @@ function getLineTextBeforeCaret(range, editorEl) {
   return preRange.toString();
 }
 
+// Sidebar liste satırlarında başlığın altında gösterilen düz-metin özet —
+// HTML'i sadece OKUYOR (detached bir div'e yazıp textContent alıyor),
+// gerçek not içeriğine hiç dokunmuyor.
+function getPlainTextPreview(html, maxLen = 170) {
+  if (!html) return '';
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  const text = (div.textContent || '').replace(/\s+/g, ' ').trim();
+  if (!text) return '';
+  return text.length > maxLen ? text.slice(0, maxLen) + '…' : text;
+}
+
+function formatNoteDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function rgbToHex(rgb) {
   const m = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
   if (!m) return null;
@@ -1100,6 +1119,8 @@ function Notes() {
   });
   const [editingTitle, setEditingTitle] = useState(null); // { noteId, subId }
   const [editingTitleValue, setEditingTitleValue] = useState('');
+  const [addingTag, setAddingTag] = useState(false);
+  const [tagDraft, setTagDraft] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFormats, setActiveFormats] = useState({});
   const [showColorPresets, setShowColorPresets] = useState(false);
@@ -1123,6 +1144,7 @@ function Notes() {
 
   const sidebarRef = useRef(null);
   const editorRef = useRef(null);
+  const gutterRef = useRef(null);
   const savedSelectionRef = useRef(null);
   const notesSaveTimerRef = useRef(null);
   const resizeStartXRef = useRef(0);
@@ -1291,6 +1313,8 @@ function Notes() {
       content: '',
       subNotes: [],
       color: '#667eea',
+      tags: [],
+      pinned: false,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -1305,7 +1329,7 @@ function Notes() {
   const addSubNote = (noteId, e) => {
     e.stopPropagation();
     const id = Date.now();
-    const newSub = { id, title: 'New Sub Note', content: '' };
+    const newSub = { id, title: 'New Sub Note', content: '', tags: [], pinned: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     setNotes(prev => prev.map(n =>
       n.id === noteId ? { ...n, subNotes: [...(n.subNotes || []), newSub] } : n
     ));
@@ -1613,7 +1637,7 @@ ${body}
       s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       s.content?.toLowerCase().includes(searchQuery.toLowerCase())
     )
-  );
+  ).sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
 
   const selectedNote = selected ? notes.find(n => n.id === selected.noteId) : null;
   const selectedSub = selectedNote && selected?.subId != null
@@ -1622,6 +1646,65 @@ ${body}
   const selectedTitle = selectedSub ? selectedSub.title : selectedNote?.title;
   const selectedContent = selectedSub ? selectedSub.content : selectedNote?.content;
   const selectedCanvasImages = (selectedSub ? selectedSub.canvasImages : selectedNote?.canvasImages) || [];
+
+  useEffect(() => { setAddingTag(false); setTagDraft(''); }, [selected?.noteId, selected?.subId]);
+
+  // Kod-editörü tarzı satır numarası gutter'ı. İlk yaklaşım editörün doğrudan
+  // <div> çocuklarını sayıyordu, ama ilk satır (ve bazı satırlar) çoğunlukla
+  // element değil çıplak bir text node oluyor — bu yüzden çoğu notta tek bir
+  // "1" dışında numara görünmüyordu. Bunun yerine, tüm içeriği kapsayan bir
+  // Range'in getClientRects()'i kullanılıyor: bu, tarayıcının gerçekten
+  // ÇİZDİĞİ her satırı (DOM şekli ne olursa olsun — çıplak text, <br>,
+  // <div>, satır içi <b>/<i> parçaları) verir; aynı satıra ait parçalar
+  // hep aynı "top" değerini paylaştığından birleştirilip tek satır sayılıyor.
+  // editorEl'e hiç dokunmuyor, sadece okuyor — not içeriğini bozma riski yok.
+  useEffect(() => {
+    const editorEl = editorRef.current;
+    const gutterEl = gutterRef.current;
+    if (!editorEl || !gutterEl) return;
+
+    let raf = null;
+    const sync = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = null;
+        if (!editorEl.isConnected || !gutterEl.isConnected) return;
+        const wrapRect = editorEl.parentElement.getBoundingClientRect();
+
+        let tops = [];
+        if (editorEl.childNodes.length) {
+          const range = document.createRange();
+          range.selectNodeContents(editorEl);
+          const rects = Array.from(range.getClientRects())
+            .filter(r => r.height > 0)
+            .sort((a, b) => a.top - b.top);
+          for (const r of rects) {
+            const top = r.top - wrapRect.top;
+            if (tops.length === 0 || top - tops[tops.length - 1] > 4) tops.push(top);
+          }
+        }
+        if (tops.length === 0) tops = [0];
+
+        gutterEl.innerHTML = tops.map((top, i) =>
+          `<span class="notebook-page-gutter-num" style="top:${top}px">${i + 1}</span>`
+        ).join('');
+      });
+    };
+
+    sync();
+    const mo = new MutationObserver(sync);
+    mo.observe(editorEl, { childList: true, subtree: true, characterData: true });
+    const ro = new ResizeObserver(sync);
+    ro.observe(editorEl);
+    window.addEventListener('resize', sync);
+
+    return () => {
+      mo.disconnect();
+      ro.disconnect();
+      window.removeEventListener('resize', sync);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [selected?.noteId, selected?.subId]);
 
   // Apply fn to the selected note/subnote's canvasImages array
   const patchSelectedCanvas = (fn) => {
@@ -1685,6 +1768,36 @@ ${body}
     }));
   };
 
+  // Sidebar satırından herhangi bir not/alt not için pin aç/kapa — pinliler
+  // kendi listesinde (üst notlar kendi aralarında, alt notlar kendi
+  // ebeveyninin altında) en üste sıralanır.
+  const togglePin = (noteId, subId, e) => {
+    e.stopPropagation();
+    setNotes(prev => prev.map(n => {
+      if (n.id !== noteId) return n;
+      if (subId == null) return { ...n, pinned: !n.pinned, updatedAt: new Date().toISOString() };
+      return {
+        ...n,
+        subNotes: n.subNotes.map(s => s.id === subId ? { ...s, pinned: !s.pinned, updatedAt: new Date().toISOString() } : s),
+      };
+    }));
+    playClickSound();
+  };
+
+  const sortByPinned = (list) => [...list].sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
+
+  const updateTags = (tags) => {
+    if (!selected) return;
+    setNotes(prev => prev.map(n => {
+      if (n.id !== selected.noteId) return n;
+      if (selected.subId === null) return { ...n, tags, updatedAt: new Date().toISOString() };
+      return {
+        ...n,
+        subNotes: n.subNotes.map(s => s.id === selected.subId ? { ...s, tags, updatedAt: new Date().toISOString() } : s),
+      };
+    }));
+  };
+
   const commitTitleEdit = (title) => {
     if (!editingTitle) return;
     const { noteId, subId } = editingTitle;
@@ -1730,9 +1843,16 @@ ${body}
       {/* Sidebar */}
       <div className="notes-sidebar" ref={sidebarRef} style={{ width: sidebarWidth }}>
         <div className="notes-sidebar-header">
-          <span className="notes-header-label">NOTES</span>
+          <div className="notes-search-inline">
+            <input
+              type="text"
+              placeholder="search..."
+              value={searchQuery}
+              onChange={e => { playTypeSoundThrottled(); setSearchQuery(e.target.value); }}
+            />
+          </div>
           <button className="notes-new-btn" onClick={createNote}>+ ADD</button>
-          <div style={{ position: 'relative', marginLeft: 'auto' }} onMouseDown={e => e.stopPropagation()}>
+          <div style={{ position: 'relative' }} onMouseDown={e => e.stopPropagation()}>
             <button className="notes-collapse-btn" title="Settings" onClick={() => setShowMenu(v => !v)}>⚙</button>
             {showMenu && (
               <div style={{
@@ -1768,34 +1888,25 @@ ${body}
         </div>
 
         <div className="notes-sidebar-inner">
-          <div className="notes-search">
-            <input
-              type="text"
-              placeholder="search..."
-              value={searchQuery}
-              onChange={e => { playTypeSoundThrottled(); setSearchQuery(e.target.value); }}
-            />
-          </div>
-
           <div className="notes-tree">
             {filteredNotes.length === 0 ? (
               <div className="notes-empty">{searchQuery ? 'not found' : 'no notes yet'}</div>
             ) : filteredNotes.map(note => (
               <div key={note.id} className="notes-tree-group">
+                {/* Tüm grubu (üst not + açık alt notlar) tek parça kaplayan renk çizgisi */}
+                <span className="notes-tree-bar" style={{ background: note.color || '#667eea' }} />
                 {/* Note row */}
                 <div
                   className={`notes-tree-row${selected?.noteId === note.id && selected?.subId == null ? ' active' : ''}`}
                   style={{ '--note-color': note.color || '#667eea' }}
                   data-note-id={note.id}
+                  title="Sürükle - sırayı değiştir"
                   onClick={() => setSelected({ noteId: note.id, subId: null })}
+                  onMouseDown={e => {
+                    if (e.target.closest('.notes-tree-actions, .notes-expand-btn, .notes-tree-pin-btn')) return;
+                    startTreeDrag(e, 'note', note.id, null);
+                  }}
                 >
-                  <span
-                    className="notes-tree-drag-handle"
-                    title="Sürükle - sırayı değiştir"
-                    onMouseDown={e => startTreeDrag(e, 'note', note.id, null)}
-                    onClick={e => e.stopPropagation()}
-                  >⠿</span>
-                  <span className="notes-tree-bar" style={{ background: note.color || '#667eea' }} />
                   <button
                     className="notes-expand-btn"
                     onClick={e => toggleExpand(note.id, e)}
@@ -1805,29 +1916,50 @@ ${body}
                       : <span className="notes-expand-placeholder" />}
                   </button>
 
-                  {editingTitle?.noteId === note.id && editingTitle?.subId == null ? (
-                    <input
-                      className="notes-title-edit-inline"
-                      value={editingTitleValue}
-                      onChange={e => setEditingTitleValue(e.target.value)}
-                      onBlur={() => commitTitleEdit(editingTitleValue)}
-                      onKeyDown={e => { if (e.key === 'Enter') commitTitleEdit(editingTitleValue); }}
-                      onClick={e => e.stopPropagation()}
-                      onMouseDown={e => e.stopPropagation()}
-                      autoFocus
-                    />
-                  ) : (
-                    <span
-                      className="notes-tree-title"
-                      onDoubleClick={e => {
-                        e.stopPropagation();
-                        setEditingTitle({ noteId: note.id, subId: null });
-                        setEditingTitleValue(note.title);
-                      }}
-                    >
-                      {note.title || 'Untitled'}
-                    </span>
-                  )}
+                  <div className="notes-tree-title-col">
+                    {formatNoteDate(note.updatedAt) && (
+                      <span className="notes-tree-date">{formatNoteDate(note.updatedAt)}</span>
+                    )}
+                    {editingTitle?.noteId === note.id && editingTitle?.subId == null ? (
+                      <input
+                        className="notes-title-edit-inline"
+                        value={editingTitleValue}
+                        onChange={e => setEditingTitleValue(e.target.value)}
+                        onBlur={() => commitTitleEdit(editingTitleValue)}
+                        onKeyDown={e => { if (e.key === 'Enter') commitTitleEdit(editingTitleValue); }}
+                        onClick={e => e.stopPropagation()}
+                        onMouseDown={e => e.stopPropagation()}
+                        autoFocus
+                      />
+                    ) : (
+                      <span
+                        className="notes-tree-title"
+                        style={{ '--note-title-color': note.color || '#667eea' }}
+                        onDoubleClick={e => {
+                          e.stopPropagation();
+                          setEditingTitle({ noteId: note.id, subId: null });
+                          setEditingTitleValue(note.title);
+                        }}
+                      >
+                        {note.title || 'Untitled'}
+                      </span>
+                    )}
+                    {getPlainTextPreview(note.content) && (
+                      <span className="notes-tree-preview">{getPlainTextPreview(note.content)}</span>
+                    )}
+                    {note.tags?.length > 0 && (
+                      <div className="notes-tree-tags">
+                        {note.tags.map(tag => <span key={tag} className="notes-tree-tag-pill">#{tag}</span>)}
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    className={`notes-tree-pin-btn ${note.pinned ? 'pinned' : ''}`}
+                    title={note.pinned ? 'Sabitlemeyi kaldır' : 'Sabitle'}
+                    style={{ '--note-title-color': note.color || '#667eea' }}
+                    onClick={e => togglePin(note.id, null, e)}
+                  >📌</button>
 
                   <div className="notes-tree-actions">
                     <button
@@ -1862,45 +1994,64 @@ ${body}
                 </div>
 
                 {/* Sub notes */}
-                {expandedNotes.has(note.id) && note.subNotes?.map((sub, si) => (
+                {expandedNotes.has(note.id) && sortByPinned(note.subNotes || []).map((sub, si) => (
                   <div
                     key={sub.id}
                     className={`notes-tree-row notes-sub-row${selected?.noteId === note.id && selected?.subId === sub.id ? ' active' : ''}`}
                     style={{ '--note-color': note.color || '#667eea' }}
                     data-sub-id={sub.id}
                     data-parent-id={note.id}
+                    title="Sürükle - sırayı değiştir"
                     onClick={() => setSelected({ noteId: note.id, subId: sub.id })}
+                    onMouseDown={e => {
+                      if (e.target.closest('.notes-tree-actions, .notes-tree-pin-btn')) return;
+                      startTreeDrag(e, 'sub', sub.id, note.id);
+                    }}
                   >
-                    <span
-                      className="notes-tree-drag-handle"
-                      title="Sürükle - sırayı değiştir"
-                      onMouseDown={e => startTreeDrag(e, 'sub', sub.id, note.id)}
-                      onClick={e => e.stopPropagation()}
-                    >⠿</span>
-                    <span className="notes-tree-bar" style={{ background: note.color || '#667eea', opacity: 0.55 }} />
-                    {editingTitle?.noteId === note.id && editingTitle?.subId === sub.id ? (
-                      <input
-                        className="notes-title-edit-inline"
-                        value={editingTitleValue}
-                        onChange={e => setEditingTitleValue(e.target.value)}
-                        onBlur={() => commitTitleEdit(editingTitleValue)}
-                        onKeyDown={e => { if (e.key === 'Enter') commitTitleEdit(editingTitleValue); }}
-                        onClick={e => e.stopPropagation()}
-                        onMouseDown={e => e.stopPropagation()}
-                        autoFocus
-                      />
-                    ) : (
-                      <span
-                        className="notes-tree-title"
-                        onDoubleClick={e => {
-                          e.stopPropagation();
-                          setEditingTitle({ noteId: note.id, subId: sub.id });
-                          setEditingTitleValue(sub.title);
-                        }}
-                      >
-                        {sub.title || 'Untitled'}
-                      </span>
-                    )}
+                    <div className="notes-tree-title-col">
+                      {formatNoteDate(sub.updatedAt) && (
+                        <span className="notes-tree-date">{formatNoteDate(sub.updatedAt)}</span>
+                      )}
+                      {editingTitle?.noteId === note.id && editingTitle?.subId === sub.id ? (
+                        <input
+                          className="notes-title-edit-inline"
+                          value={editingTitleValue}
+                          onChange={e => setEditingTitleValue(e.target.value)}
+                          onBlur={() => commitTitleEdit(editingTitleValue)}
+                          onKeyDown={e => { if (e.key === 'Enter') commitTitleEdit(editingTitleValue); }}
+                          onClick={e => e.stopPropagation()}
+                          onMouseDown={e => e.stopPropagation()}
+                          autoFocus
+                        />
+                      ) : (
+                        <span
+                          className="notes-tree-title"
+                          style={{ '--note-title-color': note.color || '#667eea' }}
+                          onDoubleClick={e => {
+                            e.stopPropagation();
+                            setEditingTitle({ noteId: note.id, subId: sub.id });
+                            setEditingTitleValue(sub.title);
+                          }}
+                        >
+                          {sub.title || 'Untitled'}
+                        </span>
+                      )}
+                      {getPlainTextPreview(sub.content) && (
+                        <span className="notes-tree-preview">{getPlainTextPreview(sub.content)}</span>
+                      )}
+                      {sub.tags?.length > 0 && (
+                        <div className="notes-tree-tags">
+                          {sub.tags.map(tag => <span key={tag} className="notes-tree-tag-pill">#{tag}</span>)}
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      className={`notes-tree-pin-btn ${sub.pinned ? 'pinned' : ''}`}
+                      title={sub.pinned ? 'Sabitlemeyi kaldır' : 'Sabitle'}
+                      style={{ '--note-title-color': note.color || '#667eea' }}
+                      onClick={e => togglePin(note.id, sub.id, e)}
+                    >📌</button>
 
                     <div className="notes-tree-actions">
                       <button
@@ -1928,6 +2079,52 @@ ${body}
                 value={selectedTitle || ''}
                 onChange={e => updateTitle(e.target.value)}
               />
+              <div className="notes-editor-meta">
+                {selectedSub && (
+                  <span className="notes-editor-parent-pill" style={{ '--pill-color': selectedNote.color || '#667eea' }}>
+                    {selectedNote.title || 'Untitled'}
+                  </span>
+                )}
+                <div className="notes-editor-tags">
+                  {((selectedSub ? selectedSub.tags : selectedNote.tags) || []).map((tag, i) => (
+                    <span key={tag + i} className="notes-editor-tag-pill">
+                      #{tag}
+                      <button
+                        className="notes-editor-tag-remove"
+                        onClick={() => {
+                          const cur = (selectedSub ? selectedSub.tags : selectedNote.tags) || [];
+                          updateTags(cur.filter((_, idx) => idx !== i));
+                        }}
+                      >×</button>
+                    </span>
+                  ))}
+                  {addingTag ? (
+                    <input
+                      className="notes-editor-tag-input"
+                      value={tagDraft}
+                      autoFocus
+                      placeholder="etiket..."
+                      onChange={e => setTagDraft(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          const val = tagDraft.trim().replace(/^#/, '');
+                          if (val) {
+                            const cur = (selectedSub ? selectedSub.tags : selectedNote.tags) || [];
+                            if (!cur.includes(val)) updateTags([...cur, val]);
+                          }
+                          setTagDraft('');
+                          setAddingTag(false);
+                        } else if (e.key === 'Escape') {
+                          setTagDraft(''); setAddingTag(false);
+                        }
+                      }}
+                      onBlur={() => { setTagDraft(''); setAddingTag(false); }}
+                    />
+                  ) : (
+                    <button className="notes-editor-tag-add-btn" onClick={() => setAddingTag(true)}>+ tag</button>
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* Formatting Toolbar */}
@@ -2086,6 +2283,7 @@ ${body}
               }}
               onClick={() => { showColorPresets && setShowColorPresets(false); showShortcuts && setShowShortcuts(false); }}
             >
+              <div className="notebook-page-gutter" ref={gutterRef} aria-hidden="true" />
               <RichTextEditor
                 key={`${selected.noteId}-${selected.subId}`}
                 ref={editorRef}
