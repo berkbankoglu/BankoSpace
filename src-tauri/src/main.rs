@@ -770,11 +770,20 @@ toggle_kana_window,
         ])
         .on_window_event(|window, event| {
             match event {
-                tauri::WindowEvent::CloseRequested { .. } => {
+                // main penceresi kapanmadan önce JS tarafı bekleyen Supabase
+                // push'larını flush edip kendi onCloseRequested akışında
+                // destroy() çağırıyor (preventDefault + async await + destroy).
+                // Burada CloseRequested anında diğer webview'leri kapatırsak,
+                // JS'in preventDefault'u henüz IPC üzerinden ulaşmadan pencere
+                // ekosistemi dağılmış olur — bu yüzden gerçek kapanışı
+                // (Destroyed) bekliyoruz, ki main zaten kesin gitmiş olsun.
+                tauri::WindowEvent::Destroyed => {
                     if window.label() == "main" {
                         let app = window.app_handle();
                         for (_, w) in app.webview_windows() {
-                            let _ = w.close();
+                            if w.label() != "main" {
+                                let _ = w.close();
+                            }
                         }
                     }
                 }

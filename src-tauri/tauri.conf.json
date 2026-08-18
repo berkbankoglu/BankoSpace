@@ -73,6 +73,7 @@
             "fs:allow-read-file",
             "fs:allow-read-dir",
             "notification:default",
+            "core:event:default",
             "core:window:allow-create",
             "core:window:allow-close",
             "core:window:allow-minimize",

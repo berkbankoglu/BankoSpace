@@ -55,6 +55,7 @@ export const SYNC_KEYS = [
   'invoices',
   'invoiceBasePath',
   'streakData',
+  'taskScore',
   'loginHeatmap',
   'bs_contribution_log',
   'payments_v2',

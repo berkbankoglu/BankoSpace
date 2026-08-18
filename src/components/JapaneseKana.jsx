@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getAudioContext, getMasterGain, getVolume } from "../utils/sounds";
 import { pushKeyToSupabase } from "../supabase";
+import FlashCards from "./FlashCards";
 import "./JapaneseKana.css";
 
 function openKanaPopup() {
@@ -3175,27 +3176,23 @@ function VocabularyTab() {
 
 // ── Root component ────────────────────────────────────────────────────────────
 
-export default function JapaneseKana() {
-  const [tab, setTab] = useState("Guide");
+// view: 'guide' | 'practice' | 'vocabulary' | 'flashcards' — sekme seçimi artık
+// sol sidebar'daki alt başlıklardan geliyor (App.jsx: kanaView), Fitness'ın
+// Antrenman/Grafikler alt başlıklarıyla aynı desen.
+export default function JapaneseKana({ view = 'guide' }) {
   const [selectedRows, setSelectedRows] = useState(() => {
     try { return JSON.parse(localStorage.getItem('kana_selected_rows')) || null; } catch { return null; }
   });
 
+  const tab = view === 'flashcards' ? 'FlashCards'
+    : view === 'practice' ? 'Practice'
+    : view === 'vocabulary' ? 'Vocabulary'
+    : 'Guide';
+
   return (
     <div className="japanese-kana">
-      <div className="jk-header">
-        <div className="jk-tabs">
-          {["Guide", "Practice", "Vocabulary"].map((t) => (
-            <button
-              key={t}
-              className={`jk-tab${tab === t ? " jk-tab--active" : ""}`}
-              onClick={() => setTab(t)}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-        {tab === "Practice" && (
+      {tab === "Practice" && (
+        <div className="jk-header" style={{ justifyContent: 'flex-end' }}>
           <button
             className="jk-practice-popup-btn"
             onClick={openKanaPopup}
@@ -3203,12 +3200,17 @@ export default function JapaneseKana() {
           >
             ⧉ Pop-up
           </button>
-        )}
-      </div>
-      <div className="jk-body" style={tab === "Vocabulary" ? { padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' } : {}}>
+        </div>
+      )}
+      <div className="jk-body" style={(tab === "Vocabulary" || tab === "FlashCards") ? { padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' } : {}}>
         {tab === "Guide" && <GuideTab />}
         {tab === "Practice" && <PracticeTab selectedRows={selectedRows} setSelectedRows={setSelectedRows} />}
         {tab === "Vocabulary" && <VocabularyTab />}
+        {tab === "FlashCards" && (
+          <div className="flashcards-fullscreen">
+            <FlashCards fullscreen={true} />
+          </div>
+        )}
       </div>
     </div>
   );

@@ -52,7 +52,7 @@ function FlashCards({ fullscreen = false }) {
   const [aiError, setAiError] = useState(null);
   const [showApiKeyInput, setShowApiKeyInput] = useState(false);
   const [apiKeyDraft, setApiKeyDraft] = useState('');
-  const [aiMode, setAiMode] = useState('single'); // 'single' | 'bulk'
+  const [aiMode, setAiMode] = useState('single'); // 'single' | 'bulk' | 'image'
   const [bulkPrompt, setBulkPrompt] = useState('');
   const [bulkResults, setBulkResults] = useState(null); // array of {front, back}
   const [aiPanelHeight, setAiPanelHeight] = useState(() => {
@@ -60,6 +60,22 @@ function FlashCards({ fullscreen = false }) {
   });
   const sidebarRef = useRef(null);
   const isResizingRef = useRef(false);
+
+  // Image → word extraction state (görseldeki Japonca kelime notlarını çıkar)
+  const [aiImages, setAiImages] = useState([]); // [{dataUrl, mediaType}]
+  const [imageResults, setImageResults] = useState(null); // [{writing, reading, turkish, corrected}]
+  const imageFileRef = useRef(null);
+  // Görsel çıktısının hangi desteye ekleneceği — mevcut deste veya yeni bir deste
+  const [imageTargetDeck, setImageTargetDeck] = useState('');
+  const [imageNewDeckName, setImageNewDeckName] = useState('');
+
+  // Study kartı büyüklüğü — kullanıcı +/- ile ayarlıyor
+  const [studyScale, setStudyScale] = useState(() => {
+    return parseFloat(localStorage.getItem('fc_study_scale') || '1');
+  });
+  useEffect(() => {
+    localStorage.setItem('fc_study_scale', String(studyScale));
+  }, [studyScale]);
 
   // Reload from localStorage when flashcards-updated event fires (from QuickNote)
   useEffect(() => {
@@ -199,12 +215,13 @@ function FlashCards({ fullscreen = false }) {
   };
 
   // Card operations
-  const addCard = (front, back) => {
+  const addCard = (front, reading, back) => {
     if (!front.trim() || !back.trim()) return;
 
     const card = {
       id: Date.now(),
       front: front.trim(),
+      reading: (reading || '').trim(),
       back: back.trim(),
       group: selectedDeck,
       known: null,
@@ -346,15 +363,135 @@ function FlashCards({ fullscreen = false }) {
     setApiKeyDraft('');
   };
 
-  const updateCard = (cardId, front, back) => {
+  const updateCard = (cardId, front, reading, back) => {
     if (!front.trim() || !back.trim()) return;
 
     setCards(cards.map(c =>
       c.id === cardId
-        ? { ...c, front: front.trim(), back: back.trim() }
+        ? { ...c, front: front.trim(), reading: (reading || '').trim(), back: back.trim() }
         : c
     ));
     setEditingCard(null);
+  };
+
+  // Görsel → base64 (Fitness AI görsel yükleme deseniyle aynı)
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function handleImageFiles(files) {
+    const imgs = [];
+    for (const f of files) {
+      if (!f.type.startsWith('image/')) continue;
+      const dataUrl = await fileToBase64(f);
+      imgs.push({ dataUrl, mediaType: f.type });
+    }
+    if (imgs.length) setAiImages(prev => [...prev, ...imgs]);
+  }
+
+  // Görseldeki Japonca kelime notlarını (yazılış + okunuş + Türkçe) çıkar
+  const extractFromImages = async () => {
+    if (aiImages.length === 0) return;
+    const key = localStorage.getItem('anthropic_api_key');
+    if (!key) { setShowApiKeyInput(true); return; }
+
+    setAiLoading(true);
+    setAiError(null);
+    setImageResults(null);
+
+    try {
+      const imageBlocks = aiImages.map(img => ({
+        type: 'image',
+        source: { type: 'base64', media_type: img.mediaType, data: img.dataUrl.split(',')[1] },
+      }));
+      const prompt = `Bu görsel(ler)de Japonca kelime notları var — her kelimenin yazılışı (kanji/kana), okunuşu (furigana/romaji) ve Türkçe karşılığı yazılı. Hepsini çıkar.
+
+Sen bir Japonca uzmanısın. Görselde yazılanı sadece kopyalama — her kelimenin
+yazılışını, okunuşunu ve Türkçe karşılığını kendi bilgine göre DOĞRULA. Eğer
+görseldeki Türkçe karşılık yanlışsa, eksikse veya okunuş hatalıysa, DOĞRUSUNU
+yaz ve "corrected" alanını true yap. Kullanıcı bu kartlardan çalışıp
+öğrenecek — yanlış bilgiyi asla olduğu gibi geçirme.
+
+SADECE şu JSON formatında yanıt ver, başka hiçbir şey yazma:
+[{"writing":"漢字","reading":"かんじ","turkish":"Türkçe karşılığı","corrected":false}]
+
+Kurallar:
+- Görseldeki TÜM kelimeleri ekle, hiçbirini atlama
+- writing: kelimenin Japonca yazılışı (kanji/kana), okunuş değil
+- reading: kelimenin okunuşu (furigana/hiragana veya romaji, görselde nasıl yazılıysa) — bu da yanlışsa düzelt
+- turkish: doğrulanmış/düzeltilmiş Türkçe karşılık
+- corrected: görseldeki bilgiyi değiştirdiysen true, aynen doğruysa false`;
+
+      const body = JSON.stringify({
+        model: 'claude-opus-5',
+        max_tokens: 2048,
+        output_config: { effort: 'low' },
+        messages: [{ role: 'user', content: [...imageBlocks, { type: 'text', text: prompt }] }],
+      });
+      const result = await invoke('fetch_post', {
+        url: 'https://api.anthropic.com/v1/messages',
+        headers: {
+          'x-api-key': key,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        body,
+      });
+      const data = JSON.parse(result);
+      if (data.error) throw new Error(data.error.message);
+      const raw = data.content.find(b => b.type === 'text')?.text || '';
+      const match = raw.match(/\[[\s\S]*\]/);
+      if (!match) throw new Error('Görsel parse edilemedi: ' + raw.slice(0, 200));
+      const parsed = JSON.parse(match[0]);
+      if (!Array.isArray(parsed) || parsed.length === 0) throw new Error('Görselde kelime bulunamadı.');
+      setImageResults(parsed);
+      setImageTargetDeck(selectedDeck || decks[0]?.name || '');
+      setImageNewDeckName('');
+    } catch (e) {
+      setAiError('Görsel işlenemedi: ' + (e?.message || 'Bilinmeyen hata'));
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const addAllImageCards = () => {
+    if (!imageResults || imageResults.length === 0) return;
+
+    let targetDeck = imageTargetDeck;
+    let newDeckToCreate = null;
+    if (targetDeck === '__new__') {
+      const name = imageNewDeckName.trim();
+      if (!name) { setAiError('Yeni deste için bir isim gir.'); return; }
+      if (decks.some(d => d.name === name)) { setAiError('Bu isimde bir deste zaten var.'); return; }
+      newDeckToCreate = { name, color: DECK_COLORS[decks.length % DECK_COLORS.length] };
+      targetDeck = name;
+    }
+    if (!targetDeck) { setAiError('Eklenecek bir deste seç.'); return; }
+
+    const now = Date.now();
+    const newCards = imageResults.map((item, i) => ({
+      id: now + i,
+      front: item.writing || '',
+      reading: item.reading || '',
+      back: item.turkish || '',
+      group: targetDeck,
+      known: null,
+      createdAt: now + i
+    }));
+    if (newDeckToCreate) setDecks(prev => [...prev, newDeckToCreate]);
+    setCards(prev => [...prev, ...newCards]);
+    playAddSound();
+    setAiImages([]);
+    setImageResults(null);
+    setImageTargetDeck('');
+    setImageNewDeckName('');
+    setAiError(null);
+    setSelectedDeck(targetDeck);
   };
 
   const deleteCard = (id) => {
@@ -533,6 +670,10 @@ function FlashCards({ fullscreen = false }) {
                 className={`fc-ai-mode-btn ${aiMode === 'bulk' ? 'active' : ''}`}
                 onClick={() => { setAiMode('bulk'); setAiError(null); setAiResult(null); }}
               >Bulk</button>
+              <button
+                className={`fc-ai-mode-btn ${aiMode === 'image' ? 'active' : ''}`}
+                onClick={() => { setAiMode('image'); setAiError(null); setAiResult(null); setBulkResults(null); }}
+              >Image</button>
             </div>
 
             {showApiKeyInput ? (
@@ -565,6 +706,31 @@ function FlashCards({ fullscreen = false }) {
                 <button className="fc-ai-ask-btn" onClick={askAI} disabled={aiLoading || !aiWord.trim()} title="Ask AI">
                   {aiLoading ? <span className="fc-ai-spinner" /> : 'Ask'}
                 </button>
+              </div>
+            ) : aiMode === 'image' ? (
+              <div className="fc-ai-image-input-area">
+                {aiImages.length > 0 && (
+                  <div className="fc-ai-image-preview">
+                    {aiImages.map((img, i) => (
+                      <div key={i} className="fc-ai-image-thumb">
+                        <img src={img.dataUrl} alt="" />
+                        <button className="fc-ai-image-remove" onClick={() => setAiImages(prev => prev.filter((_, idx) => idx !== i))}>×</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <input
+                  type="file" accept="image/*" multiple ref={imageFileRef} style={{ display: 'none' }}
+                  onChange={e => { handleImageFiles([...e.target.files]); e.target.value = ''; }}
+                />
+                <div className="fc-ai-image-btn-row">
+                  <button className="fc-ai-attach-btn" onClick={() => imageFileRef.current?.click()} disabled={aiLoading} title="Görsel seç">
+                    📎 Görsel Seç
+                  </button>
+                  <button className="fc-ai-ask-btn" onClick={extractFromImages} disabled={aiLoading || aiImages.length === 0}>
+                    {aiLoading ? <span className="fc-ai-spinner" /> : 'Kelimeleri Çıkar'}
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="fc-ai-bulk-input-area">
@@ -639,12 +805,60 @@ function FlashCards({ fullscreen = false }) {
               </div>
             )}
 
-            {!aiResult && !bulkResults && !aiLoading && !aiError && (
+            {aiMode === 'image' && imageResults && !aiLoading && (
+              <div className="fc-ai-bulk-results">
+                <div className="fc-ai-bulk-results-header">
+                  <span>{imageResults.length} kelime bulundu</span>
+                </div>
+
+                <div className="fc-ai-deck-target-row">
+                  <select
+                    className="fc-ai-deck-select"
+                    value={imageTargetDeck}
+                    onChange={e => setImageTargetDeck(e.target.value)}
+                  >
+                    <option value="" disabled>Deste seç...</option>
+                    {decks.map(d => (
+                      <option key={d.name} value={d.name}>{d.name}</option>
+                    ))}
+                    <option value="__new__">+ Yeni deste oluştur...</option>
+                  </select>
+                  {imageTargetDeck === '__new__' && (
+                    <input
+                      type="text"
+                      className="fc-ai-deck-new-input"
+                      placeholder="Yeni deste adı..."
+                      value={imageNewDeckName}
+                      onChange={e => setImageNewDeckName(e.target.value)}
+                      autoFocus
+                    />
+                  )}
+                </div>
+
+                <div className="fc-ai-bulk-list">
+                  {imageResults.map((item, i) => (
+                    <div key={i} className={`fc-ai-bulk-item fc-ai-bulk-item--jp ${item.corrected ? 'fc-ai-bulk-item--corrected' : ''}`}>
+                      <span className="fc-ai-bulk-front">{item.writing}</span>
+                      <span className="fc-ai-bulk-reading">{item.reading}</span>
+                      <span className="fc-ai-bulk-arrow">→</span>
+                      <span className="fc-ai-bulk-back">{item.turkish}</span>
+                      {item.corrected && <span className="fc-ai-corrected-badge" title="AI görseldeki bilgiyi düzeltti">✓ düzeltildi</span>}
+                    </div>
+                  ))}
+                </div>
+
+                <button className="fc-ai-add-btn" onClick={addAllImageCards}>+ Hepsini Ekle</button>
+              </div>
+            )}
+
+            {!aiResult && !bulkResults && !imageResults && !aiLoading && !aiError && (
               <div className="fc-ai-empty-state">
                 <div className="fc-ai-empty-icon">✦</div>
                 <div className="fc-ai-empty-text">
                   {aiMode === 'single'
                     ? "Type a word or concept you're curious about, let AI explain it and add it as a flash card."
+                    : aiMode === 'image'
+                    ? 'Japonca kelime notlarının olduğu bir görsel yükle — yazılış, okunuş ve Türkçesini otomatik çıkarıp ekleyeyim.'
                     : 'Describe a topic and AI will generate multiple flash cards at once.'}
                 </div>
               </div>
@@ -799,7 +1013,7 @@ function FlashCards({ fullscreen = false }) {
             <div className="fc-add-card-section">
               <h3>Add New Card</h3>
               <CardForm
-                onSave={(front, back) => addCard(front, back)}
+                onSave={(front, reading, back) => addCard(front, reading, back)}
                 onCancel={() => {}}
               />
             </div>
@@ -818,6 +1032,7 @@ function FlashCards({ fullscreen = false }) {
                       <tr>
                         <th>#</th>
                         <th>Front</th>
+                        <th>Reading</th>
                         <th>Back</th>
                         <th>Status</th>
                         <th>Actions</th>
@@ -827,11 +1042,12 @@ function FlashCards({ fullscreen = false }) {
                       {deckCards.map((card, index) => (
                         <tr key={card.id}>
                           {editingCard === card.id ? (
-                            <td colSpan="5">
+                            <td colSpan="6">
                               <CardForm
                                 initialFront={card.front}
+                                initialReading={card.reading || ''}
                                 initialBack={card.back}
-                                onSave={(front, back) => updateCard(card.id, front, back)}
+                                onSave={(front, reading, back) => updateCard(card.id, front, reading, back)}
                                 onCancel={() => setEditingCard(null)}
                               />
                             </td>
@@ -839,6 +1055,7 @@ function FlashCards({ fullscreen = false }) {
                             <>
                               <td>{index + 1}</td>
                               <td>{card.front}</td>
+                              <td className="fc-reading-cell">{card.reading || '—'}</td>
                               <td>{card.back}</td>
                               <td>
                                 <span className={`fc-status ${card.known === true ? 'known' : card.known === false ? 'unknown' : 'fresh'}`}>
@@ -875,15 +1092,28 @@ function FlashCards({ fullscreen = false }) {
                   />
                 </div>
               </div>
+              <div className="fc-study-zoom">
+                <button
+                  onClick={() => setStudyScale(s => Math.max(0.6, Math.round((s - 0.1) * 10) / 10))}
+                  title="Küçült"
+                >−</button>
+                <span className="fc-study-zoom-value">{Math.round(studyScale * 100)}%</span>
+                <button
+                  onClick={() => setStudyScale(s => Math.min(2.5, Math.round((s + 0.1) * 10) / 10))}
+                  title="Büyüt"
+                >+</button>
+              </div>
             </div>
 
             <div
               className={`fc-study-card ${isFlipped ? 'flipped' : ''}`}
+              style={{ '--fc-scale': studyScale }}
               onClick={() => { playClickSound(); setIsFlipped(!isFlipped); }}
             >
               <div className="fc-study-card-inner">
                 <div className="fc-study-card-front">
                   <span className="fc-card-label">Question</span>
+                  {currentCard.reading && <p className="fc-study-card-reading">{currentCard.reading}</p>}
                   <p>{currentCard.front}</p>
                 </div>
                 <div className="fc-study-card-back">
@@ -944,14 +1174,16 @@ function FlashCards({ fullscreen = false }) {
 }
 
 // Card Form Component
-function CardForm({ initialFront = '', initialBack = '', onSave, onCancel }) {
+function CardForm({ initialFront = '', initialReading = '', initialBack = '', onSave, onCancel }) {
   const [front, setFront] = useState(initialFront);
+  const [reading, setReading] = useState(initialReading);
   const [back, setBack] = useState(initialBack);
 
   const handleSave = () => {
     if (front.trim() && back.trim()) {
-      onSave(front, back);
+      onSave(front, reading, back);
       setFront('');
+      setReading('');
       setBack('');
     }
   };
@@ -960,7 +1192,7 @@ function CardForm({ initialFront = '', initialBack = '', onSave, onCancel }) {
     <div className="fc-card-form">
       <input
         type="text"
-        placeholder="Front (Question)"
+        placeholder="Front / Yazılış"
         value={front}
         onChange={(e) => { playTypeSoundThrottled(); setFront(e.target.value); }}
         onKeyDown={(e) => {
@@ -970,7 +1202,17 @@ function CardForm({ initialFront = '', initialBack = '', onSave, onCancel }) {
       />
       <input
         type="text"
-        placeholder="Back (Answer)"
+        placeholder="Okunuş (opsiyonel)"
+        value={reading}
+        onChange={(e) => { playTypeSoundThrottled(); setReading(e.target.value); }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && e.ctrlKey) handleSave();
+          if (e.key === 'Escape') onCancel();
+        }}
+      />
+      <input
+        type="text"
+        placeholder="Back / Türkçe"
         value={back}
         onChange={(e) => { playTypeSoundThrottled(); setBack(e.target.value); }}
         onKeyDown={(e) => {

@@ -658,17 +658,29 @@
   width: 50px;
 }
 
-.fc-cards-table th:nth-child(2),
+.fc-cards-table th:nth-child(2) {
+  width: 28%;
+}
+
 .fc-cards-table th:nth-child(3) {
-  width: 35%;
+  width: 16%;
 }
 
 .fc-cards-table th:nth-child(4) {
+  width: 28%;
+}
+
+.fc-cards-table th:nth-child(5) {
   width: 120px;
 }
 
 .fc-cards-table th:last-child {
   width: 150px;
+}
+
+.fc-reading-cell {
+  color: var(--text-muted);
+  font-size: 13px;
 }
 
 .fc-cards-table tbody tr {
@@ -696,7 +708,7 @@
 }
 
 .fc-cards-table td:first-child,
-.fc-cards-table td:nth-child(4),
+.fc-cards-table td:nth-child(5),
 .fc-cards-table td:last-child {
   max-width: none;
   white-space: normal;
@@ -828,11 +840,35 @@
 
 .fc-study-card {
   width: 100%;
-  max-width: 700px;
-  height: 400px;
+  max-width: calc(760px * var(--fc-scale, 1));
+  height: calc(460px * var(--fc-scale, 1));
   margin: 80px 0 20px 0;
   cursor: pointer;
   perspective: 1000px;
+}
+
+.fc-study-zoom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fc-study-zoom button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  font-size: 18px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fc-study-zoom-value {
+  font-size: 13px;
+  color: var(--text-muted);
+  min-width: 40px;
+  text-align: center;
 }
 
 .fc-study-card-inner {
@@ -879,13 +915,19 @@
   font-weight: 600;
 }
 
+.fc-study-card-front p.fc-study-card-reading {
+  font-size: calc(22px * var(--fc-scale, 1));
+  color: var(--text-muted);
+  margin: 0 0 10px;
+}
+
 .fc-study-card-front p,
 .fc-study-card-back p {
-  font-size: 24px;
+  font-size: calc(48px * var(--fc-scale, 1));
   color: var(--text-primary);
   text-align: center;
   margin: 0;
-  line-height: 1.5;
+  line-height: 1.4;
 }
 
 .fc-study-hint {
@@ -1488,6 +1530,121 @@
   text-align: right;
 }
 
+.fc-ai-bulk-item--jp {
+  flex-wrap: wrap;
+}
+
+.fc-ai-bulk-item--corrected {
+  border-color: var(--accent);
+}
+
+.fc-ai-corrected-badge {
+  width: 100%;
+  font-size: 10px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.fc-ai-bulk-reading {
+  color: var(--text-muted);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.fc-ai-deck-target-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fc-ai-deck-select,
+.fc-ai-deck-new-input {
+  width: 100%;
+  padding: 7px 10px;
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+.fc-ai-deck-select:focus,
+.fc-ai-deck-new-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* ── Image → word extraction ───────────────────────────────────────────── */
+
+.fc-ai-image-input-area {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px;
+}
+
+.fc-ai-image-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.fc-ai-image-thumb {
+  position: relative;
+  display: inline-flex;
+}
+
+.fc-ai-image-thumb img {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--accent);
+}
+
+.fc-ai-image-remove {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #f85149;
+  border: none;
+  color: #fff;
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.fc-ai-image-btn-row {
+  display: flex;
+  gap: 8px;
+}
+.fc-ai-image-btn-row .fc-ai-ask-btn {
+  width: auto;
+  flex: 1;
+}
+
+.fc-ai-attach-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 0 10px;
+  cursor: pointer;
+  flex: 1;
+  transition: border-color 0.12s, color 0.12s;
+}
+.fc-ai-attach-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.fc-ai-attach-btn:disabled { opacity: 0.5; cursor: default; }
+
 .fc-ai-empty-text {
   font-size: 13px;
   color: var(--text-muted);
@@ -1571,11 +1728,11 @@
     width: 30px;
   }
 
-  .fc-cards-table th:nth-child(4) {
+  .fc-cards-table th:nth-child(5) {
     display: none;
   }
 
-  .fc-cards-table td:nth-child(4) {
+  .fc-cards-table td:nth-child(5) {
     display: none;
   }
 
@@ -1626,8 +1783,8 @@
     display: none;
   }
 
-  .fc-cards-table th:nth-child(4),
-  .fc-cards-table td:nth-child(4) {
+  .fc-cards-table th:nth-child(5),
+  .fc-cards-table td:nth-child(5) {
     display: none;
   }
 }

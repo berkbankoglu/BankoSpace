@@ -226,6 +226,11 @@ import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
 const APP_VERSION = '4.2.7';
+// Kullanıcıya gösterilen sürüm sayacı — package.json/Cargo.toml/tauri.conf.json'daki
+// gerçek build sürümünden (APP_VERSION) BAĞIMSIZ. O sayı auto-updater'ın semver
+// karşılaştırması için geriye gitmemeli; bu ise her push'ta elle +0.1 artan,
+// kullanıcının takip ettiği kozmetik bir sayaç. 3.0'a geçilmez, kullanıcı isteyene kadar.
+const DISPLAY_VERSION = '2.1';
 const MIN_COL_PX = 220;
 const DEFAULT_COL_PX = [null, null, null]; // [dailyPx, weeklyPx, monthlyPx] — null = auto (flex:1)
 
@@ -384,14 +389,35 @@ function App({ session, onLogout }) {
         }
       };
 
-      // Kapanmadan önce bekleyen tüm keyleri hemen gönder
+      // Kapanmadan önce bekleyen tüm keyleri hemen gönder — dönen promise'ler
+      // pencere gerçekten kapanmadan önce beklenebilsin diye return ediliyor.
       const flushAll = () => {
-        Object.entries(pendingKeys).forEach(([key, value]) => {
+        return Object.entries(pendingKeys).map(([key, value]) => {
           clearTimeout(debounceTimers[key]);
-          pushKeyToSupabase(key, value);
+          delete pendingKeys[key];
+          return pushKeyToSupabase(key, value);
         });
       };
       window.addEventListener('beforeunload', flushAll);
+
+      // Pencere kapatma isteğini yakalayıp bekleyen push'lar bitmeden
+      // pencereyi gerçekten kapatmıyoruz — aksi halde 2sn'lik debounce
+      // penceresinde kalan veya hâlâ ağ üzerinde olan bir yazma, süreç
+      // sonlanınca sessizce kayboluyordu (kullanıcının "kaydolmuyor" şikayeti).
+      let unlistenClose = null;
+      const appWindow = getCurrentWindow();
+      appWindow.onCloseRequested(async (event) => {
+        event.preventDefault();
+        const pending = flushAll();
+        // Ağ takılırsa pencere sonsuza kadar kapanmayı reddetmesin diye
+        // güvenlik zaman aşımı — freeze-diagnostic prensibiyle aynı: sessiz
+        // asılı kalma yerine, en kötü ihtimalle veri kaybı riskini göze al.
+        await Promise.race([
+          Promise.all(pending),
+          new Promise(resolve => setTimeout(resolve, 4000)),
+        ]);
+        await appWindow.destroy();
+      }).then(fn => { unlistenClose = fn; });
 
       const origRemoveItem = localStorage.removeItem.bind(localStorage);
       localStorage.removeItem = function(key) {
@@ -403,6 +429,7 @@ function App({ session, onLogout }) {
 
       return () => {
         window.removeEventListener('beforeunload', flushAll);
+        if (unlistenClose) unlistenClose();
       };
     });
 
@@ -470,15 +497,17 @@ function App({ session, onLogout }) {
   // Fitness'ın sol sidebar altındaki alt sekmesi: 'overview' | 'workout'
   const [fitnessView, setFitnessView] = useState(() => localStorage.getItem('ft_view') || 'overview');
   useEffect(() => { localStorage.setItem('ft_view', fitnessView); }, [fitnessView]);
+  // Language Learn'ın sol sidebar altındaki alt sekmesi: 'guide' | 'practice' | 'vocabulary' | 'flashcards'
+  const [kanaView, setKanaView] = useState(() => localStorage.getItem('kana_ui_view') || 'guide');
+  useEffect(() => { localStorage.setItem('kana_ui_view', kanaView); }, [kanaView]);
 
   const [sidebarItems, setSidebarItems] = useState(() => {
     const defaults = [
       { id: 'dashboard',    label: 'Dashboard',      view: 'dashboard',    hidden: false, icon: '⊞' },
-      { id: 'flashcards',   label: 'Flash Cards',     view: 'flashcards',   hidden: false, icon: '⧉' },
       { id: 'checklists',   label: 'Checklists',      view: 'checklists',   hidden: false, icon: '✓' },
       { id: 'income',       label: 'Income Tracker',  view: 'income',       hidden: false, icon: '$' },
       { id: 'tools',        label: 'Tools',            view: 'tools',        hidden: true,  icon: '⚙' },
-      { id: 'japanesekana', label: 'Japanese Kana',    view: 'japanesekana', hidden: false, icon: 'あ' },
+      { id: 'japanesekana', label: 'Language Learn',  view: 'japanesekana', hidden: false, icon: 'あ' },
       { id: 'fitness',      label: 'Fitness',          view: 'fitness',      hidden: false, icon: '◈' },
       { id: 'planner',      label: 'Planner',          view: 'planner',      hidden: false, icon: '≡' },
       { id: 'notes',        label: 'Notes',            view: 'notes',        hidden: false, icon: '✎' },
@@ -491,7 +520,9 @@ function App({ session, onLogout }) {
         .filter(item => defaults.find(d => d.id === item.id))
         .map(item => {
           const def = defaults.find(d => d.id === item.id);
-          const merged = { ...def, ...item, icon: def.icon };
+          // icon/label kaynak kodda tanımlı — kullanıcının eski kayıtlı
+          // sidebarOrder'ındaki bayat metin, yeniden adlandırmaları ezmesin.
+          const merged = { ...def, ...item, icon: def.icon, label: def.label };
           // Force hidden state for items that should always be hidden
           if (def.hidden) merged.hidden = true;
           return merged;
@@ -600,6 +631,12 @@ const [dailyChecklistCollapsed, setDailyChecklistCollapsed] = useState(() => {
   });
 
   const [editingChecklistId, setEditingChecklistId] = useState(null);
+
+  // Task Score: her todo/subtask tamamlamada +1, geri alınca -1
+  const [taskScore, setTaskScore] = useState(() => {
+    const saved = localStorage.getItem('taskScore');
+    return saved ? Number(saved) || 0 : 0;
+  });
 
   // Streak Tracker State
   const [streakData, setStreakData] = useState(() => {
@@ -792,6 +829,11 @@ useEffect(() => {
     localStorage.setItem('streakData', JSON.stringify(streakData));
   }, [streakData]);
 
+  // Save task score to localStorage
+  useEffect(() => {
+    localStorage.setItem('taskScore', String(taskScore));
+  }, [taskScore]);
+
   // Contribution grafiği için: alt görev (subtask) tamamlama/silme gibi
   // completedAt'i olmayan olayları günlük anahtarla kalıcı olarak kaydeder.
   // Append-only — bir şeyi geri alsan bile o günkü katkı geçmişten silinmez
@@ -894,6 +936,7 @@ useEffect(() => {
       }
       return todo;
     }));
+    setTaskScore(s => s + (willComplete ? 1 : -1));
     if (willComplete) logContribution();
   };
 
@@ -979,6 +1022,7 @@ useEffect(() => {
   const toggleTodo = (id) => {
     pushHistory(todos);
     const todo = todos.find(t => t.id === id);
+    const willComplete = todo ? !todo.completed : false;
     if (todo) {
       if (!todo.completed) playCompleteSound();
       else playUncompleteSound();
@@ -995,6 +1039,7 @@ useEffect(() => {
       return todo;
     });
     setTodos(updatedTodos);
+    setTaskScore(s => s + (willComplete ? 1 : -1));
 
     // Check if this completion creates a daily streak
     const toggledTodo = updatedTodos.find(t => t.id === id);
@@ -1897,6 +1942,7 @@ useEffect(() => {
                       if (draggedSidebarItem) return;
                       playNavSound();
                       if (item.id === 'japanesekana') {
+                        setKanaView('guide');
                         setActiveView('japanesekana');
                         return;
                       }
@@ -1926,6 +1972,36 @@ useEffect(() => {
                       </div>
                     </>
                   )}
+
+                  {/* Language Learn altında her zaman görünen alt sekmeler */}
+                  {item.id === 'japanesekana' && (
+                    <>
+                      <div
+                        className={`sidebar-subitem ${activeView === 'japanesekana' && kanaView === 'guide' ? 'active' : ''}`}
+                        onClick={() => { playNavSound(); setKanaView('guide'); setActiveView('japanesekana'); }}
+                      >
+                        <span className="item-name">- Guide</span>
+                      </div>
+                      <div
+                        className={`sidebar-subitem ${activeView === 'japanesekana' && kanaView === 'practice' ? 'active' : ''}`}
+                        onClick={() => { playNavSound(); setKanaView('practice'); setActiveView('japanesekana'); }}
+                      >
+                        <span className="item-name">- Practice</span>
+                      </div>
+                      <div
+                        className={`sidebar-subitem ${activeView === 'japanesekana' && kanaView === 'vocabulary' ? 'active' : ''}`}
+                        onClick={() => { playNavSound(); setKanaView('vocabulary'); setActiveView('japanesekana'); }}
+                      >
+                        <span className="item-name">- Vocabulary</span>
+                      </div>
+                      <div
+                        className={`sidebar-subitem ${activeView === 'japanesekana' && kanaView === 'flashcards' ? 'active' : ''}`}
+                        onClick={() => { playNavSound(); setKanaView('flashcards'); setActiveView('japanesekana'); }}
+                      >
+                        <span className="item-name">- Flash Cards</span>
+                      </div>
+                    </>
+                  )}
                 </div>
               ))}
 
@@ -1948,17 +2024,23 @@ useEffect(() => {
             </div>
           )}
 
+          <div className="sidebar-footer">
+            <span className="sidebar-footer-score" title="Tamamlanan görev skoru">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M8 21h8" />
+                <path d="M12 17v4" />
+                <path d="M7 4h10v5a5 5 0 0 1-10 0V4Z" />
+                <path d="M17 5h2a2 2 0 0 1 2 2v1a3 3 0 0 1-3 3h-1" />
+                <path d="M7 5H5a2 2 0 0 0-2 2v1a3 3 0 0 0 3 3h1" />
+              </svg>
+              {taskScore}
+            </span>
+            <span className="sidebar-footer-version" title="Sürüm">v{DISPLAY_VERSION}</span>
+          </div>
         </div>
 
         {/* Main Content Area */}
         <div className="main-content-area">
-          {/* Flash Cards Full Screen View */}
-          {activeView === 'flashcards' && (
-            <div className="flashcards-fullscreen">
-              <FlashCards fullscreen={true} />
-            </div>
-          )}
-
           {/* Checklists Full Screen View */}
           {activeView === 'checklists' && (
             <div className="checklists-fullscreen">
@@ -2015,9 +2097,9 @@ useEffect(() => {
             <ToolsView />
           )}
 
-          {/* Japanese Kana full page */}
+          {/* Language Learn full page */}
           {activeView === 'japanesekana' && (
-            <JapaneseKana />
+            <JapaneseKana view={kanaView} />
           )}
 
 

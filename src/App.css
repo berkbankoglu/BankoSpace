@@ -8116,6 +8116,32 @@ body.light .sidebar-settings-version {
 }
 .sidebar-content::-webkit-scrollbar { display: none; }
 
+.sidebar-footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.sidebar-footer-score,
+.sidebar-footer-version {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted);
+  letter-spacing: 0.2px;
+  opacity: 0.7;
+}
+.sidebar-footer-score {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+body.light .sidebar-footer {
+  border-top: 1px solid rgba(0,0,0,0.07);
+}
+
 /* Sidebar Section */
 .sidebar-section {
   margin-bottom: 4px;
