@@ -46,11 +46,6 @@ export const SYNC_KEYS = [
   'notes',
   'freeformTabs',
   'quickNotes',
-  'portfolio_positions',
-  'portfolio_closed',
-  'price_groups',
-  'price_tickers',
-  'stock_tickers',
   'goals',
   'invoices',
   'invoiceBasePath',
@@ -86,7 +81,6 @@ export const SYNC_KEYS = [
   'subtaskFontSize',
   'theme',
   'soundVolume',
-  'anthropic_api_key',
   'translate_rules',
   'dailyChecklistColor',
   'longtermChecklistColor',
@@ -205,6 +199,21 @@ export async function pullFromSupabase() {
   } catch (e) {
     console.error('Supabase pull error:', e);
     return false;
+  }
+}
+
+// anthropic_api_key SYNC_KEYS'ten çıkarıldı (düz metin API anahtarının uzak
+// veritabanında durmasını istemiyoruz) — ama bu değişiklikten önce zaten
+// senkronize edilmiş kopyalar Supabase'de kalmış olabilir. Bunu tek seferlik
+// bir temizlik olarak sil; SYNC_KEYS guard'ını bilerek atlıyor çünkü artık o
+// listede olmayan bir key'i kaldırmak amaçlanıyor.
+export async function purgeApiKeyFromSupabase() {
+  try {
+    const userId = await getUserId();
+    if (!userId) return;
+    await supabase.from('user_data').delete().eq('user_id', userId).eq('key', 'anthropic_api_key');
+  } catch (e) {
+    console.error('Supabase purge error:', e);
   }
 }
 

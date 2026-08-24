@@ -1320,7 +1320,6 @@ function Notes() {
     };
     setNotes(prev => [newNote, ...prev]);
     setExpandedNotes(prev => new Set([...prev, id]));
-    setSelected({ noteId: id, subId: null });
     setEditingTitle({ noteId: id, subId: null });
     setEditingTitleValue('New Note');
     playAddSound();
@@ -1901,7 +1900,7 @@ ${body}
                   style={{ '--note-color': note.color || '#667eea' }}
                   data-note-id={note.id}
                   title="Sürükle - sırayı değiştir"
-                  onClick={() => setSelected({ noteId: note.id, subId: null })}
+                  onClick={e => toggleExpand(note.id, e)}
                   onMouseDown={e => {
                     if (e.target.closest('.notes-tree-actions, .notes-expand-btn, .notes-tree-pin-btn')) return;
                     startTreeDrag(e, 'note', note.id, null);

@@ -4,8 +4,6 @@
 use std::collections::VecDeque;
 use std::sync::{Mutex, OnceLock};
 use tauri::Manager;
-use tauri::{LogicalPosition, LogicalSize, WebviewUrl};
-use tauri::webview::WebviewBuilder;
 
 static HTTP_CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
 
@@ -204,97 +202,6 @@ fn spawn_eventlog_snapshot(incident_id: u64) {
 }
 
 #[tauri::command]
-async fn create_child_webview(
-    app: tauri::AppHandle,
-    url: String,
-    x: f64,
-    y: f64,
-    width: f64,
-    height: f64,
-) -> Result<(), String> {
-    let window = app
-        .get_window("main")
-        .ok_or_else(|| "Main window not found".to_string())?;
-
-    // If already exists, just navigate and show
-    if let Some(existing) = app.get_webview("tradingview-child") {
-        let parsed = url.parse().map_err(|e: url::ParseError| e.to_string())?;
-        existing.navigate(parsed).map_err(|e| e.to_string())?;
-        existing.show().map_err(|e| e.to_string())?;
-        return Ok(());
-    }
-
-    let parsed: url::Url = url.parse().map_err(|e: url::ParseError| e.to_string())?;
-
-    window
-        .add_child(
-            WebviewBuilder::new("tradingview-child", WebviewUrl::External(parsed)),
-            LogicalPosition::new(x, y),
-            LogicalSize::new(width, height),
-        )
-        .map_err(|e| e.to_string())?;
-
-    Ok(())
-}
-
-#[tauri::command]
-async fn navigate_child_webview(app: tauri::AppHandle, url: String) -> Result<(), String> {
-    let webview = app
-        .get_webview("tradingview-child")
-        .ok_or_else(|| "tradingview-child not found".to_string())?;
-    let parsed: url::Url = url.parse().map_err(|e: url::ParseError| e.to_string())?;
-    webview.navigate(parsed).map_err(|e| e.to_string())?;
-    Ok(())
-}
-
-#[tauri::command]
-async fn show_child_webview(app: tauri::AppHandle) -> Result<(), String> {
-    let webview = app
-        .get_webview("tradingview-child")
-        .ok_or_else(|| "tradingview-child not found".to_string())?;
-    webview.show().map_err(|e| e.to_string())?;
-    Ok(())
-}
-
-#[tauri::command]
-async fn hide_child_webview(app: tauri::AppHandle) -> Result<(), String> {
-    let webview = app
-        .get_webview("tradingview-child")
-        .ok_or_else(|| "tradingview-child not found".to_string())?;
-    webview.hide().map_err(|e| e.to_string())?;
-    Ok(())
-}
-
-#[tauri::command]
-async fn close_child_webview(app: tauri::AppHandle) -> Result<(), String> {
-    if let Some(webview) = app.get_webview("tradingview-child") {
-        webview.close().map_err(|e| e.to_string())?;
-    }
-    Ok(())
-}
-
-#[tauri::command]
-async fn set_child_webview_bounds(
-    app: tauri::AppHandle,
-    x: f64,
-    y: f64,
-    width: f64,
-    height: f64,
-) -> Result<(), String> {
-    let webview = app
-        .get_webview("tradingview-child")
-        .ok_or_else(|| "tradingview-child not found".to_string())?;
-    webview
-        .set_position(tauri::Position::Logical(LogicalPosition::new(x, y)))
-        .map_err(|e| e.to_string())?;
-    webview
-        .set_size(tauri::Size::Logical(LogicalSize::new(width, height)))
-        .map_err(|e| e.to_string())?;
-    Ok(())
-}
-
-
-#[tauri::command]
 fn toggle_kana_window(app: tauri::AppHandle) {
     if let Some(w) = app.get_webview_window("kana-popup") {
         if w.is_visible().unwrap_or(false) {
@@ -304,22 +211,6 @@ fn toggle_kana_window(app: tauri::AppHandle) {
             let _ = w.set_focus();
         }
     }
-}
-
-#[tauri::command]
-async fn fetch_rss(url: String) -> Result<String, String> {
-    let response = get_client()
-        .get(&url)
-        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-
-    if !response.status().is_success() {
-        return Err(format!("HTTP {}", response.status()));
-    }
-    let text = response.text().await.map_err(|e| e.to_string())?;
-    Ok(text)
 }
 
 #[tauri::command]
@@ -343,9 +234,20 @@ async fn fetch_tts(text: String, slow: bool) -> Result<Vec<u8>, String> {
     Ok(bytes.to_vec())
 }
 
-// Host part of the URL only (no query string/tokens) — safe to log.
+// Host part of the URL only (no query string/tokens, no userinfo/port) — safe
+// to log and safe to use for the allowlist check below.
 fn url_host(url: &str) -> String {
-    url.split('/').nth(2).unwrap_or(url).to_string()
+    let authority = url.split('/').nth(2).unwrap_or(url);
+    let authority = authority.rsplit('@').next().unwrap_or(authority);
+    authority.split(':').next().unwrap_or(authority).to_lowercase()
+}
+
+// fetch_get/fetch_post proxy arbitrary requests through Rust (bypassing the
+// WebView2 CSP's connect-src entirely), so the set of hosts they'll reach is
+// fixed here rather than left open — only the hosts the app actually calls
+// (Anthropic AI, the GitHub contributions widget, our own Supabase project).
+fn is_allowed_host(host: &str) -> bool {
+    host == "api.anthropic.com" || host == "github.com" || host.ends_with(".supabase.co")
 }
 
 static INFLIGHT: OnceLock<std::sync::atomic::AtomicU64> = OnceLock::new();
@@ -371,6 +273,21 @@ fn last_js_ping() -> &'static std::sync::atomic::AtomicU64 {
     LAST_JS_PING.get_or_init(|| std::sync::atomic::AtomicU64::new(now_secs()))
 }
 
+// Alt+Tab / arka plana geçiş donmayla aynı anda mı oluyor sorusuna cevap
+// vermek için: ana pencerenin şu anki odak durumu + en son ne zaman
+// değiştiği. Freeze incident anında bu bilgi snapshot'a eklenir — eğer her
+// donma "window_focused=false, Xs önce odak kaybedildi" ile eşleşiyorsa,
+// bu WebView2'nin kendi occlusion/visibility davranışının donmayı
+// tetiklediğini kesin olarak doğrular (ana JS thread'i çökmeden durur).
+static MAIN_FOCUSED: OnceLock<std::sync::atomic::AtomicBool> = OnceLock::new();
+fn main_focused() -> &'static std::sync::atomic::AtomicBool {
+    MAIN_FOCUSED.get_or_init(|| std::sync::atomic::AtomicBool::new(true))
+}
+static LAST_FOCUS_CHANGE: OnceLock<std::sync::atomic::AtomicU64> = OnceLock::new();
+fn last_focus_change() -> &'static std::sync::atomic::AtomicU64 {
+    LAST_FOCUS_CHANGE.get_or_init(|| std::sync::atomic::AtomicU64::new(now_secs()))
+}
+
 #[tauri::command]
 fn js_ping() {
     last_js_ping().store(now_secs(), std::sync::atomic::Ordering::SeqCst);
@@ -380,6 +297,10 @@ fn js_ping() {
 async fn fetch_post(url: String, headers: std::collections::HashMap<String, String>, body: String) -> Result<String, String> {
     use std::sync::atomic::Ordering;
     let host = url_host(&url);
+    if !is_allowed_host(&host) {
+        write_diag(&format!("RUST: fetch_post REJECTED -> {} (not allowlisted)", host));
+        return Err(format!("Host not allowed: {}", host));
+    }
     let n = inflight_counter().fetch_add(1, Ordering::SeqCst) + 1;
     write_diag(&format!("RUST: fetch_post START -> {} (inflight={})", host, n));
     let t0 = std::time::Instant::now();
@@ -400,6 +321,10 @@ async fn fetch_post(url: String, headers: std::collections::HashMap<String, Stri
 async fn fetch_get(url: String, headers: std::collections::HashMap<String, String>) -> Result<String, String> {
     use std::sync::atomic::Ordering;
     let host = url_host(&url);
+    if !is_allowed_host(&host) {
+        write_diag(&format!("RUST: fetch_get REJECTED -> {} (not allowlisted)", host));
+        return Err(format!("Host not allowed: {}", host));
+    }
     let n = inflight_counter().fetch_add(1, Ordering::SeqCst) + 1;
     write_diag(&format!("RUST: fetch_get START -> {} (inflight={})", host, n));
     let t0 = std::time::Instant::now();
@@ -607,13 +532,14 @@ fn main() {
                     let now = now_secs();
                     let ping_age = now.saturating_sub(last_js_ping().load(std::sync::atomic::Ordering::SeqCst));
                     write_diag(&format!(
-                        "RUST-HB alive (inflight_http={}, host_cpu={:.1}%, webview_cpu={:.1}% across {} proc, js_ping_age={}s)",
-                        n, my_cpu, wv_cpu, wv_count, ping_age
+                        "RUST-HB alive (inflight_http={}, host_cpu={:.1}%, webview_cpu={:.1}% across {} proc, js_ping_age={}s, focused={})",
+                        n, my_cpu, wv_cpu, wv_count, ping_age, main_focused().load(std::sync::atomic::Ordering::SeqCst)
                     ));
 
                     push_history(format!(
-                        "[{}] host_cpu={:.1}% webview_cpu={:.1}% js_ping_age={}s top_cpu=[{}] {}",
-                        local_time_string(), my_cpu, wv_cpu, ping_age, top_by_cpu(&sys, 3), mem_summary(&sys)
+                        "[{}] host_cpu={:.1}% webview_cpu={:.1}% js_ping_age={}s focused={} top_cpu=[{}] {}",
+                        local_time_string(), my_cpu, wv_cpu, ping_age,
+                        main_focused().load(std::sync::atomic::Ordering::SeqCst), top_by_cpu(&sys, 3), mem_summary(&sys)
                     ));
 
                     // Freeze incident recorder — fires at 12s stale (well before the
@@ -631,9 +557,12 @@ fn main() {
                                 "RUST: !!! FREEZE INCIDENT #{} started (ping_age={}s) -> see bankospace-freeze-incidents.log",
                                 incident_id, ping_age
                             ));
+                            let is_focused = main_focused().load(std::sync::atomic::Ordering::SeqCst);
+                            let since_focus_change = now.saturating_sub(last_focus_change().load(std::sync::atomic::Ordering::SeqCst));
                             write_incident(&format!(
-                                "\n========== FREEZE INCIDENT #{} START {} ==========\nping_age={}s host_cpu={:.1}% webview_cpu={:.1}% across {} webview proc\n{}\n-- last ~2 min before freeze --\n{}\n-- top CPU system-wide --\n{}\n-- top RAM system-wide --\n{}\n-- {}",
+                                "\n========== FREEZE INCIDENT #{} START {} ==========\nping_age={}s host_cpu={:.1}% webview_cpu={:.1}% across {} webview proc\nwindow_focused={} (changed {}s ago) - if false, this freeze coincides with alt-tab/background occlusion\n{}\n-- last ~2 min before freeze --\n{}\n-- top CPU system-wide --\n{}\n-- top RAM system-wide --\n{}\n-- {}",
                                 incident_id, local_time_string(), ping_age, my_cpu, wv_cpu, wv_count,
+                                is_focused, since_focus_change,
                                 mem_summary(&sys), dump_history(), top_by_cpu(&sys, 10), top_by_mem(&sys, 5), own_disk_io(&sys, my_pid)
                             ));
                             spawn_gpu_snapshot(incident_id);
@@ -755,16 +684,9 @@ fn main() {
         .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
 toggle_kana_window,
-            fetch_rss,
             fetch_post,
             fetch_get,
             fetch_tts,
-            create_child_webview,
-            navigate_child_webview,
-            show_child_webview,
-            hide_child_webview,
-            close_child_webview,
-            set_child_webview_bounds,
             diag_log,
             js_ping,
         ])
@@ -790,23 +712,21 @@ toggle_kana_window,
                 // WebView2 freeze fix: odak gelince agresif repaint + child webview restore
                 tauri::WindowEvent::Focused(true) => {
                     if window.label() == "main" {
+                        let blurred_for = now_secs().saturating_sub(last_focus_change().load(std::sync::atomic::Ordering::SeqCst));
+                        main_focused().store(true, std::sync::atomic::Ordering::SeqCst);
+                        last_focus_change().store(now_secs(), std::sync::atomic::Ordering::SeqCst);
+                        write_diag(&format!("RUST: window FOCUSED (was unfocused for {}s)", blurred_for));
                         let app = window.app_handle();
-                        // Child webview'i tekrar göster (arka planda hide edilmişse)
-                        if let Some(child) = app.get_webview("tradingview-child") {
-                            let _ = child.show();
-                        }
                         if let Some(wv) = app.get_webview_window("main") {
                             let _ = wv.eval("window.dispatchEvent(new Event('resize')); window.dispatchEvent(new Event('focus'));");
                         }
                     }
                 }
-                // Arka plana geçince child webview'i hide et — GPU kaynak çakışmasını önle
                 tauri::WindowEvent::Focused(false) => {
                     if window.label() == "main" {
-                        let app = window.app_handle();
-                        if let Some(child) = app.get_webview("tradingview-child") {
-                            let _ = child.hide();
-                        }
+                        main_focused().store(false, std::sync::atomic::Ordering::SeqCst);
+                        last_focus_change().store(now_secs(), std::sync::atomic::Ordering::SeqCst);
+                        write_diag("RUST: window UNFOCUSED (blurred - alt-tab or click-away)");
                     }
                 }
                 _ => {}

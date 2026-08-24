@@ -1,9 +1,8 @@
-import { useState, useEffect, useRef, forwardRef } from 'react';
+import { useState, useEffect, useRef, forwardRef, Fragment } from 'react';
 import ReactDOM from 'react-dom';
 import './CategoryColumn.css';
 import { playTypeSoundThrottled, playCompleteSound, playUncompleteSound, playDeleteSound } from '../utils/sounds';
-
-const TODO_COLORS = ['#667eea', '#f093fb', '#4ade80', '#60a5fa', '#fb923c', '#f87171', '#facc15', '#9ca3af'];
+import { TODO_COLORS } from '../constants';
 
 // Single-line-looking textarea that wraps long text onto new lines and grows
 // downward instead of scrolling sideways. Plain Enter submits (handled by the
@@ -40,7 +39,13 @@ const GrowTextarea = forwardRef(function GrowTextarea({ value, onKeyDown, classN
   );
 });
 
-function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDeleteTodo, onUpdateTodo, currentFilter, onRename, onAddSubtask, onToggleSubtask, onDeleteSubtask, onUpdateSubtask, onReorder, onTodoDragStart, onMoveSubtask }) {
+function CategoryColumn({ title, category, todos, currentFilter, actions }) {
+  const {
+    onAddTodo, onToggleTodo, onDeleteTodo, onUpdateTodo, onRename,
+    onAddSubtask, onToggleSubtask, onDeleteSubtask, onUpdateSubtask,
+    onAddSubtaskChild, onToggleSubtaskChild, onDeleteSubtaskChild, onUpdateSubtaskChild,
+    onReorder, onTodoDragStart, onMoveSubtask,
+  } = actions;
   const [inputValue, setInputValue] = useState('');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editTitleValue, setEditTitleValue] = useState(title);
@@ -56,6 +61,15 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
     return s;
   });
   const [subtaskInputs, setSubtaskInputs] = useState({});
+  const [childInputs, setChildInputs] = useState({}); // { [subtaskId]: draftText }
+  const [addingChildFor, setAddingChildFor] = useState(null); // subtaskId currently showing its "add child" input
+  const [draggingChild, setDraggingChild] = useState(null); // { todoId, subtaskId, childId, index }
+  const [dragOverChild, setDragOverChild] = useState(null); // { subtaskId, index }
+  const [pressedChildId, setPressedChildId] = useState(null);
+  const [editingChildId, setEditingChildId] = useState(null);
+  const [editingChildText, setEditingChildText] = useState('');
+  const [copiedChildId, setCopiedChildId] = useState(null);
+  const editChildInputRef = useRef(null);
   const [editingTodoId, setEditingTodoId] = useState(null);
   const [editingTodoText, setEditingTodoText] = useState('');
   const [editingSubtaskId, setEditingSubtaskId] = useState(null);
@@ -161,6 +175,14 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
     }
   };
 
+  const handleAddChild = (todoId, subtaskId) => {
+    const val = childInputs[subtaskId] || '';
+    if (val.trim()) {
+      onAddSubtaskChild(todoId, subtaskId, val.trim());
+      setChildInputs(prev => ({ ...prev, [subtaskId]: '' }));
+    }
+  };
+
   const subtaskDragRef = useRef(null);
   const subtaskDragOverRef = useRef(null);
 
@@ -249,6 +271,68 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
         const [moved] = subtasks.splice(fromIdx, 1);
         subtasks.splice(toIdx, 0, moved);
         onUpdateTodo(tid, { subtasks });
+      }
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  };
+
+  // Child'ları (subtask'ın altındaki üçüncü kademe) kendi ebeveyni içinde
+  // sürükle-bırak ile yeniden sırala — subtask sürükleme deseniyle aynı,
+  // sadece tek bir subtask'ın children dizisi içinde kalıyor (ebeveynler
+  // arası taşıma yok).
+  const childDragRef = useRef(null);
+  const childDragOverRef = useRef(null);
+
+  const handleChildMouseDown = (e, todoId, subtaskId, childId, index) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setPressedChildId(childId);
+    childDragRef.current = { todoId, subtaskId, childId, index, started: false };
+
+    const onMouseMove = (me) => {
+      if (!childDragRef.current) return;
+      if (!childDragRef.current.started) {
+        childDragRef.current.started = true;
+        setDraggingChild({ todoId, subtaskId, childId, index });
+      }
+      const els = document.querySelectorAll(`.cc-subtask-child[data-child-subtaskid="${subtaskId}"]`);
+      let overIdx = null;
+      els.forEach((el, i) => {
+        const rect = el.getBoundingClientRect();
+        if (me.clientY >= rect.top && me.clientY <= rect.bottom) overIdx = i;
+      });
+      if (overIdx !== null) {
+        childDragOverRef.current = overIdx;
+        setDragOverChild({ subtaskId, index: overIdx });
+      }
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      const started = childDragRef.current?.started;
+      const dragged = childDragRef.current || {};
+      const { todoId: tid, subtaskId: sid, index: fromIdx } = dragged;
+      const toIdx = childDragOverRef.current;
+      childDragRef.current = null;
+      childDragOverRef.current = null;
+      setDraggingChild(null);
+      setDragOverChild(null);
+      setPressedChildId(null);
+      if (!started) return;
+
+      if (toIdx !== null && toIdx !== undefined && toIdx !== fromIdx) {
+        const todo = todos.find(t => t.id === tid);
+        if (!todo) return;
+        const subtask = (todo.subtasks || []).find(st => st.id === sid);
+        if (!subtask) return;
+        const children = [...(subtask.children || [])];
+        const [moved] = children.splice(fromIdx, 1);
+        children.splice(toIdx, 0, moved);
+        const updatedSubtasks = (todo.subtasks || []).map(st => st.id === sid ? { ...st, children } : st);
+        onUpdateTodo(tid, { subtasks: updatedSubtasks });
       }
     };
 
@@ -410,8 +494,8 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
             <div className={`cc-subtasks-wrapper${expandedTodos.has(todo.id) ? ' expanded' : ''}`} onClick={(e) => e.stopPropagation()}>
               <div className="cc-subtasks">
                 {todo.subtasks && todo.subtasks.map((subtask, sIdx) => (
+                  <Fragment key={subtask.id}>
                   <div
-                    key={subtask.id}
                     data-subtask-todoid={todo.id}
                     className={`cc-subtask ${subtask.completed ? 'completed' : ''} ${draggingSubtask?.subtaskId === subtask.id ? 'dragging' : ''} ${pressedSubtaskId === subtask.id && !draggingSubtask ? 'pressed' : ''} ${dragOverSubtask && dragOverSubtask.todoId === todo.id && dragOverSubtask.index === sIdx && draggingSubtask?.subtaskId !== subtask.id ? 'drag-target' : ''}`}
                   >
@@ -456,6 +540,11 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
                     </label>
                     <div className="cc-subtask-actions">
                       <button
+                        className="cc-action-btn add-child-btn small"
+                        onClick={(e) => { e.stopPropagation(); setAddingChildFor(v => v === subtask.id ? null : subtask.id); }}
+                        title="Add item"
+                      >+</button>
+                      <button
                         className="cc-action-btn copy-btn small"
                         onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(subtask.text); setCopiedSubtaskId(subtask.id); setTimeout(() => setCopiedSubtaskId(null), 1500); }}
                         title="Copy"
@@ -471,6 +560,94 @@ function CategoryColumn({ title, category, todos, onAddTodo, onToggleTodo, onDel
                       >×</button>
                     </div>
                   </div>
+
+                  {((subtask.children && subtask.children.length > 0) || addingChildFor === subtask.id) && (
+                    <div className="cc-subtask-children">
+                      {(subtask.children || []).map((child, cIdx) => (
+                        <div
+                          key={child.id}
+                          data-child-subtaskid={subtask.id}
+                          className={`cc-subtask-child ${child.completed ? 'completed' : ''} ${draggingChild?.childId === child.id ? 'dragging' : ''} ${pressedChildId === child.id && !draggingChild ? 'pressed' : ''} ${dragOverChild && dragOverChild.subtaskId === subtask.id && dragOverChild.index === cIdx && draggingChild?.childId !== child.id ? 'drag-target' : ''}`}
+                        >
+                          <span
+                            className="cc-drag-handle cc-subtask-drag"
+                            onMouseDown={(e) => handleChildMouseDown(e, todo.id, subtask.id, child.id, cIdx)}
+                          >⠿</span>
+                          <label className="cc-label" onClick={(e) => { if (editingChildId === child.id) e.preventDefault(); else e.stopPropagation(); }}>
+                            <input
+                              type="checkbox"
+                              className="cc-checkbox small"
+                              checked={child.completed}
+                              onChange={() => { child.completed ? playUncompleteSound() : playCompleteSound(); onToggleSubtaskChild(todo.id, subtask.id, child.id); }}
+                            />
+                            <span className="cc-checkmark small"></span>
+                            {editingChildId === child.id ? (
+                              <GrowTextarea
+                                ref={editChildInputRef}
+                                className="cc-edit-input"
+                                value={editingChildText}
+                                onChange={(e) => { playTypeSoundThrottled(); setEditingChildText(e.target.value); }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' && editingChildText.trim()) {
+                                    onUpdateSubtaskChild && onUpdateSubtaskChild(todo.id, subtask.id, child.id, editingChildText.trim());
+                                    setEditingChildId(null);
+                                  } else if (e.key === 'Escape') {
+                                    setEditingChildId(null);
+                                  }
+                                }}
+                                onBlur={() => {
+                                  if (editingChildText.trim() && editingChildText.trim() !== child.text) {
+                                    onUpdateSubtaskChild && onUpdateSubtaskChild(todo.id, subtask.id, child.id, editingChildText.trim());
+                                  }
+                                  setEditingChildId(null);
+                                }}
+                                autoFocus
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            ) : (
+                              <span className="cc-text">{child.text}</span>
+                            )}
+                          </label>
+                          <div className="cc-subtask-actions">
+                            <button
+                              className="cc-action-btn copy-btn small"
+                              onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(child.text); setCopiedChildId(child.id); setTimeout(() => setCopiedChildId(null), 1500); }}
+                              title="Copy"
+                            >{copiedChildId === child.id ? '✓' : '❐'}</button>
+                            <button
+                              className="cc-action-btn edit-btn small"
+                              onClick={(e) => { e.stopPropagation(); setEditingChildId(child.id); setEditingChildText(child.text); }}
+                              title="Edit"
+                            >✎</button>
+                            <button
+                              className="cc-action-btn delete small"
+                              onClick={(e) => { e.stopPropagation(); playDeleteSound(); onDeleteSubtaskChild(todo.id, subtask.id, child.id); }}
+                            >×</button>
+                          </div>
+                        </div>
+                      ))}
+                      {addingChildFor === subtask.id && (
+                        <div className="cc-subtask-child-add">
+                          <GrowTextarea
+                            className="cc-subtask-input cc-child-input"
+                            placeholder="Add item..."
+                            value={childInputs[subtask.id] || ''}
+                            onChange={(e) => { playTypeSoundThrottled(); setChildInputs(prev => ({ ...prev, [subtask.id]: e.target.value })); }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && (childInputs[subtask.id] || '').trim()) {
+                                handleAddChild(todo.id, subtask.id);
+                              } else if (e.key === 'Escape') {
+                                setAddingChildFor(null);
+                              }
+                            }}
+                            autoFocus
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  </Fragment>
                 ))}
                 <div className="cc-subtask-add">
                   <GrowTextarea

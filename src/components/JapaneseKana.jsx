@@ -1690,7 +1690,7 @@ export function PracticeTab({ selectedRows, setSelectedRows }) {
       playCorrectSound();
       setFeedback("correct");
       setStreak((s) => s + 1);
-      advanceTimerRef.current = setTimeout(() => advance(), 600);
+      advanceTimerRef.current = setTimeout(() => advance(), 300);
     } else {
       // Schedule this card to reappear 2-5 cards later
       const delay = 2 + Math.floor(Math.random() * 4); // 2-5

@@ -363,8 +363,8 @@
 }
 
 .sc-lightbox {
-  background: #14181f;
-  border: 1px solid #30363d;
+  background: var(--bg-base);
+  border: 1px solid var(--border);
   border-radius: 12px;
   width: min(1080px, 94vw);
   max-height: 90vh;
@@ -1245,7 +1245,7 @@
 }
 .ft-workout-tab:hover { background: var(--bg-hover); }
 .ft-workout-tab--active {
-  background: #21262d;
+  background: var(--bg-elevated);
   border-color: var(--border);
 }
 

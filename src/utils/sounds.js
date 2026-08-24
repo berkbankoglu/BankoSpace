@@ -9,7 +9,12 @@ let volume = parseFloat(localStorage.getItem('soundVolume') ?? '0.7');
 
 export function getAudioContext() {
   if (!audioCtx) {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    // latencyHint: 'interactive' — anında geri bildirim gereken tıklama/yazma
+    // sesleri için tarayıcıdan en küçük çıkış tamponunu (dolayısıyla en düşük
+    // gecikmeyi) iste. Varsayılan (belirtilmezse) bazı sistemlerde daha büyük,
+    // "playback" tarzı bir tampon seçebiliyor ve bu, her tuşta hissedilen
+    // gecikmenin sebebiydi.
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
     masterGain = audioCtx.createGain();
     masterGain.gain.value = volume;
     masterGain.connect(audioCtx.destination);
@@ -37,20 +42,41 @@ export function getVolume() {
   return volume;
 }
 
+// Gürültü tamponları (thock/click) her tuşta yeniden hesaplanmıyor — ilk
+// çağrıda bir kere üretilip önbelleğe alınıyor. Aynı AudioBuffer birden çok
+// AudioBufferSourceNode arasında paylaşılabilir (Web Audio API'nin standart
+// "ses havuzu" deseni); bu, her tuş vuruşunda ana thread'de ~2500 örneklik
+// Math.random() döngüsünü tekrar çalıştırmayı ortadan kaldırıp, sesin
+// gerçekten anında (tıklamayla aynı JS turunda) planlanmasını garanti eder.
+let cachedThockBuf = null;
+let cachedClickBuf = null;
+function getTypeSoundBuffers(ctx) {
+  if (!cachedThockBuf || cachedThockBuf.sampleRate !== ctx.sampleRate) {
+    const thockSize = Math.floor(ctx.sampleRate * 0.05);
+    cachedThockBuf = ctx.createBuffer(1, thockSize, ctx.sampleRate);
+    const thockData = cachedThockBuf.getChannelData(0);
+    for (let i = 0; i < thockSize; i++) {
+      thockData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / thockSize, 4);
+    }
+    const clickSize = Math.floor(ctx.sampleRate * 0.007);
+    cachedClickBuf = ctx.createBuffer(1, clickSize, ctx.sampleRate);
+    const clickData = cachedClickBuf.getChannelData(0);
+    for (let i = 0; i < clickSize; i++) {
+      clickData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / clickSize, 2);
+    }
+  }
+  return { thockBuf: cachedThockBuf, clickBuf: cachedClickBuf };
+}
+
 // Typing sound - mechanical keyboard thock
 export function playTypeSound() {
   try {
     const ctx = getAudioContext();
     const dest = getMasterGain();
     const t = ctx.currentTime;
+    const { thockBuf, clickBuf } = getTypeSoundBuffers(ctx);
 
     // Layer 1: deep thock — plate/body resonance (low-mid freq)
-    const thockSize = Math.floor(ctx.sampleRate * 0.05);
-    const thockBuf = ctx.createBuffer(1, thockSize, ctx.sampleRate);
-    const thockData = thockBuf.getChannelData(0);
-    for (let i = 0; i < thockSize; i++) {
-      thockData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / thockSize, 4);
-    }
     const thockSrc = ctx.createBufferSource();
     thockSrc.buffer = thockBuf;
 
@@ -70,12 +96,6 @@ export function playTypeSound() {
     thockSrc.stop(t + 0.09);
 
     // Layer 2: sharp click transient — key actuation mechanism
-    const clickSize = Math.floor(ctx.sampleRate * 0.007);
-    const clickBuf = ctx.createBuffer(1, clickSize, ctx.sampleRate);
-    const clickData = clickBuf.getChannelData(0);
-    for (let i = 0; i < clickSize; i++) {
-      clickData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / clickSize, 2);
-    }
     const clickSrc = ctx.createBufferSource();
     clickSrc.buffer = clickBuf;
 
@@ -257,11 +277,13 @@ export function playAddSound() {
   } catch (e) { /* silent fail */ }
 }
 
-// Throttled typing sound (prevents too many sounds when typing fast)
+// Throttled typing sound (prevents too many overlapping sounds when typing
+// very fast) — kept short so it only guards against literal audio overlap,
+// not against feeling responsive to each keystroke.
 let lastTypeTime = 0;
 export function playTypeSoundThrottled() {
   const now = Date.now();
-  if (now - lastTypeTime > 40) {
+  if (now - lastTypeTime > 18) {
     lastTypeTime = now;
     playTypeSound();
   }

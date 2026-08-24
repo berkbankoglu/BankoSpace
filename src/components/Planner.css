@@ -1150,10 +1150,10 @@
   border-left: 1px solid #3a3a3a;
   cursor: crosshair;
   box-sizing: border-box;
-  background: #1e1e1e;
+  background: var(--bg-base);
 }
 .pl-wk-day-col.today {
-  background: #242424;
+  background: #1f1f1f;
 }
 
 /* Hour grid lines */

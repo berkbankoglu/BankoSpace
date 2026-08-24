@@ -57,12 +57,12 @@
     ],
     "withGlobalTauri": true,
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' https://accounts.google.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com https://*.cloudfunctions.net https://feeds.finance.yahoo.com https://finance.yahoo.com https://news.google.com https://*.google.com https://query1.finance.yahoo.com https://query2.finance.yahoo.com https://api.anthropic.com https://*.tradingview.com https://s3.tradingview.com https://translate.google.com https://translate.googleapis.com https://*.supabase.co wss://*.supabase.co https://feeds.reuters.com https://*.reuters.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://s3.tradingview.com https://*.tradingview.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data: https://fonts.gstatic.com https://*.tradingview.com; media-src 'self' https://translate.google.com https://translate.googleapis.com; frame-src https://accounts.google.com https://*.firebaseapp.com https://*.tradingview.com",
+      "csp": "default-src 'self'; connect-src 'self' https://accounts.google.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com https://*.cloudfunctions.net https://api.anthropic.com https://translate.google.com https://translate.googleapis.com https://*.supabase.co wss://*.supabase.co; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data: https://fonts.gstatic.com; media-src 'self' https://translate.google.com https://translate.googleapis.com; frame-src https://accounts.google.com https://*.firebaseapp.com",
       "capabilities": [
         {
           "identifier": "main-capability",
           "description": "Main app capabilities",
-          "windows": ["main", "kana-popup"],
+          "windows": ["main"],
           "permissions": [
             "dialog:default",
             "dialog:allow-save",
@@ -105,6 +105,16 @@
             "deep-link:default",
             "updater:default",
             "process:allow-restart"
+          ]
+        },
+        {
+          "identifier": "kana-popup-capability",
+          "description": "Kana practice popup — no filesystem/dialog/notification access, it only shows a small always-on-top word list",
+          "windows": ["kana-popup"],
+          "permissions": [
+            "core:window:allow-hide",
+            "core:window:allow-set-always-on-top",
+            "core:window:allow-start-dragging"
           ]
         }
       ]

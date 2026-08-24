@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { ask } from '@tauri-apps/plugin-dialog';
 import './SubscriptionTracker.css';
 
 const STORAGE_KEY = 'payments_v2';
@@ -145,7 +146,24 @@ function AddModal({ initial, onSave, onDelete, onClose }) {
         </div>
 
         <div className="sub-modal-footer">
-          {isEdit && <button className="sub-delete-modal-btn" onClick={() => { onDelete(form.id); onClose(); }}>Delete</button>}
+          {isEdit && (
+            <button
+              className="sub-delete-modal-btn"
+              onClick={async () => {
+                const confirmed = await ask(`Delete "${form.name}"?\n\nThis action cannot be undone!`, {
+                  title: 'Delete Subscription',
+                  kind: 'warning',
+                  okLabel: 'Yes, Delete',
+                  cancelLabel: 'Cancel',
+                });
+                if (!confirmed) return;
+                onDelete(form.id);
+                onClose();
+              }}
+            >
+              Delete
+            </button>
+          )}
           <div className="sub-modal-footer-right">
             <button className="sub-cancel-btn" onClick={onClose}>Cancel</button>
             <button className="sub-confirm-btn" onClick={handleSave} disabled={!form.name.trim() || (form.category !== 'once-cancel' && !form.date)}>Save</button>

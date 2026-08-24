@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, Component } from 'react';
 import { flushSync } from 'react-dom';
 import { invoke } from '@tauri-apps/api/core';
 import { platform } from '@tauri-apps/plugin-os';
@@ -6,7 +6,7 @@ import { check as checkForUpdate } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import logo from './assets/logo.svg';
 import './App.css';
-import { supabase, pullFromSupabase, pushKeyToSupabase, pushAllToSupabase, SYNC_KEYS } from './supabase';
+import { supabase, pullFromSupabase, pushKeyToSupabase, pushAllToSupabase, purgeApiKeyFromSupabase, SYNC_KEYS } from './supabase';
 import Login from './components/Login';
 import CategoryColumn from './components/CategoryColumn';
 import FlashCards from './components/FlashCards';
@@ -16,10 +16,44 @@ import FitnessTracker from './components/FitnessTracker';
 import JapaneseKana from './components/JapaneseKana';
 import ToolsChat from './components/ToolsChat';
 import SubscriptionTracker, { SubscriptionWidget, SubscriptionPopup } from './components/SubscriptionTracker';
-import StockNews from './components/StockNews';
 import Planner from './components/Planner';
 import Notes from './components/Notes';
 import { onAction, registerActionTypes } from '@tauri-apps/plugin-notification';
+import { TODO_COLORS } from './constants';
+
+// Bu bölümde beklenmedik bir render hatası olursa (ör. bozuk veri), sadece bu
+// ekranı hata mesajıyla değiştirir — geri kalan uygulama (sidebar dahil)
+// çalışmaya devam eder. Tek bir bileşenin hatası artık tüm uygulamayı
+// beyaz ekrana düşürmüyor.
+class ViewErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  componentDidCatch(error, info) {
+    console.error('View crashed:', error, info);
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32, textAlign: 'center' }}>
+          <div style={{ fontSize: 15, color: 'var(--text-primary)' }}>Bu bölüm yüklenirken bir hata oluştu.</div>
+          <div style={{ fontSize: 13, color: 'var(--text-secondary)', maxWidth: 480 }}>{String(this.state.error?.message || this.state.error)}</div>
+          <button
+            onClick={() => this.setState({ error: null })}
+            style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-surface)', color: 'var(--text-primary)', cursor: 'pointer' }}
+          >
+            Tekrar dene
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 function toDayKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -230,7 +264,7 @@ const APP_VERSION = '4.2.7';
 // gerçek build sürümünden (APP_VERSION) BAĞIMSIZ. O sayı auto-updater'ın semver
 // karşılaştırması için geriye gitmemeli; bu ise her push'ta elle +0.1 artan,
 // kullanıcının takip ettiği kozmetik bir sayaç. 3.0'a geçilmez, kullanıcı isteyene kadar.
-const DISPLAY_VERSION = '2.2';
+const DISPLAY_VERSION = '2.3';
 const MIN_COL_PX = 220;
 const DEFAULT_COL_PX = [null, null, null]; // [dailyPx, weeklyPx, monthlyPx] — null = auto (flex:1)
 
@@ -256,7 +290,7 @@ function App({ session, onLogout }) {
 
 
 
-  // [dailyPx, stockPx] — Weekly is flex:1 in the middle, always fills remaining space
+  // [dailyPx, monthlyPx] — Weekly is flex:1 in the middle, always fills remaining space
   const [colWidths, setColWidths] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('dashColWidths'));
@@ -354,7 +388,16 @@ function App({ session, onLogout }) {
       const alreadySynced = sessionStorage.getItem('supabase_synced');
       if (!alreadySynced) {
         sessionStorage.setItem('supabase_synced', '1');
-        pullFromSupabase().then(changed => {
+
+        // anthropic_api_key artık cloud'a senkronize edilmiyor (bkz. supabase.js) —
+        // ama önceden push edilmiş bir kopya hâlâ Supabase'de duruyor olabilir.
+        // Tek seferlik bir temizlikle sil, aksi halde pull bunu geri indirir.
+        const apiKeyPurged = localStorage.getItem('apiKeyPurgedFromCloud');
+        const purge = apiKeyPurged ? Promise.resolve() : purgeApiKeyFromSupabase().then(() => {
+          localStorage.setItem('apiKeyPurgedFromCloud', '1');
+        });
+
+        purge.then(() => pullFromSupabase()).then(changed => {
           if (changed) window.location.reload();
         });
       }
@@ -506,7 +549,7 @@ function App({ session, onLogout }) {
       { id: 'dashboard',    label: 'Dashboard',      view: 'dashboard',    hidden: false, icon: '⊞' },
       { id: 'checklists',   label: 'Checklists',      view: 'checklists',   hidden: false, icon: '✓' },
       { id: 'income',       label: 'Income Tracker',  view: 'income',       hidden: false, icon: '$' },
-      { id: 'tools',        label: 'Tools',            view: 'tools',        hidden: true,  icon: '⚙' },
+      { id: 'tools',        label: 'Tools',            view: 'tools',        hidden: false, icon: '⚙' },
       { id: 'japanesekana', label: 'Language Learn',  view: 'japanesekana', hidden: false, icon: 'あ' },
       { id: 'fitness',      label: 'Fitness',          view: 'fitness',      hidden: false, icon: '◈' },
       { id: 'planner',      label: 'Planner',          view: 'planner',      hidden: false, icon: '≡' },
@@ -888,7 +931,6 @@ useEffect(() => {
 
   const addTodo = (category, text, dueDate = null) => {
     pushHistory(todos);
-    const TODO_COLORS = ['#667eea', '#f093fb', '#4ade80', '#60a5fa', '#fb923c', '#f87171', '#facc15', '#9ca3af'];
     const newTodo = {
       id: Date.now(),
       text,
@@ -986,6 +1028,78 @@ useEffect(() => {
         };
       }
       return todo;
+    }));
+  };
+
+  // Subtask'ın bir alt kademesi daha: her subtask kendi "children" listesini
+  // taşıyabiliyor — todo -> subtask -> child, aynı toggle/delete deseniyle.
+  const addSubtaskChild = (todoId, subtaskId, childText) => {
+    pushHistory(todos);
+    setTodos(todos.map(todo => {
+      if (todo.id !== todoId) return todo;
+      return {
+        ...todo,
+        subtasks: (todo.subtasks || []).map(st => {
+          if (st.id !== subtaskId) return st;
+          const newChild = { id: Date.now(), text: childText, completed: false };
+          return { ...st, children: [...(st.children || []), newChild] };
+        }),
+      };
+    }));
+    playAddSound();
+  };
+
+  const toggleSubtaskChild = (todoId, subtaskId, childId) => {
+    pushHistory(todos);
+    const parentTodo = todos.find(t => t.id === todoId);
+    const parentSubtask = parentTodo?.subtasks?.find(st => st.id === subtaskId);
+    const child = parentSubtask?.children?.find(c => c.id === childId);
+    const willComplete = child ? !child.completed : false;
+    setTodos(todos.map(todo => {
+      if (todo.id !== todoId) return todo;
+      return {
+        ...todo,
+        subtasks: (todo.subtasks || []).map(st => {
+          if (st.id !== subtaskId) return st;
+          return {
+            ...st,
+            children: (st.children || []).map(c => c.id === childId ? { ...c, completed: !c.completed } : c),
+          };
+        }),
+      };
+    }));
+    setTaskScore(s => s + (willComplete ? 1 : -1));
+    if (willComplete) logContribution();
+  };
+
+  const deleteSubtaskChild = (todoId, subtaskId, childId) => {
+    pushHistory(todos);
+    setTodos(todos.map(todo => {
+      if (todo.id !== todoId) return todo;
+      return {
+        ...todo,
+        subtasks: (todo.subtasks || []).map(st => {
+          if (st.id !== subtaskId) return st;
+          return { ...st, children: (st.children || []).filter(c => c.id !== childId) };
+        }),
+      };
+    }));
+    logContribution();
+  };
+
+  const updateSubtaskChild = (todoId, subtaskId, childId, newText) => {
+    setTodos(todos.map(todo => {
+      if (todo.id !== todoId) return todo;
+      return {
+        ...todo,
+        subtasks: (todo.subtasks || []).map(st => {
+          if (st.id !== subtaskId) return st;
+          return {
+            ...st,
+            children: (st.children || []).map(c => c.id === childId ? { ...c, text: newText } : c),
+          };
+        }),
+      };
     }));
   };
 
@@ -1305,7 +1419,7 @@ useEffect(() => {
     {
       id: 'finance',
       label: 'Finance',
-      keys: ['portfolio_positions', 'portfolio_closed', 'price_groups', 'price_tickers', 'stock_tickers', 'invoices', 'goals'],
+      keys: ['invoices', 'goals'],
     },
     {
       id: 'japanese',
@@ -1473,6 +1587,27 @@ useEffect(() => {
   };
 
   const appZoom = window.screen.width <= 1600 ? 0.9 : 1;
+
+  // CategoryColumn'un iki örneği de aynı 16 mutasyon fonksiyonunu kullanıyor —
+  // tek tek prop olarak geçmek yerine bir kere burada paketleniyor.
+  const todoActions = {
+    onAddTodo: addTodo,
+    onToggleTodo: toggleTodo,
+    onDeleteTodo: deleteTodo,
+    onUpdateTodo: updateTodo,
+    onRename: renameCategory,
+    onAddSubtask: addSubtask,
+    onToggleSubtask: toggleSubtask,
+    onDeleteSubtask: deleteSubtask,
+    onUpdateSubtask: updateSubtask,
+    onAddSubtaskChild: addSubtaskChild,
+    onToggleSubtaskChild: toggleSubtaskChild,
+    onDeleteSubtaskChild: deleteSubtaskChild,
+    onUpdateSubtaskChild: updateSubtaskChild,
+    onReorder: reorderTodos,
+    onTodoDragStart: handleTodoDragStart,
+    onMoveSubtask: moveSubtaskToTodo,
+  };
 
   return (
     <div className="container" style={{ zoom: appZoom }}>
@@ -1657,7 +1792,7 @@ useEffect(() => {
                       <h2 className="settings-modal-title">AI</h2>
                       <div className="settings-field">
                         <label className="settings-field-label">Anthropic API Key</label>
-                        <div className="settings-field-desc">Enter your API key to use Claude AI features</div>
+                        <div className="settings-field-desc">Enter your API key to use Claude AI features. Stored on this device only — not synced to the cloud.</div>
                         <input
                           type="password"
                           className="settings-field-input"
@@ -1667,10 +1802,8 @@ useEffect(() => {
                             const val = e.target.value.trim();
                             if (val) {
                               localStorage.setItem('anthropic_api_key', val);
-                              pushKeyToSupabase('anthropic_api_key', val);
                             } else {
                               localStorage.removeItem('anthropic_api_key');
-                              pushKeyToSupabase('anthropic_api_key', null);
                             }
                           }}
                         />
@@ -1955,20 +2088,26 @@ useEffect(() => {
                     <span className="sidebar-drag-handle">⠿</span>
                   </div>
 
-                  {/* Fitness altında her zaman görünen alt sekmeler: Antrenman, Grafikler */}
+                  {/* Fitness altında her zaman görünen alt sekmeler: Beslenme, Grafikler, Antrenman */}
                   {item.id === 'fitness' && (
                     <>
                       <div
-                        className={`sidebar-subitem ${activeView === 'fitness' && fitnessView === 'workout' ? 'active' : ''}`}
-                        onClick={() => { playNavSound(); setFitnessView('workout'); setActiveView('fitness'); }}
+                        className={`sidebar-subitem ${activeView === 'fitness' && fitnessView === 'overview' ? 'active' : ''}`}
+                        onClick={() => { playNavSound(); setFitnessView('overview'); setActiveView('fitness'); }}
                       >
-                        <span className="item-name">- Antrenman</span>
+                        <span className="item-name">- Beslenme</span>
                       </div>
                       <div
                         className={`sidebar-subitem ${activeView === 'fitness' && fitnessView === 'charts' ? 'active' : ''}`}
                         onClick={() => { playNavSound(); setFitnessView('charts'); setActiveView('fitness'); }}
                       >
                         <span className="item-name">- Grafikler</span>
+                      </div>
+                      <div
+                        className={`sidebar-subitem ${activeView === 'fitness' && fitnessView === 'workout' ? 'active' : ''}`}
+                        onClick={() => { playNavSound(); setFitnessView('workout'); setActiveView('fitness'); }}
+                      >
+                        <span className="item-name">- Antrenman</span>
                       </div>
                     </>
                   )}
@@ -2043,6 +2182,7 @@ useEffect(() => {
         <div className="main-content-area">
           {/* Checklists Full Screen View */}
           {activeView === 'checklists' && (
+            <ViewErrorBoundary>
             <div className="checklists-fullscreen">
               <div className="checklists-container">
                 <div className="checklist-section">
@@ -2060,52 +2200,65 @@ useEffect(() => {
                 </div>
               </div>
             </div>
+            </ViewErrorBoundary>
           )}
 
 
           {/* Income Tracker Full Screen View */}
           {activeView === 'income' && (
+            <ViewErrorBoundary>
             <div className="income-fullscreen">
               <IncomeTracker />
             </div>
+            </ViewErrorBoundary>
           )}
 
           {/* Fitness Tracker */}
           {activeView === 'fitness' && (
+            <ViewErrorBoundary>
             <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
               <FitnessTracker view={fitnessView} />
             </div>
+            </ViewErrorBoundary>
           )}
 
 
           {/* Planner */}
           {activeView === 'planner' && (
+            <ViewErrorBoundary>
             <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
               <Planner onPlannerToast={showPlannerToast} onOpenPlanner={() => setActiveView('planner')} />
             </div>
+            </ViewErrorBoundary>
           )}
 
           {/* Notes */}
           {activeView === 'notes' && (
+            <ViewErrorBoundary>
             <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
               <Notes />
             </div>
+            </ViewErrorBoundary>
           )}
 
-          {/* Tools View: Project Bid + Translate */}
           {activeView === 'tools' && (
+            <ViewErrorBoundary>
             <ToolsView />
+            </ViewErrorBoundary>
           )}
 
           {/* Language Learn full page */}
           {activeView === 'japanesekana' && (
+            <ViewErrorBoundary>
             <JapaneseKana view={kanaView} />
+            </ViewErrorBoundary>
           )}
 
 
 
           {/* Dashboard View */}
           {activeView === 'dashboard' && (
+          <ViewErrorBoundary>
           <div key="dashboard" className="dashboard-container" style={{ '--todo-font-size': fontSizeMap[todoFontSize], '--subtask-font-size': subtaskFontSizeMap[subtaskFontSize] }}>
             {/* Todo Columns - resizable */}
             <div className="todo-columns" ref={columnsRef}>
@@ -2114,19 +2267,8 @@ useEffect(() => {
                   title={categoryNames.daily}
                   category="daily"
                   todos={todosByCategory.daily}
-                  onAddTodo={addTodo}
-                  onToggleTodo={toggleTodo}
-                  onDeleteTodo={deleteTodo}
-                  onUpdateTodo={updateTodo}
-                  onRename={renameCategory}
                   currentFilter={currentFilter}
-                  onAddSubtask={addSubtask}
-                  onToggleSubtask={toggleSubtask}
-                  onDeleteSubtask={deleteSubtask}
-                  onUpdateSubtask={updateSubtask}
-                  onReorder={reorderTodos}
-                  onTodoDragStart={handleTodoDragStart}
-                  onMoveSubtask={moveSubtaskToTodo}
+                  actions={todoActions}
                 />
               </div>
               <div className="col-resize-handle" onMouseDown={e => startColResize(0, e)} onDoubleClick={() => { setColWidths(DEFAULT_COL_PX); localStorage.setItem('dashColWidths', JSON.stringify(DEFAULT_COL_PX)); }} />
@@ -2135,19 +2277,8 @@ useEffect(() => {
                   title={categoryNames.weekly}
                   category="weekly"
                   todos={todosByCategory.weekly}
-                  onAddTodo={addTodo}
-                  onToggleTodo={toggleTodo}
-                  onDeleteTodo={deleteTodo}
-                  onUpdateTodo={updateTodo}
-                  onRename={renameCategory}
                   currentFilter={currentFilter}
-                  onAddSubtask={addSubtask}
-                  onToggleSubtask={toggleSubtask}
-                  onDeleteSubtask={deleteSubtask}
-                  onUpdateSubtask={updateSubtask}
-                  onReorder={reorderTodos}
-                  onTodoDragStart={handleTodoDragStart}
-                  onMoveSubtask={moveSubtaskToTodo}
+                  actions={todoActions}
                 />
               </div>
               <div className="col-resize-handle" onMouseDown={e => startColResize(1, e)} onDoubleClick={() => { setColWidths(DEFAULT_COL_PX); localStorage.setItem('dashColWidths', JSON.stringify(DEFAULT_COL_PX)); }} />
@@ -2156,6 +2287,7 @@ useEffect(() => {
               </div>
             </div>
           </div>
+          </ViewErrorBoundary>
           )}
         </div>
       </div>
@@ -2293,8 +2425,19 @@ function ToolsView() {
 }
 
 function AppWrapper() {
-  // TEMPORARY: Bypass Supabase completely for testing
-  return <App key="main-app" session={null} onLogout={() => {}} />;
+  // undefined = henüz kontrol edilmedi, null = giriş yapılmamış, object = oturum var
+  const [session, setSession] = useState(undefined);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => setSession(s));
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (session === undefined) return null;
+  if (!session) return <Login onLogin={setSession} />;
+
+  return <App key="main-app" session={session} onLogout={() => setSession(null)} />;
 }
 
 export default AppWrapper;
