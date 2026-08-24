@@ -8138,6 +8138,41 @@ body.light .sidebar-settings-version {
   align-items: center;
   gap: 4px;
 }
+.sidebar-footer-update {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.sidebar-footer-update-btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  opacity: 1;
+  letter-spacing: 0.2px;
+}
+.sidebar-footer-update-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.sidebar-footer-update-hide {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+  opacity: 0.6;
+}
+.sidebar-footer-update-hide:hover {
+  opacity: 1;
+  color: var(--text-primary);
+}
 body.light .sidebar-footer {
   border-top: 1px solid rgba(0,0,0,0.07);
 }

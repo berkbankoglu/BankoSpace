@@ -259,12 +259,12 @@ function TaskContributionGraph({ todos, contributionLog }) {
 import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, setVolume, getVolume } from './utils/sounds';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
-const APP_VERSION = '4.2.7';
+const APP_VERSION = '4.2.8';
 // Kullanıcıya gösterilen sürüm sayacı — package.json/Cargo.toml/tauri.conf.json'daki
 // gerçek build sürümünden (APP_VERSION) BAĞIMSIZ. O sayı auto-updater'ın semver
 // karşılaştırması için geriye gitmemeli; bu ise her push'ta elle +0.1 artan,
 // kullanıcının takip ettiği kozmetik bir sayaç. 3.0'a geçilmez, kullanıcı isteyene kadar.
-const DISPLAY_VERSION = '2.3';
+const DISPLAY_VERSION = '2.4';
 const MIN_COL_PX = 220;
 const DEFAULT_COL_PX = [null, null, null]; // [dailyPx, weeklyPx, monthlyPx] — null = auto (flex:1)
 
@@ -504,6 +504,11 @@ function App({ session, onLogout }) {
   // güncelleme varsa kullanıcı onayı olmadan indirme/kurulum başlamaz.
   const [appUpdate, setAppUpdate] = useState(null);
   const [updateStatus, setUpdateStatus] = useState('idle'); // idle | downloading | error
+  // Sürüm bazlı hatırlama: kullanıcı bir sürümün bildirimini/butonunu
+  // kapattıysa, aynı sürüm için bir daha gösterilmez — ama bir sonraki
+  // (daha yeni) sürüm çıktığında otomatik olarak tekrar sorulur/görünür.
+  const [updateSkippedVersion, setUpdateSkippedVersion] = useState(() => localStorage.getItem('updateSkippedVersion') || null);
+  const [updateButtonHiddenVersion, setUpdateButtonHiddenVersion] = useState(() => localStorage.getItem('updateButtonHiddenVersion') || null);
   useEffect(() => {
     const timer = setTimeout(() => {
       checkForUpdate().then(update => {
@@ -512,6 +517,16 @@ function App({ session, onLogout }) {
     }, 4000);
     return () => clearTimeout(timer);
   }, []);
+  const skipUpdateVersion = useCallback(() => {
+    if (!appUpdate) return;
+    localStorage.setItem('updateSkippedVersion', appUpdate.version);
+    setUpdateSkippedVersion(appUpdate.version);
+  }, [appUpdate]);
+  const hideUpdateButton = useCallback(() => {
+    if (!appUpdate) return;
+    localStorage.setItem('updateButtonHiddenVersion', appUpdate.version);
+    setUpdateButtonHiddenVersion(appUpdate.version);
+  }, [appUpdate]);
   const applyUpdate = useCallback(async () => {
     if (!appUpdate) return;
     setUpdateStatus('downloading');
@@ -2174,6 +2189,25 @@ useEffect(() => {
               </svg>
               {taskScore}
             </span>
+            {appUpdate && appUpdate.version !== updateButtonHiddenVersion && (
+              <span className="sidebar-footer-update">
+                <button
+                  className="sidebar-footer-update-btn"
+                  onClick={applyUpdate}
+                  disabled={updateStatus === 'downloading'}
+                  title={`v${appUpdate.version} güncellemesi hazır — indirip kur`}
+                >
+                  {updateStatus === 'downloading' ? 'Güncelleniyor…' : 'Güncelle'}
+                </button>
+                <button
+                  className="sidebar-footer-update-hide"
+                  onClick={hideUpdateButton}
+                  title="Bu butonu gizle (yeni sürüm çıkana kadar)"
+                >
+                  ×
+                </button>
+              </span>
+            )}
             <span className="sidebar-footer-version" title="Sürüm">v{DISPLAY_VERSION}</span>
           </div>
         </div>
@@ -2325,7 +2359,7 @@ useEffect(() => {
       )}
 
       {/* Native App Update Banner */}
-      {appUpdate && (
+      {appUpdate && appUpdate.version !== updateSkippedVersion && (
         <div style={{
           position: 'fixed', bottom: 24, right: 24, zIndex: 9999,
           background: 'var(--bg-surface)',
@@ -2358,13 +2392,14 @@ useEffect(() => {
             </button>
             {updateStatus !== 'downloading' && (
               <button
-                onClick={() => setAppUpdate(null)}
+                onClick={skipUpdateVersion}
+                title="Bu sürüm için bir daha sorulmaz — sol alttaki Güncelle butonundan istediğin zaman kurabilirsin"
                 style={{
                   background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border)',
                   borderRadius: 6, padding: '6px 12px', fontSize: 12, cursor: 'pointer',
                 }}
               >
-                Sonra
+                Bu sürümü atla
               </button>
             )}
           </div>
