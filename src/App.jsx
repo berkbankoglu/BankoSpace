@@ -259,12 +259,12 @@ function TaskContributionGraph({ todos, contributionLog }) {
 import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, setVolume, getVolume } from './utils/sounds';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
-const APP_VERSION = '4.2.9';
+const APP_VERSION = '4.2.10';
 // Kullanıcıya gösterilen sürüm sayacı — package.json/Cargo.toml/tauri.conf.json'daki
 // gerçek build sürümünden (APP_VERSION) BAĞIMSIZ. O sayı auto-updater'ın semver
 // karşılaştırması için geriye gitmemeli; bu ise her push'ta elle +0.1 artan,
 // kullanıcının takip ettiği kozmetik bir sayaç. 3.0'a geçilmez, kullanıcı isteyene kadar.
-const DISPLAY_VERSION = '2.5';
+const DISPLAY_VERSION = '2.6';
 const MIN_COL_PX = 220;
 const DEFAULT_COL_PX = [null, null, null]; // [dailyPx, weeklyPx, monthlyPx] — null = auto (flex:1)
 
@@ -511,9 +511,14 @@ function App({ session, onLogout }) {
   const [updateButtonHiddenVersion, setUpdateButtonHiddenVersion] = useState(() => localStorage.getItem('updateButtonHiddenVersion') || null);
   useEffect(() => {
     const timer = setTimeout(() => {
+      if (window.__diag) window.__diag(`update-check: starting, current=${APP_VERSION}`);
       checkForUpdate().then(update => {
+        if (window.__diag) window.__diag(`update-check: available=${update?.available} version=${update?.version ?? '-'} currentVersion=${update?.currentVersion ?? '-'}`);
         if (update?.available) setAppUpdate(update);
-      }).catch(err => console.error('Update check failed:', err));
+      }).catch(err => {
+        if (window.__diag) window.__diag(`update-check: ERROR ${err?.message || err}`, true);
+        console.error('Update check failed:', err);
+      });
     }, 4000);
     return () => clearTimeout(timer);
   }, []);

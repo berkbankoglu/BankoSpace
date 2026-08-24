@@ -1,6 +1,6 @@
 [package]
 name = "todo-app"
-version = "4.2.9"
+version = "4.2.10"
 description = "BankoSpace - Modern productivity application"
 authors = ["berkbankoglu"]
 edition = "2021"
