@@ -259,12 +259,12 @@ function TaskContributionGraph({ todos, contributionLog }) {
 import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, setVolume, getVolume } from './utils/sounds';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
-const APP_VERSION = '4.2.8';
+const APP_VERSION = '4.2.9';
 // Kullanıcıya gösterilen sürüm sayacı — package.json/Cargo.toml/tauri.conf.json'daki
 // gerçek build sürümünden (APP_VERSION) BAĞIMSIZ. O sayı auto-updater'ın semver
 // karşılaştırması için geriye gitmemeli; bu ise her push'ta elle +0.1 artan,
 // kullanıcının takip ettiği kozmetik bir sayaç. 3.0'a geçilmez, kullanıcı isteyene kadar.
-const DISPLAY_VERSION = '2.4';
+const DISPLAY_VERSION = '2.5';
 const MIN_COL_PX = 220;
 const DEFAULT_COL_PX = [null, null, null]; // [dailyPx, weeklyPx, monthlyPx] — null = auto (flex:1)
 
@@ -2179,16 +2179,6 @@ useEffect(() => {
           )}
 
           <div className="sidebar-footer">
-            <span className="sidebar-footer-score" title="Tamamlanan görev skoru">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M8 21h8" />
-                <path d="M12 17v4" />
-                <path d="M7 4h10v5a5 5 0 0 1-10 0V4Z" />
-                <path d="M17 5h2a2 2 0 0 1 2 2v1a3 3 0 0 1-3 3h-1" />
-                <path d="M7 5H5a2 2 0 0 0-2 2v1a3 3 0 0 0 3 3h1" />
-              </svg>
-              {taskScore}
-            </span>
             {appUpdate && appUpdate.version !== updateButtonHiddenVersion && (
               <span className="sidebar-footer-update">
                 <button
