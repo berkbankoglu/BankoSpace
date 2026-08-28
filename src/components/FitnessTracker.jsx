@@ -257,189 +257,189 @@ function save(key, val) {
 // unit: 'g' → gram bazlı (kcal/makro per 100g)
 // unit: 'adet', perUnit: N → 1 adet = N gram eşdeğeri (kcal/makro per adet)
 const FOOD_DB = [
-  { name: 'Tavuk göğsü (ızgara)', kcal: 165, p: 31,  c: 0,   f: 3.6, unit: 'g' },
-  { name: 'Tavuk but (ızgara)',    kcal: 209, p: 26,  c: 0,   f: 11,  unit: 'g' },
-  { name: 'Tavuk but (kemikli)',   kcal: 215, p: 25,  c: 0,   f: 12,  unit: 'g' },
-  { name: 'Tavuk kanat',           kcal: 222, p: 22,  c: 0,   f: 14,  unit: 'g' },
-  { name: 'Tavuk göğsü (haşlama)',kcal: 150, p: 28,  c: 0,   f: 3.2, unit: 'g' },
-  { name: 'Tavuk but (kavurma)',   kcal: 245, p: 24,  c: 0,   f: 16,  unit: 'g' },
-  { name: 'Tavuk ciğeri',          kcal: 167, p: 24,  c: 1,   f: 7,   unit: 'g' },
-  { name: 'Hindi göğsü',           kcal: 135, p: 30,  c: 0,   f: 1,   unit: 'g' },
-  { name: 'Hindi but (ızgara)',    kcal: 218, p: 27,  c: 0,   f: 12,  unit: 'g' },
-  { name: 'Dana kıyma (%20 yağ)', kcal: 254, p: 17,  c: 0,   f: 20,  unit: 'g' },
-  { name: 'Dana kıyma (%10 yağ)', kcal: 196, p: 21,  c: 0,   f: 12,  unit: 'g' },
-  { name: 'Dana bonfile',          kcal: 271, p: 26,  c: 0,   f: 18,  unit: 'g' },
-  { name: 'Dana antrikot',         kcal: 291, p: 24,  c: 0,   f: 21,  unit: 'g' },
-  { name: 'Dana kavurma',          kcal: 280, p: 25,  c: 0,   f: 19,  unit: 'g' },
-  { name: 'Dana but (haşlama)',    kcal: 185, p: 27,  c: 0,   f: 8,   unit: 'g' },
-  { name: 'Dana ciğer',            kcal: 135, p: 21,  c: 4,   f: 4,   unit: 'g' },
-  { name: 'Dana döş (kavurma)',    kcal: 320, p: 22,  c: 0,   f: 25,  unit: 'g' },
-  { name: 'Kuzu pirzola',          kcal: 294, p: 25,  c: 0,   f: 21,  unit: 'g' },
-  { name: 'Kuzu but (ızgara)',     kcal: 258, p: 26,  c: 0,   f: 17,  unit: 'g' },
-  { name: 'Kuzu kavurma',          kcal: 310, p: 24,  c: 0,   f: 23,  unit: 'g' },
-  { name: 'Kuzu ciğer',            kcal: 140, p: 20,  c: 3,   f: 5,   unit: 'g' },
-  { name: 'Kuzu kıyma',            kcal: 268, p: 18,  c: 0,   f: 21,  unit: 'g' },
-  { name: 'Sucuk',                 kcal: 450, p: 16,  c: 1,   f: 42,  unit: 'g' },
-  { name: 'Salam',                 kcal: 300, p: 14,  c: 2,   f: 26,  unit: 'g' },
-  { name: 'Pastırma',              kcal: 230, p: 32,  c: 1,   f: 11,  unit: 'g' },
-  { name: 'Somon (ızgara)',        kcal: 208, p: 20,  c: 0,   f: 13,  unit: 'g' },
-  { name: 'Ton balığı (konserve)', kcal: 116, p: 26,  c: 0,   f: 1,   unit: 'g' },
-  { name: 'Hamsi',                 kcal: 131, p: 20,  c: 0,   f: 5,   unit: 'g' },
-  { name: 'Çipura',                kcal: 128, p: 21,  c: 0,   f: 4,   unit: 'g' },
-  { name: 'Levrek',                kcal: 124, p: 24,  c: 0,   f: 3,   unit: 'g' },
-  { name: 'Karides',               kcal: 99,  p: 24,  c: 0,   f: 0.3, unit: 'g' },
-  { name: 'Yumurta',               kcal: 78,  p: 6,   c: 0.6, f: 5,   unit: 'adet', perUnit: 60 },
-  { name: 'Yumurta akı',           kcal: 17,  p: 4,   c: 0.2, f: 0,   unit: 'adet', perUnit: 30 },
-  { name: 'Süt (%3.2)',            kcal: 61,  p: 3.2, c: 4.8, f: 3.2, unit: 'g' },
-  { name: 'Yoğurt (%3)',           kcal: 59,  p: 3.5, c: 4.7, f: 3,   unit: 'g' },
-  { name: 'Yoğurt (light)',        kcal: 35,  p: 5,   c: 3.8, f: 0.2, unit: 'g' },
-  { name: 'Kefir',                 kcal: 52,  p: 3.4, c: 4.7, f: 1.5, unit: 'g' },
-  { name: 'Beyaz peynir (%40)',    kcal: 264, p: 17,  c: 2,   f: 21,  unit: 'g' },
-  { name: 'Kaşar peyniri',         kcal: 386, p: 25,  c: 1,   f: 31,  unit: 'g' },
-  { name: 'Lor peyniri',           kcal: 98,  p: 11,  c: 3,   f: 4,   unit: 'g' },
-  { name: 'Labne',                 kcal: 170, p: 10,  c: 4,   f: 13,  unit: 'g' },
-  { name: 'Tereyağı',              kcal: 717, p: 0.9, c: 0.1, f: 81,  unit: 'g' },
-  { name: 'Beyaz ekmek (dilim)',   kcal: 79,  p: 2.7, c: 15,  f: 1,   unit: 'adet', perUnit: 30 },
-  { name: 'Tam buğday ekmek',      kcal: 69,  p: 3.6, c: 11,  f: 1.1, unit: 'adet', perUnit: 30 },
-  { name: 'Pirinç (pişmiş)',       kcal: 130, p: 2.7, c: 28,  f: 0.3, unit: 'g' },
-  { name: 'Makarna (pişmiş)',      kcal: 131, p: 5,   c: 25,  f: 1.1, unit: 'g' },
-  { name: 'Yulaf ezmesi (kuru)',   kcal: 389, p: 17,  c: 66,  f: 7,   unit: 'g' },
-  { name: 'Bulgur (pişmiş)',       kcal: 83,  p: 3,   c: 19,  f: 0.2, unit: 'g' },
-  { name: 'Mercimek (pişmiş)',     kcal: 116, p: 9,   c: 20,  f: 0.4, unit: 'g' },
-  { name: 'Nohut (pişmiş)',        kcal: 164, p: 9,   c: 27,  f: 2.6, unit: 'g' },
-  { name: 'Fasulye (pişmiş)',      kcal: 127, p: 8.7, c: 23,  f: 0.5, unit: 'g' },
-  { name: 'Patates (haşlanmış)',   kcal: 87,  p: 1.9, c: 20,  f: 0.1, unit: 'g' },
-  { name: 'Patates kızartması',    kcal: 312, p: 3.4, c: 41,  f: 15,  unit: 'g' },
-  { name: 'Mısır (haşlanmış)',     kcal: 96,  p: 3.4, c: 21,  f: 1.5, unit: 'g' },
-  { name: 'Domates',               kcal: 18,  p: 0.9, c: 3.9, f: 0.2, unit: 'adet', perUnit: 120 },
-  { name: 'Salatalık',             kcal: 15,  p: 0.7, c: 3.6, f: 0.1, unit: 'adet', perUnit: 200 },
-  { name: 'Biber (yeşil)',         kcal: 20,  p: 0.9, c: 4.6, f: 0.2, unit: 'adet', perUnit: 100 },
-  { name: 'Ispanak',               kcal: 23,  p: 2.9, c: 3.6, f: 0.4, unit: 'g' },
-  { name: 'Brokoli',               kcal: 34,  p: 2.8, c: 7,   f: 0.4, unit: 'g' },
-  { name: 'Havuç',                 kcal: 41,  p: 0.9, c: 10,  f: 0.2, unit: 'adet', perUnit: 80 },
-  { name: 'Kabak',                 kcal: 17,  p: 1.2, c: 3.1, f: 0.3, unit: 'adet', perUnit: 200 },
-  { name: 'Patlıcan',              kcal: 25,  p: 1,   c: 5.9, f: 0.2, unit: 'adet', perUnit: 300 },
-  { name: 'Soğan',                 kcal: 40,  p: 1.1, c: 9.3, f: 0.1, unit: 'adet', perUnit: 100 },
-  { name: 'Marul',                 kcal: 15,  p: 1.4, c: 2.9, f: 0.2, unit: 'g' },
-  { name: 'Bezelye',               kcal: 81,  p: 5.4, c: 14,  f: 0.4, unit: 'g' },
-  { name: 'Avokado',               kcal: 160, p: 2,   c: 9,   f: 15,  unit: 'adet', perUnit: 150 },
-  { name: 'Elma',                  kcal: 52,  p: 0.3, c: 14,  f: 0.2, unit: 'adet', perUnit: 180 },
-  { name: 'Muz',                   kcal: 89,  p: 1.1, c: 23,  f: 0.3, unit: 'adet', perUnit: 120 },
-  { name: 'Portakal',              kcal: 47,  p: 0.9, c: 12,  f: 0.1, unit: 'adet', perUnit: 180 },
-  { name: 'Üzüm',                  kcal: 69,  p: 0.7, c: 18,  f: 0.2, unit: 'g' },
-  { name: 'Çilek',                 kcal: 32,  p: 0.7, c: 7.7, f: 0.3, unit: 'adet', perUnit: 12 },
-  { name: 'Kivi',                  kcal: 61,  p: 1.1, c: 15,  f: 0.5, unit: 'adet', perUnit: 75 },
-  { name: 'Karpuz',                kcal: 30,  p: 0.6, c: 7.6, f: 0.2, unit: 'g' },
-  { name: 'Kavun',                 kcal: 34,  p: 0.8, c: 8.2, f: 0.2, unit: 'g' },
-  { name: 'Badem',                 kcal: 579, p: 21,  c: 22,  f: 50,  unit: 'adet', perUnit: 1.2 },
-  { name: 'Ceviz',                 kcal: 654, p: 15,  c: 14,  f: 65,  unit: 'adet', perUnit: 5 },
-  { name: 'Antep fıstığı',         kcal: 562, p: 20,  c: 28,  f: 45,  unit: 'adet', perUnit: 0.7 },
-  { name: 'Fıstık ezmesi',         kcal: 588, p: 25,  c: 20,  f: 50,  unit: 'g' },
-  { name: 'Zeytinyağı',            kcal: 884, p: 0,   c: 0,   f: 100, unit: 'g' },
-  { name: 'Zeytin (siyah)',        kcal: 115, p: 0.8, c: 6,   f: 11,  unit: 'adet', perUnit: 5 },
-  { name: 'Ayran',                 kcal: 38,  p: 2,   c: 2.8, f: 2,   unit: 'g' },
-  { name: 'Portakal suyu (taze)',  kcal: 45,  p: 0.7, c: 10,  f: 0.2, unit: 'g' },
-  { name: 'Sütlü kahve (latte)',   kcal: 54,  p: 2.4, c: 6,   f: 2.5, unit: 'g' },
-  { name: 'Kola',                  kcal: 42,  p: 0,   c: 10.6,f: 0,   unit: 'g' },
-  { name: 'Pizza (dilim)',         kcal: 266, p: 11,  c: 33,  f: 10,  unit: 'adet', perUnit: 100 },
-  { name: 'Hamburger',             kcal: 295, p: 17,  c: 24,  f: 14,  unit: 'adet', perUnit: 150 },
-  { name: 'Döner (tavuk dürüm)',   kcal: 218, p: 14,  c: 22,  f: 8,   unit: 'adet', perUnit: 250 },
-  { name: 'Kebap (şiş)',           kcal: 195, p: 20,  c: 0,   f: 12,  unit: 'g' },
-  { name: 'Lahmacun',              kcal: 230, p: 11,  c: 30,  f: 8,   unit: 'adet', perUnit: 120 },
-  { name: 'Gözleme (peynirli)',    kcal: 280, p: 10,  c: 35,  f: 12,  unit: 'adet', perUnit: 200 },
-  { name: 'Börek (su böreği)',     kcal: 258, p: 8,   c: 30,  f: 12,  unit: 'g' },
-  { name: 'Simit',                 kcal: 285, p: 9,   c: 55,  f: 4,   unit: 'adet', perUnit: 120 },
-  { name: 'Poğaça (sade)',         kcal: 310, p: 7,   c: 42,  f: 13,  unit: 'adet', perUnit: 80 },
-  { name: 'Çikolata (sütlü)',      kcal: 535, p: 8,   c: 59,  f: 30,  unit: 'g' },
-  { name: 'Çikolata (bitter)',     kcal: 546, p: 5,   c: 60,  f: 31,  unit: 'g' },
-  { name: 'Dondurma (vanilyalı)',  kcal: 207, p: 3.5, c: 24,  f: 11,  unit: 'g' },
-  { name: 'Baklava (dilim)',       kcal: 337, p: 4,   c: 40,  f: 18,  unit: 'adet', perUnit: 80 },
-  { name: 'Cips (patates)',        kcal: 536, p: 7,   c: 53,  f: 35,  unit: 'g' },
-  { name: 'Kuru incir',            kcal: 249, p: 3.3, c: 64,  f: 0.9, unit: 'adet', perUnit: 20 },
-  { name: 'Hurma',                 kcal: 277, p: 1.8, c: 75,  f: 0.2, unit: 'adet', perUnit: 24 },
-  { name: 'Protein tozu (servis)', kcal: 120, p: 25,  c: 3,   f: 1.5, unit: 'adet', perUnit: 30 },
-  { name: 'Yulaf ezmesi (pişmiş)', kcal: 71,  p: 2.5, c: 12,  f: 1.4, unit: 'g' },
-  { name: 'Tatlı patates',         kcal: 86,  p: 1.6, c: 20,  f: 0.1, unit: 'g' },
-  { name: 'Sarımsak',              kcal: 149, p: 6.4, c: 33,  f: 0.5, unit: 'adet', perUnit: 4 },
-  { name: 'Havuç (küçük)',         kcal: 18,  p: 0.3, c: 4.1, f: 0.1, unit: 'adet', perUnit: 50 },
-  { name: 'Hıyar (küçük)',         kcal: 15,  p: 0.7, c: 3.6, f: 0.1, unit: 'adet', perUnit: 100 },
-  { name: 'Cherry domates',        kcal: 3,   p: 0.2, c: 0.5, f: 0,   unit: 'adet', perUnit: 17 },
-  { name: 'Antrikot (çiğ)',        kcal: 208, p: 20,  c: 0,   f: 14,  unit: 'g' },
-  { name: 'Muz (küçük)',           kcal: 71,  p: 0.9, c: 18,  f: 0.2, unit: 'adet', perUnit: 80 },
-  { name: 'Uludağ Limonata Şekersiz', kcal: 4, p: 0,  c: 0.7, f: 0,  unit: 'g' },
-  { name: 'Eti Form Limon Bisküvi (50g)', kcal: 223, p: 3.9, c: 35, f: 7, unit: 'adet', perUnit: 50 },
+  { name: 'Chicken breast (grilled)', kcal: 165, p: 31,  c: 0,   f: 3.6, unit: 'g' },
+  { name: 'Chicken thigh (grilled)', kcal: 209, p: 26,  c: 0,   f: 11,  unit: 'g' },
+  { name: 'Chicken thigh (bone-in)', kcal: 215, p: 25,  c: 0,   f: 12,  unit: 'g' },
+  { name: 'Chicken wing', kcal: 222, p: 22,  c: 0,   f: 14,  unit: 'g' },
+  { name: 'Chicken breast (boiled)', kcal: 150, p: 28,  c: 0,   f: 3.2, unit: 'g' },
+  { name: 'Chicken thigh (pan-fried)', kcal: 245, p: 24,  c: 0,   f: 16,  unit: 'g' },
+  { name: 'Chicken liver', kcal: 167, p: 24,  c: 1,   f: 7,   unit: 'g' },
+  { name: 'Turkey breast', kcal: 135, p: 30,  c: 0,   f: 1,   unit: 'g' },
+  { name: 'Turkey thigh (grilled)', kcal: 218, p: 27,  c: 0,   f: 12,  unit: 'g' },
+  { name: 'Ground beef (20% fat)', kcal: 254, p: 17,  c: 0,   f: 20,  unit: 'g' },
+  { name: 'Ground beef (10% fat)', kcal: 196, p: 21,  c: 0,   f: 12,  unit: 'g' },
+  { name: 'Beef tenderloin', kcal: 271, p: 26,  c: 0,   f: 18,  unit: 'g' },
+  { name: 'Beef ribeye', kcal: 291, p: 24,  c: 0,   f: 21,  unit: 'g' },
+  { name: 'Beef (pan-fried)', kcal: 280, p: 25,  c: 0,   f: 19,  unit: 'g' },
+  { name: 'Beef leg (boiled)', kcal: 185, p: 27,  c: 0,   f: 8,   unit: 'g' },
+  { name: 'Beef liver', kcal: 135, p: 21,  c: 4,   f: 4,   unit: 'g' },
+  { name: 'Beef brisket (pan-fried)', kcal: 320, p: 22,  c: 0,   f: 25,  unit: 'g' },
+  { name: 'Lamb chop', kcal: 294, p: 25,  c: 0,   f: 21,  unit: 'g' },
+  { name: 'Lamb leg (grilled)', kcal: 258, p: 26,  c: 0,   f: 17,  unit: 'g' },
+  { name: 'Lamb (pan-fried)', kcal: 310, p: 24,  c: 0,   f: 23,  unit: 'g' },
+  { name: 'Lamb liver', kcal: 140, p: 20,  c: 3,   f: 5,   unit: 'g' },
+  { name: 'Ground lamb', kcal: 268, p: 18,  c: 0,   f: 21,  unit: 'g' },
+  { name: 'Sucuk (Turkish sausage)', kcal: 450, p: 16,  c: 1,   f: 42,  unit: 'g' },
+  { name: 'Salami', kcal: 300, p: 14,  c: 2,   f: 26,  unit: 'g' },
+  { name: 'Pastırma (cured beef)', kcal: 230, p: 32,  c: 1,   f: 11,  unit: 'g' },
+  { name: 'Salmon (grilled)', kcal: 208, p: 20,  c: 0,   f: 13,  unit: 'g' },
+  { name: 'Tuna (canned)', kcal: 116, p: 26,  c: 0,   f: 1,   unit: 'g' },
+  { name: 'Anchovy', kcal: 131, p: 20,  c: 0,   f: 5,   unit: 'g' },
+  { name: 'Sea bream', kcal: 128, p: 21,  c: 0,   f: 4,   unit: 'g' },
+  { name: 'Sea bass', kcal: 124, p: 24,  c: 0,   f: 3,   unit: 'g' },
+  { name: 'Shrimp', kcal: 99,  p: 24,  c: 0,   f: 0.3, unit: 'g' },
+  { name: 'Egg', kcal: 78,  p: 6,   c: 0.6, f: 5,   unit: 'adet', perUnit: 60 },
+  { name: 'Egg white', kcal: 17,  p: 4,   c: 0.2, f: 0,   unit: 'adet', perUnit: 30 },
+  { name: 'Milk (3.2% fat)', kcal: 61,  p: 3.2, c: 4.8, f: 3.2, unit: 'g' },
+  { name: 'Yogurt (3% fat)', kcal: 59,  p: 3.5, c: 4.7, f: 3,   unit: 'g' },
+  { name: 'Yogurt (light)', kcal: 35,  p: 5,   c: 3.8, f: 0.2, unit: 'g' },
+  { name: 'Kefir', kcal: 52,  p: 3.4, c: 4.7, f: 1.5, unit: 'g' },
+  { name: 'Feta cheese (40% fat)', kcal: 264, p: 17,  c: 2,   f: 21,  unit: 'g' },
+  { name: 'Kashar cheese', kcal: 386, p: 25,  c: 1,   f: 31,  unit: 'g' },
+  { name: 'Lor cheese (ricotta-style)', kcal: 98,  p: 11,  c: 3,   f: 4,   unit: 'g' },
+  { name: 'Labneh', kcal: 170, p: 10,  c: 4,   f: 13,  unit: 'g' },
+  { name: 'Butter', kcal: 717, p: 0.9, c: 0.1, f: 81,  unit: 'g' },
+  { name: 'White bread (slice)', kcal: 79,  p: 2.7, c: 15,  f: 1,   unit: 'adet', perUnit: 30 },
+  { name: 'Whole wheat bread', kcal: 69,  p: 3.6, c: 11,  f: 1.1, unit: 'adet', perUnit: 30 },
+  { name: 'Rice (cooked)', kcal: 130, p: 2.7, c: 28,  f: 0.3, unit: 'g' },
+  { name: 'Pasta (cooked)', kcal: 131, p: 5,   c: 25,  f: 1.1, unit: 'g' },
+  { name: 'Oats (dry)', kcal: 389, p: 17,  c: 66,  f: 7,   unit: 'g' },
+  { name: 'Bulgur (cooked)', kcal: 83,  p: 3,   c: 19,  f: 0.2, unit: 'g' },
+  { name: 'Lentils (cooked)', kcal: 116, p: 9,   c: 20,  f: 0.4, unit: 'g' },
+  { name: 'Chickpeas (cooked)', kcal: 164, p: 9,   c: 27,  f: 2.6, unit: 'g' },
+  { name: 'Beans (cooked)', kcal: 127, p: 8.7, c: 23,  f: 0.5, unit: 'g' },
+  { name: 'Potato (boiled)', kcal: 87,  p: 1.9, c: 20,  f: 0.1, unit: 'g' },
+  { name: 'French fries', kcal: 312, p: 3.4, c: 41,  f: 15,  unit: 'g' },
+  { name: 'Corn (boiled)', kcal: 96,  p: 3.4, c: 21,  f: 1.5, unit: 'g' },
+  { name: 'Tomato', kcal: 18,  p: 0.9, c: 3.9, f: 0.2, unit: 'adet', perUnit: 120 },
+  { name: 'Cucumber', kcal: 15,  p: 0.7, c: 3.6, f: 0.1, unit: 'adet', perUnit: 200 },
+  { name: 'Pepper (green)', kcal: 20,  p: 0.9, c: 4.6, f: 0.2, unit: 'adet', perUnit: 100 },
+  { name: 'Spinach', kcal: 23,  p: 2.9, c: 3.6, f: 0.4, unit: 'g' },
+  { name: 'Broccoli', kcal: 34,  p: 2.8, c: 7,   f: 0.4, unit: 'g' },
+  { name: 'Carrot', kcal: 41,  p: 0.9, c: 10,  f: 0.2, unit: 'adet', perUnit: 80 },
+  { name: 'Zucchini', kcal: 17,  p: 1.2, c: 3.1, f: 0.3, unit: 'adet', perUnit: 200 },
+  { name: 'Eggplant', kcal: 25,  p: 1,   c: 5.9, f: 0.2, unit: 'adet', perUnit: 300 },
+  { name: 'Onion', kcal: 40,  p: 1.1, c: 9.3, f: 0.1, unit: 'adet', perUnit: 100 },
+  { name: 'Lettuce', kcal: 15,  p: 1.4, c: 2.9, f: 0.2, unit: 'g' },
+  { name: 'Peas', kcal: 81,  p: 5.4, c: 14,  f: 0.4, unit: 'g' },
+  { name: 'Avocado', kcal: 160, p: 2,   c: 9,   f: 15,  unit: 'adet', perUnit: 150 },
+  { name: 'Apple', kcal: 52,  p: 0.3, c: 14,  f: 0.2, unit: 'adet', perUnit: 180 },
+  { name: 'Banana', kcal: 89,  p: 1.1, c: 23,  f: 0.3, unit: 'adet', perUnit: 120 },
+  { name: 'Orange', kcal: 47,  p: 0.9, c: 12,  f: 0.1, unit: 'adet', perUnit: 180 },
+  { name: 'Grapes', kcal: 69,  p: 0.7, c: 18,  f: 0.2, unit: 'g' },
+  { name: 'Strawberry', kcal: 32,  p: 0.7, c: 7.7, f: 0.3, unit: 'adet', perUnit: 12 },
+  { name: 'Kiwi', kcal: 61,  p: 1.1, c: 15,  f: 0.5, unit: 'adet', perUnit: 75 },
+  { name: 'Watermelon', kcal: 30,  p: 0.6, c: 7.6, f: 0.2, unit: 'g' },
+  { name: 'Melon', kcal: 34,  p: 0.8, c: 8.2, f: 0.2, unit: 'g' },
+  { name: 'Almond', kcal: 579, p: 21,  c: 22,  f: 50,  unit: 'adet', perUnit: 1.2 },
+  { name: 'Walnut', kcal: 654, p: 15,  c: 14,  f: 65,  unit: 'adet', perUnit: 5 },
+  { name: 'Pistachio', kcal: 562, p: 20,  c: 28,  f: 45,  unit: 'adet', perUnit: 0.7 },
+  { name: 'Peanut butter', kcal: 588, p: 25,  c: 20,  f: 50,  unit: 'g' },
+  { name: 'Olive oil', kcal: 884, p: 0,   c: 0,   f: 100, unit: 'g' },
+  { name: 'Olive (black)', kcal: 115, p: 0.8, c: 6,   f: 11,  unit: 'adet', perUnit: 5 },
+  { name: 'Ayran (yogurt drink)', kcal: 38,  p: 2,   c: 2.8, f: 2,   unit: 'g' },
+  { name: 'Orange juice (fresh)', kcal: 45,  p: 0.7, c: 10,  f: 0.2, unit: 'g' },
+  { name: 'Latte (milk coffee)', kcal: 54,  p: 2.4, c: 6,   f: 2.5, unit: 'g' },
+  { name: 'Cola', kcal: 42,  p: 0,   c: 10.6,f: 0,   unit: 'g' },
+  { name: 'Pizza (slice)', kcal: 266, p: 11,  c: 33,  f: 10,  unit: 'adet', perUnit: 100 },
+  { name: 'Hamburger', kcal: 295, p: 17,  c: 24,  f: 14,  unit: 'adet', perUnit: 150 },
+  { name: 'Döner (chicken wrap)', kcal: 218, p: 14,  c: 22,  f: 8,   unit: 'adet', perUnit: 250 },
+  { name: 'Kebab (skewered)', kcal: 195, p: 20,  c: 0,   f: 12,  unit: 'g' },
+  { name: 'Lahmacun (Turkish flatbread)', kcal: 230, p: 11,  c: 30,  f: 8,   unit: 'adet', perUnit: 120 },
+  { name: 'Gözleme (cheese-filled flatbread)', kcal: 280, p: 10,  c: 35,  f: 12,  unit: 'adet', perUnit: 200 },
+  { name: 'Börek (water pastry)', kcal: 258, p: 8,   c: 30,  f: 12,  unit: 'g' },
+  { name: 'Simit (Turkish bread ring)', kcal: 285, p: 9,   c: 55,  f: 4,   unit: 'adet', perUnit: 120 },
+  { name: 'Poğaça (plain pastry)', kcal: 310, p: 7,   c: 42,  f: 13,  unit: 'adet', perUnit: 80 },
+  { name: 'Chocolate (milk)', kcal: 535, p: 8,   c: 59,  f: 30,  unit: 'g' },
+  { name: 'Chocolate (dark)', kcal: 546, p: 5,   c: 60,  f: 31,  unit: 'g' },
+  { name: 'Ice cream (vanilla)', kcal: 207, p: 3.5, c: 24,  f: 11,  unit: 'g' },
+  { name: 'Baklava (slice)', kcal: 337, p: 4,   c: 40,  f: 18,  unit: 'adet', perUnit: 80 },
+  { name: 'Chips (potato)', kcal: 536, p: 7,   c: 53,  f: 35,  unit: 'g' },
+  { name: 'Dried fig', kcal: 249, p: 3.3, c: 64,  f: 0.9, unit: 'adet', perUnit: 20 },
+  { name: 'Date (fruit)', kcal: 277, p: 1.8, c: 75,  f: 0.2, unit: 'adet', perUnit: 24 },
+  { name: 'Protein powder (serving)', kcal: 120, p: 25,  c: 3,   f: 1.5, unit: 'adet', perUnit: 30 },
+  { name: 'Oats (cooked)', kcal: 71,  p: 2.5, c: 12,  f: 1.4, unit: 'g' },
+  { name: 'Sweet potato', kcal: 86,  p: 1.6, c: 20,  f: 0.1, unit: 'g' },
+  { name: 'Garlic', kcal: 149, p: 6.4, c: 33,  f: 0.5, unit: 'adet', perUnit: 4 },
+  { name: 'Carrot (small)', kcal: 18,  p: 0.3, c: 4.1, f: 0.1, unit: 'adet', perUnit: 50 },
+  { name: 'Cucumber (small)', kcal: 15,  p: 0.7, c: 3.6, f: 0.1, unit: 'adet', perUnit: 100 },
+  { name: 'Cherry tomato', kcal: 3,   p: 0.2, c: 0.5, f: 0,   unit: 'adet', perUnit: 17 },
+  { name: 'Ribeye (raw)', kcal: 208, p: 20,  c: 0,   f: 14,  unit: 'g' },
+  { name: 'Banana (small)', kcal: 71,  p: 0.9, c: 18,  f: 0.2, unit: 'adet', perUnit: 80 },
+  { name: 'Uludağ Lemonade (sugar-free)', kcal: 4, p: 0,  c: 0.7, f: 0,  unit: 'g' },
+  { name: 'Eti Form Lemon Biscuit (50g)', kcal: 223, p: 3.9, c: 35, f: 7, unit: 'adet', perUnit: 50 },
 
   // ── Meyveler ──
-  { name: 'Erik',                  kcal: 20,  p: 0.5, c: 5,   f: 0.1, unit: 'adet', perUnit: 40 },
-  { name: 'Armut',                 kcal: 57,  p: 0.4, c: 15,  f: 0.1, unit: 'adet', perUnit: 100 },
-  { name: 'İncir (taze)',          kcal: 74,  p: 0.8, c: 19,  f: 0.3, unit: 'g' },
-  { name: 'Şeftali',               kcal: 38,  p: 0.9, c: 9,   f: 0.3, unit: 'adet', perUnit: 80 },
-  { name: 'Kayısı',                kcal: 7,   p: 0.2, c: 1.7, f: 0.1, unit: 'adet', perUnit: 12 },
-  { name: 'Kiraz',                 kcal: 63,  p: 1.1, c: 16,  f: 0.2, unit: 'g' },
-  { name: 'Vişne',                 kcal: 50,  p: 1.0, c: 12,  f: 0.3, unit: 'g' },
-  { name: 'Nar',                   kcal: 83,  p: 1.7, c: 19,  f: 1.2, unit: 'g' },
-  { name: 'Trabzon hurması',       kcal: 96,  p: 0.8, c: 25,  f: 0.3, unit: 'adet', perUnit: 168 },
-  { name: 'Malta eriği',           kcal: 30,  p: 0.6, c: 7,   f: 0.2, unit: 'adet', perUnit: 70 },
-  { name: 'Dut',                   kcal: 43,  p: 1.4, c: 9.8, f: 0.4, unit: 'g' },
-  { name: 'Böğürtlen',             kcal: 43,  p: 1.4, c: 10,  f: 0.5, unit: 'g' },
-  { name: 'Ahududu',               kcal: 52,  p: 1.2, c: 12,  f: 0.7, unit: 'g' },
-  { name: 'Yaban mersini',         kcal: 57,  p: 0.7, c: 14,  f: 0.3, unit: 'g' },
-  { name: 'Mandalina',             kcal: 47,  p: 0.7, c: 12,  f: 0.3, unit: 'adet', perUnit: 88 },
-  { name: 'Greyfurt',              kcal: 42,  p: 0.8, c: 11,  f: 0.1, unit: 'g' },
-  { name: 'Limon',                 kcal: 17,  p: 0.6, c: 5,   f: 0.3, unit: 'adet', perUnit: 58 },
-  { name: 'Ananas',                kcal: 50,  p: 0.5, c: 13,  f: 0.1, unit: 'g' },
-  { name: 'Mango',                 kcal: 60,  p: 0.8, c: 15,  f: 0.4, unit: 'g' },
-  { name: 'Papaya',                kcal: 43,  p: 0.6, c: 11,  f: 0.3, unit: 'g' },
-  { name: 'Hindistan cevizi',      kcal: 354, p: 3.3, c: 15,  f: 35,  unit: 'g' },
-  { name: 'Kuru erik',             kcal: 240, p: 2.3, c: 63,  f: 0.4, unit: 'g' },
-  { name: 'Kuru kayısı',           kcal: 241, p: 3.6, c: 62,  f: 0.5, unit: 'g' },
+  { name: 'Plum', kcal: 20,  p: 0.5, c: 5,   f: 0.1, unit: 'adet', perUnit: 40 },
+  { name: 'Pear', kcal: 57,  p: 0.4, c: 15,  f: 0.1, unit: 'adet', perUnit: 100 },
+  { name: 'Fig (fresh)', kcal: 74,  p: 0.8, c: 19,  f: 0.3, unit: 'g' },
+  { name: 'Peach', kcal: 38,  p: 0.9, c: 9,   f: 0.3, unit: 'adet', perUnit: 80 },
+  { name: 'Apricot', kcal: 7,   p: 0.2, c: 1.7, f: 0.1, unit: 'adet', perUnit: 12 },
+  { name: 'Cherry', kcal: 63,  p: 1.1, c: 16,  f: 0.2, unit: 'g' },
+  { name: 'Sour cherry', kcal: 50,  p: 1.0, c: 12,  f: 0.3, unit: 'g' },
+  { name: 'Pomegranate', kcal: 83,  p: 1.7, c: 19,  f: 1.2, unit: 'g' },
+  { name: 'Persimmon', kcal: 96,  p: 0.8, c: 25,  f: 0.3, unit: 'adet', perUnit: 168 },
+  { name: 'Loquat', kcal: 30,  p: 0.6, c: 7,   f: 0.2, unit: 'adet', perUnit: 70 },
+  { name: 'Mulberry', kcal: 43,  p: 1.4, c: 9.8, f: 0.4, unit: 'g' },
+  { name: 'Blackberry', kcal: 43,  p: 1.4, c: 10,  f: 0.5, unit: 'g' },
+  { name: 'Raspberry', kcal: 52,  p: 1.2, c: 12,  f: 0.7, unit: 'g' },
+  { name: 'Blueberry', kcal: 57,  p: 0.7, c: 14,  f: 0.3, unit: 'g' },
+  { name: 'Tangerine', kcal: 47,  p: 0.7, c: 12,  f: 0.3, unit: 'adet', perUnit: 88 },
+  { name: 'Grapefruit', kcal: 42,  p: 0.8, c: 11,  f: 0.1, unit: 'g' },
+  { name: 'Lemon', kcal: 17,  p: 0.6, c: 5,   f: 0.3, unit: 'adet', perUnit: 58 },
+  { name: 'Pineapple', kcal: 50,  p: 0.5, c: 13,  f: 0.1, unit: 'g' },
+  { name: 'Mango', kcal: 60,  p: 0.8, c: 15,  f: 0.4, unit: 'g' },
+  { name: 'Papaya', kcal: 43,  p: 0.6, c: 11,  f: 0.3, unit: 'g' },
+  { name: 'Coconut', kcal: 354, p: 3.3, c: 15,  f: 35,  unit: 'g' },
+  { name: 'Prune', kcal: 240, p: 2.3, c: 63,  f: 0.4, unit: 'g' },
+  { name: 'Dried apricot', kcal: 241, p: 3.6, c: 62,  f: 0.5, unit: 'g' },
 
   // ── Kahvaltılık ──
-  { name: 'Bal',                   kcal: 304, p: 0.3, c: 82,  f: 0,   unit: 'g' },
-  { name: 'Reçel',                 kcal: 280, p: 0.4, c: 70,  f: 0,   unit: 'g' },
-  { name: 'Tahin',                 kcal: 595, p: 17,  c: 21,  f: 53,  unit: 'g' },
-  { name: 'Pekmez',                kcal: 265, p: 0.5, c: 66,  f: 0.1, unit: 'g' },
-  { name: 'Kaymak',                kcal: 263, p: 4,   c: 5,   f: 26,  unit: 'g' },
-  { name: 'Menemen (porsiyon)',    kcal: 326, p: 17,  c: 4,   f: 27,  unit: 'adet', perUnit: 250 },
-  { name: 'Sucuklu yumurta',       kcal: 446, p: 26,  c: 2,   f: 36,  unit: 'adet', perUnit: 250 },
+  { name: 'Honey', kcal: 304, p: 0.3, c: 82,  f: 0,   unit: 'g' },
+  { name: 'Jam', kcal: 280, p: 0.4, c: 70,  f: 0,   unit: 'g' },
+  { name: 'Tahini', kcal: 595, p: 17,  c: 21,  f: 53,  unit: 'g' },
+  { name: 'Pekmez (grape molasses)', kcal: 265, p: 0.5, c: 66,  f: 0.1, unit: 'g' },
+  { name: 'Kaymak (clotted cream)', kcal: 263, p: 4,   c: 5,   f: 26,  unit: 'g' },
+  { name: 'Menemen (portion)', kcal: 326, p: 17,  c: 4,   f: 27,  unit: 'adet', perUnit: 250 },
+  { name: 'Eggs with sucuk', kcal: 446, p: 26,  c: 2,   f: 36,  unit: 'adet', perUnit: 250 },
 
   // ── Çorbalar ──
-  { name: 'Mercimek çorbası',      kcal: 94,  p: 3.5, c: 11,  f: 4,   unit: 'g' },
-  { name: 'Tarhana çorbası',       kcal: 151, p: 2,   c: 11,  f: 8,   unit: 'g' },
-  { name: 'Domates çorbası',       kcal: 62,  p: 1.5, c: 9,   f: 2,   unit: 'g' },
-  { name: 'Yayla çorbası',         kcal: 68,  p: 3,   c: 7,   f: 3,   unit: 'g' },
-  { name: 'Ezogelin çorbası',      kcal: 88,  p: 3.5, c: 12,  f: 3,   unit: 'g' },
+  { name: 'Lentil soup', kcal: 94,  p: 3.5, c: 11,  f: 4,   unit: 'g' },
+  { name: 'Tarhana soup', kcal: 151, p: 2,   c: 11,  f: 8,   unit: 'g' },
+  { name: 'Tomato soup', kcal: 62,  p: 1.5, c: 9,   f: 2,   unit: 'g' },
+  { name: 'Yayla soup (yogurt & rice)', kcal: 68,  p: 3,   c: 7,   f: 3,   unit: 'g' },
+  { name: 'Ezogelin soup (red lentil & bulgur)', kcal: 88,  p: 3.5, c: 12,  f: 3,   unit: 'g' },
 
   // ── Türk Yemekleri ──
-  { name: 'İmam bayıldı (porsiyon)', kcal: 280, p: 3, c: 25,  f: 18,  unit: 'adet', perUnit: 200 },
-  { name: 'Dolma (yaprak)',         kcal: 70,  p: 2.5, c: 8,   f: 3,   unit: 'adet', perUnit: 40 },
-  { name: 'Sarma',                 kcal: 70,  p: 2.5, c: 8,   f: 3,   unit: 'adet', perUnit: 40 },
-  { name: 'Köfte',                 kcal: 150, p: 12,  c: 3,   f: 9,   unit: 'adet', perUnit: 60, defaultUnit: 'g' },
-  { name: 'Kuru fasulye',          kcal: 127, p: 8.7, c: 23,  f: 0.5, unit: 'g' },
-  { name: 'Pilav (pirinç)',        kcal: 130, p: 2.7, c: 28,  f: 0.3, unit: 'g' },
-  { name: 'Su böreği (dilim)',     kcal: 200, p: 6,   c: 20,  f: 10,  unit: 'adet', perUnit: 80 },
-  { name: 'Kol böreği',            kcal: 280, p: 5,   c: 22,  f: 18,  unit: 'adet', perUnit: 70 },
-  { name: 'Ispanaklı börek',       kcal: 220, p: 6,   c: 24,  f: 11,  unit: 'g' },
-  { name: 'Mücver (kabak)',        kcal: 180, p: 5,   c: 12,  f: 12,  unit: 'adet', perUnit: 80 },
-  { name: 'Patates köftesi',       kcal: 145, p: 4,   c: 20,  f: 5,   unit: 'adet', perUnit: 70 },
-  { name: 'Çiğ köfte (dürüm)',    kcal: 210, p: 4,   c: 38,  f: 4,   unit: 'adet', perUnit: 150 },
-  { name: 'Mantı (porsiyon)',      kcal: 320, p: 14,  c: 40,  f: 10,  unit: 'g' },
-  { name: 'Türlü (sebze yemeği)', kcal: 90,  p: 2,   c: 12,  f: 4,   unit: 'g' },
+  { name: 'İmam bayıldı (stuffed eggplant, portion)', kcal: 280, p: 3, c: 25,  f: 18,  unit: 'adet', perUnit: 200 },
+  { name: 'Dolma (stuffed grape leaves)', kcal: 70,  p: 2.5, c: 8,   f: 3,   unit: 'adet', perUnit: 40 },
+  { name: 'Sarma (stuffed grape leaves)', kcal: 70,  p: 2.5, c: 8,   f: 3,   unit: 'adet', perUnit: 40 },
+  { name: 'Meatball (köfte)', kcal: 150, p: 12,  c: 3,   f: 9,   unit: 'adet', perUnit: 60, defaultUnit: 'g' },
+  { name: 'White bean stew', kcal: 127, p: 8.7, c: 23,  f: 0.5, unit: 'g' },
+  { name: 'Rice pilaf', kcal: 130, p: 2.7, c: 28,  f: 0.3, unit: 'g' },
+  { name: 'Water börek (slice)', kcal: 200, p: 6,   c: 20,  f: 10,  unit: 'adet', perUnit: 80 },
+  { name: 'Rolled börek (kol böreği)', kcal: 280, p: 5,   c: 22,  f: 18,  unit: 'adet', perUnit: 70 },
+  { name: 'Spinach börek', kcal: 220, p: 6,   c: 24,  f: 11,  unit: 'g' },
+  { name: 'Zucchini fritter', kcal: 180, p: 5,   c: 12,  f: 12,  unit: 'adet', perUnit: 80 },
+  { name: 'Potato croquette', kcal: 145, p: 4,   c: 20,  f: 5,   unit: 'adet', perUnit: 70 },
+  { name: 'Çiğ köfte (wrap)', kcal: 210, p: 4,   c: 38,  f: 4,   unit: 'adet', perUnit: 150 },
+  { name: 'Mantı (Turkish dumplings, portion)', kcal: 320, p: 14,  c: 40,  f: 10,  unit: 'g' },
+  { name: 'Türlü (mixed vegetable stew)', kcal: 90,  p: 2,   c: 12,  f: 4,   unit: 'g' },
 
   // ── Fındık & Kuruyemiş ──
-  { name: 'Fındık',               kcal: 628, p: 14,  c: 17,  f: 61,  unit: 'g' },
-  { name: 'Kaju',                  kcal: 553, p: 18,  c: 30,  f: 44,  unit: 'g' },
-  { name: 'Çam fıstığı',          kcal: 673, p: 14,  c: 13,  f: 68,  unit: 'g' },
-  { name: 'Ay çekirdeği',         kcal: 584, p: 21,  c: 20,  f: 51,  unit: 'g' },
-  { name: 'Kabak çekirdeği',      kcal: 559, p: 30,  c: 11,  f: 49,  unit: 'g' },
-  { name: 'Leblebi',               kcal: 364, p: 20,  c: 61,  f: 5,   unit: 'g' },
-  { name: 'Mısır (patlamış)',      kcal: 375, p: 12,  c: 74,  f: 4.5, unit: 'g' },
+  { name: 'Hazelnut', kcal: 628, p: 14,  c: 17,  f: 61,  unit: 'g' },
+  { name: 'Cashew', kcal: 553, p: 18,  c: 30,  f: 44,  unit: 'g' },
+  { name: 'Pine nut', kcal: 673, p: 14,  c: 13,  f: 68,  unit: 'g' },
+  { name: 'Sunflower seeds', kcal: 584, p: 21,  c: 20,  f: 51,  unit: 'g' },
+  { name: 'Pumpkin seeds', kcal: 559, p: 30,  c: 11,  f: 49,  unit: 'g' },
+  { name: 'Roasted chickpeas (leblebi)', kcal: 364, p: 20,  c: 61,  f: 5,   unit: 'g' },
+  { name: 'Popcorn', kcal: 375, p: 12,  c: 74,  f: 4.5, unit: 'g' },
 
   // ── İçecekler ──
-  { name: 'Türk kahvesi (sade)',   kcal: 2,   p: 0.2, c: 0,   f: 0,   unit: 'adet', perUnit: 60 },
-  { name: 'Çay (şekersiz)',        kcal: 1,   p: 0,   c: 0.2, f: 0,   unit: 'adet', perUnit: 200 },
-  { name: 'Salep',                 kcal: 102, p: 2.5, c: 20,  f: 1.5, unit: 'g' },
-  { name: 'Boza',                  kcal: 80,  p: 3,   c: 17,  f: 0.5, unit: 'g' },
+  { name: 'Turkish coffee (plain)', kcal: 2,   p: 0.2, c: 0,   f: 0,   unit: 'adet', perUnit: 60 },
+  { name: 'Tea (unsweetened)', kcal: 1,   p: 0,   c: 0.2, f: 0,   unit: 'adet', perUnit: 200 },
+  { name: 'Salep', kcal: 102, p: 2.5, c: 20,  f: 1.5, unit: 'g' },
+  { name: 'Boza (fermented millet drink)', kcal: 80,  p: 3,   c: 17,  f: 0.5, unit: 'g' },
 ];
 
 const MEAL_TYPES = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
@@ -449,7 +449,7 @@ const CHART_TABS = [
   { key: 'calories', label: 'Calories' },
   { key: 'bodyfat', label: 'Body Fat' },
   { key: 'ffmi', label: 'FFMI' },
-  { key: 'ratio', label: 'Omuz / Bel' },
+  { key: 'ratio', label: 'Shoulder / Waist' },
   { key: 'waist', label: 'Waist' },
   { key: 'neck', label: 'Neck' },
 ];
@@ -682,7 +682,7 @@ function SeriesChart({ entries, color = '#5c7cfa', unit = '', targetLine = null,
         {delta !== null && Math.abs(delta) > 0.001 && (
           <span className="sc-delta">{delta > 0 ? '▲' : '▼'} {formatValue(Math.abs(delta))} vs last</span>
         )}
-        <button className="sc-expand-btn" title="Büyüt / zoom" onClick={openFullscreen}>⤢</button>
+        <button className="sc-expand-btn" title="Expand / zoom" onClick={openFullscreen}>⤢</button>
       </div>
       <ChartBody
         sorted={sorted} color={color} unit={unit} targetLine={targetLine}
@@ -1014,12 +1014,12 @@ export default function FitnessTracker({ view = 'overview' } = {}) {
 
     // Eski flat array [ {id,name,sets:[...]} ] → günlere taşı
     if (saved && Array.isArray(saved) && saved.length > 0 && !saved[0]?.exercises) {
-      return [{ id: Date.now(), name: 'Gün 1', exercises: saved.map(migrateEx) }];
+      return [{ id: Date.now(), name: 'Day 1', exercises: saved.map(migrateEx) }];
     }
     // Eski {date:[...]} format
     if (saved && !Array.isArray(saved)) {
       const allExs = Object.values(saved).flat();
-      return allExs.length > 0 ? [{ id: Date.now(), name: 'Gün 1', exercises: allExs.map(migrateEx) }] : [];
+      return allExs.length > 0 ? [{ id: Date.now(), name: 'Day 1', exercises: allExs.map(migrateEx) }] : [];
     }
     // Günlü format — egzersizleri yine de migrate et (eski sets array varsa)
     if (Array.isArray(saved)) {
@@ -1059,14 +1059,78 @@ export default function FitnessTracker({ view = 'overview' } = {}) {
   // Weight ↕ AI dikey resize
 
 
-  // ── AI Fitness Assistant state ──
-  const [aiMessages, setAiMessages] = useState([]);
+  // ── AI Fitness Assistant state — multiple persisted, resumable chat threads ──
+  const [aiThreads, setAiThreads] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('ft_ai_threads'));
+      if (Array.isArray(saved) && saved.length > 0) return saved;
+    } catch {}
+    return [{ id: Date.now(), title: 'New chat', messages: [], updatedAt: Date.now() }];
+  });
+  const [activeThreadId, setActiveThreadId] = useState(() => {
+    const saved = localStorage.getItem('ft_ai_active_thread');
+    return saved ? Number(saved) : null;
+  });
+  const [showThreadList, setShowThreadList] = useState(false);
+  const [aiFontScale, setAiFontScale] = useState(() => {
+    const saved = parseFloat(localStorage.getItem('ft_ai_font_scale'));
+    return saved >= 0.6 && saved <= 2.2 ? saved : 1;
+  });
   const [aiInput, setAiInput] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiImages, setAiImages] = useState([]); // [{dataUrl, mediaType}]
   const aiBottomRef = useRef(null);
   const aiInputRef = useRef(null);
   const aiFileRef = useRef(null);
+
+  const activeAiThread = aiThreads.find(t => t.id === activeThreadId) || aiThreads[0];
+  const aiMessages = activeAiThread ? activeAiThread.messages : [];
+
+  useEffect(() => { save('ft_ai_threads', aiThreads); }, [aiThreads]);
+  useEffect(() => {
+    if (!activeThreadId || !aiThreads.some(t => t.id === activeThreadId)) {
+      setActiveThreadId(aiThreads[0]?.id ?? null);
+    }
+  }, [aiThreads, activeThreadId]);
+  useEffect(() => { if (activeThreadId) localStorage.setItem('ft_ai_active_thread', String(activeThreadId)); }, [activeThreadId]);
+  useEffect(() => { localStorage.setItem('ft_ai_font_scale', String(aiFontScale)); }, [aiFontScale]);
+
+  // Drop-in replacement for the old setAiMessages(updater) — writes into the
+  // active thread instead of a single flat array, so every thread keeps its
+  // own history. Same call signature (function updater or plain array).
+  function updateAiMessages(updater) {
+    setAiThreads(prev => prev.map(t => {
+      if (t.id !== activeThreadId) return t;
+      const nextMessages = typeof updater === 'function' ? updater(t.messages) : updater;
+      let title = t.title;
+      if (title === 'New chat') {
+        const firstUser = nextMessages.find(m => m.role === 'user');
+        const raw = typeof firstUser?.content === 'string' ? firstUser.content.trim() : '';
+        if (raw) title = raw.slice(0, 40);
+      }
+      return { ...t, messages: nextMessages, title, updatedAt: Date.now() };
+    }));
+  }
+
+  function newAiThread() {
+    const t = { id: Date.now(), title: 'New chat', messages: [], updatedAt: Date.now() };
+    setAiThreads(prev => [t, ...prev]);
+    setActiveThreadId(t.id);
+    setShowThreadList(false);
+  }
+
+  function deleteAiThread(id) {
+    setAiThreads(prev => {
+      const next = prev.filter(t => t.id !== id);
+      return next.length > 0 ? next : [{ id: Date.now(), title: 'New chat', messages: [], updatedAt: Date.now() }];
+    });
+  }
+
+  function handleAiWheel(e) {
+    if (!e.ctrlKey) return;
+    e.preventDefault();
+    setAiFontScale(s => Math.min(2.2, Math.max(0.6, +(s + (e.deltaY < 0 ? 0.08 : -0.08)).toFixed(2))));
+  }
 
   useEffect(() => { aiBottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [aiMessages]);
 
@@ -1409,7 +1473,7 @@ export default function FitnessTracker({ view = 'overview' } = {}) {
     },
     {
       name: 'add_workout_day',
-      description: 'Create a new workout day (e.g. "Push Day", "Göğüs Günü", "Leg Day").',
+      description: 'Create a new workout day (e.g. "Push Day", "Chest Day", "Leg Day").',
       input_schema: {
         type: 'object',
         properties: {
@@ -1636,7 +1700,7 @@ export default function FitnessTracker({ view = 'overview' } = {}) {
     const userMsg = (typeof text === 'string' ? text : aiInput).trim();
     if ((!userMsg && aiImages.length === 0) || aiLoading) return;
     const key = localStorage.getItem('anthropic_api_key');
-    if (!key) { setAiMessages(p => [...p, { role: 'assistant', content: 'API key required — Settings → AI.' }]); return; }
+    if (!key) { updateAiMessages(p => [...p, { role: 'assistant', content: 'API key required — Settings → AI.' }]); return; }
 
     // Görsel varsa multipart content block oluştur
     const pendingImages = [...aiImages];
@@ -1647,15 +1711,15 @@ export default function FitnessTracker({ view = 'overview' } = {}) {
           type: 'image',
           source: { type: 'base64', media_type: img.mediaType, data: img.dataUrl.split(',')[1] },
         })),
-        ...(userMsg ? [{ type: 'text', text: userMsg }] : [{ type: 'text', text: 'Bu görseli analiz et.' }]),
+        ...(userMsg ? [{ type: 'text', text: userMsg }] : [{ type: 'text', text: 'Analyze this image.' }]),
       ];
     } else {
       userContent = userMsg;
     }
 
-    const displayMsg = { role: 'user', content: userMsg || '📷 Görsel gönderildi', images: pendingImages };
+    const displayMsg = { role: 'user', content: userMsg || '📷 Image sent', images: pendingImages };
     const newMessages = [...aiMessages, displayMsg];
-    setAiMessages(newMessages);
+    updateAiMessages(newMessages);
     setAiInput('');
     setAiImages([]);
     setAiLoading(true);
@@ -1673,13 +1737,42 @@ export default function FitnessTracker({ view = 'overview' } = {}) {
         id: d.id, name: d.name,
         exercises: d.exercises.map(e => ({ id: e.id, name: e.name, sets: e.sets, reps: e.isMax ? 'MAX' : e.reps })),
       }));
-      return `You are a fitness coach with direct write access to the user's app. Today: ${today()}.
-USER: gender=${profile.gender||'?'}, age=${profile.age||'?'}, weight=${profile.weight||'?'}kg, height=${profile.height||'?'}cm, BMR=${bmr||'?'}, TDEE=${tdee||'?'}, goal=${goal.type||'maintain'}${goal.targetWeight?` →${goal.targetWeight}kg`:''}
+      return `You are an expert fitness coach and sports nutritionist with direct write access to the user's app. Today: ${today()}.
+USER: gender=${profile.gender||'?'}, age=${profile.age||'?'}, weight=${profile.weight||'?'}kg, height=${profile.height||'?'}cm, BMR=${bmr||'?'}, TDEE=${tdee||'?'}, minSafeCalories=${minKcal||'?'}, goal=${goal.type||'maintain'}${goal.targetWeight?` →${goal.targetWeight}kg`:''}
 
 CURRENT WORKOUT PLAN (use these IDs):
 ${snap.length ? JSON.stringify(snap) : 'No workout days yet.'}
 
 WORKOUT DATA STRUCTURE: Each exercise: {id, name, sets:number, reps:number, isMax:boolean}.
+
+COACHING PRINCIPLES — ground every recommendation in these, not generic advice:
+
+TRAINING
+- Progressive overload: increase load, reps, or volume by roughly 2.5-10%/week depending on training age (novices progress faster than advanced trainees). Never suggest a jump bigger than ~10% in one week — that's when injury risk spikes.
+- Periodize intelligently through the full arc, not just two speeds: stabilization/technique work (higher reps, light load, controlled tempo) for beginners or after a layoff → hypertrophy blocks (6-12 reps, moderate-high volume) → maximal strength blocks (1-6 reps, low volume, high load, longer rests) → power/peaking blocks (explosive, low volume) if the goal calls for it. Match the phase to the user's goal and training age, not a fixed template.
+- Rest periods and tempo matter, not just sets/reps: shorter rests (~30-60s) suit hypertrophy/endurance work, longer rests (2-5min) suit strength/power work where full recovery between sets preserves output.
+- Always account for warm-up: 1-2 light ramp-up sets before working sets on compound lifts, plus brief joint-specific mobility for whatever's being trained that day — don't jump straight to working weight.
+- Favor compound, multi-joint movements as the backbone of any plan; add isolation/unilateral work to address weak points or imbalances.
+- Use RPE (rate of perceived exertion, 1-10) or RIR (reps in reserve) to gauge intensity when the user's 1RM isn't known — don't assume they know their max.
+- Suggest a deload (cut volume/intensity ~40-50%) every 4-6 weeks or when performance stalls, not just when injury is already present.
+- Watch for overtraining signals in what the user reports (persistent fatigue, stalled or declining performance, poor sleep, elevated resting heart rate, joint pain, mood dip) and recommend rest or a deload instead of pushing through.
+- Form and safety over ego: if the user reports pain (not normal muscle soreness) in a joint, stop recommending load increases there and tell them to see a doctor or physical therapist — that's outside your scope.
+
+NUTRITION
+- Anchor targets to the user's real TDEE above, not generic formulas. For fat loss: a moderate deficit of ~15-25% below TDEE (roughly 300-500 kcal/day) is sustainable and preserves muscle better than aggressive cuts; never recommend going below their minSafeCalories floor above — that number already accounts for BMR and lean body mass.
+- For muscle gain: a modest surplus of ~10-20% above TDEE (roughly 200-300 kcal/day) limits fat gain while supporting growth.
+- Protein: 1.6-2.2g per kg bodyweight/day, toward the higher end when the user is in a deficit or recomposing. Fat: at least ~0.5-1g/kg for hormonal health; fill the rest of the budget with carbs to fuel training. This matters more than chasing an exact carb/fat split.
+- Judge progress by more than scale weight: when weight_log data is available (waist/neck measurements or body-fat trend), weigh that alongside the scale number — water/sodium/cycle fluctuations make single weigh-ins noisy, so favor multi-week trend over any one entry.
+- Hydration and sleep are part of the plan, not an afterthought: mention them when relevant to recovery, performance, or a stalled goal, not just as a checklist line.
+- Frame nutrition around adherence and whole foods, not rigid "clean eating" — the best plan is the one they'll actually follow. When estimating macros for a food (per tool rule below), use real nutrition data, not guesses.
+
+COMMUNICATION & ACCOUNTABILITY
+- Talk like a real coach texting a client, not a report generator: warm, personal, conversational sentences. Do NOT format replies as bullet points, numbered lists, headers, or bold labels unless the user is asking for something genuinely list-shaped (e.g. "write me a 4-week plan") or added more than ~4 things at once. A quick "Nice, bumped bench press to 4x8 — that's a solid jump from last week" beats a clinical checklist every time.
+- Vary your phrasing, react to what the user actually said, and let a little personality through — you're chatting with someone, not filing a report.
+- Base advice on the user's actual logged data, not boilerplate — see tool rule 7 below for how to pull it.
+- Be honest, not just encouraging: if progress has stalled or an ask is unsustainable (extreme deficit, daily max-effort training, skipping recovery), say so like a coach leveling with you, not a warning label — then offer the better move.
+- Reinforce consistency over intensity: a missed session or an off-plan meal isn't a failure worth dwelling on — redirect to the next actionable step. If the user hasn't logged weight or meals in a while, a brief nudge to log is fair game, but don't nag.
+- If something is a medical question (persistent pain, a diagnosed condition, anything beyond normal training/nutrition guidance), say plainly that it's outside your scope and they should see a doctor — don't guess.
 
 TOOL RULES — FOLLOW EXACTLY:
 1. add_exercise: ALWAYS include sets, reps, is_max in the SAME call. Never add first then update.
@@ -1687,9 +1780,10 @@ TOOL RULES — FOLLOW EXACTLY:
 2. When an image shows a workout list: process it COMPLETELY — add every single exercise shown, one add_exercise call per exercise. Do NOT stop partway through.
 3. Do NOT call get_fitness_data for workouts — current plan is already above.
 4. DO NOT ask for confirmation. Act immediately, confirm after.
-5. Reply in same language as user. After finishing, list what was added (1 line each).
+5. Reply in the same language as the user, in plain conversational sentences — mention what you added the way a person would say it out loud, not as a formatted list (unless it's a genuinely long batch, e.g. a whole plan parsed from an image).
 6. add_food_to_menu: if food_name isn't in food_database (check via get_fitness_data first), estimate its macros yourself from general nutrition knowledge (kcal/protein/carbs/fat per 100g, or per piece for countable foods) and pass estimate_kcal/estimate_p/estimate_c/estimate_f/estimate_unit in the SAME call. Never ask the user for macros — estimate confidently, mention it was an estimate in your reply.
-7. Be fast and direct. Keep replies to 1-3 short sentences unless the user explicitly asks for more detail. No filler, no restating the question, no long caveats — just the answer or the confirmation.`;
+7. Before giving nutrition or progress-related coaching advice (deficit/surplus sizing, "am I on track", trend questions) — unlike workouts — you don't already have weight/meal history above, so call get_fitness_data with include:['weight_log','today_macros'] (add 'meals' if you need more detail) FIRST, then base your answer on what it returns instead of assuming.
+8. Be quick, not curt. Keep replies short (1-4 sentences) like a real text conversation — "short" means no filler and no restating the question, NOT clinical or robotic. Talk TO the user like a person who knows them, informed by the coaching principles above even when the reply itself is brief.`;
     }
 
     // Agentic loop helper — system + messages → {text, actionTaken}
@@ -1740,24 +1834,24 @@ TOOL RULES — FOLLOW EXACTLY:
         type: 'image',
         source: { type: 'base64', media_type: img.mediaType, data: img.dataUrl.split(',')[1] },
       }));
-      const parsePrompt = `Bu görsellerde antrenman planı var. Tüm günleri ve egzersizleri tam olarak çıkar.
+      const parsePrompt = `These images contain a workout plan. Extract all the days and exercises exactly.
 
-SADECE şu JSON formatında yanıt ver, başka hiçbir şey yazma:
+Respond ONLY in this JSON format, nothing else:
 {
   "days": [
     {
-      "name": "gün adı (ör: SIRA 1, Push Day, Göğüs Günü...)",
+      "name": "day name (e.g. Day 1, Push Day, Chest Day...)",
       "exercises": [
-        { "name": "egzersiz adı", "sets": 3, "reps": 10, "is_max": false }
+        { "name": "exercise name", "sets": 3, "reps": 10, "is_max": false }
       ]
     }
   ]
 }
 
-Kurallar:
-- is_max: egzersiz "max" veya "AMRAP" veya tekrar sayısı belirsizse true, yoksa false
-- sets ve reps her zaman sayı olsun
-- Görseldeki TÜM günleri ve TÜM egzersizleri ekle, hiçbirini atlama`;
+Rules:
+- is_max: true if the exercise says "max" or "AMRAP" or the rep count is unclear, otherwise false
+- sets and reps must always be numbers
+- Add ALL days and ALL exercises shown in the image, don't skip any`;
 
       const body = JSON.stringify({
         model: 'claude-opus-5',
@@ -1775,7 +1869,7 @@ Kurallar:
       const raw = data.content.find(b => b.type === 'text')?.text || '';
       // JSON bloğunu çıkar
       const match = raw.match(/\{[\s\S]*\}/);
-      if (!match) throw new Error('Görsel parse edilemedi: ' + raw.slice(0, 200));
+      if (!match) throw new Error('Failed to parse image: ' + raw.slice(0, 200));
       return JSON.parse(match[0]);
     }
 
@@ -1784,7 +1878,7 @@ Kurallar:
         // Aşama 1: Görselleri parse et
         const parsed = await parseWorkoutImages(pendingImages);
         const days = parsed.days || [];
-        if (days.length === 0) throw new Error('Görselde antrenman planı bulunamadı.');
+        if (days.length === 0) throw new Error('No workout plan found in the image.');
 
         // Aşama 2: Tüm günleri tek seferde state'e ekle (setWorkouts batching sorunundan kaçın)
         const newDays = days.map(day => {
@@ -1797,7 +1891,7 @@ Kurallar:
             reps: Number(ex.reps) || 10,
             isMax: ex.is_max === true,
           }));
-          return { id: dayId, name: (day.name || 'Gün').trim(), exercises };
+          return { id: dayId, name: (day.name || 'Day').trim(), exercises };
         });
         setWorkouts(prev => [...prev, ...newDays]);
         if (newDays.length > 0) setExpandedDay(newDays[newDays.length - 1].id);
@@ -1805,7 +1899,7 @@ Kurallar:
         const results = newDays.map(d =>
           `**${d.name}**: ${d.exercises.map(e => `${e.name} ${e.sets}×${e.isMax ? 'MAX' : e.reps}`).join(', ')}`
         );
-        setAiMessages(p => [...p, { role: 'assistant', content: results.join('\n') }]);
+        updateAiMessages(p => [...p, { role: 'assistant', content: results.join('\n') }]);
         setAiLoading(false);
         setTimeout(() => aiInputRef.current?.focus(), 50);
         return;
@@ -1815,13 +1909,13 @@ Kurallar:
       const history = newMessages.slice(-6).map((m, idx) => {
         const isLast = idx === newMessages.slice(-6).length - 1;
         if (isLast && m.role === 'user') return { role: 'user', content: userContent };
-        if (m.images?.length) return { role: m.role, content: m.content || '[görsel gönderildi]' };
+        if (m.images?.length) return { role: m.role, content: m.content || '[image sent]' };
         return { role: m.role, content: m.content };
       });
       const { text, actionTaken } = await runAiLoop(buildSystem(), history);
-      setAiMessages(p => [...p, { role: 'assistant', content: text || (actionTaken ? '✓ Done.' : '...') }]);
+      updateAiMessages(p => [...p, { role: 'assistant', content: text || (actionTaken ? '✓ Done.' : '...') }]);
     } catch (e) {
-      setAiMessages(p => [...p, { role: 'assistant', content: 'Hata: ' + errMsg(e) }]);
+      updateAiMessages(p => [...p, { role: 'assistant', content: 'Error: ' + errMsg(e) }]);
     } finally {
       setAiLoading(false);
       setTimeout(() => aiInputRef.current?.focus(), 50);
@@ -1936,7 +2030,7 @@ Kurallar:
       return;
     }
     const newId = Date.now();
-    setMenuPresets(prev => [...prev, { id: newId, name: 'Yeni Menü', items: [] }]);
+    setMenuPresets(prev => [...prev, { id: newId, name: 'New Menu', items: [] }]);
     setExpandedPresetId(newId);
     // Fonksiyonel updater'lar sırayla uygulanır, bu yüzden yukarıdaki preset
     // React state'ine eklendikten sonra bu güvenle çalışır (setTimeout gerekmez).
@@ -2068,7 +2162,7 @@ Kurallar:
   // ── Antrenman CRUD ──
   function addDay(name) {
     playAddSound();
-    const day = { id: Date.now(), name: name.trim() || `Gün ${workouts.length + 1}`, exercises: [] };
+    const day = { id: Date.now(), name: name.trim() || `Day ${workouts.length + 1}`, exercises: [] };
     setWorkouts(prev => [...prev, day]);
     setExpandedDay(day.id);
     return day.id;
@@ -2221,31 +2315,31 @@ Kurallar:
                   {bodyFat != null ? `%${bodyFat}` : '—'}
                 </div>
                 <div className="ft-hstat-unit">fat</div>
-                <div className="ft-hstat-label">Vücut Yağ Oranı</div>
+                <div className="ft-hstat-label">Body Fat %</div>
               </div>
               <div className="ft-hstat-sep" />
               <div className="ft-hstat">
                 <div className="ft-hstat-val" style={{ color: '#e8e8e8' }}>{leanMass ?? '—'}</div>
                 <div className="ft-hstat-unit">kg</div>
-                <div className="ft-hstat-label">Yağsız Kütle</div>
+                <div className="ft-hstat-label">Lean Mass</div>
               </div>
               <div className="ft-hstat-sep" />
               <div className="ft-hstat">
                 <div className="ft-hstat-val" style={{ color: '#e8e8e8' }}>{shoulderWaistRatio ?? '—'}</div>
-                <div className="ft-hstat-unit">oran</div>
-                <div className="ft-hstat-label">Omuz / Bel Oranı</div>
+                <div className="ft-hstat-unit">ratio</div>
+                <div className="ft-hstat-label">Shoulder / Waist Ratio</div>
               </div>
               <div className="ft-hstat-sep" />
               <div className="ft-hstat">
                 <div className="ft-hstat-val" style={{ color: '#e8e8e8' }}>{ffmi ?? '—'}</div>
                 <div className="ft-hstat-unit">ffmi</div>
-                <div className="ft-hstat-label">FFMI Endeksi</div>
+                <div className="ft-hstat-label">FFMI Index</div>
               </div>
             </div>
           )}
           <div className="ft-hero-actions">
             <button className={`ft-btn-ghost${heroMode === 'karne' ? ' ft-btn-ghost--active' : ''}`} onClick={() => setHeroMode(m => m === 'main' ? 'karne' : 'main')}>
-              {heroMode === 'main' ? 'Karne' : 'Genel'}
+              {heroMode === 'main' ? 'Composition' : 'General'}
             </button>
             <button className="ft-btn-ghost" onClick={() => { setGoalDraft(goal); setEditingGoal(true); }}>
               Goal
@@ -2532,16 +2626,43 @@ Kurallar:
           {/* ── Sol Kolon: AI (Kilo Takibi Grafikler sekmesine taşındı) ── */}
           <div className="ft-resizable-col" style={{ width: w0, gap: 0 }}>
             {/* ── AI Fitness Assistant ── */}
-            <div className="ft-card ft-ai-box" style={{ flex: 1, minHeight: 0 }}>
+            <div className="ft-card ft-ai-box" style={{ flex: 1, minHeight: 0, position: 'relative' }}>
               <div className="ft-card-header">
                 <div className="ft-card-label">AI Fitness Assistant</div>
-                {aiMessages.length > 0 && (
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                   <button className="ft-btn-ghost" style={{ fontSize: 11, padding: '2px 8px' }}
-                    onClick={() => setAiMessages([])}>Clear</button>
-                )}
+                    onClick={() => setShowThreadList(s => !s)} title="Chat history">
+                    🗂 {activeAiThread?.title || 'New chat'}
+                  </button>
+                  <button className="ft-btn-ghost" style={{ fontSize: 11, padding: '2px 8px' }}
+                    onClick={newAiThread} title="Start a new chat">+ New</button>
+                  {aiMessages.length > 0 && (
+                    <button className="ft-btn-ghost" style={{ fontSize: 11, padding: '2px 8px' }}
+                      onClick={() => updateAiMessages([])} title="Clear this chat's messages">Clear</button>
+                  )}
+                </div>
               </div>
 
-              <div className="ft-ai-messages">
+              {showThreadList && (
+                <div className="ft-ai-thread-list">
+                  {[...aiThreads].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)).map(t => (
+                    <div
+                      key={t.id}
+                      className={`ft-ai-thread-item ${t.id === activeThreadId ? 'active' : ''}`}
+                      onClick={() => { setActiveThreadId(t.id); setShowThreadList(false); }}
+                    >
+                      <span className="ft-ai-thread-item-title">{t.title || 'New chat'}</span>
+                      <button
+                        className="ft-ai-thread-item-delete"
+                        title="Delete this chat"
+                        onClick={e => { e.stopPropagation(); deleteAiThread(t.id); }}
+                      >×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="ft-ai-messages" onWheel={handleAiWheel} style={{ '--ft-ai-scale': aiFontScale }}>
                 {aiMessages.map((m, i) => (
                   <div key={i} className={`ft-ai-msg ft-ai-msg--${m.role}`}>
                     <span className="ft-ai-msg-label">{m.role === 'user' ? 'You' : 'AI'}</span>
@@ -2586,14 +2707,14 @@ Kurallar:
                 <button
                   className="ft-ai-attach-btn"
                   onClick={() => aiFileRef.current?.click()}
-                  title="Görsel ekle"
+                  title="Add image"
                   disabled={aiLoading}
                 >📎</button>
                 <input
                   ref={aiInputRef}
                   className="ft-input"
                   style={{ flex: 1, fontSize: 13 }}
-                  placeholder="Soru sor veya görsel yapıştır (Ctrl+V)..."
+                  placeholder="Ask a question or paste an image (Ctrl+V)..."
                   value={aiInput}
                   onChange={e => setAiInput(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendAiMessage(); } }}
@@ -2688,7 +2809,7 @@ Kurallar:
                                           color: mode === 'adet' ? '#fff' : 'var(--text-muted)',
                                         }}
                                         onClick={() => { setFoodUnitMode(prev => ({ ...prev, [food.name]: 'adet' })); setFoodQty(prev => ({ ...prev, [food.name]: '1' })); }}
-                                      >adet</button>
+                                      >pcs</button>
                                       <button
                                         style={{
                                           padding:'3px 8px', fontSize:12, border:'none', cursor:'pointer',
@@ -2769,7 +2890,7 @@ Kurallar:
                                     type="number" min="0.5"
                                     step={item.unit === 'adet' ? 1 : 10}
                                     value={item.qty}
-                                    title="Miktar (değiştirince kalori otomatik yeniden hesaplanır)"
+                                    title="Amount (calories recalculate automatically when changed)"
                                     style={{ width:54, textAlign:'center', padding:'3px 4px', fontSize:15 }}
                                     onChange={e => updatePresetItemQty(preset.id, item.id, e.target.value)}
                                   />
@@ -2778,7 +2899,7 @@ Kurallar:
                                     className="ft-input"
                                     type="number" min="0"
                                     value={item.kcal}
-                                    title="Kaloriyi elle düzenle (formülden bağımsız, custom)"
+                                    title="Edit calories manually (independent of formula, custom)"
                                     style={{ width:58, textAlign:'center', padding:'3px 4px', fontSize:15 }}
                                     onChange={e => updatePresetItemKcal(preset.id, item.id, e.target.value)}
                                   />
@@ -2831,7 +2952,7 @@ Kurallar:
                                 key={item.id}
                                 className="ft-menu-food-row"
                                 style={isCopied ? { outline: '1.5px solid #58a6ff88', borderRadius: 4 } : {}}
-                                title="Ctrl+C ile kopyala"
+                                title="Copy with Ctrl+C"
                                 onClick={() => setCopiedItem(item)}
                               >
                                 <span className="ft-list-name">{item.name}</span>
@@ -2962,7 +3083,7 @@ Kurallar:
                                 color: mode === 'adet' ? '#fff' : 'var(--text-muted)',
                               }}
                               onClick={() => { setFoodUnitMode(prev => ({ ...prev, [food.name]: 'adet' })); setFoodQty(prev => ({ ...prev, [food.name]: '1' })); }}
-                            >adet</button>
+                            >pcs</button>
                             <button
                               style={{
                                 padding:'5px 8px', fontSize:12, border:'none', cursor:'pointer',
@@ -3039,19 +3160,19 @@ Kurallar:
                             {!isRenaming && (
                               <button
                                 className="ft-workout-tab-edit"
-                                title="Yeniden adlandır"
+                                title="Rename"
                                 onClick={e => { e.stopPropagation(); setExpandedDay(day.id); setRenamingDay(day.id); }}
                               >✎</button>
                             )}
                             <button
                               className="ft-workout-tab-del"
-                              title="Günü sil"
+                              title="Delete day"
                               onMouseDown={e => { e.stopPropagation(); e.preventDefault(); removeDay(day.id); }}
                             >×</button>
                           </div>
                         );
                       })}
-                      <button className="ft-workout-tab-add" onClick={() => addDay(`Gün ${workouts.length + 1}`)} title="Gün ekle">+</button>
+                      <button className="ft-workout-tab-add" onClick={() => addDay(`Day ${workouts.length + 1}`)} title="Add day">+</button>
                     </div>
 
                     {/* Resize handle */}
@@ -3059,14 +3180,14 @@ Kurallar:
 
                     {/* İçerik */}
                     <div className="ft-workout-content">
-                      {workouts.length === 0 && <div className="ft-empty">+ ile gün ekle</div>}
+                      {workouts.length === 0 && <div className="ft-empty">Add a day with +</div>}
                       {activeDay && (
                         <>
                           <div className="ft-workout-ex-add-row">
                             <input
                               className="ft-input"
                               style={{ flex: 1, fontSize: 12, padding: '5px 8px' }}
-                              placeholder="Egzersiz adı..."
+                              placeholder="Exercise name..."
                               value={newExName}
                               onChange={e => setNewExName(e.target.value)}
                               onKeyDown={e => { if (e.key === 'Enter' && newExName.trim()) { addExercise(activeDay.id, newExName); setNewExName(''); } }}
@@ -3075,15 +3196,15 @@ Kurallar:
                           </div>
 
                           {activeDay.exercises.length === 0
-                            ? <div className="ft-empty">Egzersiz ekle veya AI'dan iste</div>
+                            ? <div className="ft-empty">Add an exercise or ask the AI</div>
                             : (
                               <table className="ft-workout-table">
                                 <thead>
                                   <tr>
-                                    <th>Hareket</th>
+                                    <th>Exercise</th>
                                     <th>Set</th>
                                     <th>×</th>
-                                    <th>Tekrar</th>
+                                    <th>Reps</th>
                                     <th></th>
                                   </tr>
                                 </thead>
@@ -3145,8 +3266,8 @@ Kurallar:
                     {lastWeight && goal.targetWeight && (
                       <span className="ft-badge">
                         {(lastWeight - parseFloat(goal.targetWeight)).toFixed(1)} kg remaining
-                        {weeklyRate != null && ` · ${weeklyRate > 0 ? '+' : ''}${weeklyRate} kg/hafta`}
-                        {etaDays != null && (etaDays === 0 ? ' · hedefte' : ` · ~${etaDays} gün`)}
+                        {weeklyRate != null && ` · ${weeklyRate > 0 ? '+' : ''}${weeklyRate} kg/week`}
+                        {etaDays != null && (etaDays === 0 ? ' · at goal' : ` · ~${etaDays} days`)}
                       </span>
                     )}
                     <button
@@ -3237,27 +3358,27 @@ Kurallar:
                         )}
                         {slot.tab === 'bodyfat' && (
                           bodyFatSeries.length === 0
-                            ? <div className="ft-empty">Boy + bel + boyun girildiğinde burada görünür</div>
+                            ? <div className="ft-empty">Shows once height + waist + neck are entered</div>
                             : <div className="ft-chart-wrap"><MetricChart entries={bodyFatSeries.slice(-60)} color="#e8a838" unit="%" title="Body Fat" height={280} /></div>
                         )}
                         {slot.tab === 'ffmi' && (
                           ffmiSeries.length === 0
-                            ? <div className="ft-empty">Boy + bel + boyun girildiğinde burada görünür</div>
+                            ? <div className="ft-empty">Shows once height + waist + neck are entered</div>
                             : <div className="ft-chart-wrap"><MetricChart entries={ffmiSeries.slice(-60)} color="#58a6ff" unit="" title="FFMI" height={280} /></div>
                         )}
                         {slot.tab === 'ratio' && (
                           ratioSeries.length === 0
-                            ? <div className="ft-empty">Omuz + bel girildiğinde burada görünür</div>
-                            : <div className="ft-chart-wrap"><MetricChart entries={ratioSeries.slice(-60)} color="#3fb950" unit="" title="Omuz / Bel" height={280} /></div>
+                            ? <div className="ft-empty">Shows once shoulder + waist are entered</div>
+                            : <div className="ft-chart-wrap"><MetricChart entries={ratioSeries.slice(-60)} color="#3fb950" unit="" title="Shoulder / Waist" height={280} /></div>
                         )}
                         {slot.tab === 'waist' && (
                           waistSeries.length === 0
-                            ? <div className="ft-empty">Bel ölçüsü girildiğinde burada görünür</div>
+                            ? <div className="ft-empty">Shows once waist measurement is entered</div>
                             : <div className="ft-chart-wrap"><MetricChart entries={waistSeries.slice(-60)} color="#bc8cff" unit=" cm" title="Waist" height={280} /></div>
                         )}
                         {slot.tab === 'neck' && (
                           neckSeries.length === 0
-                            ? <div className="ft-empty">Boyun ölçüsü girildiğinde burada görünür</div>
+                            ? <div className="ft-empty">Shows once neck measurement is entered</div>
                             : <div className="ft-chart-wrap"><MetricChart entries={neckSeries.slice(-60)} color="#ff7b72" unit=" cm" title="Neck" height={280} /></div>
                         )}
                       </div>
@@ -3275,7 +3396,7 @@ Kurallar:
                     <span>Neck</span>
                     <span>Shoulder</span>
                     <span>FFMI</span>
-                    <span>O/B</span>
+                    <span>S/W</span>
                     <span></span>
                   </div>
                 )}
@@ -3288,11 +3409,11 @@ Kurallar:
                         <input type="number" step="0.1" className="ft-input ft-edit-input" placeholder="kg" value={editVal}
                           onChange={ev => setEditVal(ev.target.value)}
                           onKeyDown={ev => { if (ev.key === 'Enter') saveEdit(e.date); if (ev.key === 'Escape') setEditingIdx(null); }} />
-                        <input type="number" step="0.5" className="ft-input ft-edit-input" placeholder="bel" value={editWaist}
+                        <input type="number" step="0.5" className="ft-input ft-edit-input" placeholder="waist" value={editWaist}
                           onChange={ev => setEditWaist(ev.target.value)} />
-                        <input type="number" step="0.5" className="ft-input ft-edit-input" placeholder="boyun" value={editNeck}
+                        <input type="number" step="0.5" className="ft-input ft-edit-input" placeholder="neck" value={editNeck}
                           onChange={ev => setEditNeck(ev.target.value)} />
-                        <input type="number" step="0.5" className="ft-input ft-edit-input" placeholder="omuz" value={editShoulder}
+                        <input type="number" step="0.5" className="ft-input ft-edit-input" placeholder="shoulder" value={editShoulder}
                           onChange={ev => setEditShoulder(ev.target.value)} />
                         <button className="ft-btn-accent ft-edit-save" onClick={() => saveEdit(e.date)}>✓</button>
                         <button className="ft-del-btn" onClick={() => deleteEntry(e.date)}>×</button>

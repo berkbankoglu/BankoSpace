@@ -106,7 +106,7 @@ function QuickNote({ onClose, isPopup = false }) {
         <span className="qn-arrow">{isTranslating ? '...' : '→'}</span>
         <input
           className="qn-input readonly"
-          placeholder="Turkce"
+          placeholder="Turkish"
           value={turkishText}
           readOnly
         />

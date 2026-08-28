@@ -607,7 +607,7 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style, onPa
               if (e.key === 'Enter') { e.preventDefault(); insertImageEmbed(pendingImg.dataUrl, pendingTitle); }
               if (e.key === 'Escape') { setPendingImg(null); pendingRangeRef.current = null; }
             }}
-            placeholder="Başlık yaz, Enter'a bas..."
+            placeholder="Type a title, press Enter..."
           />
           <button className="note-img-title-confirm" onClick={() => insertImageEmbed(pendingImg.dataUrl, pendingTitle)}>↵</button>
         </div>
@@ -629,7 +629,7 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style, onPa
             onMouseEnter={() => { previewPinnedRef.current = true; }}
             onMouseLeave={() => { previewPinnedRef.current = false; setPreview(null); }}
             onClick={(e) => { e.stopPropagation(); deleteEmbed(preview.el); }}
-            title="Sil"
+            title="Delete"
           >×</button>
         </div>
       )}
@@ -644,12 +644,12 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style, onPa
           <button
             className="note-embed-chip-btn zoom"
             onClick={(e) => { e.stopPropagation(); const el = embedHover.el; resolveEmbed(el).then(url => { setLightbox({ dataUrl: url }); setLightboxZoom(1); }); }}
-            title="Büyüt"
+            title="Zoom in"
           >⤢</button>
           <button
             className="note-embed-chip-btn delete"
             onClick={(e) => { e.stopPropagation(); deleteEmbed(embedHover.el); }}
-            title="Sil"
+            title="Delete"
           >×</button>
         </div>,
         document.body
@@ -871,8 +871,8 @@ function CanvasImage({ img, onCommit, onDelete, onOpen, strokesVersion }) {
     >
       {src ? <img src={src} draggable={false} alt="" onLoad={() => setLoaded(true)} /> : <div className="nci-loading" />}
       <canvas ref={overlayRef} className="nci-overlay" />
-      <button className="nci-delete" title="Sil" onMouseDown={e => e.stopPropagation()} onClick={onDelete}>×</button>
-      <div className="nci-resize" title="Boyutlandır" onMouseDown={startResize} />
+      <button className="nci-delete" title="Delete" onMouseDown={e => e.stopPropagation()} onClick={onDelete}>×</button>
+      <div className="nci-resize" title="Resize" onMouseDown={startResize} />
       {/* Alt başlık şeridi: varsa hep görünür; yoksa hover'da "+ başlık" */}
       <div
         className={`nci-titlebar${img.title ? '' : ' nci-empty'}`}
@@ -884,7 +884,7 @@ function CanvasImage({ img, onCommit, onDelete, onOpen, strokesVersion }) {
             className="nci-title-input"
             autoFocus
             defaultValue={img.title || ''}
-            placeholder="Başlık yaz..."
+            placeholder="Type a title..."
             onKeyDown={e => {
               if (e.key === 'Enter') { onCommit({ title: e.target.value.trim() }); setEditingTitle(false); }
               if (e.key === 'Escape') setEditingTitle(false);
@@ -892,8 +892,8 @@ function CanvasImage({ img, onCommit, onDelete, onOpen, strokesVersion }) {
             onBlur={e => { onCommit({ title: e.target.value.trim() }); setEditingTitle(false); }}
           />
         ) : (
-          <span className="nci-title-text" onClick={() => setEditingTitle(true)} title="Başlığı düzenle">
-            {img.title || '+ başlık'}
+          <span className="nci-title-text" onClick={() => setEditingTitle(true)} title="Edit title">
+            {img.title || '+ title'}
           </span>
         )}
       </div>
@@ -1039,8 +1039,8 @@ function CanvasLightbox({ imgId, src, onClose }) {
           />
         ))}
         <span className="ncl-sep" />
-        <button className="ncl-btn" onClick={undo} disabled={!strokesRef.current.length}>↶ Geri al</button>
-        <button className="ncl-btn" onClick={clearAll} disabled={!strokesRef.current.length}>Temizle</button>
+        <button className="ncl-btn" onClick={undo} disabled={!strokesRef.current.length}>↶ Undo</button>
+        <button className="ncl-btn" onClick={clearAll} disabled={!strokesRef.current.length}>Clear</button>
         <span className="ncl-sep" />
         <span className="ncl-zoom">{Math.round(zoom * 100)}%</span>
         <button className="ncl-btn" onClick={onClose}>✕</button>
@@ -1589,10 +1589,10 @@ function Notes() {
       const body = sections.join('<hr>');
 
       const fullHtml = `<!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>BankoSpace Notlar — ${date}</title>
+<title>BankoSpace Notes — ${date}</title>
 <style>
   body{font-family:system-ui,sans-serif;max-width:860px;margin:40px auto;padding:0 24px;color:#222;line-height:1.7;}
   h2{font-size:22px;margin:32px 0 8px;border-bottom:2px solid #eee;padding-bottom:6px;}
@@ -1865,14 +1865,14 @@ ${body}
                   style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', background: 'none', border: 'none', color: '#c9d1d9', cursor: 'pointer', fontSize: 13 }}
                   onMouseEnter={e => e.target.style.background = '#21262d'}
                   onMouseLeave={e => e.target.style.background = 'none'}
-                >↓ Export (HTML + Görseller)</button>
+                >↓ Export (HTML + Images)</button>
                 <button
                   onMouseDown={e => e.stopPropagation()}
                   onClick={() => { setShowMenu(false); exportAllNotes(); }}
                   style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', background: 'none', border: 'none', color: '#c9d1d9', cursor: 'pointer', fontSize: 13 }}
                   onMouseEnter={e => e.target.style.background = '#21262d'}
                   onMouseLeave={e => e.target.style.background = 'none'}
-                >↓ Export (JSON — yedek)</button>
+                >↓ Export (JSON — backup)</button>
                 <button
                   onMouseDown={e => e.stopPropagation()}
                   onClick={() => { setShowMenu(false); importNotes(); }}
@@ -1899,7 +1899,7 @@ ${body}
                   className={`notes-tree-row${selected?.noteId === note.id && selected?.subId == null ? ' active' : ''}`}
                   style={{ '--note-color': note.color || '#667eea' }}
                   data-note-id={note.id}
-                  title="Sürükle - sırayı değiştir"
+                  title="Drag to reorder"
                   onClick={e => toggleExpand(note.id, e)}
                   onMouseDown={e => {
                     if (e.target.closest('.notes-tree-actions, .notes-expand-btn, .notes-tree-pin-btn')) return;
@@ -1955,7 +1955,7 @@ ${body}
 
                   <button
                     className={`notes-tree-pin-btn ${note.pinned ? 'pinned' : ''}`}
-                    title={note.pinned ? 'Sabitlemeyi kaldır' : 'Sabitle'}
+                    title={note.pinned ? 'Unpin' : 'Pin'}
                     style={{ '--note-title-color': note.color || '#667eea' }}
                     onClick={e => togglePin(note.id, null, e)}
                   >📌</button>
@@ -1963,7 +1963,7 @@ ${body}
                   <div className="notes-tree-actions">
                     <button
                       className="notes-tree-color-btn"
-                      title="Renk değiştir"
+                      title="Change color"
                       style={{ background: note.color || '#667eea' }}
                       onClick={e => { e.stopPropagation(); setColorPickerNote(v => v === note.id ? null : note.id); }}
                     />
@@ -2000,7 +2000,7 @@ ${body}
                     style={{ '--note-color': note.color || '#667eea' }}
                     data-sub-id={sub.id}
                     data-parent-id={note.id}
-                    title="Sürükle - sırayı değiştir"
+                    title="Drag to reorder"
                     onClick={() => setSelected({ noteId: note.id, subId: sub.id })}
                     onMouseDown={e => {
                       if (e.target.closest('.notes-tree-actions, .notes-tree-pin-btn')) return;
@@ -2047,7 +2047,7 @@ ${body}
 
                     <button
                       className={`notes-tree-pin-btn ${sub.pinned ? 'pinned' : ''}`}
-                      title={sub.pinned ? 'Sabitlemeyi kaldır' : 'Sabitle'}
+                      title={sub.pinned ? 'Unpin' : 'Pin'}
                       style={{ '--note-title-color': note.color || '#667eea' }}
                       onClick={e => togglePin(note.id, sub.id, e)}
                     >📌</button>
@@ -2102,7 +2102,7 @@ ${body}
                       className="notes-editor-tag-input"
                       value={tagDraft}
                       autoFocus
-                      placeholder="etiket..."
+                      placeholder="tag..."
                       onChange={e => setTagDraft(e.target.value)}
                       onKeyDown={e => {
                         if (e.key === 'Enter') {
@@ -2181,12 +2181,12 @@ ${body}
                     setCanvasBg(e.target.value);
                     localStorage.setItem('notesCanvasBg', e.target.value);
                   }}
-                  title="Canvas arka planı"
+                  title="Canvas background"
                 >
-                  <option value="none">Düz</option>
-                  <option value="lines">Çizgili</option>
-                  <option value="dots">Noktalı</option>
-                  <option value="grid">Damalı</option>
+                  <option value="none">Plain</option>
+                  <option value="lines">Lined</option>
+                  <option value="dots">Dotted</option>
+                  <option value="grid">Grid</option>
                 </select>
               </div>
 
@@ -2246,21 +2246,21 @@ ${body}
                 <button
                   className={`toolbar-btn ${showShortcuts ? 'active' : ''}`}
                   onMouseDown={e => { e.preventDefault(); e.stopPropagation(); saveSelection(); setShowShortcuts(v => !v); setShowColorPresets(false); }}
-                  title="Kısayollar"
+                  title="Shortcuts"
                 >⌨</button>
                 {showShortcuts && (
                   <div className="notes-shortcuts-panel">
-                    <div className="notes-shortcuts-title">Kısayollar</div>
+                    <div className="notes-shortcuts-title">Shortcuts</div>
                     {[
-                      ['Ctrl+Z', 'Geri al'],
-                      ['Ctrl+Y', 'Yinele'],
-                      ['Ctrl+Shift+Z', 'Yinele'],
-                      ['Ctrl+B', 'Kalın'],
-                      ['Ctrl+I', 'İtalik'],
-                      ['Ctrl+U', 'Altı çizili'],
-                      ['Ctrl+V', 'Görsel / ekran görüntüsü yapıştır'],
-                      ['Alt+1–9', 'Renk kısayolu uygula'],
-                      ["Alt+' veya \"", 'Rengi sıfırla'],
+                      ['Ctrl+Z', 'Undo'],
+                      ['Ctrl+Y', 'Redo'],
+                      ['Ctrl+Shift+Z', 'Redo'],
+                      ['Ctrl+B', 'Bold'],
+                      ['Ctrl+I', 'Italic'],
+                      ['Ctrl+U', 'Underline'],
+                      ['Ctrl+V', 'Paste image / screenshot'],
+                      ['Alt+1–9', 'Apply color shortcut'],
+                      ["Alt+' or \"", 'Reset color'],
                     ].map(([key, desc]) => (
                       <div key={key} className="notes-shortcut-row">
                         <kbd className="notes-shortcut-key">{key}</kbd>

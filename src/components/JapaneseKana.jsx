@@ -1452,25 +1452,25 @@ function WriteCard({ targetChar, targetRomaji, onCorrect, onWrong, onNext }) {
     <div className="write-card">
       <div className="write-card-prompt">
         <span className="write-card-romaji">{targetRomaji}</span>
-        <span className="write-card-hint">deftere yaz, sonra kontrol et</span>
+        <span className="write-card-hint">write it on paper, then check</span>
       </div>
 
       <div className={`write-card-reveal${revealed ? ' write-card-reveal--open' : ''}`}>
         {revealed
           ? <span className="write-card-kana">{targetChar}</span>
-          : <button className="draw-btn draw-btn--reveal" onClick={() => setRevealed(true)}>Cevabı Göster</button>
+          : <button className="draw-btn draw-btn--reveal" onClick={() => setRevealed(true)}>Show Answer</button>
         }
       </div>
 
       {revealed && (
         <div className="write-card-assess">
-          <button className="draw-btn draw-btn--wrong" onClick={onWrong}>✗ Yanlış</button>
-          <button className="draw-btn draw-btn--correct" onClick={onCorrect}>✓ Doğru</button>
+          <button className="draw-btn draw-btn--wrong" onClick={onWrong}>✗ Wrong</button>
+          <button className="draw-btn draw-btn--correct" onClick={onCorrect}>✓ Correct</button>
         </div>
       )}
 
       {!revealed && (
-        <button className="draw-btn draw-btn--next" style={{ marginTop: 8 }} onClick={onNext}>Atla →</button>
+        <button className="draw-btn draw-btn--next" style={{ marginTop: 8 }} onClick={onNext}>Skip →</button>
       )}
     </div>
   );
@@ -1790,13 +1790,13 @@ export function PracticeTab({ selectedRows, setSelectedRows }) {
           <button
             className={`toggle-btn${practiceMode === 'type' ? ' toggle-btn--active' : ''}`}
             onClick={() => setPracticeMode('type')}
-            title="Romaji yazarak pratik yap"
-          >✎ Yaz</button>
+            title="Practice by typing romaji"
+          >✎ Type</button>
           <button
             className={`toggle-btn${practiceMode === 'draw' ? ' toggle-btn--active' : ''}`}
             onClick={() => setPracticeMode('draw')}
-            title="Kana çizerek pratik yap"
-          >✏ Çiz</button>
+            title="Practice by drawing kana"
+          >✏ Draw</button>
         </div>
         <button className="reset-btn" onClick={resetStats}>
           Reset Stats
@@ -2110,7 +2110,7 @@ function StudyWordsSection({ selectedRows }) {
         Study Words
         <span className="wrong-analysis-badge" style={{ marginLeft: '0.5rem' }}>{filteredWords.length}</span>
         {filteredCustom.length > 0 && (
-          <span className="wrong-analysis-badge" style={{ marginLeft: '0.3rem', background: '#7c3aed' }}>{filteredCustom.length} özel</span>
+          <span className="wrong-analysis-badge" style={{ marginLeft: '0.3rem', background: '#7c3aed' }}>{filteredCustom.length} custom</span>
         )}
         {selectedWords.size > 0 && (
           <span className="wrong-analysis-badge" style={{ marginLeft: '0.3rem', background: '#2563eb' }}>{selectedWords.size} selected</span>
@@ -2182,7 +2182,7 @@ function StudyWordsSection({ selectedRows }) {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2 }}>
                         <span className="word-kana">{w.kana}</span>
                         <div style={{ display: 'flex', gap: 2, flexShrink: 0, alignItems: 'center' }}>
-                          {w._custom && <span style={{ fontSize: '0.6rem', color: '#a78bfa', border: '1px solid #7c3aed', borderRadius: 3, padding: '0 3px', lineHeight: '1.4' }}>özel</span>}
+                          {w._custom && <span style={{ fontSize: '0.6rem', color: '#a78bfa', border: '1px solid #7c3aed', borderRadius: 3, padding: '0 3px', lineHeight: '1.4' }}>custom</span>}
                           <span className="word-learned-btn" onClick={(e) => { e.stopPropagation(); speakKana(w.kana, 1.0); }} title="Listen">🔊</span>
                           <span
                             className={`word-learned-btn${isLearned ? ' word-learned-btn--active' : ''}`}
@@ -2232,7 +2232,7 @@ function MeaningEditor({ word, editing, setEditing, inputRef, onSave }) {
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, marginTop: 4 }}>
       <div
         style={{ color: '#ffffff', fontSize: '1rem', fontWeight: 600, cursor: 'pointer', borderBottom: '1px dashed #444', paddingBottom: 1 }}
-        title="Tıklayarak düzenle"
+        title="Click to edit"
         onClick={() => setEditing({ kana: word.kana, value: word.meaning })}
       >
         {word.meaning}
@@ -2304,7 +2304,7 @@ function VocabFoldersPractice() {
 
   if (folders.length === 0) return (
     <div style={{ textAlign: 'center', color: '#6e7681', padding: '2rem', fontSize: '0.9rem' }}>
-      Henüz klasör yok — Vocabulary sekmesinden kelime ekle.
+      No folders yet — add a word from the Vocabulary tab.
     </div>
   );
 
@@ -2312,7 +2312,7 @@ function VocabFoldersPractice() {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: '16px 0', width: '100%' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', maxWidth: 480 }}>
-          <button className="reset-btn" onClick={() => { setQuiz(null); setActiveFolder(null); }}>← Klasörler</button>
+          <button className="reset-btn" onClick={() => { setQuiz(null); setActiveFolder(null); }}>← Folders</button>
           <span style={{ flex: 1, fontSize: '0.88rem', fontWeight: 600, color: activeFolder.color }}>{activeFolder.name}</span>
           <span style={{ fontSize: '0.76rem', color: '#6e7681', background: '#1e1e22', padding: '3px 9px', borderRadius: 20 }}>{quiz.idx + 1} / {quizPool.length} · ∞</span>
         </div>
@@ -2357,7 +2357,7 @@ function VocabFoldersPractice() {
   return (
     <div style={{ padding: '16px 0', width: '100%' }}>
       <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#6e7681', marginBottom: 10 }}>
-        Klasör seç
+        Select a folder
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {folders.map(folder => {
@@ -2435,9 +2435,9 @@ function VocabFoldersSection() {
     <div className="study-words-section">
       <button className="study-words-toggle" onClick={() => { setOpen(o => !o); setQuiz(null); setActiveFolder(null); }}>
         <span style={{ marginRight: '0.5rem' }}>{open ? '▲' : '▼'}</span>
-        Vocab Klasörleri
+        Vocab Folders
         <span className="wrong-analysis-badge" style={{ marginLeft: '0.5rem', background: '#7c3aed' }}>{folders.length}</span>
-        <span style={{ marginLeft: 'auto', fontSize: '0.78rem', color: '#8b949e', fontWeight: 400 }}>kelime çalışma</span>
+        <span style={{ marginLeft: 'auto', fontSize: '0.78rem', color: '#8b949e', fontWeight: 400 }}>word practice</span>
       </button>
 
       {open && (
@@ -2445,7 +2445,7 @@ function VocabFoldersSection() {
           {quiz && activeFolder ? (
             <div className="words-quiz">
               <div className="words-quiz-header">
-                <button className="reset-btn" onClick={() => { setQuiz(null); setActiveFolder(null); }}>← Klasörler</button>
+                <button className="reset-btn" onClick={() => { setQuiz(null); setActiveFolder(null); }}>← Folders</button>
                 <span style={{ fontSize: '0.82rem', color: '#a78bfa', fontWeight: 600 }}>{activeFolder.name}</span>
                 <span className="words-quiz-progress">{quiz.idx + 1} / {quizPool.length} · ∞</span>
               </div>
@@ -2754,7 +2754,7 @@ const CATEGORY_LABELS = {
   school: 'School', work: 'Work', shopping: 'Shopping', health: 'Health',
   daily: 'Daily Life', hobbies: 'Hobbies', emotions: 'Emotions',
   verbs: 'Verbs', adjectives: 'Adjectives', conjugation: 'Conjugation',
-  grammar: 'Grammar', custom: 'Özel',
+  grammar: 'Grammar', custom: 'Custom',
 };
 
 function VocabularyTab() {
@@ -2860,13 +2860,13 @@ function VocabularyTab() {
       const resp = JSON.parse(text);
       const content = resp.content?.[0]?.text || '';
       const match = content.match(/\{[\s\S]*\}/);
-      if (!match) throw new Error('Yanıt alınamadı');
+      if (!match) throw new Error('No response received');
       const parsed = JSON.parse(match[0]);
       setModalKana(parsed.kana || '');
       setModalMeaning(parsed.meaning_tr || parsed.meaning || '');
       setModalMeaningEn(parsed.meaning_en || '');
     } catch (e) {
-      setModalLookupError('Arama başarısız: ' + (e.message || e));
+      setModalLookupError('Search failed: ' + (e.message || e));
     } finally {
       setModalLookupLoading(false);
     }
@@ -2972,9 +2972,9 @@ function VocabularyTab() {
   }
 
   const sidebarCategories = [
-    { key: 'all', label: 'Tümü' },
+    { key: 'all', label: 'All' },
     ...allCategories.map(c => ({ key: c, label: CATEGORY_LABELS[c] || c })),
-    { key: 'custom', label: '★ Özel' },
+    { key: 'custom', label: '★ Custom' },
   ];
 
   // ── Practice mode ──
@@ -2983,7 +2983,7 @@ function VocabularyTab() {
       <div className="vocab-tab">
         <div className="vocab-practice-area">
           <div className="vocab-practice-header">
-            <button className="vocab-practice-back" onClick={exitPractice}>← Çıkış</button>
+            <button className="vocab-practice-back" onClick={exitPractice}>← Exit</button>
             <span className="vocab-practice-title">{practiceLabel}</span>
             <span className="vocab-practice-progress">{quiz.idx + 1} / {quizPool.length} · ∞</span>
           </div>
@@ -3030,12 +3030,12 @@ function VocabularyTab() {
         {/* Folders */}
         <div className="vocab-sb-section">
           <div className="vocab-sb-label">
-            <span>Klasörler</span>
+            <span>Folders</span>
             <button className="vocab-sb-add" onClick={() => setShowNewFolder(v => !v)}>+</button>
           </div>
           {showNewFolder && (
             <div className="vocab-new-folder-row">
-              <input className="vocab-folder-input" placeholder="Klasör adı" value={newFolderName} autoFocus
+              <input className="vocab-folder-input" placeholder="Folder name" value={newFolderName} autoFocus
                 onChange={e => setNewFolderName(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') addFolder(); if (e.key === 'Escape') { setShowNewFolder(false); setNewFolderName(''); } }}
               />
@@ -3043,7 +3043,7 @@ function VocabularyTab() {
             </div>
           )}
           {folders.length === 0 && !showNewFolder && (
-            <div className="vocab-empty-hint">Henüz klasör yok</div>
+            <div className="vocab-empty-hint">No folders yet</div>
           )}
           {folders.map(folder => {
             const isActive = activeFolderId === folder.id;
@@ -3062,10 +3062,10 @@ function VocabularyTab() {
                 )}
                 <span className="vocab-folder-count">{folder.kanas.length}</span>
                 <div className="vocab-folder-btns">
-                  <button className="vocab-folder-play" title="Çalış"
+                  <button className="vocab-folder-play" title="Practice"
                     onClick={e => { e.stopPropagation(); startPractice(getFolderWords(folder), folder.name); }}
                     disabled={folder.kanas.length === 0}>▶</button>
-                  <button className="vocab-folder-del-inline" title="Sil"
+                  <button className="vocab-folder-del-inline" title="Delete"
                     onClick={e => { e.stopPropagation(); deleteFolder(folder.id); }}>×</button>
                 </div>
               </div>
@@ -3075,7 +3075,7 @@ function VocabularyTab() {
 
         {/* Categories */}
         <div className="vocab-sb-section vocab-sb-cats">
-          <div className="vocab-sb-label"><span>Kategoriler</span></div>
+          <div className="vocab-sb-label"><span>Categories</span></div>
           {sidebarCategories.map(({ key, label }) => (
             <button key={key}
               className={`vocab-cat-btn${activeCategory === key && !activeFolderId ? ' vocab-cat-btn--active' : ''}`}
@@ -3089,22 +3089,22 @@ function VocabularyTab() {
       {/* ── Main ── */}
       <div className="vocab-main">
         <div className="vocab-toolbar">
-          <input className="vocab-search" placeholder="Ara... (kana, romaji, anlam)"
+          <input className="vocab-search" placeholder="Search... (kana, romaji, meaning)"
             value={search} onChange={e => setSearch(e.target.value)} />
           {activeFolder && (
             <button className="vocab-practice-btn"
               onClick={() => startPractice(getFolderWords(activeFolder), activeFolder.name)}
               disabled={activeFolder.kanas.length === 0}>
-              ▶ Çalış ({activeFolder.kanas.length})
+              ▶ Practice ({activeFolder.kanas.length})
             </button>
           )}
-          <button className="vocab-add-btn" onClick={() => setShowAddModal(true)}>+ Kelime</button>
+          <button className="vocab-add-btn" onClick={() => setShowAddModal(true)}>+ Word</button>
         </div>
 
         {activeFolder && (
           <div className="vocab-folder-hint">
             <span style={{ color: activeFolder.color }}>● {activeFolder.name}</span>
-            {' '}— Kartlara tıklayarak klasöre ekle / çıkar
+            {' '}— Click cards to add to / remove from the folder
           </div>
         )}
 
@@ -3122,7 +3122,7 @@ function VocabularyTab() {
                     {inFolder && <span className="vocab-in-folder-mark">✓</span>}
                     {isLearned && <span className="vocab-learned-mark">★</span>}
                     {word._custom && (
-                      <button className="vocab-card-del" onClick={e => { e.stopPropagation(); deleteCustomWord(word.id); }} title="Sil">×</button>
+                      <button className="vocab-card-del" onClick={e => { e.stopPropagation(); deleteCustomWord(word.id); }} title="Delete">×</button>
                     )}
                   </div>
                 </div>
@@ -3135,7 +3135,7 @@ function VocabularyTab() {
               </div>
             );
           })}
-          {displayedWords.length === 0 && <div className="vocab-empty">Kelime bulunamadı.</div>}
+          {displayedWords.length === 0 && <div className="vocab-empty">No words found.</div>}
         </div>
       </div>
 
@@ -3143,29 +3143,29 @@ function VocabularyTab() {
       {showAddModal && (
         <div className="vocab-modal-overlay" onClick={closeModal}>
           <div className="vocab-modal" onClick={e => e.stopPropagation()}>
-            <div className="vocab-modal-title">Kelime Ekle</div>
+            <div className="vocab-modal-title">Add Word</div>
             <div className="vocab-modal-lookup-row">
-              <input className="vocab-modal-input" placeholder="Romaji (örn: tomodachi)"
+              <input className="vocab-modal-input" placeholder="Romaji (e.g. tomodachi)"
                 value={modalRomaji} onChange={e => setModalRomaji(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && lookupWord()} autoFocus />
               <button className="vocab-lookup-btn" onClick={lookupWord} disabled={modalLookupLoading}>
-                {modalLookupLoading ? <span className="vocab-lookup-spinner" /> : 'AI Ara'}
+                {modalLookupLoading ? <span className="vocab-lookup-spinner" /> : 'AI Search'}
               </button>
             </div>
             {modalLookupError && <div className="vocab-lookup-error">{modalLookupError}</div>}
-            <input className="vocab-modal-input" placeholder="Japonca yazılış (kana/kanji)"
+            <input className="vocab-modal-input" placeholder="Japanese writing (kana/kanji)"
               value={modalKana} onChange={e => setModalKana(e.target.value)} />
-            <input className="vocab-modal-input" placeholder="Türkçe anlam"
+            <input className="vocab-modal-input" placeholder="Turkish meaning"
               value={modalMeaning} onChange={e => setModalMeaning(e.target.value)} />
-            <input className="vocab-modal-input" placeholder="İngilizce anlam (opsiyonel)"
+            <input className="vocab-modal-input" placeholder="English meaning (optional)"
               value={modalMeaningEn} onChange={e => setModalMeaningEn(e.target.value)} />
             <select className="vocab-modal-select" value={modalCategory} onChange={e => setModalCategory(e.target.value)}>
               {Object.entries(CATEGORY_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
             <div className="vocab-modal-actions">
-              <button className="vocab-modal-cancel" onClick={closeModal}>İptal</button>
+              <button className="vocab-modal-cancel" onClick={closeModal}>Cancel</button>
               <button className="vocab-modal-save" onClick={saveCustomWord}
-                disabled={!modalKana.trim() || !modalRomaji.trim() || !modalMeaning.trim()}>Kaydet</button>
+                disabled={!modalKana.trim() || !modalRomaji.trim() || !modalMeaning.trim()}>Save</button>
             </div>
           </div>
         </div>

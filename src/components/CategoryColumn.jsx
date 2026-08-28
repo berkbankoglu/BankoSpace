@@ -403,7 +403,7 @@ function CategoryColumn({ title, category, todos, currentFilter, actions }) {
             {todo.color && <div className="cc-item-color-bar" style={{ background: todo.color }} />}
             {/* Top row: drag handle + checkbox + actions */}
             <div className="cc-item-top">
-              <div className="cc-drag-handle" title="Surukle" onMouseDown={(e) => onTodoDragStart(e, todo)}>⠿</div>
+              <div className="cc-drag-handle" title="Drag" onMouseDown={(e) => onTodoDragStart(e, todo)}>⠿</div>
               <label className="cc-inline-check" onClick={e => e.stopPropagation()}>
                 <input type="checkbox" className="cc-checkbox" checked={todo.completed} onChange={() => {
                   if (!todo.completed) {
@@ -436,7 +436,7 @@ function CategoryColumn({ title, category, todos, currentFilter, actions }) {
                       setColorPickerTodoId(todo.id);
                     }
                   }}
-                  title="Renk"
+                  title="Color"
                   style={{ color: todo.color || '#333' }}
                 >●</button>
                 <button

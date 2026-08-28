@@ -18,6 +18,7 @@ import ToolsChat from './components/ToolsChat';
 import SubscriptionTracker, { SubscriptionWidget, SubscriptionPopup } from './components/SubscriptionTracker';
 import Planner from './components/Planner';
 import Notes from './components/Notes';
+import HabitTracker from './components/HabitTracker';
 import { onAction, registerActionTypes } from '@tauri-apps/plugin-notification';
 import { TODO_COLORS } from './constants';
 
@@ -40,13 +41,13 @@ class ViewErrorBoundary extends Component {
     if (this.state.error) {
       return (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32, textAlign: 'center' }}>
-          <div style={{ fontSize: 15, color: 'var(--text-primary)' }}>Bu bölüm yüklenirken bir hata oluştu.</div>
+          <div style={{ fontSize: 15, color: 'var(--text-primary)' }}>An error occurred while loading this section.</div>
           <div style={{ fontSize: 13, color: 'var(--text-secondary)', maxWidth: 480 }}>{String(this.state.error?.message || this.state.error)}</div>
           <button
             onClick={() => this.setState({ error: null })}
             style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-surface)', color: 'var(--text-primary)', cursor: 'pointer' }}
           >
-            Tekrar dene
+            Try again
           </button>
         </div>
       );
@@ -60,7 +61,7 @@ function toDayKey(date) {
 }
 
 const CG_WEEKS = 53; // ~1 yıl, GitHub gibi — dar alanda yatay scroll ile gezilir
-const CG_MONTH_NAMES = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
+const CG_MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const CG_DOW_LABELS = ['', 'Mon', '', 'Wed', '', 'Fri', '']; // d=0 Paz .. d=6 Cmt, GitHub gibi seyrek etiket
 const GH_USERNAME = 'berkbankoglu';
 const GH_CACHE_KEY = 'gh_contributions_cache_v1';
@@ -135,13 +136,13 @@ function ContributionGrid({ weeks, scrollRef }) {
 function ContributionLegend() {
   return (
     <div className="cg-legend">
-      <span>Az</span>
+      <span>Less</span>
       <div className="cg-day cg-level-0" />
       <div className="cg-day cg-level-1" />
       <div className="cg-day cg-level-2" />
       <div className="cg-day cg-level-3" />
       <div className="cg-day cg-level-4" />
-      <span>Çok</span>
+      <span>More</span>
     </div>
   );
 }
@@ -213,12 +214,12 @@ function GithubContributionGraph() {
       <div className="cg-header">
         <span className="cg-title">
           {error && !levelMap
-            ? 'GitHub verisi alınamadı'
+            ? 'Failed to load GitHub data'
             : loading && !levelMap
-              ? 'Yükleniyor…'
-              : <>GitHub · Son 1 yılda <b>{total ?? '—'}</b> katkı</>}
+              ? 'Loading…'
+              : <>GitHub · <b>{total ?? '—'}</b> contributions in the last year</>}
         </span>
-        <button className="cg-refresh" title="Yenile" onClick={() => { setLoading(true); load(true); }}>↻</button>
+        <button className="cg-refresh" title="Refresh" onClick={() => { setLoading(true); load(true); }}>↻</button>
       </div>
       <ContributionGrid weeks={weeks} scrollRef={scrollRef} />
       <ContributionLegend />
@@ -249,7 +250,7 @@ function TaskContributionGraph({ todos, contributionLog }) {
   return (
     <div className="cg-panel">
       <div className="cg-header">
-        <span className="cg-title">BankoSpace · Son 1 yılda <b>{totalCompleted}</b> görev</span>
+        <span className="cg-title">BankoSpace · <b>{totalCompleted}</b> tasks in the last year</span>
       </div>
       <ContributionGrid weeks={weeks} scrollRef={scrollRef} />
       <ContributionLegend />
@@ -259,7 +260,7 @@ function TaskContributionGraph({ todos, contributionLog }) {
 import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, setVolume, getVolume } from './utils/sounds';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
-const APP_VERSION = '4.2.12';
+const APP_VERSION = '4.2.13';
 const MIN_COL_PX = 220;
 const DEFAULT_COL_PX = [null, null, null]; // [dailyPx, weeklyPx, monthlyPx] — null = auto (flex:1)
 
@@ -563,6 +564,7 @@ function App({ session, onLogout }) {
     const defaults = [
       { id: 'dashboard',    label: 'Dashboard',      view: 'dashboard',    hidden: false, icon: '⊞' },
       { id: 'checklists',   label: 'Checklists',      view: 'checklists',   hidden: false, icon: '✓' },
+      { id: 'habits',       label: 'Habits',           view: 'habits',       hidden: false, icon: '⟳' },
       { id: 'income',       label: 'Income Tracker',  view: 'income',       hidden: false, icon: '$' },
       { id: 'tools',        label: 'Tools',            view: 'tools',        hidden: false, icon: '⚙' },
       { id: 'japanesekana', label: 'Language Learn',  view: 'japanesekana', hidden: false, icon: 'あ' },
@@ -594,6 +596,8 @@ function App({ session, onLogout }) {
     return defaults;
   });
   const [draggedSidebarItem, setDraggedSidebarItem] = useState(null);
+  const [dragOverInfo, setDragOverInfo] = useState(null); // { id, position: 'before' | 'after' } — preview only, no reorder yet
+  const dragOverInfoRef = useRef(null);
 
   const togglePageVisibility = (id) => {
     if (id === 'dashboard') return;
@@ -626,7 +630,6 @@ function App({ session, onLogout }) {
   const sidebarDragOffsetRef = useRef({ x: 0, y: 0 });
   const sidebarGhostRef = useRef(null);
   const sidebarPositionsRef = useRef({});
-  const sidebarReorderLockRef = useRef(false);
   const sidebarHoldTimerRef = useRef(null);
   const sidebarDragJustEndedRef = useRef(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false); // Full sidebar collapsed
@@ -749,47 +752,61 @@ const [dailyChecklistCollapsed, setDailyChecklistCollapsed] = useState(() => {
       sidebarGhostRef.current.style.top = `${e.clientY - sidebarDragOffsetRef.current.y}px`;
     }
 
-    // Throttle reorder with lock
-    if (sidebarReorderLockRef.current) return;
-
-    const items = document.querySelectorAll('.sidebar-item[data-sidebar-id]');
+    // Just track where a drop would land — the actual array only changes once,
+    // on mouseup (handleSidebarDragEnd). Reordering live on every hover used to
+    // re-trigger the FLIP animation dozens of times per drag, which is what
+    // caused items (and their subitems) to visibly overlap mid-animation.
+    const items = document.querySelectorAll('.sidebar-item-group[data-sidebar-id]');
+    let next = null;
     for (const el of items) {
       const rect = el.getBoundingClientRect();
       if (e.clientY > rect.top && e.clientY < rect.bottom) {
         const targetId = el.getAttribute('data-sidebar-id');
         if (targetId && targetId !== draggedSidebarItem.item.id) {
-          // Lock reorder for duration of animation
-          sidebarReorderLockRef.current = true;
-
-          // Capture old positions
-          const oldPositions = {};
-          items.forEach(item => {
-            const id = item.getAttribute('data-sidebar-id');
-            if (id) oldPositions[id] = item.getBoundingClientRect();
-          });
-          sidebarPositionsRef.current = oldPositions;
-
-          playClickSound();
-          setSidebarItems(prev => {
-            const dragIdx = prev.findIndex(i => i.id === draggedSidebarItem.item.id);
-            const targetIdx = prev.findIndex(i => i.id === targetId);
-            if (dragIdx === -1 || targetIdx === -1 || dragIdx === targetIdx) return prev;
-            const newItems = [...prev];
-            const [removed] = newItems.splice(dragIdx, 1);
-            newItems.splice(targetIdx, 0, removed);
-            return newItems;
-          });
-          setDraggedSidebarItem(prev => prev ? { ...prev, index: -1 } : null);
-
-          setTimeout(() => { sidebarReorderLockRef.current = false; }, 340);
-          break;
+          // Top half of the hovered row -> drop before it; bottom half -> after it.
+          // Hovering right at the boundary between two rows lands you in the
+          // bottom half of the one above or the top half of the one below —
+          // either way you land in the gap between them, as expected.
+          next = { id: targetId, position: e.clientY < rect.top + rect.height / 2 ? 'before' : 'after' };
         }
+        break;
       }
     }
+    dragOverInfoRef.current = next;
+    setDragOverInfo(prev => (prev?.id === next?.id && prev?.position === next?.position) ? prev : next);
   }, [draggedSidebarItem]);
 
   const handleSidebarDragEnd = useCallback(() => {
-    setDraggedSidebarItem(null);
+    const overInfo = dragOverInfoRef.current;
+    setDraggedSidebarItem(current => {
+      if (current && overInfo && overInfo.id !== current.item.id) {
+        // Capture positions once, right before the one-and-only reorder, so
+        // the FLIP animation below has something correct to animate from.
+        const groups = document.querySelectorAll('.sidebar-item-group[data-sidebar-id]');
+        const oldPositions = {};
+        groups.forEach(el => {
+          const id = el.getAttribute('data-sidebar-id');
+          if (id) oldPositions[id] = el.getBoundingClientRect();
+        });
+        sidebarPositionsRef.current = oldPositions;
+
+        playClickSound();
+        setSidebarItems(prev => {
+          const dragIdx = prev.findIndex(i => i.id === current.item.id);
+          if (dragIdx === -1) return prev;
+          const newItems = [...prev];
+          const [removed] = newItems.splice(dragIdx, 1);
+          let insertAt = newItems.findIndex(i => i.id === overInfo.id);
+          if (insertAt === -1) return prev;
+          if (overInfo.position === 'after') insertAt += 1;
+          newItems.splice(insertAt, 0, removed);
+          return newItems;
+        });
+      }
+      return null;
+    });
+    dragOverInfoRef.current = null;
+    setDragOverInfo(null);
   }, []);
 
   useEffect(() => {
@@ -807,40 +824,45 @@ const [dailyChecklistCollapsed, setDailyChecklistCollapsed] = useState(() => {
     }
   }, [draggedSidebarItem, handleSidebarDragMove, handleSidebarDragEnd]);
 
-  // FLIP animation for sidebar reorder
+  // FLIP animation for sidebar reorder. Classic First-Last-Invert-Play: measure
+  // the delta ONCE while every element is still untransformed, then reuse that
+  // same number for both the instant "invert" snap and the animated "play"
+  // step. Calling getBoundingClientRect() again after Invert (the previous
+  // bug) reads the element's CURRENT transformed position, not its real
+  // layout position — the second delta comes out ~0, the transform is never
+  // cleared, and the item stays visually stuck at its old spot forever,
+  // overlapping whatever now occupies that spot.
   useEffect(() => {
     const oldPos = sidebarPositionsRef.current;
     if (Object.keys(oldPos).length === 0) return;
 
-    const items = document.querySelectorAll('.sidebar-item[data-sidebar-id]');
+    const items = document.querySelectorAll('.sidebar-item-group[data-sidebar-id]');
 
-    // Invert: snap every item back to its old position instantly
+    // Measure every real delta up front, before anything is transformed.
+    const deltas = new Map();
     items.forEach(el => {
       const id = el.getAttribute('data-sidebar-id');
       if (!id || !oldPos[id]) return;
-      const newRect = el.getBoundingClientRect();
-      const deltaY = oldPos[id].top - newRect.top;
-      if (Math.abs(deltaY) > 1) {
-        el.style.transition = 'none';
-        el.style.transform = `translateY(${deltaY}px)`;
-      }
+      const deltaY = oldPos[id].top - el.getBoundingClientRect().top;
+      if (Math.abs(deltaY) > 1) deltas.set(el, deltaY);
+    });
+    if (deltas.size === 0) { sidebarPositionsRef.current = {}; return; }
+
+    // Invert: snap every item back to its old position instantly.
+    deltas.forEach((deltaY, el) => {
+      el.style.transition = 'none';
+      el.style.transform = `translateY(${deltaY}px)`;
     });
 
-    // Force reflow so the browser commits the "inverted" positions
+    // Force reflow so the browser commits the "inverted" positions.
     document.body.offsetHeight;
 
-    // Play: animate each item to its real (new) position
+    // Play: animate every item from its inverted spot back to its real one.
     requestAnimationFrame(() => {
-      items.forEach(el => {
-        const id = el.getAttribute('data-sidebar-id');
-        if (!id || !oldPos[id]) return;
-        const newRect = el.getBoundingClientRect();
-        const deltaY = oldPos[id].top - newRect.top;
-        if (Math.abs(deltaY) > 1) {
-          el.style.transition = 'transform 0.32s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
-          el.style.transform = '';
-          el.addEventListener('transitionend', () => { el.style.transition = ''; }, { once: true });
-        }
+      deltas.forEach((_deltaY, el) => {
+        el.style.transition = 'transform 0.32s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+        el.style.transform = '';
+        el.addEventListener('transitionend', () => { el.style.transition = ''; }, { once: true });
       });
     });
 
@@ -1412,6 +1434,11 @@ useEffect(() => {
       keys: ['dailyChecklistItems', 'dailyChecklistLastReset', 'dailyChecklistColor', 'longtermChecklistItems', 'longtermChecklistLastReset', 'longtermChecklistColor', 'checklistNames'],
     },
     {
+      id: 'habits',
+      label: 'Habits',
+      keys: ['habitTracker_habits', 'habitTracker_log'],
+    },
+    {
       id: 'payments',
       label: 'Payments',
       keys: ['payments_v2'],
@@ -1950,11 +1977,11 @@ useEffect(() => {
 
                   {settingsTab === 'sound' && (
                     <div className="settings-modal-section">
-                      <h2 className="settings-modal-title">Ses</h2>
+                      <h2 className="settings-modal-title">Sound</h2>
                       <div className="settings-row-inline">
                         <div>
-                          <div className="settings-row-name">Ses Seviyesi</div>
-                          <div className="settings-row-sub">Uygulama ses efektlerinin seviyesi</div>
+                          <div className="settings-row-name">Volume</div>
+                          <div className="settings-row-sub">Volume of the app's sound effects</div>
                         </div>
                         <div className="settings-volume-right">
                           <button
@@ -2005,7 +2032,7 @@ useEffect(() => {
 
                   {settingsTab === 'pages' && (
                     <div className="settings-modal-section">
-                      <h2 className="settings-modal-title">Sayfalar</h2>
+                      <h2 className="settings-modal-title">Pages</h2>
                       <div className="settings-field-desc" style={{marginBottom:'16px'}}>Select pages to show in the sidebar</div>
                       {sidebarItems.filter(item => item.id !== 'dashboard').map(item => (
                         <div key={item.id} className="settings-page-row" onClick={() => togglePageVisibility(item.id)}>
@@ -2022,7 +2049,7 @@ useEffect(() => {
 
                   {settingsTab === 'data' && (
                     <div className="settings-modal-section">
-                      <h2 className="settings-modal-title">Veri</h2>
+                      <h2 className="settings-modal-title">Data</h2>
 
                       <div className="settings-section-title">Export</div>
                       <div className="settings-export-grid">
@@ -2081,9 +2108,12 @@ useEffect(() => {
             <div className="sidebar-content">
               {/* Draggable Sidebar Items */}
               {sidebarItems.filter(item => !item.hidden).map((item, index) => (
-                <div key={item.id}>
+                <div
+                  key={item.id}
+                  className={`sidebar-item-group ${dragOverInfo?.id === item.id ? `sidebar-drop-${dragOverInfo.position}` : ''}`}
+                  data-sidebar-id={item.id}
+                >
                   <div
-                    data-sidebar-id={item.id}
                     className={`sidebar-item ${item.id === 'dashboard' ? 'main-item' : ''} ${activeView === item.view ? 'active' : ''} ${draggedSidebarItem?.item.id === item.id ? 'sidebar-dragging' : ''}`}
                     onMouseDown={(e) => handleSidebarDragStart(e, item, index)}
                     onClick={() => {
@@ -2110,19 +2140,19 @@ useEffect(() => {
                         className={`sidebar-subitem ${activeView === 'fitness' && fitnessView === 'overview' ? 'active' : ''}`}
                         onClick={() => { playNavSound(); setFitnessView('overview'); setActiveView('fitness'); }}
                       >
-                        <span className="item-name">- Beslenme</span>
+                        <span className="item-name">- Nutrition</span>
                       </div>
                       <div
                         className={`sidebar-subitem ${activeView === 'fitness' && fitnessView === 'charts' ? 'active' : ''}`}
                         onClick={() => { playNavSound(); setFitnessView('charts'); setActiveView('fitness'); }}
                       >
-                        <span className="item-name">- Grafikler</span>
+                        <span className="item-name">- Charts</span>
                       </div>
                       <div
                         className={`sidebar-subitem ${activeView === 'fitness' && fitnessView === 'workout' ? 'active' : ''}`}
                         onClick={() => { playNavSound(); setFitnessView('workout'); setActiveView('fitness'); }}
                       >
-                        <span className="item-name">- Antrenman</span>
+                        <span className="item-name">- Workout</span>
                       </div>
                     </>
                   )}
@@ -2185,20 +2215,20 @@ useEffect(() => {
                   className="sidebar-footer-update-btn"
                   onClick={applyUpdate}
                   disabled={updateStatus === 'downloading'}
-                  title={`v${appUpdate.version} güncellemesi hazır — indirip kur`}
+                  title={`v${appUpdate.version} update ready — download and install`}
                 >
-                  {updateStatus === 'downloading' ? 'Güncelleniyor…' : 'Güncelle'}
+                  {updateStatus === 'downloading' ? 'Updating…' : 'Update'}
                 </button>
                 <button
                   className="sidebar-footer-update-hide"
                   onClick={hideUpdateButton}
-                  title="Bu butonu gizle (yeni sürüm çıkana kadar)"
+                  title="Hide this button (until a new version is released)"
                 >
                   ×
                 </button>
               </span>
             )}
-            <span className="sidebar-footer-version" title="Sürüm">v{APP_VERSION}</span>
+            <span className="sidebar-footer-version" title="Version">v{APP_VERSION}</span>
           </div>
         </div>
 
@@ -2227,6 +2257,15 @@ useEffect(() => {
             </ViewErrorBoundary>
           )}
 
+
+          {/* Habit Tracker */}
+          {activeView === 'habits' && (
+            <ViewErrorBoundary>
+            <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <HabitTracker />
+            </div>
+            </ViewErrorBoundary>
+          )}
 
           {/* Income Tracker Full Screen View */}
           {activeView === 'income' && (
@@ -2362,10 +2401,10 @@ useEffect(() => {
           boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
         }}>
           <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)', marginBottom: 4 }}>
-            Yeni sürüm hazır: v{appUpdate.version}
+            New version ready: v{appUpdate.version}
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 10 }}>
-            {updateStatus === 'downloading' ? 'İndiriliyor ve kuruluyor…' : updateStatus === 'error' ? 'Güncelleme başarısız oldu, tekrar dene.' : 'İndirip yeniden başlatarak kurabilirsin.'}
+            {updateStatus === 'downloading' ? 'Downloading and installing…' : updateStatus === 'error' ? 'Update failed, please try again.' : 'Download and restart to install.'}
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button
@@ -2378,18 +2417,18 @@ useEffect(() => {
                 opacity: updateStatus === 'downloading' ? 0.6 : 1,
               }}
             >
-              {updateStatus === 'downloading' ? 'Güncelleniyor…' : 'Şimdi Güncelle'}
+              {updateStatus === 'downloading' ? 'Updating…' : 'Update Now'}
             </button>
             {updateStatus !== 'downloading' && (
               <button
                 onClick={skipUpdateVersion}
-                title="Bu sürüm için bir daha sorulmaz — sol alttaki Güncelle butonundan istediğin zaman kurabilirsin"
+                title="You won't be asked again for this version — you can install anytime from the Update button in the bottom left"
                 style={{
                   background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border)',
                   borderRadius: 6, padding: '6px 12px', fontSize: 12, cursor: 'pointer',
                 }}
               >
-                Bu sürümü atla
+                Skip this version
               </button>
             )}
           </div>

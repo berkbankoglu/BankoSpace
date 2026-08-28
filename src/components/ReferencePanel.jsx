@@ -2225,13 +2225,13 @@ function ReferencePanel() {
       {deleteConfirm && (
         <div className="freeform-confirm-overlay" onClick={() => setDeleteConfirm(null)}>
           <div className="freeform-confirm-modal" onClick={e => e.stopPropagation()}>
-            <p className="freeform-confirm-title">"{deleteConfirm.tabName}" silinsin mi?</p>
+            <p className="freeform-confirm-title">Delete "{deleteConfirm.tabName}"?</p>
             {deleteConfirm.itemCount > 0 && (
-              <p className="freeform-confirm-sub">İçindeki {deleteConfirm.itemCount} öğe de silinecek.</p>
+              <p className="freeform-confirm-sub">The {deleteConfirm.itemCount} items inside it will also be deleted.</p>
             )}
             <div className="freeform-confirm-btns">
-              <button className="freeform-confirm-cancel" onClick={() => setDeleteConfirm(null)}>İptal</button>
-              <button className="freeform-confirm-delete" onClick={confirmDeleteTab}>Sil</button>
+              <button className="freeform-confirm-cancel" onClick={() => setDeleteConfirm(null)}>Cancel</button>
+              <button className="freeform-confirm-delete" onClick={confirmDeleteTab}>Delete</button>
             </div>
           </div>
         </div>

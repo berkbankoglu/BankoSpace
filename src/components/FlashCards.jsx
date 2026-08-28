@@ -446,14 +446,14 @@ Kurallar:
       if (data.error) throw new Error(data.error.message);
       const raw = data.content.find(b => b.type === 'text')?.text || '';
       const match = raw.match(/\[[\s\S]*\]/);
-      if (!match) throw new Error('Görsel parse edilemedi: ' + raw.slice(0, 200));
+      if (!match) throw new Error('Failed to parse image: ' + raw.slice(0, 200));
       const parsed = JSON.parse(match[0]);
-      if (!Array.isArray(parsed) || parsed.length === 0) throw new Error('Görselde kelime bulunamadı.');
+      if (!Array.isArray(parsed) || parsed.length === 0) throw new Error('No words found in the image.');
       setImageResults(parsed);
       setImageTargetDeck(selectedDeck || decks[0]?.name || '');
       setImageNewDeckName('');
     } catch (e) {
-      setAiError('Görsel işlenemedi: ' + (e?.message || 'Bilinmeyen hata'));
+      setAiError('Failed to process image: ' + (e?.message || 'Unknown error'));
     } finally {
       setAiLoading(false);
     }
@@ -466,12 +466,12 @@ Kurallar:
     let newDeckToCreate = null;
     if (targetDeck === '__new__') {
       const name = imageNewDeckName.trim();
-      if (!name) { setAiError('Yeni deste için bir isim gir.'); return; }
-      if (decks.some(d => d.name === name)) { setAiError('Bu isimde bir deste zaten var.'); return; }
+      if (!name) { setAiError('Enter a name for the new deck.'); return; }
+      if (decks.some(d => d.name === name)) { setAiError('A deck with this name already exists.'); return; }
       newDeckToCreate = { name, color: DECK_COLORS[decks.length % DECK_COLORS.length] };
       targetDeck = name;
     }
-    if (!targetDeck) { setAiError('Eklenecek bir deste seç.'); return; }
+    if (!targetDeck) { setAiError('Select a deck to add to.'); return; }
 
     const now = Date.now();
     const newCards = imageResults.map((item, i) => ({
@@ -653,11 +653,11 @@ Kurallar:
         <div className="fc-ai-col">
           <div className="fc-ai-panel">
             <div className="fc-ai-panel-header">
-              <span className="fc-ai-panel-title">AI Asistan</span>
+              <span className="fc-ai-panel-title">AI Assistant</span>
               <button
                 className="fc-ai-key-btn"
                 onClick={() => { setApiKeyDraft(localStorage.getItem('anthropic_api_key') || ''); setShowApiKeyInput(true); }}
-                title="API Key ayarla"
+                title="Set API key"
               >🔑</button>
             </div>
 
@@ -724,11 +724,11 @@ Kurallar:
                   onChange={e => { handleImageFiles([...e.target.files]); e.target.value = ''; }}
                 />
                 <div className="fc-ai-image-btn-row">
-                  <button className="fc-ai-attach-btn" onClick={() => imageFileRef.current?.click()} disabled={aiLoading} title="Görsel seç">
-                    📎 Görsel Seç
+                  <button className="fc-ai-attach-btn" onClick={() => imageFileRef.current?.click()} disabled={aiLoading} title="Select image">
+                    📎 Select Image
                   </button>
                   <button className="fc-ai-ask-btn" onClick={extractFromImages} disabled={aiLoading || aiImages.length === 0}>
-                    {aiLoading ? <span className="fc-ai-spinner" /> : 'Kelimeleri Çıkar'}
+                    {aiLoading ? <span className="fc-ai-spinner" /> : 'Extract Words'}
                   </button>
                 </div>
               </div>
@@ -808,7 +808,7 @@ Kurallar:
             {aiMode === 'image' && imageResults && !aiLoading && (
               <div className="fc-ai-bulk-results">
                 <div className="fc-ai-bulk-results-header">
-                  <span>{imageResults.length} kelime bulundu</span>
+                  <span>{imageResults.length} words found</span>
                 </div>
 
                 <div className="fc-ai-deck-target-row">
@@ -817,17 +817,17 @@ Kurallar:
                     value={imageTargetDeck}
                     onChange={e => setImageTargetDeck(e.target.value)}
                   >
-                    <option value="" disabled>Deste seç...</option>
+                    <option value="" disabled>Select deck...</option>
                     {decks.map(d => (
                       <option key={d.name} value={d.name}>{d.name}</option>
                     ))}
-                    <option value="__new__">+ Yeni deste oluştur...</option>
+                    <option value="__new__">+ Create new deck...</option>
                   </select>
                   {imageTargetDeck === '__new__' && (
                     <input
                       type="text"
                       className="fc-ai-deck-new-input"
-                      placeholder="Yeni deste adı..."
+                      placeholder="New deck name..."
                       value={imageNewDeckName}
                       onChange={e => setImageNewDeckName(e.target.value)}
                       autoFocus
@@ -842,12 +842,12 @@ Kurallar:
                       <span className="fc-ai-bulk-reading">{item.reading}</span>
                       <span className="fc-ai-bulk-arrow">→</span>
                       <span className="fc-ai-bulk-back">{item.turkish}</span>
-                      {item.corrected && <span className="fc-ai-corrected-badge" title="AI görseldeki bilgiyi düzeltti">✓ düzeltildi</span>}
+                      {item.corrected && <span className="fc-ai-corrected-badge" title="AI corrected the information from the image">✓ corrected</span>}
                     </div>
                   ))}
                 </div>
 
-                <button className="fc-ai-add-btn" onClick={addAllImageCards}>+ Hepsini Ekle</button>
+                <button className="fc-ai-add-btn" onClick={addAllImageCards}>+ Add All</button>
               </div>
             )}
 
@@ -858,7 +858,7 @@ Kurallar:
                   {aiMode === 'single'
                     ? "Type a word or concept you're curious about, let AI explain it and add it as a flash card."
                     : aiMode === 'image'
-                    ? 'Japonca kelime notlarının olduğu bir görsel yükle — yazılış, okunuş ve Türkçesini otomatik çıkarıp ekleyeyim.'
+                    ? "Upload an image with Japanese vocabulary notes — I'll automatically extract the writing, reading, and Turkish meaning, and add them."
                     : 'Describe a topic and AI will generate multiple flash cards at once.'}
                 </div>
               </div>
@@ -1095,12 +1095,12 @@ Kurallar:
               <div className="fc-study-zoom">
                 <button
                   onClick={() => setStudyScale(s => Math.max(0.6, Math.round((s - 0.1) * 10) / 10))}
-                  title="Küçült"
+                  title="Zoom out"
                 >−</button>
                 <span className="fc-study-zoom-value">{Math.round(studyScale * 100)}%</span>
                 <button
                   onClick={() => setStudyScale(s => Math.min(2.5, Math.round((s + 0.1) * 10) / 10))}
-                  title="Büyüt"
+                  title="Zoom in"
                 >+</button>
               </div>
             </div>
@@ -1192,7 +1192,7 @@ function CardForm({ initialFront = '', initialReading = '', initialBack = '', on
     <div className="fc-card-form">
       <input
         type="text"
-        placeholder="Front / Yazılış"
+        placeholder="Front / Writing"
         value={front}
         onChange={(e) => { playTypeSoundThrottled(); setFront(e.target.value); }}
         onKeyDown={(e) => {
@@ -1202,7 +1202,7 @@ function CardForm({ initialFront = '', initialReading = '', initialBack = '', on
       />
       <input
         type="text"
-        placeholder="Okunuş (opsiyonel)"
+        placeholder="Reading (optional)"
         value={reading}
         onChange={(e) => { playTypeSoundThrottled(); setReading(e.target.value); }}
         onKeyDown={(e) => {
@@ -1212,7 +1212,7 @@ function CardForm({ initialFront = '', initialReading = '', initialBack = '', on
       />
       <input
         type="text"
-        placeholder="Back / Türkçe"
+        placeholder="Back / Turkish"
         value={back}
         onChange={(e) => { playTypeSoundThrottled(); setBack(e.target.value); }}
         onKeyDown={(e) => {

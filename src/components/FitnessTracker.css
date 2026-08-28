@@ -1061,6 +1061,54 @@
   flex-direction: column;
 }
 
+.ft-ai-thread-list {
+  position: absolute;
+  top: 38px;
+  right: 8px;
+  z-index: 20;
+  width: 240px;
+  max-height: 300px;
+  overflow-y: auto;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ft-ai-thread-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 7px 9px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+.ft-ai-thread-item:hover { background: var(--bg-hover); }
+.ft-ai-thread-item.active { background: var(--bg-hover); color: var(--text-primary); font-weight: 600; }
+.ft-ai-thread-item-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.ft-ai-thread-item-delete {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+.ft-ai-thread-item-delete:hover { color: var(--text-primary); }
+
 .ft-ai-messages {
   flex: 1;
   overflow-y: auto;
@@ -1081,7 +1129,7 @@
 .ft-ai-msg--assistant { align-self: flex-start; align-items: flex-start; }
 
 .ft-ai-msg-label {
-  font-size: 10px;
+  font-size: calc(10px * var(--ft-ai-scale, 1));
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -1108,7 +1156,7 @@
 }
 
 .ft-ai-msg-text {
-  font-size: 13px;
+  font-size: calc(13px * var(--ft-ai-scale, 1));
   line-height: 1.55;
   padding: 8px 12px;
   border-radius: 10px;

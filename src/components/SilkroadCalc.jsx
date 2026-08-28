@@ -25,16 +25,16 @@ export default function SilkroadCalc() {
   return (
     <div className="sro-calc">
       <div className="sro-header">
-        <h2 className="sro-title">Silkroad Gold/Silk Hesap Makinesi</h2>
+        <h2 className="sro-title">Silkroad Gold/Silk Calculator</h2>
       </div>
 
       <div className="sro-body">
         {/* Bazar Ayarı */}
         <div className="sro-card">
-          <h3 className="sro-card-title">Bazar Ayarı</h3>
+          <h3 className="sro-card-title">Bazaar Settings</h3>
 
           <div className="sro-field">
-            <label>Alınan 1M Gold Bar sayısı</label>
+            <label>Number of 1M Gold Bars received</label>
             <div className="sro-input-row">
               <button onClick={() => { const v = Math.max(1, barReceived - 1); setBarReceived(v); setBarReceivedRaw(String(v)); }}>−</button>
               <input
@@ -49,7 +49,7 @@ export default function SilkroadCalc() {
           </div>
 
           <div className="sro-field">
-            <label>Ödenen Silk</label>
+            <label>Silk Paid</label>
             <div className="sro-input-row">
               <button onClick={() => { const v = Math.max(1, silkPaid - 10); setSilkPaid(v); setSilkPaidRaw(String(v)); }}>−</button>
               <input
@@ -63,7 +63,7 @@ export default function SilkroadCalc() {
           </div>
 
           <div className="sro-field">
-            <label>1k Silk piyasa fiyatı (M Gold)</label>
+            <label>1k Silk market price (M Gold)</label>
             <div className="sro-preset-row">
               {PRESET_SILK_PRICES.map(p => (
                 <button
@@ -75,7 +75,7 @@ export default function SilkroadCalc() {
               <input
                 className={`sro-custom-price${useCustom ? ' active' : ''}`}
                 type="number"
-                placeholder="Özel..."
+                placeholder="Custom..."
                 value={customSilkPrice}
                 onChange={e => { setCustomSilkPrice(e.target.value); setUseCustom(true); }}
                 onFocus={() => setUseCustom(true)}
@@ -86,7 +86,7 @@ export default function SilkroadCalc() {
 
         {/* Dönüşüm */}
         <div className="sro-card sro-convert-card">
-          <h3 className="sro-card-title">Dönüşüm</h3>
+          <h3 className="sro-card-title">Conversion</h3>
           <p className="sro-convert-rate">
             {silkPaid} silk = {fmtGold(barReceived)} &nbsp;·&nbsp;
             <strong>1 silk = {fmtGold(goldPerSilk)}</strong>
@@ -138,17 +138,17 @@ function ArenaCoinCalc() {
       <h3 className="sro-arena-title">Arena Coin → Silk</h3>
       <div className="sro-body" style={{ marginTop: 0 }}>
         <div className="sro-card">
-          <h3 className="sro-card-title">Bazar Ayarı</h3>
+          <h3 className="sro-card-title">Bazaar Settings</h3>
 
           <div className="sro-field">
-            <label>Satılan Arena Coin</label>
+            <label>Arena Coin Sold</label>
             <div className="sro-input-row">
               <input type="number" value={coins} onChange={e => setCoins(e.target.value)} />
             </div>
           </div>
 
           <div className="sro-field">
-            <label>Karşılığında alınan Silk</label>
+            <label>Silk received in exchange</label>
             <div className="sro-input-row">
               <input type="number" value={silk} onChange={e => setSilk(e.target.value)} />
             </div>
@@ -163,7 +163,7 @@ function ArenaCoinCalc() {
 
         {rate > 0 && (
           <div className="sro-card">
-            <h3 className="sro-card-title">Hızlı Tablo</h3>
+            <h3 className="sro-card-title">Quick Table</h3>
             {[1, 5, 10, 20, 50, 100, 200, 500, 1000].map(c => (
               <div className="sro-convert-row" key={c}>
                 <span>{c} coin</span>

@@ -8257,6 +8257,11 @@ body.light .sidebar-footer {
   border: 1px dashed var(--accent);
 }
 
+/* Drop preview while dragging — shows where the item will land without
+   moving anything yet; the real reorder only happens on mouseup. */
+.sidebar-item-group.sidebar-drop-before { box-shadow: inset 0 2px 0 0 var(--accent); }
+.sidebar-item-group.sidebar-drop-after { box-shadow: inset 0 -2px 0 0 var(--accent); }
+
 /* Fitness altında açılan alt sekme (Antrenman) */
 .sidebar-subitem {
   display: flex;
