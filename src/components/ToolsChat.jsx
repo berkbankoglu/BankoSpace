@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { proxyFetch } from '../platform';
 import './ToolsChat.css';
 
 const LANGUAGES = [
@@ -29,8 +29,8 @@ async function callAI(prompt, maxTokens = 1000) {
   if (!key) throw new Error('API key missing → Settings → AI');
   key = key.trim().replace(/^["']|["']$/g, '');
   if (!key.startsWith('sk-')) throw new Error('Invalid API key');
-  const text = await invoke('fetch_post', {
-    url: 'https://api.anthropic.com/v1/messages',
+  const text = await proxyFetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
     headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
     body: JSON.stringify({ model: 'claude-opus-5', max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] }),
   });

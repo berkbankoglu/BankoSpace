@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { invoke } from '@tauri-apps/api/core';
+import { proxyFetch } from '../platform';
 import './FitnessTracker.css';
 import { pushKeyToSupabase } from '../supabase';
 import { playClickSound, playAddSound, playDeleteSound } from '../utils/sounds';
@@ -1800,8 +1800,8 @@ TOOL RULES — FOLLOW EXACTLY:
           messages: loopMsgs,
           output_config: { effort: 'low' },
         });
-        const result = await invoke('fetch_post', {
-          url: 'https://api.anthropic.com/v1/messages',
+        const result = await proxyFetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
           headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
           body,
         });
@@ -1859,8 +1859,8 @@ Rules:
         output_config: { effort: 'low' },
         messages: [{ role: 'user', content: [...imageBlocks, { type: 'text', text: parsePrompt }] }],
       });
-      const result = await invoke('fetch_post', {
-        url: 'https://api.anthropic.com/v1/messages',
+      const result = await proxyFetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
         headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
         body,
       });

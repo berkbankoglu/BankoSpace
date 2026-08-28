@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
+import { notifyPermission, notify } from '../platform';
 import { pushKeyToSupabase } from '../supabase';
 import './Planner.css';
 
@@ -134,9 +134,7 @@ export default function Planner({ onPlannerToast }) {
   useEffect(() => {
     (async () => {
       try {
-        let ok = await isPermissionGranted();
-        if (!ok) ok = (await requestPermission()) === 'granted';
-        setNotifOk(ok);
+        setNotifOk(await notifyPermission());
       } catch {}
     })();
   }, []);
@@ -151,7 +149,7 @@ export default function Planner({ onPlannerToast }) {
         const ms = (mins - nowM) * 60000 - new Date().getSeconds() * 1000;
         if (ms > 0) notifTimers.current.push(setTimeout(async () => {
           if (onPlannerToast) onPlannerToast(`${label}: ${block.title}`, minutesToTime(mins));
-          if (notifOk) try { await sendNotification({ title: `${label}: ${block.title}`, body: minutesToTime(mins) }); } catch {}
+          if (notifOk) try { await notify(`${label}: ${block.title}`, minutesToTime(mins)); } catch {}
         }, ms));
       });
     });

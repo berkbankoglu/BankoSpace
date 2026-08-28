@@ -1,10 +1,8 @@
 import { useState } from 'react';
 import { supabase } from '../supabase';
+import { isTauri, windowControls } from '../platform';
 import logo from '../assets/logo.svg';
 import './Login.css';
-
-const closeApp    = async () => { try { const { getCurrentWindow } = await import('@tauri-apps/api/window'); await getCurrentWindow().close(); } catch {} };
-const minimizeApp = async () => { try { const { getCurrentWindow } = await import('@tauri-apps/api/window'); await getCurrentWindow().minimize(); } catch {} };
 
 // step: 'form' | 'otp'
 export default function Login({ onLogin }) {
@@ -83,11 +81,13 @@ export default function Login({ onLogin }) {
 
   return (
     <div className="login-wrapper">
-      {/* Minimal titlebar — sadece kapat, sürükle */}
-      <div className="login-titlebar" data-tauri-drag-region>
-        <button className="login-minimize-btn" onClick={minimizeApp}>─</button>
-        <button className="login-close-btn" onClick={closeApp}>×</button>
-      </div>
+      {/* Minimal titlebar — sadece kapat, sürükle (web'de tarayıcı kendi chrome'unu kullanır) */}
+      {isTauri && (
+        <div className="login-titlebar" data-tauri-drag-region>
+          <button className="login-minimize-btn" onClick={windowControls.minimize}>─</button>
+          <button className="login-close-btn" onClick={windowControls.close}>×</button>
+        </div>
+      )}
       <div className="login-box">
         <div className="login-logo">
           <img src={logo} alt="BankoSpace" className="login-logo-img" />

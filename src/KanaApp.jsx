@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { getCurrentWindow } from '@tauri-apps/api/window';
 import { PracticeTab } from './components/JapaneseKana';
+import { isTauri } from './platform';
 import './App.css';
 import './components/JapaneseKana.css';
 
+// This is the kana.html popup entry — a native always-on-top Tauri window
+// with no web equivalent, so it's never reachable from the web build.
 export default function KanaApp() {
   const [selectedRows, setSelectedRows] = useState(() => {
     try { return JSON.parse(localStorage.getItem('kana_selected_rows')) || null; } catch { return null; }
@@ -11,16 +13,19 @@ export default function KanaApp() {
   const [isAlwaysOnTop, setIsAlwaysOnTop] = useState(true);
 
   useEffect(() => {
-    getCurrentWindow().setAlwaysOnTop(true).catch(() => {});
+    if (!isTauri) return;
+    import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
+      getCurrentWindow().setAlwaysOnTop(true).catch(() => {});
+    });
   }, []);
 
   const closePopup = async () => {
-    try { await getCurrentWindow().hide(); } catch {}
+    try { const { getCurrentWindow } = await import('@tauri-apps/api/window'); await getCurrentWindow().hide(); } catch {}
   };
 
   const togglePin = async () => {
     const next = !isAlwaysOnTop;
-    try { await getCurrentWindow().setAlwaysOnTop(next); } catch {}
+    try { const { getCurrentWindow } = await import('@tauri-apps/api/window'); await getCurrentWindow().setAlwaysOnTop(next); } catch {}
     setIsAlwaysOnTop(next);
   };
 

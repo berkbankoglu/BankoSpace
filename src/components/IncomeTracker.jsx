@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { open, ask } from '@tauri-apps/plugin-dialog';
+import { open } from '@tauri-apps/plugin-dialog';
 import { readDir, readFile } from '@tauri-apps/plugin-fs';
+import { isTauri, confirmAsync } from '../platform';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import './IncomeTracker.css';
@@ -516,7 +517,7 @@ function IncomeTracker() {
 
   // Clear all data
   const clearAllData = async () => {
-    const confirmed = await ask('Are you sure you want to delete all invoice data?\n\nThis action cannot be undone!', {
+    const confirmed = await confirmAsync('Are you sure you want to delete all invoice data?\n\nThis action cannot be undone!', {
       title: 'Delete Data',
       kind: 'warning',
       okLabel: 'Yes, Delete',
@@ -1365,14 +1366,16 @@ function IncomeTracker() {
 
           {/* Action Buttons */}
           <div className="it-actions">
-            <button
-              className="it-action-btn primary"
-              onClick={selectFolder}
-              title="Select invoice folder"
-            >
-              📁 {basePath ? 'Change Folder' : 'Select Folder'}
-            </button>
-            {basePath && (
+            {isTauri && (
+              <button
+                className="it-action-btn primary"
+                onClick={selectFolder}
+                title="Select invoice folder"
+              >
+                📁 {basePath ? 'Change Folder' : 'Select Folder'}
+              </button>
+            )}
+            {isTauri && basePath && (
               <>
                 <button
                   className="it-action-btn"
@@ -1604,7 +1607,7 @@ function IncomeTracker() {
                   <div className="it-empty-list">
                     <p>No invoices yet</p>
                     <button onClick={() => setView('add')}>Add Manually</button>
-                    <button onClick={scanFolder}>Scan from Folder</button>
+                    {isTauri && <button onClick={scanFolder}>Scan from Folder</button>}
                   </div>
                 )}
               </>

@@ -1,5 +1,5 @@
 import { useState, useRef, Fragment } from 'react';
-import { ask } from '@tauri-apps/plugin-dialog';
+import { confirmAsync } from '../platform';
 import './HabitTracker.css';
 import { playAddSound, playDeleteSound, playCompleteSound, playUncompleteSound } from '../utils/sounds';
 
@@ -107,7 +107,7 @@ export default function HabitTracker() {
 
   async function removeHabit(id) {
     const habit = habits.find(h => h.id === id);
-    const confirmed = await ask(`Delete "${habit?.name}"?\n\nIts history will be deleted too. This action cannot be undone!`, {
+    const confirmed = await confirmAsync(`Delete "${habit?.name}"?\n\nIts history will be deleted too. This action cannot be undone!`, {
       title: 'Delete Habit',
       kind: 'warning',
       okLabel: 'Yes, Delete',

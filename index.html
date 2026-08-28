@@ -2,12 +2,19 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>BankoSpace</title>
     <!-- Inter bundled locally — no network dependency -->
     <link rel="stylesheet" href="/fonts/inter.css">
+    <!-- iOS "Add to Home Screen" doesn't fully honor the web manifest —
+         Safari needs these older meta tags to install standalone. -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="BankoSpace">
+    <link rel="apple-touch-icon" href="/icons/icon-512.png">
+    <meta name="theme-color" content="#0d1117">
 </head>
-<body style="margin:0;padding:0;height:100%;overflow:hidden;">
+<body style="margin:0;padding:0;height:100%;overflow:hidden;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);box-sizing:border-box;">
     <div id="root" style="height:100%;"></div>
     <script type="module" src="/src/main.jsx"></script>
 </body>

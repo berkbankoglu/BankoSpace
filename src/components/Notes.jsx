@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, forwardRef } from 'react';
 import ReactDOM, { flushSync } from 'react-dom';
 import './Notes.css';
+import { exportJSON, exportText, importJSON } from '../platform';
 import { playTypeSoundThrottled, playClickSound, playAddSound, playDeleteSound } from '../utils/sounds';
 import { pushKeyToSupabase } from '../supabase';
 import { putImage, getImage, resolveEmbed, newImageId, putStrokes, getStrokes } from '../utils/imageStore';
@@ -1529,17 +1530,9 @@ function Notes() {
 
   const exportAllNotes = async () => {
     try {
-      const { save } = await import('@tauri-apps/plugin-dialog');
-      const { writeTextFile } = await import('@tauri-apps/plugin-fs');
       const date = new Date().toISOString().slice(0, 10);
-      const filePath = await save({
-        defaultPath: `notlar-${date}.json`,
-        filters: [{ name: 'JSON', extensions: ['json'] }],
-      });
-      if (filePath) {
-        const exportable = await inlineNotesForExport(notes);
-        await writeTextFile(filePath, JSON.stringify(exportable, null, 2));
-      }
+      const exportable = await inlineNotesForExport(notes);
+      await exportJSON(`notlar-${date}.json`, JSON.stringify(exportable, null, 2));
     } catch (e) { console.error('Export error:', e); }
   };
 
@@ -1568,14 +1561,7 @@ function Notes() {
 
   const exportAsHtml = async () => {
     try {
-      const { save } = await import('@tauri-apps/plugin-dialog');
-      const { writeTextFile } = await import('@tauri-apps/plugin-fs');
       const date = new Date().toISOString().slice(0, 10);
-      const filePath = await save({
-        defaultPath: `notlar-${date}.html`,
-        filters: [{ name: 'HTML', extensions: ['html'] }],
-      });
-      if (!filePath) return;
 
       const renderSection = async (title, content, level = 2) =>
         `<section><h${level}>${title || 'Untitled'}</h${level}><div class="content">${await contentToHtml(content)}</div></section>`;
@@ -1609,17 +1595,14 @@ function Notes() {
 ${body}
 </body>
 </html>`;
-      await writeTextFile(filePath, fullHtml);
+      await exportText(`notlar-${date}.html`, fullHtml, 'text/html');
     } catch (e) { console.error('HTML export error:', e); }
   };
 
   const importNotes = async () => {
     try {
-      const { open } = await import('@tauri-apps/plugin-dialog');
-      const { readTextFile } = await import('@tauri-apps/plugin-fs');
-      const filePath = await open({ filters: [{ name: 'JSON', extensions: ['json'] }] });
-      if (!filePath) return;
-      const text = await readTextFile(filePath);
+      const text = await importJSON();
+      if (!text) return;
       const imported = JSON.parse(text);
       if (!Array.isArray(imported)) { alert('Invalid file'); return; }
       // Pull any inline base64 from the backup into IndexedDB so the live

@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { isTauri, proxyFetch } from "../platform";
 import { getAudioContext, getMasterGain, getVolume } from "../utils/sounds";
 import { pushKeyToSupabase } from "../supabase";
 import FlashCards from "./FlashCards";
 import "./JapaneseKana.css";
 
+// Native always-on-top popup window — no web equivalent, only called from a
+// button that's hidden entirely when !isTauri (see openKanaPopup's usage).
 function openKanaPopup() {
   invoke('toggle_kana_window').catch(() => {});
 }
@@ -2852,8 +2855,8 @@ function VocabularyTab() {
           content: `Given the Japanese romaji "${romaji}", provide:\n1. The Japanese writing (hiragana/katakana/kanji)\n2. The Turkish meaning\n3. The English meaning\n\nReply ONLY in this exact JSON format:\n{"kana":"<japanese>","meaning_tr":"<turkish>","meaning_en":"<english>"}`,
         }],
       });
-      const text = await invoke('fetch_post', {
-        url: 'https://api.anthropic.com/v1/messages',
+      const text = await proxyFetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
         headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
         body,
       });
@@ -3191,7 +3194,7 @@ export default function JapaneseKana({ view = 'guide' }) {
 
   return (
     <div className="japanese-kana">
-      {tab === "Practice" && (
+      {tab === "Practice" && isTauri && (
         <div className="jk-header" style={{ justifyContent: 'flex-end' }}>
           <button
             className="jk-practice-popup-btn"

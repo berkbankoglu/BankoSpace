@@ -1,9 +1,6 @@
 import { useState, useEffect, useRef, useCallback, Component } from 'react';
 import { flushSync } from 'react-dom';
-import { invoke } from '@tauri-apps/api/core';
-import { platform } from '@tauri-apps/plugin-os';
-import { check as checkForUpdate } from '@tauri-apps/plugin-updater';
-import { relaunch } from '@tauri-apps/plugin-process';
+import { isTauri, proxyFetch, confirmAsync, notifyPermission, notify, exportJSON, importJSON, windowControls } from './platform';
 import logo from './assets/logo.svg';
 import './App.css';
 import { supabase, pullFromSupabase, pushKeyToSupabase, pushAllToSupabase, purgeApiKeyFromSupabase, SYNC_KEYS } from './supabase';
@@ -19,7 +16,6 @@ import SubscriptionTracker, { SubscriptionWidget, SubscriptionPopup } from './co
 import Planner from './components/Planner';
 import Notes from './components/Notes';
 import HabitTracker from './components/HabitTracker';
-import { onAction, registerActionTypes } from '@tauri-apps/plugin-notification';
 import { TODO_COLORS } from './constants';
 
 // Bu bölümde beklenmedik bir render hatası olursa (ör. bozuk veri), sadece bu
@@ -152,10 +148,7 @@ function ContributionLegend() {
 // attribute'lu <td> hücreleri var. CORS'u aşmak için Rust'taki genel fetch_get
 // komutu üzerinden çekiliyor (supabase.js'deki tauriFetch ile aynı desen).
 async function fetchGithubContributions() {
-  const html = await invoke('fetch_get', {
-    url: `https://github.com/users/${GH_USERNAME}/contributions`,
-    headers: {},
-  });
+  const html = await proxyFetch(`https://github.com/users/${GH_USERNAME}/contributions`, { method: 'GET' });
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const map = {};
   doc.querySelectorAll('td[data-date]').forEach(td => {
@@ -258,7 +251,6 @@ function TaskContributionGraph({ todos, contributionLog }) {
   );
 }
 import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, setVolume, getVolume } from './utils/sounds';
-import { getCurrentWindow } from '@tauri-apps/api/window';
 
 const APP_VERSION = '4.2.13';
 const MIN_COL_PX = 220;
@@ -269,16 +261,21 @@ function App({ session, onLogout }) {
   const [currentPlatform, setCurrentPlatform] = useState('macos'); // Default to macos while detecting
 
   useEffect(() => {
+    // Only matters for the custom title bar, which isn't rendered on web at
+    // all (the browser draws its own chrome) — skip platform() there.
+    if (!isTauri) return;
     // platform() is synchronous in @tauri-apps/plugin-os v2 (returns the
     // string directly, not a Promise) — calling .then() on it threw on every
     // launch and left currentPlatform stuck on the 'macos' fallback even on
     // Windows.
-    try {
-      setCurrentPlatform(platform());
-    } catch (err) {
-      console.error('Platform detection failed:', err);
-      setCurrentPlatform('macos'); // Fallback
-    }
+    import('@tauri-apps/plugin-os').then(({ platform }) => {
+      try {
+        setCurrentPlatform(platform());
+      } catch (err) {
+        console.error('Platform detection failed:', err);
+        setCurrentPlatform('macos'); // Fallback
+      }
+    });
   }, []);
 
   // Check if this is a popup window
@@ -353,11 +350,15 @@ function App({ session, onLogout }) {
   const [showUpdateWarning, setShowUpdateWarning] = useState(false);
 
 
-  // Planner notification tap → navigate to planner
+  // Planner notification tap → navigate to planner (native notification action
+  // routing — no equivalent needed on web, Web Notifications are handled
+  // inline where they're sent)
   useEffect(() => {
+    if (!isTauri) return;
     let unlisten;
     (async () => {
       try {
+        const { onAction, registerActionTypes } = await import('@tauri-apps/plugin-notification');
         await registerActionTypes([{
           id: 'planner-block',
           actions: [{ id: 'open', title: 'Open Planner' }],
@@ -443,20 +444,27 @@ function App({ session, onLogout }) {
       // pencereyi gerçekten kapatmıyoruz — aksi halde 2sn'lik debounce
       // penceresinde kalan veya hâlâ ağ üzerinde olan bir yazma, süreç
       // sonlanınca sessizce kayboluyordu (kullanıcının "kaydolmuyor" şikayeti).
+      // Native window-close interception — no equivalent on web (a browser
+      // tab can't be held open to await pending pushes); the `beforeunload`
+      // listener above is the web fallback, best-effort like it already was.
       let unlistenClose = null;
-      const appWindow = getCurrentWindow();
-      appWindow.onCloseRequested(async (event) => {
-        event.preventDefault();
-        const pending = flushAll();
-        // Ağ takılırsa pencere sonsuza kadar kapanmayı reddetmesin diye
-        // güvenlik zaman aşımı — freeze-diagnostic prensibiyle aynı: sessiz
-        // asılı kalma yerine, en kötü ihtimalle veri kaybı riskini göze al.
-        await Promise.race([
-          Promise.all(pending),
-          new Promise(resolve => setTimeout(resolve, 4000)),
-        ]);
-        await appWindow.destroy();
-      }).then(fn => { unlistenClose = fn; });
+      if (isTauri) {
+        import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
+          const appWindow = getCurrentWindow();
+          appWindow.onCloseRequested(async (event) => {
+            event.preventDefault();
+            const pending = flushAll();
+            // Ağ takılırsa pencere sonsuza kadar kapanmayı reddetmesin diye
+            // güvenlik zaman aşımı — freeze-diagnostic prensibiyle aynı: sessiz
+            // asılı kalma yerine, en kötü ihtimalle veri kaybı riskini göze al.
+            await Promise.race([
+              Promise.all(pending),
+              new Promise(resolve => setTimeout(resolve, 4000)),
+            ]);
+            await appWindow.destroy();
+          }).then(fn => { unlistenClose = fn; });
+        });
+      }
 
       const origRemoveItem = localStorage.removeItem.bind(localStorage);
       localStorage.removeItem = function(key) {
@@ -506,9 +514,10 @@ function App({ session, onLogout }) {
   const [updateSkippedVersion, setUpdateSkippedVersion] = useState(() => localStorage.getItem('updateSkippedVersion') || null);
   const [updateButtonHiddenVersion, setUpdateButtonHiddenVersion] = useState(() => localStorage.getItem('updateButtonHiddenVersion') || null);
   useEffect(() => {
+    if (!isTauri) return; // native updater doesn't apply to the web build
     const timer = setTimeout(() => {
       if (window.__diag) window.__diag(`update-check: starting, current=${APP_VERSION}`);
-      checkForUpdate().then(update => {
+      import('@tauri-apps/plugin-updater').then(({ check }) => check()).then(update => {
         if (window.__diag) window.__diag(`update-check: available=${update?.available} version=${update?.version ?? '-'} currentVersion=${update?.currentVersion ?? '-'}`);
         if (update?.available) setAppUpdate(update);
       }).catch(err => {
@@ -533,6 +542,7 @@ function App({ session, onLogout }) {
     setUpdateStatus('downloading');
     try {
       await appUpdate.downloadAndInstall();
+      const { relaunch } = await import('@tauri-apps/plugin-process');
       await relaunch();
     } catch (err) {
       console.error('Update install failed:', err);
@@ -1477,8 +1487,6 @@ useEffect(() => {
 
   const exportSection = async (sectionIdOrIds) => {
     try {
-      const { save } = await import('@tauri-apps/plugin-dialog');
-      const { writeTextFile } = await import('@tauri-apps/plugin-fs');
       const isAll = sectionIdOrIds === 'all';
       const ids = isAll ? DATA_SECTIONS.map(s => s.id) : Array.isArray(sectionIdOrIds) ? sectionIdOrIds : [sectionIdOrIds];
       const sections = ids.map(id => DATA_SECTIONS.find(s => s.id === id)).filter(Boolean);
@@ -1493,12 +1501,8 @@ useEffect(() => {
       });
       if (ids.includes('todos')) data['todos'] = todos;
       const date = new Date().toISOString().split('T')[0];
-      const filePath = await save({
-        defaultPath: `bankospace-${sectionLabel}-${date}.json`,
-        filters: [{ name: 'JSON', extensions: ['json'] }]
-      });
-      if (filePath) {
-        await writeTextFile(filePath, JSON.stringify(data, null, 2));
+      const saved = await exportJSON(`bankospace-${sectionLabel}-${date}.json`, JSON.stringify(data, null, 2));
+      if (saved) {
         alert(`${isAll ? 'All data' : sections.map(s => s.label).join(', ')} exported successfully!`);
       }
     } catch (e) {
@@ -1509,11 +1513,9 @@ useEffect(() => {
 
   const importSection = async () => {
     try {
-      const { open } = await import('@tauri-apps/plugin-dialog');
-      const { readTextFile } = await import('@tauri-apps/plugin-fs');
-      const filePath = await open({ multiple: false, filters: [{ name: 'JSON', extensions: ['json'] }] });
-      if (!filePath) return;
-      const data = JSON.parse(await readTextFile(filePath));
+      const raw = await importJSON();
+      if (!raw) return;
+      const data = JSON.parse(raw);
       if (!data._bankospace) { alert('Invalid file. Please select a BankoSpace export file.'); return; }
       const sectionId = data._section;
       const keys = sectionId === 'all' || !sectionId
@@ -1597,36 +1599,10 @@ useEffect(() => {
   };
 
 
-  // Window control functions
-  const minimizeWindow = async () => {
-    try {
-      await getCurrentWindow().minimize();
-    } catch (err) {
-      console.error('Failed to minimize:', err);
-    }
-  };
-
-  const maximizeWindow = async () => {
-    try {
-      const window = getCurrentWindow();
-      const isMaximized = await window.isMaximized();
-      if (isMaximized) {
-        await window.unmaximize();
-      } else {
-        await window.maximize();
-      }
-    } catch (err) {
-      console.error('Failed to toggle maximize:', err);
-    }
-  };
-
-  const closeWindow = async () => {
-    try {
-      await getCurrentWindow().close();
-    } catch (err) {
-      console.error('Failed to close:', err);
-    }
-  };
+  // Window control functions (no-ops in the browser — see src/platform.js)
+  const minimizeWindow = windowControls.minimize;
+  const maximizeWindow = windowControls.maximize;
+  const closeWindow = windowControls.close;
 
   const appZoom = window.screen.width <= 1600 ? 0.9 : 1;
 
@@ -1658,18 +1634,20 @@ useEffect(() => {
         {/* macOS: Traffic lights LEFT, workspace center-left */}
         {currentPlatform === 'macos' && (
           <>
-            <div className="titlebar-controls-mac">
-              <button className="traffic-light close" onClick={closeWindow} title="Close">
-                <svg width="6" height="6" viewBox="0 0 6 6"><line x1="1" y1="1" x2="5" y2="5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/><line x1="5" y1="1" x2="1" y2="5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
-              </button>
-              <button className="traffic-light minimize" onClick={minimizeWindow} title="Minimize">
-                <svg width="6" height="1.5" viewBox="0 0 6 1.5"><rect width="6" height="1.5" rx="0.75" fill="currentColor"/></svg>
-              </button>
-              <button className="traffic-light maximize" onClick={maximizeWindow} title="Maximize">
-                <svg width="6" height="6" viewBox="0 0 6 6"><rect x="1" y="1.5" width="4" height="3" stroke="currentColor" strokeWidth="1" fill="none"/><polyline points="1.5,1.5 1.5,1 4.5,1 4.5,4" stroke="currentColor" strokeWidth="1" fill="none"/></svg>
-              </button>
-            </div>
-            <div className="titlebar-workspace" style={{ width: sidebarCollapsed ? 50 : 240, flexShrink: 0, marginLeft: '70px' }}>
+            {isTauri && (
+              <div className="titlebar-controls-mac">
+                <button className="traffic-light close" onClick={closeWindow} title="Close">
+                  <svg width="6" height="6" viewBox="0 0 6 6"><line x1="1" y1="1" x2="5" y2="5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/><line x1="5" y1="1" x2="1" y2="5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                </button>
+                <button className="traffic-light minimize" onClick={minimizeWindow} title="Minimize">
+                  <svg width="6" height="1.5" viewBox="0 0 6 1.5"><rect width="6" height="1.5" rx="0.75" fill="currentColor"/></svg>
+                </button>
+                <button className="traffic-light maximize" onClick={maximizeWindow} title="Maximize">
+                  <svg width="6" height="6" viewBox="0 0 6 6"><rect x="1" y="1.5" width="4" height="3" stroke="currentColor" strokeWidth="1" fill="none"/><polyline points="1.5,1.5 1.5,1 4.5,1 4.5,4" stroke="currentColor" strokeWidth="1" fill="none"/></svg>
+                </button>
+              </div>
+            )}
+            <div className="titlebar-workspace" style={{ width: sidebarCollapsed ? 50 : 240, flexShrink: 0, marginLeft: isTauri ? '70px' : 0 }}>
               <button
                 className="titlebar-workspace-btn"
                 onClick={() => { setShowSidebarSettings(true); setSettingsTab('account'); }}
@@ -1684,7 +1662,7 @@ useEffect(() => {
                 )}
               </button>
             </div>
-            <div className="titlebar-drag-region" data-tauri-drag-region onDoubleClick={maximizeWindow} />
+            {isTauri && <div className="titlebar-drag-region" data-tauri-drag-region onDoubleClick={maximizeWindow} />}
           </>
         )}
 
@@ -1706,18 +1684,20 @@ useEffect(() => {
                 )}
               </button>
             </div>
-            <div className="titlebar-drag-region" data-tauri-drag-region onDoubleClick={maximizeWindow} />
-            <div className="titlebar-controls">
-              <button className="titlebar-btn minimize" onClick={minimizeWindow} title="Minimize">
-                <svg width="11" height="1" viewBox="0 0 11 1"><rect width="11" height="1.5" rx="0.75" fill="currentColor"/></svg>
-              </button>
-              <button className="titlebar-btn maximize" onClick={maximizeWindow} title="Maximize">
-                <svg width="10" height="10" viewBox="0 0 10 10"><rect x="0.75" y="0.75" width="8.5" height="8.5" rx="1" stroke="currentColor" strokeWidth="1.5" fill="none"/></svg>
-              </button>
-              <button className="titlebar-btn close" onClick={closeWindow} title="Close">
-                <svg width="10" height="10" viewBox="0 0 10 10"><line x1="0.5" y1="0.5" x2="9.5" y2="9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><line x1="9.5" y1="0.5" x2="0.5" y2="9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-              </button>
-            </div>
+            {isTauri && <div className="titlebar-drag-region" data-tauri-drag-region onDoubleClick={maximizeWindow} />}
+            {isTauri && (
+              <div className="titlebar-controls">
+                <button className="titlebar-btn minimize" onClick={minimizeWindow} title="Minimize">
+                  <svg width="11" height="1" viewBox="0 0 11 1"><rect width="11" height="1.5" rx="0.75" fill="currentColor"/></svg>
+                </button>
+                <button className="titlebar-btn maximize" onClick={maximizeWindow} title="Maximize">
+                  <svg width="10" height="10" viewBox="0 0 10 10"><rect x="0.75" y="0.75" width="8.5" height="8.5" rx="1" stroke="currentColor" strokeWidth="1.5" fill="none"/></svg>
+                </button>
+                <button className="titlebar-btn close" onClick={closeWindow} title="Close">
+                  <svg width="10" height="10" viewBox="0 0 10 10"><line x1="0.5" y1="0.5" x2="9.5" y2="9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><line x1="9.5" y1="0.5" x2="0.5" y2="9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -2019,10 +1999,14 @@ useEffect(() => {
                           onClick={async () => {
                             showPlannerToast('Starting: Test Block', '09:00 — Click to open Planner');
                             try {
-                              const { sendNotification, isPermissionGranted, requestPermission } = await import('@tauri-apps/plugin-notification');
-                              let ok = await isPermissionGranted();
-                              if (!ok) ok = (await requestPermission()) === 'granted';
-                              if (ok) await sendNotification({ title: 'Starting: Test Block', body: 'Click to open Planner', actionTypeId: 'planner-block', data: { type: 'planner' } });
+                              if (isTauri) {
+                                const { sendNotification, isPermissionGranted, requestPermission } = await import('@tauri-apps/plugin-notification');
+                                let ok = await isPermissionGranted();
+                                if (!ok) ok = (await requestPermission()) === 'granted';
+                                if (ok) await sendNotification({ title: 'Starting: Test Block', body: 'Click to open Planner', actionTypeId: 'planner-block', data: { type: 'planner' } });
+                              } else if (await notifyPermission()) {
+                                await notify('Starting: Test Block', 'Click to open Planner');
+                              }
                             } catch {}
                           }}
                         >Test</button>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { proxyFetch } from '../platform';
 import './FlashCards.css';
 import { pushKeyToSupabase } from '../supabase';
 import { playTypeSoundThrottled, playClickSound, playAddSound, playDeleteSound } from '../utils/sounds';
@@ -250,8 +250,8 @@ function FlashCards({ fullscreen = false }) {
           content: `Word/concept: "${aiWord}"\n\nRespond in this JSON format only (nothing else, just JSON):\n{"word":"original word/concept","translation":"short Turkish translation or equivalent (max 5 words)","explanation":"detailed Turkish explanation in 2-3 sentences, what it means and how it is used"}`
         }]
       });
-      const text = await invoke('fetch_post', {
-        url: 'https://api.anthropic.com/v1/messages',
+      const text = await proxyFetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
         headers: {
           'x-api-key': key,
           'anthropic-version': '2023-06-01',
@@ -310,8 +310,8 @@ function FlashCards({ fullscreen = false }) {
           content: `Create flash cards for: "${bulkPrompt}"\n\nRespond ONLY with a JSON array, no extra text. Each item must have "front" and "back" keys. Example:\n[{"front":"January","back":"Ocak"},{"front":"February","back":"Şubat"}]\n\nMake one card for EACH individual item. Do not combine multiple items into one card.`
         }]
       });
-      const text = await invoke('fetch_post', {
-        url: 'https://api.anthropic.com/v1/messages',
+      const text = await proxyFetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
         headers: {
           'x-api-key': key,
           'anthropic-version': '2023-06-01',
@@ -433,8 +433,8 @@ Kurallar:
         output_config: { effort: 'low' },
         messages: [{ role: 'user', content: [...imageBlocks, { type: 'text', text: prompt }] }],
       });
-      const result = await invoke('fetch_post', {
-        url: 'https://api.anthropic.com/v1/messages',
+      const result = await proxyFetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
         headers: {
           'x-api-key': key,
           'anthropic-version': '2023-06-01',

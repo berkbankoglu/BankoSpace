@@ -1,10 +1,14 @@
 import { createClient } from '@supabase/supabase-js';
-import { invoke } from '@tauri-apps/api/core';
+import { proxyFetch } from './platform';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY;
 
-// Rust backend üzerinden fetch — WebView2 CSP/network kısıtlamalarını aşar
+// Desktop: routed through the Rust backend (bypasses WebView2 network
+// quirks). Web: routed through /api/proxy (same host-allowlist as Rust's
+// fetch_get/fetch_post — see src-tauri/src/main.rs `is_allowed_host`).
+// Either way, calls stay off the page's own fetch() so nothing here depends
+// on Supabase's CORS headers.
 async function tauriFetch(input, init) {
   const url = typeof input === 'string' ? input : input.url;
   const method = (init?.method || 'GET').toUpperCase();
@@ -19,12 +23,7 @@ async function tauriFetch(input, init) {
   }
   const body = init?.body ? String(init.body) : '';
 
-  let text;
-  if (method === 'GET' || method === 'HEAD') {
-    text = await invoke('fetch_get', { url, headers });
-  } else {
-    text = await invoke('fetch_post', { url, headers, body });
-  }
+  const text = await proxyFetch(url, { method, headers, body });
 
   return new Response(text, { status: 200, headers: { 'content-type': 'application/json' } });
 }
