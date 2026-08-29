@@ -1626,7 +1626,12 @@ useEffect(() => {
   const maximizeWindow = windowControls.maximize;
   const closeWindow = windowControls.close;
 
-  const appZoom = isMobile ? 0.65 : (window.screen.width <= 1600 ? 0.9 : 1);
+  // CSS zoom does shrink everything proportionally, but on iOS Safari it's
+  // known to fight with touch-scroll/viewport-height math (this broke
+  // vertical scrolling on the Checklists view) — so mobile sizing is done
+  // with plain font-size/padding rules in the mobile media query instead,
+  // which doesn't have that interaction.
+  const appZoom = isMobile ? 1 : (window.screen.width <= 1600 ? 0.9 : 1);
 
   // CategoryColumn'un iki örneği de aynı 16 mutasyon fonksiyonunu kullanıyor —
   // tek tek prop olarak geçmek yerine bir kere burada paketleniyor.

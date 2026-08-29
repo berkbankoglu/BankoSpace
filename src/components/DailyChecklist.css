@@ -391,3 +391,35 @@ body.light .checklist-edit-input:focus {
 body.light .checklist-add-input::placeholder {
   color: #999;
 }
+
+/* Mobile (phone-width web/PWA) — more compact box, and the edit/delete
+   actions can't rely on :hover to appear on a touch screen, so they're
+   made always-visible here instead of opacity:0 until hovered. */
+@media (max-width: 768px) {
+  .checklist-wrapper {
+    padding: 12px;
+    min-height: unset;
+  }
+
+  .checklist-header {
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+  }
+
+  .checklist-title,
+  .checklist-title-input {
+    font-size: 14px;
+  }
+
+  .checklist-item {
+    padding: 8px 10px;
+  }
+
+  .checklist-text {
+    font-size: 13px;
+  }
+
+  .checklist-actions {
+    opacity: 1;
+  }
+}

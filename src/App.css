@@ -9198,6 +9198,25 @@ body.light .font-size-option:hover {
     min-width: 22px;
     min-height: 22px;
   }
+
+  /* Checklists view — single column, more compact "boxes" so more fits
+     without scrolling as far. */
+  .checklists-fullscreen {
+    padding: 10px;
+  }
+
+  .checklists-container {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .checklist-section {
+    min-height: unset;
+  }
+
+  .dashboard-container {
+    padding: 10px 12px 12px;
+  }
 }
 
 /* ==========================================
