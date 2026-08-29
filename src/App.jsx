@@ -2345,6 +2345,7 @@ useEffect(() => {
                   todos={todosByCategory.daily}
                   currentFilter={currentFilter}
                   actions={todoActions}
+                  isMobile={isMobile}
                 />
               </div>
               <div className="col-resize-handle" onMouseDown={e => startColResize(0, e)} onDoubleClick={() => { setColWidths(DEFAULT_COL_PX); localStorage.setItem('dashColWidths', JSON.stringify(DEFAULT_COL_PX)); }} />
@@ -2355,11 +2356,12 @@ useEffect(() => {
                   todos={todosByCategory.weekly}
                   currentFilter={currentFilter}
                   actions={todoActions}
+                  isMobile={isMobile}
                 />
               </div>
               <div className="col-resize-handle" onMouseDown={e => startColResize(1, e)} onDoubleClick={() => { setColWidths(DEFAULT_COL_PX); localStorage.setItem('dashColWidths', JSON.stringify(DEFAULT_COL_PX)); }} />
               <div className="todo-col-wrapper" style={colWidths[2] ? { flex: `1 1 ${colWidths[2]}px`, minWidth: 0 } : { flex: 1, minWidth: 0 }}>
-                <DashRightCol todos={todos} contributionLog={contributionLog} />
+                <DashRightCol todos={todos} contributionLog={contributionLog} isMobile={isMobile} />
               </div>
             </div>
           </div>
@@ -2458,7 +2460,7 @@ useEffect(() => {
 
 
 
-function DashRightCol({ todos, contributionLog }) {
+function DashRightCol({ todos, contributionLog, isMobile }) {
   const [topPct, setTopPct] = useState(() => {
     const saved = localStorage.getItem('dashRightSplit');
     return saved ? Number(saved) : 60;
@@ -2488,7 +2490,7 @@ function DashRightCol({ todos, contributionLog }) {
   return (
     <div className="dash-right-col" ref={containerRef}>
       <div className="dash-right-top" style={{ flex: `0 0 ${topPct}%` }}>
-        <SubscriptionTracker />
+        <SubscriptionTracker isMobile={isMobile} />
       </div>
       <div className="dash-right-resize-handle" onMouseDown={onMouseDown} />
       <div className="dash-right-bottom" style={{ flex: 1 }}>

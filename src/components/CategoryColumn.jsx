@@ -39,7 +39,8 @@ const GrowTextarea = forwardRef(function GrowTextarea({ value, onKeyDown, classN
   );
 });
 
-function CategoryColumn({ title, category, todos, currentFilter, actions }) {
+function CategoryColumn({ title, category, todos, currentFilter, actions, isMobile }) {
+  const [collapsed, setCollapsed] = useState(false);
   const {
     onAddTodo, onToggleTodo, onDeleteTodo, onUpdateTodo, onRename,
     onAddSubtask, onToggleSubtask, onDeleteSubtask, onUpdateSubtask,
@@ -353,7 +354,11 @@ function CategoryColumn({ title, category, todos, currentFilter, actions }) {
       data-category={category}
     >
       {/* Header */}
-      <div className="cc-header">
+      <div
+        className="cc-header"
+        onClick={isMobile ? () => setCollapsed(c => !c) : undefined}
+        style={isMobile ? { cursor: 'pointer' } : undefined}
+      >
         {isEditingTitle ? (
           <input
             type="text"
@@ -363,6 +368,7 @@ function CategoryColumn({ title, category, todos, currentFilter, actions }) {
             onKeyDown={handleTitleKeyPress}
             onBlur={handleTitleSave}
             autoFocus
+            onClick={e => e.stopPropagation()}
           />
         ) : (
           <div className="cc-title-wrapper">
@@ -370,12 +376,14 @@ function CategoryColumn({ title, category, todos, currentFilter, actions }) {
             <h3 className="cc-title" onDoubleClick={handleTitleDoubleClick}>
               {title}
             </h3>
+            {isMobile && <span className={`cc-collapse-chevron ${collapsed ? 'collapsed' : ''}`}>▾</span>}
           </div>
         )}
         <span className="cc-count">{activeCount}</span>
       </div>
 
-
+      {!(isMobile && collapsed) && (
+        <>
       {/* Add New Task - Top */}
       <div className="cc-add-row">
         <div className="cc-add-input-wrapper">
@@ -687,6 +695,8 @@ function CategoryColumn({ title, category, todos, currentFilter, actions }) {
         <div className="cc-empty">
           <span>No tasks yet</span>
         </div>
+      )}
+        </>
       )}
 
       {/* Color picker rendered into document.body to escape zoom/overflow */}

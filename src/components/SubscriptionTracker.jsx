@@ -215,10 +215,11 @@ function Item({ item, onClick, onComplete, animIndex = 0 }) {
   );
 }
 
-export default function SubscriptionTracker() {
+export default function SubscriptionTracker({ isMobile } = {}) {
   const [items, setItems] = useLocalStorage(STORAGE_KEY, []);
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [collapsed, setCollapsed] = useState(false);
 
   const save = (item) => {
     setItems(prev => {
@@ -246,11 +247,19 @@ export default function SubscriptionTracker() {
 
   return (
     <div className="sub-tracker">
-      <div className="sub-header">
-        <span className="sub-header-title">Payments</span>
-        <button className="sub-add-btn" onClick={() => setShowAdd(true)} title="Add">+</button>
+      <div
+        className="sub-header"
+        onClick={isMobile ? () => setCollapsed(c => !c) : undefined}
+        style={isMobile ? { cursor: 'pointer' } : undefined}
+      >
+        <span className="sub-header-title">
+          Payments
+          {isMobile && <span className={`sub-collapse-chevron ${collapsed ? 'collapsed' : ''}`}>▾</span>}
+        </span>
+        <button className="sub-add-btn" onClick={(e) => { e.stopPropagation(); setShowAdd(true); }} title="Add">+</button>
       </div>
 
+      {!(isMobile && collapsed) && (
       <div className="sub-list">
         {items.length === 0 && (
           <div className="sub-empty">
@@ -298,6 +307,7 @@ export default function SubscriptionTracker() {
           </div>
         )}
       </div>
+      )}
 
       {showAdd && <AddModal onSave={save} onDelete={remove} onClose={() => setShowAdd(false)} />}
       {editing && <AddModal initial={editing} onSave={save} onDelete={remove} onClose={() => setEditing(null)} />}

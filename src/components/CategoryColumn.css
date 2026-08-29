@@ -41,6 +41,17 @@
   flex-shrink: 0;
 }
 
+/* Mobile-only collapse toggle — see CategoryColumn.jsx's isMobile prop */
+.cc-collapse-chevron {
+  color: #888;
+  font-size: 11px;
+  transition: transform 0.15s ease;
+}
+
+.cc-collapse-chevron.collapsed {
+  transform: rotate(-90deg);
+}
+
 .cc-priority-badge--daily {
   background: #f85149;
   box-shadow: 0 0 6px rgba(248, 81, 73, 0.6);
