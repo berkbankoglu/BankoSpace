@@ -1626,7 +1626,7 @@ useEffect(() => {
   const maximizeWindow = windowControls.maximize;
   const closeWindow = windowControls.close;
 
-  const appZoom = window.screen.width <= 1600 ? 0.9 : 1;
+  const appZoom = isMobile ? 0.65 : (window.screen.width <= 1600 ? 0.9 : 1);
 
   // CategoryColumn'un iki örneği de aynı 16 mutasyon fonksiyonunu kullanıyor —
   // tek tek prop olarak geçmek yerine bir kere burada paketleniyor.
@@ -1651,6 +1651,7 @@ useEffect(() => {
   };
 
   return (
+    <>
     <div className="container" style={{ zoom: appZoom }}>
       {/* Custom Title Bar - Platform Specific */}
       <div className={`custom-titlebar ${currentPlatform === 'macos' ? 'titlebar-macos' : 'titlebar-windows'}`}>
@@ -2362,10 +2363,6 @@ useEffect(() => {
         </div>
       </div>
 
-      {isMobile && (
-        <MobileTabBar items={sidebarItems} activeView={activeView} onNavigate={setActiveView} />
-      )}
-
       {/* Subscriptions & Payments Popup */}
       {showSubPopup && <SubscriptionPopup onClose={() => setShowSubPopup(false)} />}
 
@@ -2445,6 +2442,12 @@ useEffect(() => {
       )}
 
     </div>
+    {/* Rendered outside the zoomed .container so its own text/icons stay at
+        their designed size regardless of the mobile content-zoom level. */}
+    {isMobile && (
+      <MobileTabBar items={sidebarItems} activeView={activeView} onNavigate={setActiveView} />
+    )}
+    </>
   );
 }
 
