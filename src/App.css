@@ -9217,6 +9217,18 @@ body.light .font-size-option:hover {
   .dashboard-container {
     padding: 10px 12px 12px;
   }
+
+  /* GitHub + BankoSpace streak graphs — not useful on a phone-sized
+     dashboard, drop them and let the Subscriptions widget above take the
+     full column instead of its usual resizable split. */
+  .dash-right-bottom,
+  .dash-right-resize-handle {
+    display: none !important;
+  }
+
+  .dash-right-top {
+    flex: 1 1 auto !important;
+  }
 }
 
 /* ==========================================
