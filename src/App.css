@@ -9216,6 +9216,7 @@ body.light .font-size-option:hover {
 
   .dashboard-container {
     padding: 10px 12px 12px;
+    overflow-y: auto;
   }
 
   /* GitHub + BankoSpace streak graphs — not useful on a phone-sized
@@ -9226,8 +9227,19 @@ body.light .font-size-option:hover {
     display: none !important;
   }
 
-  .dash-right-top {
-    flex: 1 1 auto !important;
+  /* Daily/Long Term/Payments boxes are stacked (not side-by-side) on
+     mobile — without this they'd all stretch to equal-share the column's
+     full height (the desktop side-by-side sizing), so a collapsed section
+     would still show as a big empty box instead of shrinking to just its
+     header. Sizing to content instead lets a collapsed box become a thin
+     strip, which is the whole point of collapsing it. */
+  .todo-col-wrapper,
+  .category-column-v2,
+  .dash-right-col,
+  .dash-right-top,
+  .sub-tracker {
+    flex: 0 0 auto !important;
+    height: auto !important;
   }
 }
 
