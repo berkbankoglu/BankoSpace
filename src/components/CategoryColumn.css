@@ -262,6 +262,29 @@
   color: #444;
 }
 
+/* Touch reorder buttons — hidden by default (desktop keeps the mouse-drag
+   handle above); shown only under the mobile breakpoint, see App.css. */
+.cc-reorder-btns {
+  display: none;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.cc-reorder-btn {
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 10px;
+  line-height: 1;
+  padding: 3px 6px;
+  cursor: pointer;
+}
+
+.cc-reorder-btn:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
 /* Column drag-over state */
 .category-column-v2.drag-over {
   border-color: #333;

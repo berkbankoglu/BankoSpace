@@ -9156,6 +9156,51 @@ body.light .font-size-option:hover {
 }
 
 /* ==========================================
+   MOBILE (phone-width web/PWA) — gated at the same 768px breakpoint as
+   src/hooks/useIsMobile.js, which drives MobileTabBar. Desktop (Tauri) never
+   hits this width, so none of this touches the desktop app. Width/overflow
+   is used to collapse the sidebar rather than display:none, because the
+   Settings modal is a position:fixed element nested inside .notion-sidebar
+   and display:none on an ancestor would hide it too.
+   ========================================== */
+@media (max-width: 768px) {
+  .notion-sidebar {
+    width: 0 !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    border-right: none !important;
+  }
+
+  .main-content-area.mobile-tabbar-active {
+    padding-bottom: calc(56px + env(safe-area-inset-bottom));
+    box-sizing: border-box;
+  }
+
+  .col-resize-handle {
+    display: none !important;
+  }
+
+  .todo-col-wrapper {
+    flex: 1 1 auto !important;
+    width: 100% !important;
+  }
+
+  .cc-drag-handle {
+    display: none !important;
+  }
+
+  .cc-reorder-btns {
+    display: flex !important;
+  }
+
+  .cc-checkbox,
+  .cc-inline-check {
+    min-width: 22px;
+    min-height: 22px;
+  }
+}
+
+/* ==========================================
    SEARCH BAR STYLES
    ========================================== */
 

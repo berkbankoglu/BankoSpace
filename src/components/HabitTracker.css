@@ -434,3 +434,13 @@
   cursor: pointer;
 }
 .ht-modal-confirm:disabled { opacity: 0.5; cursor: default; }
+
+/* Mobile safety net only — the grid keeps its desktop "always fits, never
+   scrolls" design at normal widths; on a phone the fixed per-habit column
+   widths just don't all fit, so let it scroll horizontally instead of
+   clipping. A touch-first Habit Tracker layout is its own future pass. */
+@media (max-width: 768px) {
+  .ht-grid {
+    overflow-x: auto;
+  }
+}

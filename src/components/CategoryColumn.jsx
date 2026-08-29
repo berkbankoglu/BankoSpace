@@ -44,7 +44,7 @@ function CategoryColumn({ title, category, todos, currentFilter, actions }) {
     onAddTodo, onToggleTodo, onDeleteTodo, onUpdateTodo, onRename,
     onAddSubtask, onToggleSubtask, onDeleteSubtask, onUpdateSubtask,
     onAddSubtaskChild, onToggleSubtaskChild, onDeleteSubtaskChild, onUpdateSubtaskChild,
-    onReorder, onTodoDragStart, onMoveSubtask,
+    onReorder, onTodoDragStart, onMoveSubtask, onMoveTodo,
   } = actions;
   const [inputValue, setInputValue] = useState('');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -404,6 +404,20 @@ function CategoryColumn({ title, category, todos, currentFilter, actions }) {
             {/* Top row: drag handle + checkbox + actions */}
             <div className="cc-item-top">
               <div className="cc-drag-handle" title="Drag" onMouseDown={(e) => onTodoDragStart(e, todo)}>⠿</div>
+              {/* Touch-friendly stand-in for the mouse-only drag handle above —
+                  hidden by default, shown only under the mobile breakpoint (App.css). */}
+              <div className="cc-reorder-btns" onClick={e => e.stopPropagation()}>
+                <button
+                  className="cc-reorder-btn"
+                  disabled={idx === 0}
+                  onClick={() => onMoveTodo(todo.id, category, -1)}
+                >▲</button>
+                <button
+                  className="cc-reorder-btn"
+                  disabled={idx === sortedTodos.length - 1}
+                  onClick={() => onMoveTodo(todo.id, category, 1)}
+                >▼</button>
+              </div>
               <label className="cc-inline-check" onClick={e => e.stopPropagation()}>
                 <input type="checkbox" className="cc-checkbox" checked={todo.completed} onChange={() => {
                   if (!todo.completed) {

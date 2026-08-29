@@ -16,6 +16,8 @@ import SubscriptionTracker, { SubscriptionWidget, SubscriptionPopup } from './co
 import Planner from './components/Planner';
 import Notes from './components/Notes';
 import HabitTracker from './components/HabitTracker';
+import MobileTabBar from './components/MobileTabBar';
+import { useIsMobile } from './hooks/useIsMobile';
 import { TODO_COLORS } from './constants';
 
 // Bu bölümde beklenmedik bir render hatası olursa (ör. bozuk veri), sadece bu
@@ -259,6 +261,7 @@ const DEFAULT_COL_PX = [null, null, null]; // [dailyPx, weeklyPx, monthlyPx] —
 function App({ session, onLogout }) {
   // Platform detection for OS-specific UI
   const [currentPlatform, setCurrentPlatform] = useState('macos'); // Default to macos while detecting
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     // Only matters for the custom title bar, which isn't rendered on web at
@@ -1180,6 +1183,25 @@ useEffect(() => {
     setTodos([...reorderedCategoryTodos, ...otherTodos]);
   };
 
+  // Touch-friendly ▲/▼ reorder (mobile only — see CategoryColumn.jsx's
+  // .cc-reorder-btns, CSS-shown under the 768px breakpoint). Swaps a todo
+  // with its adjacent same-category neighbor, mirroring the same
+  // order-field reassignment the desktop mouse-drag system uses.
+  const moveTodoInCategory = (todoId, category, direction) => {
+    pushHistory(todos);
+    setTodos(prev => {
+      const catTodos = prev.filter(t => t.category === category).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      const idx = catTodos.findIndex(t => t.id === todoId);
+      const target = idx + direction;
+      if (idx === -1 || target < 0 || target >= catTodos.length) return prev;
+      const reordered = [...catTodos];
+      const [moved] = reordered.splice(idx, 1);
+      reordered.splice(target, 0, moved);
+      const updated = reordered.map((t, i) => ({ ...t, order: i }));
+      return [...prev.filter(t => t.category !== category), ...updated];
+    });
+  };
+
   const toggleTodo = (id) => {
     pushHistory(todos);
     const todo = todos.find(t => t.id === id);
@@ -1625,6 +1647,7 @@ useEffect(() => {
     onReorder: reorderTodos,
     onTodoDragStart: handleTodoDragStart,
     onMoveSubtask: moveSubtaskToTodo,
+    onMoveTodo: moveTodoInCategory,
   };
 
   return (
@@ -2217,7 +2240,7 @@ useEffect(() => {
         </div>
 
         {/* Main Content Area */}
-        <div className="main-content-area">
+        <div className={`main-content-area${isMobile ? ' mobile-tabbar-active' : ''}`}>
           {/* Checklists Full Screen View */}
           {activeView === 'checklists' && (
             <ViewErrorBoundary>
@@ -2339,7 +2362,9 @@ useEffect(() => {
         </div>
       </div>
 
-
+      {isMobile && (
+        <MobileTabBar items={sidebarItems} activeView={activeView} onNavigate={setActiveView} />
+      )}
 
       {/* Subscriptions & Payments Popup */}
       {showSubPopup && <SubscriptionPopup onClose={() => setShowSubPopup(false)} />}
