@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { isTauri, proxyFetch } from "../platform";
 import { getAudioContext, getMasterGain, getVolume } from "../utils/sounds";
 import { pushKeyToSupabase } from "../supabase";
+import { KANA_INFO } from "./kanaInfoData";
 import FlashCards from "./FlashCards";
 import "./JapaneseKana.css";
 
@@ -179,6 +180,18 @@ const KATAKANA = KATAKANA_ROWS.flat().map(parseEntry).filter(Boolean);
 const KATAKANA_VOICED = KATAKANA_VOICED_ROWS.flat().map(parseEntry).filter(Boolean);
 const ALL_KANA = [...HIRAGANA, ...KATAKANA];
 const ALL_KANA_WITH_VOICED = [...HIRAGANA, ...HIRAGANA_VOICED, ...KATAKANA, ...KATAKANA_VOICED];
+
+// Same set, tagged with which script each character belongs to — used to
+// bulk-prepare every character's info panel content ahead of time.
+// romaji -> { hira, kata } — lets the info panel show "the other script's"
+// character for whichever one was clicked.
+const KANA_EQUIV = {};
+[...HIRAGANA, ...HIRAGANA_VOICED].forEach(({ char, romaji }) => {
+  KANA_EQUIV[romaji] = { ...(KANA_EQUIV[romaji] || {}), hira: char };
+});
+[...KATAKANA, ...KATAKANA_VOICED].forEach(({ char, romaji }) => {
+  KANA_EQUIV[romaji] = { ...(KANA_EQUIV[romaji] || {}), kata: char };
+});
 
 const ROW_LABELS = ["a", "ka", "sa", "ta", "na", "ha", "ma", "ya", "ra", "wa"];
 const VOICED_ROW_LABELS = ["ga", "za", "da", "ba", "pa"];
@@ -1233,6 +1246,16 @@ function buildTransposedGrid(rows) {
 
 const CELL_COLORS = [null, '#f85149', '#d2a800', '#3fb950']; // null=none, red, yellow, green
 
+// A different, stable color per character in the info panel — same character
+// always gets the same color (so it stays a useful visual cue), different
+// characters get different ones. Palette distinct from CELL_COLORS above.
+const CHAR_GLYPH_COLORS = ['#58a6ff', '#f85149', '#3fb950', '#d2a800', '#bc8cff', '#39c5cf', '#ff7b9c', '#ffa657'];
+function glyphColorFor(char) {
+  let hash = 0;
+  for (let i = 0; i < char.length; i++) hash = (hash * 31 + char.charCodeAt(i)) >>> 0;
+  return CHAR_GLYPH_COLORS[hash % CHAR_GLYPH_COLORS.length];
+}
+
 function loadCellColors() {
   try { return JSON.parse(localStorage.getItem('kana_cell_colors') || '{}'); } catch { return {}; }
 }
@@ -1241,8 +1264,22 @@ function saveCellColors(obj) {
   pushKeyToSupabase('kana_cell_colors', obj);
 }
 
-function KanaTable({ rows, title, colLabels = COL_LABELS, cellColors, onCellColor, searchQuery }) {
+// ── Per-character info panel: static bundled mnemonics/words + user notes ──
+// Mnemonics/example words are no longer generated live — see
+// src/components/kanaInfoData.js, hand-written and bundled at build time.
+// The only thing still generated at runtime is the user's own notes.
+
+function loadCharNotes() {
+  try { return JSON.parse(localStorage.getItem('kana_char_notes') || '{}'); } catch { return {}; }
+}
+function saveCharNotes(obj) {
+  localStorage.setItem('kana_char_notes', JSON.stringify(obj));
+  pushKeyToSupabase('kana_char_notes', obj);
+}
+
+function KanaTable({ rows, title, colLabels = COL_LABELS, cellColors, onCellColor, searchQuery, onSelectChar, selectedChar }) {
   const grid = buildTransposedGrid(rows);
+  const isKatakana = title.includes('Katakana');
   return (
     <div className="kana-table-wrapper">
       <h3 className="kana-table-title">{title}</h3>
@@ -1262,12 +1299,14 @@ function KanaTable({ rows, title, colLabels = COL_LABELS, cellColors, onCellColo
                 const borderColor = CELL_COLORS[colorIdx];
                 const q = searchQuery.trim().toLowerCase();
                 const isMatch = q && p.romaji.toLowerCase().includes(q);
+                const isSelected = selectedChar === p.char;
                 return (
                   <div
                     key={ci}
-                    className={`kana-cell kana-cell--clickable${isMatch ? ' kana-cell--match' : ''}`}
+                    className={`kana-cell kana-cell--clickable${isMatch ? ' kana-cell--match' : ''}${isSelected ? ' kana-cell--selected' : ''}`}
                     style={borderColor ? { borderColor, boxShadow: `0 0 0 1px ${borderColor}` } : {}}
-                    onClick={() => onCellColor(p.char)}
+                    onClick={() => onSelectChar(p.char, p.romaji, isKatakana)}
+                    onContextMenu={(e) => { e.preventDefault(); onCellColor(p.char); }}
                     title={p.romaji}
                   >
                     <span className="kana-char">{p.char}</span>
@@ -1288,9 +1327,80 @@ function KanaTable({ rows, title, colLabels = COL_LABELS, cellColors, onCellColo
   );
 }
 
+function KanaInfoPanel({ selected }) {
+  const [notes, setNotes] = useState(loadCharNotes);
+  const noteTimerRef = useRef(null);
+
+  if (!selected) {
+    return (
+      <div className="guide-info-panel">
+        <div className="guide-info-empty">Click a character to see its mnemonics, example words, and your notes here.</div>
+      </div>
+    );
+  }
+
+  const equiv = KANA_EQUIV[selected.romaji];
+  const otherChar = selected.isKatakana ? equiv?.hira : equiv?.kata;
+  const noteValue = notes[selected.char] || '';
+  const info = KANA_INFO[selected.char];
+
+  const handleNoteChange = (val) => {
+    setNotes(prev => {
+      const next = { ...prev, [selected.char]: val };
+      clearTimeout(noteTimerRef.current);
+      noteTimerRef.current = setTimeout(() => saveCharNotes(next), 600);
+      return next;
+    });
+  };
+
+  return (
+    <div className="guide-info-panel">
+      <div className="guide-info-card">
+        <div className="guide-info-char" style={{ color: glyphColorFor(selected.char) }}>{selected.char}</div>
+        <div className="guide-info-romaji">{selected.romaji}</div>
+        {otherChar && (
+          <div className="guide-info-equiv">
+            {selected.isKatakana ? 'hiragana equivalent' : 'katakana equivalent'}: {otherChar}
+          </div>
+        )}
+      </div>
+
+      <div className="guide-info-section">
+        <div className="guide-info-label">Mnemonics</div>
+        {info?.mnemonics?.map((m, i) => (
+          <div key={i} className="guide-info-mnemonic">{m}</div>
+        ))}
+      </div>
+
+      {info?.words?.length > 0 && (
+        <div className="guide-info-section">
+          <div className="guide-info-label">Words with {selected.char}</div>
+          {info.words.map((w, i) => (
+            <div key={i} className="guide-info-word">
+              <div className="guide-info-word-kana">{w.kana} <span className="guide-info-word-romaji">{w.romaji}</span></div>
+              <div className="guide-info-word-meaning">{w.meaning}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="guide-info-section">
+        <div className="guide-info-label">My notes</div>
+        <textarea
+          className="guide-info-notes"
+          placeholder="Write anything that helps you remember this one..."
+          value={noteValue}
+          onChange={e => handleNoteChange(e.target.value)}
+        />
+      </div>
+    </div>
+  );
+}
+
 function GuideTab() {
   const [cellColors, setCellColors] = useState(loadCellColors);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selected, setSelected] = useState(null); // { char, romaji, isKatakana }
 
   const handleCellColor = (char) => {
     setCellColors(prev => {
@@ -1300,35 +1410,40 @@ function GuideTab() {
     });
   };
 
-  const tableProps = { cellColors, onCellColor: handleCellColor, searchQuery };
+  const handleSelectChar = (char, romaji, isKatakana) => setSelected({ char, romaji, isKatakana });
+
+  const tableProps = { cellColors, onCellColor: handleCellColor, searchQuery, onSelectChar: handleSelectChar, selectedChar: selected?.char };
 
   return (
-    <div className="guide-tab">
-      {/* Search + legend */}
-      <div className="guide-toolbar">
-        <input
-          className="guide-search"
-          placeholder="Search romaji (e.g. ka, shi, tsu...)"
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-        />
-        <div className="guide-legend">
-          <span className="guide-legend-hint">Right-click to mark:</span>
-          {CELL_COLORS.slice(1).map((c, i) => (
-            <span key={i} className="guide-legend-dot" style={{ background: c }} />
-          ))}
+    <div className="guide-layout">
+      <KanaInfoPanel selected={selected} />
+      <div className="guide-tab">
+        {/* Search + legend */}
+        <div className="guide-toolbar">
+          <input
+            className="guide-search"
+            placeholder="Search romaji (e.g. ka, shi, tsu...)"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+          />
+          <div className="guide-legend">
+            <span className="guide-legend-hint">Right-click to mark:</span>
+            {CELL_COLORS.slice(1).map((c, i) => (
+              <span key={i} className="guide-legend-dot" style={{ background: c }} />
+            ))}
+          </div>
         </div>
-      </div>
 
-      <div className="guide-section-label">Basic — 清音</div>
-      <div className="guide-tables-row">
-        <KanaTable rows={HIRAGANA_ROWS} title="Hiragana" {...tableProps} />
-        <KanaTable rows={KATAKANA_ROWS} title="Katakana" {...tableProps} />
-      </div>
-      <div className="guide-section-label">Voiced &amp; Semi-voiced — 濁音・半濁音</div>
-      <div className="guide-tables-row">
-        <KanaTable rows={HIRAGANA_VOICED_ROWS} title="Hiragana voiced" colLabels={VOICED_COL_LABELS} {...tableProps} />
-        <KanaTable rows={KATAKANA_VOICED_ROWS} title="Katakana voiced" colLabels={VOICED_COL_LABELS} {...tableProps} />
+        <div className="guide-section-label">Basic — 清音</div>
+        <div className="guide-tables-row">
+          <KanaTable rows={HIRAGANA_ROWS} title="Hiragana" {...tableProps} />
+          <KanaTable rows={KATAKANA_ROWS} title="Katakana" {...tableProps} />
+        </div>
+        <div className="guide-section-label">Voiced &amp; Semi-voiced — 濁音・半濁音</div>
+        <div className="guide-tables-row">
+          <KanaTable rows={HIRAGANA_VOICED_ROWS} title="Hiragana voiced" colLabels={VOICED_COL_LABELS} {...tableProps} />
+          <KanaTable rows={KATAKANA_VOICED_ROWS} title="Katakana voiced" colLabels={VOICED_COL_LABELS} {...tableProps} />
+        </div>
       </div>
     </div>
   );

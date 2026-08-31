@@ -15,6 +15,16 @@ const ICON_CHOICES = [
 const HABIT_COLORS = ['#ef4444', '#fb923c', '#facc15', '#9ca3af'];
 const DEFAULT_HABIT_COLOR = '#9ca3af';
 
+// Unchecked boxes use a dimmed version of the habit color so a full grid of
+// them doesn't read as a wall of saturated color — only a checked box should
+// pop at full brightness.
+function dimHex(hex, alpha) {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || '');
+  if (!m) return hex;
+  const [, r, g, b] = m;
+  return `rgba(${parseInt(r, 16)}, ${parseInt(g, 16)}, ${parseInt(b, 16)}, ${alpha})`;
+}
+
 // Icon picker shows one 4x4 page at a time, paged with arrows either side —
 // a full grid of all 33 choices was overflowing into the stats column.
 const ICONS_PER_PAGE = 16;
@@ -296,7 +306,7 @@ export default function HabitTracker() {
                     <div key={`${dateKey}-${h.id}`} className={`ht-cell ht-cell-check ${isToday ? 'today' : ''}`}>
                       <button
                         className={`ht-check ${checkedHere ? 'checked' : ''} ${isFuture ? 'disabled' : ''}`}
-                        style={checkedHere ? { background: habitColor, borderColor: habitColor } : { borderColor: habitColor }}
+                        style={checkedHere ? { background: habitColor, borderColor: habitColor } : { borderColor: dimHex(habitColor, 0.10) }}
                         onMouseDown={e => e.preventDefault()}
                         onClick={() => { if (!isFuture) toggle(dateKey, h.id); }}
                         disabled={isFuture}

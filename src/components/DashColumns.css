@@ -1,0 +1,91 @@
+/* Vertical stack of whatever a column currently holds */
+.dash-col-stack {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  gap: 0;
+}
+
+.dash-col-pane {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Panels fill their pane, or shrink to their header strip when collapsed. */
+.dash-col-pane > .dp-panel,
+.dash-col-pane > .sub-tracker,
+.dash-col-pane > .activity-box,
+.dash-col-pane > .category-column-v2 {
+  flex: 1;
+  min-height: 0;
+}
+
+.dash-col-pane > .dp-panel.collapsed,
+.dash-col-pane > .sub-tracker.collapsed,
+.dash-col-pane > .activity-box.collapsed {
+  flex: 0 0 auto;
+  height: auto;
+}
+
+.dash-col-pane.dragging {
+  opacity: 0.5;
+}
+
+/* Splitter between two stacked panels in the same column */
+.dash-stack-resize {
+  height: 8px;
+  cursor: ns-resize;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.dash-stack-resize::after {
+  content: '';
+  position: absolute;
+  left: 20%;
+  right: 20%;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 1px;
+  background: var(--bg-base);
+  border-radius: 2px;
+  transition: background 0.15s;
+}
+
+.dash-stack-resize:hover::after {
+  background: #2e2e2e;
+}
+
+/* Column highlighted as the drop target while a panel is being dragged */
+.todo-col-wrapper.dash-drop-target {
+  outline: 1px dashed var(--accent);
+  outline-offset: -3px;
+  border-radius: 8px;
+}
+
+.dash-col-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 11px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  margin: 8px 0;
+}
+
+/* Header of a movable panel reads as a grab handle */
+.dash-col-pane > .dp-panel > .dp-header,
+.dash-col-pane > .sub-tracker > .sub-header,
+.dash-col-pane > .activity-box > .activity-box-header {
+  cursor: grab;
+}
+.dash-col-pane.dragging .dp-header,
+.dash-col-pane.dragging .sub-header,
+.dash-col-pane.dragging .activity-box-header {
+  cursor: grabbing;
+}

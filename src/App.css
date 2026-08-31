@@ -8789,16 +8789,6 @@ body.light .todo-drag-ghost .cc-checkmark {
   background: var(--bg-base) !important;
 }
 
-.dashboard-container > * {
-  animation: fadeSlideUp 0.35s ease both;
-}
-
-.dashboard-container > *:nth-child(1) { animation-delay: 0.00s; }
-.dashboard-container > *:nth-child(2) { animation-delay: 0.06s; }
-.dashboard-container > *:nth-child(3) { animation-delay: 0.12s; }
-.dashboard-container > *:nth-child(4) { animation-delay: 0.18s; }
-.dashboard-container > *:nth-child(5) { animation-delay: 0.24s; }
-.dashboard-container > *:nth-child(6) { animation-delay: 0.30s; }
 
 .dashboard-header {
   display: flex;
@@ -9544,11 +9534,27 @@ body.light .search-no-results {
   height: 100%;
   min-height: 0;
 }
-.dash-right-top {
+/* One pane per stacked panel; the panel inside fills it, or shrinks to its
+   header strip when collapsed. */
+.dash-right-pane {
   min-height: 0;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+}
+
+.dash-right-pane > .dp-panel,
+.dash-right-pane > .sub-tracker,
+.dash-right-pane > .activity-box {
+  flex: 1;
+  min-height: 0;
+}
+
+.dash-right-pane > .dp-panel.collapsed,
+.dash-right-pane > .sub-tracker.collapsed,
+.dash-right-pane > .activity-box.collapsed {
+  flex: 0 0 auto;
+  height: auto;
 }
 
 .dash-right-resize-handle {
@@ -9576,7 +9582,6 @@ body.light .search-no-results {
   background: #2e2e2e;
 }
 .dash-right-bottom {
-  flex: 1;
   min-height: 0;
   overflow: hidden;
   display: flex;
@@ -9585,7 +9590,58 @@ body.light .search-no-results {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
 }
-/* Contribution Graph — Quick Launch'ın yerini aldı (GitHub + BankoSpace, alt alta) */
+/* GitHub + BankoSpace heatmaps in one collapsible box. Card and header match
+   .sub-tracker / .sub-header so the three dashboard panels read as one set —
+   this box used to borrow its frame from the old right-column wrapper. */
+.activity-box {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.activity-box-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px 8px 14px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+  flex-shrink: 0;
+}
+.activity-box.collapsed .activity-box-header { border-bottom: none; }
+
+.activity-box-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.activity-chevron {
+  font-size: 11px;
+  color: #888;
+  transition: transform 0.15s ease;
+}
+.activity-chevron.collapsed { transform: rotate(-90deg); }
+
+.activity-box-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.activity-box-body .cg-panel:first-child {
+  border-bottom: 1px solid var(--border);
+}
+
 .cg-stack {
   display: flex;
   flex-direction: column;

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { notifyPermission, notify } from '../platform';
 import { pushKeyToSupabase } from '../supabase';
+import { PLANNER_EVENT } from '../utils/plannerStore';
 import './Planner.css';
 
 const STORAGE_KEY = 'planner_blocks';
@@ -119,17 +120,35 @@ export default function Planner({ onPlannerToast }) {
   const panelRef    = useRef(null);
   const notifTimers = useRef([]);
 
+  // The dashboard shows a today-only copy of this same data, so every write is
+  // announced — localStorage's 'storage' event only reaches other tabs, not
+  // another view in this one.
   useEffect(() => {
     const val = JSON.stringify(blocks);
     localStorage.setItem(STORAGE_KEY, val);
     pushKeyToSupabase(STORAGE_KEY, val);
+    window.dispatchEvent(new CustomEvent(PLANNER_EVENT, { detail: { key: STORAGE_KEY } }));
   }, [blocks]);
 
   useEffect(() => {
     const val = JSON.stringify(qTasks);
     localStorage.setItem(QTASKS_KEY, val);
     pushKeyToSupabase(QTASKS_KEY, val);
+    window.dispatchEvent(new CustomEvent(PLANNER_EVENT, { detail: { key: QTASKS_KEY } }));
   }, [qTasks]);
+
+  // Picked up from the dashboard copy writing to the same keys.
+  useEffect(() => {
+    const onExternal = (e) => {
+      if (e.detail?.source === 'planner-page') return;
+      try {
+        const b = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+        setBlocks(prev => (JSON.stringify(prev) === JSON.stringify(b) ? prev : b));
+      } catch {}
+    };
+    window.addEventListener(PLANNER_EVENT, onExternal);
+    return () => window.removeEventListener(PLANNER_EVENT, onExternal);
+  }, []);
 
   useEffect(() => {
     (async () => {

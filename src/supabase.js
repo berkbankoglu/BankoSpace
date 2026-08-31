@@ -67,6 +67,7 @@ export const SYNC_KEYS = [
   'research_watchlist',
   'research_checked',
   'kana_cell_colors',
+  'kana_char_notes',
   'ft_profile',
   'ft_goal',
   'ft_weight_log',

@@ -215,11 +215,21 @@ function Item({ item, onClick, onComplete, animIndex = 0 }) {
   );
 }
 
-export default function SubscriptionTracker({ isMobile } = {}) {
+export default function SubscriptionTracker({ isMobile, collapsible, collapsed: collapsedProp, onToggleCollapsed } = {}) {
   const [items, setItems] = useLocalStorage(STORAGE_KEY, []);
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [collapsed, setCollapsed] = useState(false);
+  // Collapsible on the dashboard too, not just mobile — collapsed it shrinks to
+  // just its header strip, and the choice is remembered.
+  const canCollapse = isMobile || collapsible;
+  // Controlled by the dashboard when it needs to resize around this box,
+  // self-managed otherwise (e.g. the mobile layout).
+  const [ownCollapsed, setOwnCollapsed] = useState(() => localStorage.getItem('dashPaymentsCollapsed') === '1');
+  const collapsed = collapsedProp !== undefined ? collapsedProp : ownCollapsed;
+  const toggleCollapsed = onToggleCollapsed || (() => setOwnCollapsed(c => {
+    localStorage.setItem('dashPaymentsCollapsed', c ? '0' : '1');
+    return !c;
+  }));
 
   const save = (item) => {
     setItems(prev => {
@@ -246,20 +256,20 @@ export default function SubscriptionTracker({ isMobile } = {}) {
   const totalManual = manualItems.reduce((s, i) => s + (i.currency === '₺' ? i.price : 0), 0);
 
   return (
-    <div className="sub-tracker">
+    <div className={`sub-tracker${canCollapse && collapsed ? ' collapsed' : ''}`}>
       <div
         className="sub-header"
-        onClick={isMobile ? () => setCollapsed(c => !c) : undefined}
-        style={isMobile ? { cursor: 'pointer' } : undefined}
+        onClick={canCollapse ? toggleCollapsed : undefined}
+        style={canCollapse ? { cursor: 'pointer' } : undefined}
       >
         <span className="sub-header-title">
+          {canCollapse && <span className={`sub-collapse-chevron ${collapsed ? 'collapsed' : ''}`}>▾</span>}
           Payments
-          {isMobile && <span className={`sub-collapse-chevron ${collapsed ? 'collapsed' : ''}`}>▾</span>}
         </span>
         <button className="sub-add-btn" onClick={(e) => { e.stopPropagation(); setShowAdd(true); }} title="Add">+</button>
       </div>
 
-      {!(isMobile && collapsed) && (
+      {!(canCollapse && collapsed) && (
       <div className="sub-list">
         {items.length === 0 && (
           <div className="sub-empty">

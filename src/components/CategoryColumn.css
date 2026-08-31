@@ -173,18 +173,14 @@
 .cc-item {
   background: rgba(255,255,255,0.03);
   border-radius: 6px;
-  padding: 8px 10px 8px 14px;
+  padding: 8px 10px 8px 15px;
   transition: background 0.15s, border-color 0.15s;
   border: 1px solid rgba(255,255,255,0.04);
-  /* backwards (not both): keeps the staggered entrance but releases the held
-     transform once it finishes, so the FLIP reorder animation can move items */
-  animation: fadeSlideUp 0.6s ease backwards;
   cursor: default;
   user-select: none;
   -webkit-user-select: none;
   display: flex;
   flex-direction: column;
-  gap: 5px;
   position: relative;
   box-sizing: border-box;
 }
@@ -245,11 +241,52 @@
   color: var(--text-muted);
 }
 
+/* Collapsed to nothing until the item is hovered, then it opens upward above
+   the text — same idea as .cc-subtask-toolbar, which opens downward below it.
+   .cc-item's flex `gap` is deliberately not used for the spacing here: a gap
+   still applies around a zero-height child, so the row would keep reserving
+   space even while collapsed. The margin below animates with it instead. */
 .cc-item-top {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
+  max-height: 0;
+  opacity: 0;
+  margin-bottom: 0;
+  overflow: hidden;
+  transition: max-height 0.15s ease, opacity 0.15s ease, margin-bottom 0.15s ease;
+  /* Closing is immediate; the wait lives on the hover rule below, so passing
+     the cursor over an item doesn't pop the row open. */
+  transition-delay: 0s;
+}
+
+/* Only the top edge opens it — hovering the text below leaves it closed.
+   Once it's open the row itself is under the cursor, so hovering the row keeps
+   it open (otherwise it would snap shut the moment you moved onto a button).
+   The hot zone sits behind the row (z-index) so the buttons stay clickable. */
+.cc-item-hotzone {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 22px;
+  z-index: 0;
+}
+
+/* Not while the item is sitting collapsed over hidden subtasks — there the row
+   is closed and hovering the top edge should leave it that way. */
+.cc-item:not(.collapsed-parent) .cc-item-hotzone:hover + .cc-item-top,
+.cc-item:not(.collapsed-parent) .cc-item-top:hover {
+  max-height: 32px;
+  opacity: 1;
+  margin-bottom: 5px;
+  transition-delay: 0.5s;
+}
+
+.cc-item-top {
+  position: relative;
+  z-index: 1;
 }
 
 .cc-item-top .cc-item-actions {
@@ -258,7 +295,7 @@
 
 /* Drag Handle */
 .cc-drag-handle {
-  color: #222;
+  color: #6e7681;
   font-size: 15px;
   cursor: grab;
   user-select: none;
@@ -270,7 +307,7 @@
 }
 
 .cc-item:hover .cc-drag-handle {
-  color: #444;
+  color: #b1bac4;
 }
 
 /* Touch reorder buttons — hidden by default (desktop keeps the mouse-drag
@@ -397,13 +434,12 @@
   color: var(--text-muted);
 }
 
-/* Item Actions */
+/* Visibility is handled by .cc-item-top collapsing as a whole — see above. */
 .cc-item-actions {
   display: flex;
   align-items: center;
   gap: 2px;
   flex-shrink: 0;
-  opacity: 1;
   position: relative;
 }
 
@@ -420,7 +456,7 @@
 .cc-action-btn {
   background: none;
   border: none;
-  color: #2e2e2e;
+  color: #8b949e;
   font-size: 16px;
   cursor: pointer;
   padding: 2px 6px;
@@ -430,8 +466,8 @@
 }
 
 .cc-action-btn:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: #888;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
 }
 
 .cc-action-btn.delete:hover {
@@ -440,8 +476,8 @@
 }
 
 .cc-action-btn.copy-btn:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: #888;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
 }
 
 .cc-action-btn.small {
@@ -501,12 +537,12 @@
 
 .cc-subtask {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 4px 6px;
+  flex-direction: column;
+  align-items: stretch;
+  position: relative;
+  padding: 4px 2px;
   background: rgba(255,255,255,0.03);
   border-radius: 5px;
-  gap: 6px;
   transition: background 0.15s, border-color 0.15s, transform 0.2s, opacity 0.2s;
 }
 
@@ -527,30 +563,45 @@
   transform: translateY(-1px);
 }
 
+/* A second row below the text, not a side rail — the text always gets the
+   item's full width. Collapsed to nothing when not hovered (not just faded
+   out) so it doesn't hold the row open; hovering grows the row to reveal it. */
+.cc-subtask-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-height: 0;
+  opacity: 0;
+  margin-bottom: 0;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+  transition: max-height 0.15s ease, opacity 0.15s ease, margin-bottom 0.15s ease;
+  transition-delay: 0s;
+}
+
+/* Unlike the top-level item, these open from a hover anywhere on the row —
+   the rows are short, and aiming for a top edge on each one is fussy. The dwell
+   is what keeps them from popping open as the cursor passes through. */
+.cc-subtask:hover .cc-subtask-toolbar {
+  max-height: 22px;
+  opacity: 1;
+  margin-bottom: 4px;
+  transition-delay: 0.7s;
+}
+
 .cc-subtask-drag {
   font-size: 12px;
   padding: 1px 3px;
-  opacity: 0;
-  transition: opacity 0.15s;
   cursor: grab;
   flex-shrink: 0;
-}
-
-.cc-subtask:hover .cc-subtask-drag {
-  opacity: 1;
 }
 
 .cc-subtask-actions {
   display: flex;
   align-items: center;
   gap: 2px;
-  opacity: 0;
-  transition: opacity 0.15s;
   flex-shrink: 0;
-}
-
-.cc-subtask:hover .cc-subtask-actions {
-  opacity: 1;
 }
 
 .cc-subtask.completed .cc-text {
@@ -611,12 +662,12 @@
 
 .cc-subtask-child {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 3px 6px;
+  flex-direction: column;
+  align-items: stretch;
+  position: relative;
+  padding: 3px 2px;
   background: rgba(255,255,255,0.02);
   border-radius: 5px;
-  gap: 6px;
   transition: background 0.15s, transform 0.2s, opacity 0.2s;
 }
 
@@ -637,18 +688,15 @@
 .cc-subtask-child .cc-subtask-drag {
   font-size: 11px;
   padding: 1px 2px;
-  opacity: 0;
-  transition: opacity 0.15s;
   cursor: grab;
   flex-shrink: 0;
 }
 
-.cc-subtask-child:hover .cc-subtask-drag {
+.cc-subtask-child:hover .cc-subtask-toolbar {
+  max-height: 20px;
   opacity: 1;
-}
-
-.cc-subtask-child:hover .cc-subtask-actions {
-  opacity: 1;
+  margin-bottom: 3px;
+  transition-delay: 0.7s;
 }
 
 .cc-subtask-child .cc-label {
@@ -674,13 +722,7 @@
 }
 
 .cc-subtask-child .cc-action-btn {
-  opacity: 0;
-  transition: opacity 0.15s;
   flex-shrink: 0;
-}
-
-.cc-subtask-child:hover .cc-action-btn {
-  opacity: 1;
 }
 
 .cc-subtask-child-add {

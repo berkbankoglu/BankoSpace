@@ -14,6 +14,8 @@ import JapaneseKana from './components/JapaneseKana';
 import ToolsChat from './components/ToolsChat';
 import SubscriptionTracker, { SubscriptionWidget, SubscriptionPopup } from './components/SubscriptionTracker';
 import Planner from './components/Planner';
+import DashPlanner from './components/DashPlanner';
+import DashColumns from './components/DashColumns';
 import Notes from './components/Notes';
 import HabitTracker from './components/HabitTracker';
 import MobileTabBar from './components/MobileTabBar';
@@ -254,7 +256,7 @@ function TaskContributionGraph({ todos, contributionLog }) {
 }
 import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, setVolume, getVolume } from './utils/sounds';
 
-const APP_VERSION = '4.2.13';
+const APP_VERSION = '4.3.0';
 const MIN_COL_PX = 220;
 const DEFAULT_COL_PX = [null, null, null]; // [dailyPx, weeklyPx, monthlyPx] — null = auto (flex:1)
 
@@ -2338,31 +2340,53 @@ useEffect(() => {
           <div key="dashboard" className="dashboard-container" style={{ '--todo-font-size': fontSizeMap[todoFontSize], '--subtask-font-size': subtaskFontSizeMap[subtaskFontSize] }}>
             {/* Todo Columns - resizable */}
             <div className="todo-columns" ref={columnsRef}>
-              <div className="todo-col-wrapper" style={colWidths[0] ? { flex: `1 1 ${colWidths[0]}px`, minWidth: 0 } : { flex: 1, minWidth: 0 }}>
-                <CategoryColumn
-                  title={categoryNames.daily}
-                  category="daily"
-                  todos={todosByCategory.daily}
-                  currentFilter={currentFilter}
-                  actions={todoActions}
-                  isMobile={isMobile}
-                />
-              </div>
-              <div className="col-resize-handle" onMouseDown={e => startColResize(0, e)} onDoubleClick={() => { setColWidths(DEFAULT_COL_PX); localStorage.setItem('dashColWidths', JSON.stringify(DEFAULT_COL_PX)); }} />
-              <div className="todo-col-wrapper" style={colWidths[1] ? { flex: `1 1 ${colWidths[1]}px`, minWidth: 0 } : { flex: 1, minWidth: 0 }}>
-                <CategoryColumn
-                  title={categoryNames.weekly}
-                  category="weekly"
-                  todos={todosByCategory.weekly}
-                  currentFilter={currentFilter}
-                  actions={todoActions}
-                  isMobile={isMobile}
-                />
-              </div>
-              <div className="col-resize-handle" onMouseDown={e => startColResize(1, e)} onDoubleClick={() => { setColWidths(DEFAULT_COL_PX); localStorage.setItem('dashColWidths', JSON.stringify(DEFAULT_COL_PX)); }} />
-              <div className="todo-col-wrapper" style={colWidths[2] ? { flex: `1 1 ${colWidths[2]}px`, minWidth: 0 } : { flex: 1, minWidth: 0 }}>
-                <DashRightCol todos={todos} contributionLog={contributionLog} isMobile={isMobile} />
-              </div>
+              <DashColumns
+                colWidths={colWidths}
+                startColResize={startColResize}
+                resetColWidths={() => { setColWidths(DEFAULT_COL_PX); localStorage.setItem('dashColWidths', JSON.stringify(DEFAULT_COL_PX)); }}
+                renderPanel={(id, { collapsed, onToggle }) => {
+                  if (id === 'daily' || id === 'weekly') {
+                    return (
+                      <CategoryColumn
+                        title={categoryNames[id]}
+                        category={id}
+                        todos={todosByCategory[id]}
+                        currentFilter={currentFilter}
+                        actions={todoActions}
+                        isMobile={isMobile}
+                      />
+                    );
+                  }
+                  if (id === 'planner') {
+                    return (
+                      <DashPlanner
+                        onOpenPlanner={() => setActiveView('planner')}
+                        onPlannerToast={showPlannerToast}
+                        collapsed={collapsed}
+                        onToggle={onToggle}
+                      />
+                    );
+                  }
+                  if (id === 'payments') {
+                    return (
+                      <SubscriptionTracker
+                        isMobile={isMobile}
+                        collapsible
+                        collapsed={collapsed}
+                        onToggleCollapsed={onToggle}
+                      />
+                    );
+                  }
+                  return (
+                    <ActivityBox
+                      todos={todos}
+                      contributionLog={contributionLog}
+                      collapsed={collapsed}
+                      onToggle={onToggle}
+                    />
+                  );
+                }}
+              />
             </div>
           </div>
           </ViewErrorBoundary>
@@ -2460,45 +2484,23 @@ useEffect(() => {
 
 
 
-function DashRightCol({ todos, contributionLog, isMobile }) {
-  const [topPct, setTopPct] = useState(() => {
-    const saved = localStorage.getItem('dashRightSplit');
-    return saved ? Number(saved) : 60;
-  });
-  const dragging = useRef(false);
-  const containerRef = useRef(null);
-
-  const onMouseDown = (e) => {
-    e.preventDefault();
-    dragging.current = true;
-    const onMove = (e) => {
-      if (!dragging.current || !containerRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect();
-      const pct = Math.min(85, Math.max(15, ((e.clientY - rect.top) / rect.height) * 100));
-      setTopPct(pct);
-      localStorage.setItem('dashRightSplit', String(pct));
-    };
-    const onUp = () => {
-      dragging.current = false;
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-  };
+// GitHub and BankoSpace activity used to be two separate panels; they're one
+// collapsible box now, with the two heatmaps stacked inside it.
+function ActivityBox({ todos, contributionLog, collapsed, onToggle }) {
+  const toggle = onToggle;
 
   return (
-    <div className="dash-right-col" ref={containerRef}>
-      <div className="dash-right-top" style={{ flex: `0 0 ${topPct}%` }}>
-        <SubscriptionTracker isMobile={isMobile} />
+    <div className={`activity-box${collapsed ? ' collapsed' : ''}`}>
+      <div className="activity-box-header" onClick={toggle}>
+        <span className={`activity-chevron${collapsed ? ' collapsed' : ''}`}>▾</span>
+        <span className="activity-box-title">Activity</span>
       </div>
-      <div className="dash-right-resize-handle" onMouseDown={onMouseDown} />
-      <div className="dash-right-bottom" style={{ flex: 1 }}>
-        <div className="cg-stack">
+      {!collapsed && (
+        <div className="activity-box-body">
           <GithubContributionGraph />
           <TaskContributionGraph todos={todos} contributionLog={contributionLog} />
         </div>
-      </div>
+      )}
     </div>
   );
 }

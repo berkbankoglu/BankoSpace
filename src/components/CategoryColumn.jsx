@@ -404,11 +404,16 @@ function CategoryColumn({ title, category, todos, currentFilter, actions, isMobi
           <div
             key={todo.id}
             data-todo-id={todo.id}
-            className={`cc-item ${todo.completed ? 'completed' : ''} ${completingIds.has(todo.id) ? 'completing' : ''}`}
+            className={`cc-item ${todo.completed ? 'completed' : ''} ${completingIds.has(todo.id) ? 'completing' : ''} ${todo.subtasks && todo.subtasks.length > 0 && !expandedTodos.has(todo.id) ? 'collapsed-parent' : ''}`}
             style={{ animationDelay: `${idx * 0.22}s` }}
             onClick={() => { if (todo.subtasks && todo.subtasks.length > 0) toggleExpand(todo.id); }}
           >
             {todo.color && <div className="cc-item-color-bar" style={{ background: todo.color }} />}
+            {/* Invisible strip along the item's top edge. The row below is
+                collapsed to zero height, so it has no area of its own to hover —
+                this gives the cursor something to hit up there without taking
+                any layout space itself. */}
+            <div className="cc-item-hotzone" />
             {/* Top row: drag handle + checkbox + actions */}
             <div className="cc-item-top">
               <div className="cc-drag-handle" title="Drag" onMouseDown={(e) => onTodoDragStart(e, todo)}>⠿</div>
@@ -521,10 +526,33 @@ function CategoryColumn({ title, category, todos, currentFilter, actions, isMobi
                     data-subtask-todoid={todo.id}
                     className={`cc-subtask ${subtask.completed ? 'completed' : ''} ${draggingSubtask?.subtaskId === subtask.id ? 'dragging' : ''} ${pressedSubtaskId === subtask.id && !draggingSubtask ? 'pressed' : ''} ${dragOverSubtask && dragOverSubtask.todoId === todo.id && dragOverSubtask.index === sIdx && draggingSubtask?.subtaskId !== subtask.id ? 'drag-target' : ''}`}
                   >
-                    <span
-                      className="cc-drag-handle cc-subtask-drag"
-                      onMouseDown={(e) => handleSubtaskMouseDown(e, todo.id, subtask.id, sIdx)}
-                    >⠿</span>
+                    <div className="cc-subtask-toolbar">
+                      <span
+                        className="cc-drag-handle cc-subtask-drag"
+                        onMouseDown={(e) => handleSubtaskMouseDown(e, todo.id, subtask.id, sIdx)}
+                      >⠿</span>
+                      <div className="cc-subtask-actions">
+                        <button
+                          className="cc-action-btn add-child-btn small"
+                          onClick={(e) => { e.stopPropagation(); setAddingChildFor(v => v === subtask.id ? null : subtask.id); }}
+                          title="Add item"
+                        >+</button>
+                        <button
+                          className="cc-action-btn copy-btn small"
+                          onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(subtask.text); setCopiedSubtaskId(subtask.id); setTimeout(() => setCopiedSubtaskId(null), 1500); }}
+                          title="Copy"
+                        >{copiedSubtaskId === subtask.id ? '✓' : '❐'}</button>
+                        <button
+                          className="cc-action-btn edit-btn small"
+                          onClick={(e) => { e.stopPropagation(); setEditingSubtaskId(subtask.id); setEditingSubtaskText(subtask.text); }}
+                          title="Edit"
+                        >✎</button>
+                        <button
+                          className="cc-action-btn delete small"
+                          onClick={(e) => { e.stopPropagation(); playDeleteSound(); onDeleteSubtask(todo.id, subtask.id); }}
+                        >×</button>
+                      </div>
+                    </div>
                     <label className="cc-label" onClick={(e) => { if (editingSubtaskId === subtask.id) e.preventDefault(); }}>
                       <input
                         type="checkbox"
@@ -560,27 +588,6 @@ function CategoryColumn({ title, category, todos, currentFilter, actions, isMobi
                         <span className="cc-text">{subtask.text}</span>
                       )}
                     </label>
-                    <div className="cc-subtask-actions">
-                      <button
-                        className="cc-action-btn add-child-btn small"
-                        onClick={(e) => { e.stopPropagation(); setAddingChildFor(v => v === subtask.id ? null : subtask.id); }}
-                        title="Add item"
-                      >+</button>
-                      <button
-                        className="cc-action-btn copy-btn small"
-                        onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(subtask.text); setCopiedSubtaskId(subtask.id); setTimeout(() => setCopiedSubtaskId(null), 1500); }}
-                        title="Copy"
-                      >{copiedSubtaskId === subtask.id ? '✓' : '❐'}</button>
-                      <button
-                        className="cc-action-btn edit-btn small"
-                        onClick={(e) => { e.stopPropagation(); setEditingSubtaskId(subtask.id); setEditingSubtaskText(subtask.text); }}
-                        title="Edit"
-                      >✎</button>
-                      <button
-                        className="cc-action-btn delete small"
-                        onClick={(e) => { e.stopPropagation(); playDeleteSound(); onDeleteSubtask(todo.id, subtask.id); }}
-                      >×</button>
-                    </div>
                   </div>
 
                   {((subtask.children && subtask.children.length > 0) || addingChildFor === subtask.id) && (
@@ -591,10 +598,28 @@ function CategoryColumn({ title, category, todos, currentFilter, actions, isMobi
                           data-child-subtaskid={subtask.id}
                           className={`cc-subtask-child ${child.completed ? 'completed' : ''} ${draggingChild?.childId === child.id ? 'dragging' : ''} ${pressedChildId === child.id && !draggingChild ? 'pressed' : ''} ${dragOverChild && dragOverChild.subtaskId === subtask.id && dragOverChild.index === cIdx && draggingChild?.childId !== child.id ? 'drag-target' : ''}`}
                         >
-                          <span
-                            className="cc-drag-handle cc-subtask-drag"
-                            onMouseDown={(e) => handleChildMouseDown(e, todo.id, subtask.id, child.id, cIdx)}
-                          >⠿</span>
+                          <div className="cc-subtask-toolbar">
+                            <span
+                              className="cc-drag-handle cc-subtask-drag"
+                              onMouseDown={(e) => handleChildMouseDown(e, todo.id, subtask.id, child.id, cIdx)}
+                            >⠿</span>
+                            <div className="cc-subtask-actions">
+                              <button
+                                className="cc-action-btn copy-btn small"
+                                onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(child.text); setCopiedChildId(child.id); setTimeout(() => setCopiedChildId(null), 1500); }}
+                                title="Copy"
+                              >{copiedChildId === child.id ? '✓' : '❐'}</button>
+                              <button
+                                className="cc-action-btn edit-btn small"
+                                onClick={(e) => { e.stopPropagation(); setEditingChildId(child.id); setEditingChildText(child.text); }}
+                                title="Edit"
+                              >✎</button>
+                              <button
+                                className="cc-action-btn delete small"
+                                onClick={(e) => { e.stopPropagation(); playDeleteSound(); onDeleteSubtaskChild(todo.id, subtask.id, child.id); }}
+                              >×</button>
+                            </div>
+                          </div>
                           <label className="cc-label" onClick={(e) => { if (editingChildId === child.id) e.preventDefault(); else e.stopPropagation(); }}>
                             <input
                               type="checkbox"
@@ -630,22 +655,6 @@ function CategoryColumn({ title, category, todos, currentFilter, actions, isMobi
                               <span className="cc-text">{child.text}</span>
                             )}
                           </label>
-                          <div className="cc-subtask-actions">
-                            <button
-                              className="cc-action-btn copy-btn small"
-                              onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(child.text); setCopiedChildId(child.id); setTimeout(() => setCopiedChildId(null), 1500); }}
-                              title="Copy"
-                            >{copiedChildId === child.id ? '✓' : '❐'}</button>
-                            <button
-                              className="cc-action-btn edit-btn small"
-                              onClick={(e) => { e.stopPropagation(); setEditingChildId(child.id); setEditingChildText(child.text); }}
-                              title="Edit"
-                            >✎</button>
-                            <button
-                              className="cc-action-btn delete small"
-                              onClick={(e) => { e.stopPropagation(); playDeleteSound(); onDeleteSubtaskChild(todo.id, subtask.id, child.id); }}
-                            >×</button>
-                          </div>
                         </div>
                       ))}
                       {addingChildFor === subtask.id && (

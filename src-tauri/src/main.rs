@@ -30,7 +30,7 @@ fn diag_path() -> std::path::PathBuf {
     std::path::Path::new(&base).join("bankospace-diag.log")
 }
 
-fn write_diag(line: &str) {
+fn write_diag_blocking(line: &str) {
     use std::io::Write;
     let path = diag_path();
     // simple rotation so the file can't grow without bound
@@ -42,6 +42,38 @@ fn write_diag(line: &str) {
     if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
         let _ = writeln!(f, "{}", line);
     }
+}
+
+// write_diag used to open/append/close the log file inline, on whatever thread
+// called it — including the main thread, from the window event handlers. That
+// turned out to be the actual freeze: dragging the custom title bar makes the
+// window flip focus ~50x/second (measured: 499 focus events inside a single 10s
+// heartbeat window), and each one did a synchronous open+write+close on the main
+// thread. The event loop ended up spending its time on disk I/O instead of
+// painting, which is the white flashing, and then the pile-up reads as a hang.
+// Logging must never be able to block the UI: callers now just hand the line to
+// a dedicated writer thread, which batches whatever has queued up into one write.
+static DIAG_TX: OnceLock<std::sync::mpsc::Sender<String>> = OnceLock::new();
+fn diag_tx() -> &'static std::sync::mpsc::Sender<String> {
+    DIAG_TX.get_or_init(|| {
+        let (tx, rx) = std::sync::mpsc::channel::<String>();
+        std::thread::spawn(move || {
+            while let Ok(first) = rx.recv() {
+                let mut batch = first;
+                // Drain anything already queued so a burst costs one file write.
+                while let Ok(next) = rx.try_recv() {
+                    batch.push('\n');
+                    batch.push_str(&next);
+                }
+                write_diag_blocking(&batch);
+            }
+        });
+        tx
+    })
+}
+
+fn write_diag(line: &str) {
+    let _ = diag_tx().send(line.to_string());
 }
 
 #[tauri::command]
@@ -288,6 +320,29 @@ fn last_focus_change() -> &'static std::sync::atomic::AtomicU64 {
     LAST_FOCUS_CHANGE.get_or_init(|| std::sync::atomic::AtomicU64::new(now_secs()))
 }
 
+// js_ping only proves the RENDERER's JS loop is alive; it says nothing about the
+// native side. Windows reporting the window as not-Responding during a freeze
+// pointed at the host's own message pump instead, but Process.Responding is not
+// usable as evidence from inside, and it reads as true for any process without a
+// window, so it can't tell the two layers apart either. This does: the heartbeat
+// thread posts a closure to the main thread each tick, and the closure stamps
+// this. If it stops advancing while the heartbeat thread keeps logging, the
+// event loop itself is wedged — not the renderer, not scheduling.
+static LAST_MAIN_TICK: OnceLock<std::sync::atomic::AtomicU64> = OnceLock::new();
+fn last_main_tick() -> &'static std::sync::atomic::AtomicU64 {
+    LAST_MAIN_TICK.get_or_init(|| std::sync::atomic::AtomicU64::new(now_secs()))
+}
+
+// Second-granularity throttles for the focus handlers — see the comment there.
+static LAST_FOCUS_WORK: OnceLock<std::sync::atomic::AtomicU64> = OnceLock::new();
+fn last_focus_work() -> &'static std::sync::atomic::AtomicU64 {
+    LAST_FOCUS_WORK.get_or_init(|| std::sync::atomic::AtomicU64::new(0))
+}
+static LAST_BLUR_LOG: OnceLock<std::sync::atomic::AtomicU64> = OnceLock::new();
+fn last_blur_log() -> &'static std::sync::atomic::AtomicU64 {
+    LAST_BLUR_LOG.get_or_init(|| std::sync::atomic::AtomicU64::new(0))
+}
+
 #[tauri::command]
 fn js_ping() {
     last_js_ping().store(now_secs(), std::sync::atomic::Ordering::SeqCst);
@@ -395,13 +450,80 @@ fn boost_process_priority() {
     extern "system" {
         fn GetCurrentProcess() -> isize;
         fn SetPriorityClass(process: isize, priority_class: u32) -> i32;
+        fn GetCurrentThread() -> isize;
+        fn SetThreadPriority(thread: isize, priority: i32) -> i32;
     }
-    const ABOVE_NORMAL_PRIORITY_CLASS: u32 = 0x0000_8000;
     unsafe {
         let h = GetCurrentProcess();
-        let ok = SetPriorityClass(h, ABOVE_NORMAL_PRIORITY_CLASS);
-        write_diag(&format!("RUST: SetPriorityClass(ABOVE_NORMAL) ok={}", ok != 0));
+        // ABOVE_NORMAL wasn't enough headroom under the real starvation case this
+        // was built for (a background app pegging every core) — HIGH_PRIORITY_CLASS
+        // is the same class Explorer/Task Manager run at, still well short of
+        // REALTIME (which can starve input handling system-wide and needs admin),
+        // safe for a foreground interactive app that just wants to not get starved.
+        let ok = SetPriorityClass(h, HIGH_PRIORITY_CLASS);
+        write_diag(&format!("RUST: SetPriorityClass(HIGH) ok={}", ok != 0));
+        let pt_ok = disable_power_throttling(h);
+        write_diag(&format!("RUST: disable_power_throttling ok={}", pt_ok));
+
+        // This function runs at the very top of main(), on the thread that
+        // tauri's .run() below turns into the window/message-pump thread — the
+        // one thing that must never miss a scheduling slot, since Windows'
+        // "not responding" detector (and every WindowEvent, including the
+        // Focused handler recovery relies on) depends on THIS thread getting
+        // CPU time to pump messages. Live testing on this machine caught it
+        // reported not-Responding while under heavy sustained load from other
+        // processes (confirmed via Process.Responding) even with the process
+        // already at HIGH_PRIORITY_CLASS — so beyond the process-wide class,
+        // this specific thread gets bumped to the highest base priority
+        // Windows allows without REALTIME_PRIORITY_CLASS (which would elevate
+        // every thread in the process, including background workers, and can
+        // destabilize the wider system). THREAD_PRIORITY_TIME_CRITICAL is the
+        // same mechanism real-time audio engines use to guarantee one
+        // specific thread isn't starved.
+        const THREAD_PRIORITY_TIME_CRITICAL: i32 = 15;
+        let t = GetCurrentThread();
+        let tok = SetThreadPriority(t, THREAD_PRIORITY_TIME_CRITICAL);
+        write_diag(&format!("RUST: SetThreadPriority(TIME_CRITICAL) ok={}", tok != 0));
     }
+}
+
+const HIGH_PRIORITY_CLASS: u32 = 0x0000_0080;
+
+// Priority class governs scheduling priority among ready threads; EcoQoS/Power
+// Throttling is a separate, additive mechanism that tells the OS a process is
+// "background" and can be run on efficiency cores / lower clocks regardless of
+// priority class. Windows can classify an unfocused window as eligible for this
+// on its own — opting out makes sure our timers aren't silently deprioritized
+// by that layer even after the priority-class boost above.
+#[cfg(windows)]
+unsafe fn disable_power_throttling(process_handle: isize) -> bool {
+    #[link(name = "kernel32")]
+    extern "system" {
+        fn SetProcessInformation(process: isize, information_class: i32, information: *const core::ffi::c_void, information_size: u32) -> i32;
+    }
+    #[repr(C)]
+    struct ProcessPowerThrottlingState {
+        version: u32,
+        control_mask: u32,
+        state_mask: u32,
+    }
+    const PROCESS_POWER_THROTTLING: i32 = 4; // PROCESS_INFORMATION_CLASS::ProcessPowerThrottling
+    const PROCESS_POWER_THROTTLING_CURRENT_VERSION: u32 = 1;
+    const PROCESS_POWER_THROTTLING_EXECUTION_SPEED: u32 = 0x1;
+    let state = ProcessPowerThrottlingState {
+        version: PROCESS_POWER_THROTTLING_CURRENT_VERSION,
+        control_mask: PROCESS_POWER_THROTTLING_EXECUTION_SPEED,
+        state_mask: 0, // 0 = opt OUT of throttling for this control
+    };
+    // No diag write here — boost_pid_priority calls this every ~10s heartbeat
+    // tick for every webview2 child process found, which would flood the log.
+    let ok = SetProcessInformation(
+        process_handle,
+        PROCESS_POWER_THROTTLING,
+        &state as *const _ as *const core::ffi::c_void,
+        std::mem::size_of::<ProcessPowerThrottlingState>() as u32,
+    );
+    ok != 0
 }
 
 // boost_process_priority() sadece todo-app.exe'nin kendi önceliğini yükseltiyor —
@@ -419,11 +541,11 @@ fn boost_pid_priority(pid: u32) {
         fn CloseHandle(object: isize) -> i32;
     }
     const PROCESS_SET_INFORMATION: u32 = 0x0200;
-    const ABOVE_NORMAL_PRIORITY_CLASS: u32 = 0x0000_8000;
     unsafe {
         let h = OpenProcess(PROCESS_SET_INFORMATION, 0, pid);
         if h != 0 {
-            SetPriorityClass(h, ABOVE_NORMAL_PRIORITY_CLASS);
+            SetPriorityClass(h, HIGH_PRIORITY_CLASS);
+            disable_power_throttling(h);
             CloseHandle(h);
         }
     }
@@ -495,14 +617,21 @@ fn main() {
                     // bu, ProcessFailed hiç tetiklenmeden (renderer "çökmüş" değil,
                     // sadece dondurulmuş sayılıyor) ve --disable-backgrounding-*
                     // Chromium flag'lerinden bağımsız, WebView2'nin kendi occlusion
-                    // takibi. Her tick'te IsVisible=true'yu zorla yeniden dayatmak
-                    // bunu önlemeye çalışan ucuz, önleyici bir tedbir.
-                    #[cfg(windows)]
-                    if let Some(window) = app_handle.get_webview_window("main") {
-                        let _ = window.with_webview(|webview| unsafe {
-                            let _ = webview.controller().SetIsVisible(true);
-                        });
-                    }
+                    // takibi.
+                    //
+                    // A periodic IsVisible nudge (even toggled false→true for a real
+                    // edge) used to run here every tick. Live testing showed it does
+                    // NOT stop js_ping from going stale while unfocused — ping_age
+                    // climbed past 800s regardless. Worse, this same test also caught
+                    // the main window reported as not-Responding by Windows (confirmed
+                    // via Process.Responding) while the renderer sub-processes were
+                    // still Responding=true — i.e. the HOST's own message pump was
+                    // wedged, not (only) the renderer. A background thread calling into
+                    // the webview controller every 10s is a synchronous COM call that
+                    // has to be serviced by that same main thread; doing it on a timer
+                    // indefinitely, with no evidence it helps, is pure downside. It's
+                    // now only called once, from the Focused(true) handler, at the one
+                    // moment it might actually matter — see below.
 
                     let n = inflight_counter().load(std::sync::atomic::Ordering::SeqCst);
                     sys.refresh_all();
@@ -531,10 +660,60 @@ fn main() {
 
                     let now = now_secs();
                     let ping_age = now.saturating_sub(last_js_ping().load(std::sync::atomic::Ordering::SeqCst));
+
+                    // Probe the event loop itself — see last_main_tick(). Posting is
+                    // non-blocking; if the loop is alive the closure runs almost
+                    // immediately and the age below reads ~0, if it's wedged the
+                    // closure never runs and the age climbs in lockstep with the
+                    // freeze, which separates "renderer stopped" from "host stopped".
+                    let _ = app_handle.run_on_main_thread(|| {
+                        last_main_tick().store(now_secs(), std::sync::atomic::Ordering::SeqCst);
+                    });
+                    let main_age = now.saturating_sub(last_main_tick().load(std::sync::atomic::Ordering::SeqCst));
+
                     write_diag(&format!(
-                        "RUST-HB alive (inflight_http={}, host_cpu={:.1}%, webview_cpu={:.1}% across {} proc, js_ping_age={}s, focused={})",
-                        n, my_cpu, wv_cpu, wv_count, ping_age, main_focused().load(std::sync::atomic::Ordering::SeqCst)
+                        "RUST-HB alive (inflight_http={}, host_cpu={:.1}%, webview_cpu={:.1}% across {} proc, js_ping_age={}s, main_thread_age={}s, focused={})",
+                        n, my_cpu, wv_cpu, wv_count, ping_age, main_age, main_focused().load(std::sync::atomic::Ordering::SeqCst)
                     ));
+
+                    // Dragging the custom (decorations:false) title bar goes through
+                    // data-tauri-drag-region, which on Windows hands off to the native
+                    // move loop via WM_NCLBUTTONDOWN/HTCAPTION. That loop runs its own
+                    // GetMessage pump inside DefWindowProc and only exits on the
+                    // matching button-up — so while it runs, our event loop is blocked
+                    // (hence the white flash: WebView2 can't present) and if the
+                    // button-up never arrives the window stays blocked forever. This
+                    // machine remaps mouse buttons globally (X-Mouse Button Control,
+                    // Razer Synapse), which is exactly the kind of thing that can
+                    // swallow or rewrite that button-up — and matches the report that
+                    // it only happens here and never recovers.
+                    //
+                    // WM_CANCELMODE is the documented way to tell a window to leave
+                    // whatever modal loop it's in; posting it from this thread doesn't
+                    // need the blocked loop's cooperation. A real drag is over in
+                    // seconds, so 25s of a dead event loop is never a legitimate drag.
+                    #[cfg(windows)]
+                    if main_age > 25 {
+                        #[link(name = "user32")]
+                        extern "system" {
+                            fn PostMessageW(hwnd: isize, msg: u32, wparam: usize, lparam: isize) -> i32;
+                        }
+                        const WM_CANCELMODE: u32 = 0x001F;
+                        const WM_LBUTTONUP: u32 = 0x0202;
+                        if let Some(window) = app_handle.get_webview_window("main") {
+                            if let Ok(hwnd) = window.hwnd() {
+                                let raw = hwnd.0 as isize;
+                                unsafe {
+                                    PostMessageW(raw, WM_CANCELMODE, 0, 0);
+                                    PostMessageW(raw, WM_LBUTTONUP, 0, 0);
+                                }
+                                write_diag(&format!(
+                                    "RUST: !!! main thread wedged {}s -> posted WM_CANCELMODE + WM_LBUTTONUP to break a stuck native modal loop (title-bar drag?)",
+                                    main_age
+                                ));
+                            }
+                        }
+                    }
 
                     push_history(format!(
                         "[{}] host_cpu={:.1}% webview_cpu={:.1}% js_ping_age={}s focused={} top_cpu=[{}] {}",
@@ -560,8 +739,8 @@ fn main() {
                             let is_focused = main_focused().load(std::sync::atomic::Ordering::SeqCst);
                             let since_focus_change = now.saturating_sub(last_focus_change().load(std::sync::atomic::Ordering::SeqCst));
                             write_incident(&format!(
-                                "\n========== FREEZE INCIDENT #{} START {} ==========\nping_age={}s host_cpu={:.1}% webview_cpu={:.1}% across {} webview proc\nwindow_focused={} (changed {}s ago) - if false, this freeze coincides with alt-tab/background occlusion\n{}\n-- last ~2 min before freeze --\n{}\n-- top CPU system-wide --\n{}\n-- top RAM system-wide --\n{}\n-- {}",
-                                incident_id, local_time_string(), ping_age, my_cpu, wv_cpu, wv_count,
+                                "\n========== FREEZE INCIDENT #{} START {} ==========\nping_age={}s main_thread_age={}s host_cpu={:.1}% webview_cpu={:.1}% across {} webview proc\nwindow_focused={} (changed {}s ago) - if false, this freeze coincides with alt-tab/background occlusion\n{}\n-- last ~2 min before freeze --\n{}\n-- top CPU system-wide --\n{}\n-- top RAM system-wide --\n{}\n-- {}",
+                                incident_id, local_time_string(), ping_age, main_age, my_cpu, wv_cpu, wv_count,
                                 is_focused, since_focus_change,
                                 mem_summary(&sys), dump_history(), top_by_cpu(&sys, 10), top_by_mem(&sys, 5), own_disk_io(&sys, my_pid)
                             ));
@@ -598,7 +777,33 @@ fn main() {
                     // the whole process and starting a fresh one — that sidesteps
                     // whatever internal deadlock caused this, rather than asking the
                     // stuck process to fix itself.
-                    if ping_age > 100 && now.saturating_sub(last_restart_attempt) > 60 {
+                    //
+                    // Gated on window focus for the FAST path: an unfocused/backgrounded
+                    // window goes stale by design (WebView2 suspends JS on occlusion —
+                    // see the comment above main_focused()), not because it's actually
+                    // stuck. Without this gate, a relaunched process that doesn't regain
+                    // foreground focus (common — Windows routinely denies
+                    // SetForegroundWindow to background processes) goes stale again
+                    // within the same ~100s window and gets restarted again, forever:
+                    // this was observed live as the app repeatedly launching and
+                    // immediately losing focus in a loop.
+                    //
+                    // BUT: live testing also found a genuine main-thread hang (Windows
+                    // reports the window as not Responding — confirmed independently of
+                    // js_ping, which only reflects the renderer) that happened while
+                    // unfocused and the focus-gate then means NOTHING ever recovers it,
+                    // because the fast path needs a Focused(true) event to fire, and that
+                    // event can't be delivered if the message pump producing it is the
+                    // very thing that's wedged — a deadlock in the gate itself. So there's
+                    // a second, much slower unfocused safety net: 900s (15 min) of
+                    // staleness is far beyond anything normal background throttling has
+                    // ever produced, so at that point something is genuinely wrong
+                    // regardless of focus, and it's worth restarting even though nobody's
+                    // watching, rather than leaving the process wedged forever.
+                    let is_focused = main_focused().load(std::sync::atomic::Ordering::SeqCst);
+                    let fast_path = is_focused && ping_age > 100;
+                    let unfocused_safety_net = !is_focused && ping_age > 900;
+                    if (fast_path || unfocused_safety_net) && now.saturating_sub(last_restart_attempt) > 60 {
                         last_restart_attempt = now;
                         write_diag(&format!(
                             "RUST: !!! js_ping still stale ({}s) after Reload attempt(s) -> restarting the whole process",
@@ -638,7 +843,7 @@ fn main() {
                         }
                         std::thread::sleep(std::time::Duration::from_millis(200));
                         std::process::exit(1);
-                    } else if ping_age > 40 && now.saturating_sub(last_recovery_attempt) > 90 {
+                    } else if is_focused && ping_age > 40 && now.saturating_sub(last_recovery_attempt) > 90 {
                         // JS ping should land every ~2s. Past 40s with no ping and no
                         // recovery attempt in the last 90s, first try the cheaper fix:
                         // a native reload (works for lighter freezes; see escalation
@@ -710,23 +915,48 @@ toggle_kana_window,
                     }
                 }
                 // WebView2 freeze fix: odak gelince agresif repaint + child webview restore
+                // Everything in here runs on the main thread, and focus is NOT a
+                // once-in-a-while event: dragging the custom title bar makes the
+                // window flip focus ~50x/second (measured: 499 focus events within a
+                // single 10s heartbeat). So this handler must stay close to free.
+                //
+                // It previously did, per event: SetIsVisible(false) then (true), two
+                // synchronous COM calls into WebView2, plus an eval() round-trip. At
+                // 50 events/second that hides and re-shows the webview 50 times a
+                // second — which IS the white flashing, with the window's blank
+                // background showing through each time — while flooding the main
+                // thread. The visibility toggle is gone (it was added to try to wake a
+                // suspended renderer and never demonstrably worked), and the remaining
+                // wake nudge is throttled so a focus storm can't multiply it.
                 tauri::WindowEvent::Focused(true) => {
                     if window.label() == "main" {
-                        let blurred_for = now_secs().saturating_sub(last_focus_change().load(std::sync::atomic::Ordering::SeqCst));
+                        let now = now_secs();
+                        let blurred_for = now.saturating_sub(last_focus_change().load(std::sync::atomic::Ordering::SeqCst));
                         main_focused().store(true, std::sync::atomic::Ordering::SeqCst);
-                        last_focus_change().store(now_secs(), std::sync::atomic::Ordering::SeqCst);
-                        write_diag(&format!("RUST: window FOCUSED (was unfocused for {}s)", blurred_for));
-                        let app = window.app_handle();
-                        if let Some(wv) = app.get_webview_window("main") {
-                            let _ = wv.eval("window.dispatchEvent(new Event('resize')); window.dispatchEvent(new Event('focus'));");
+                        last_focus_change().store(now, std::sync::atomic::Ordering::SeqCst);
+
+                        // Coalesce: only the first focus-gain in a given second does
+                        // any work or writes a line. A drag's worth of flapping
+                        // collapses to one entry instead of hundreds.
+                        let prev = last_focus_work().swap(now, std::sync::atomic::Ordering::SeqCst);
+                        if now != prev {
+                            write_diag(&format!("RUST: window FOCUSED (was unfocused for {}s)", blurred_for));
+                            let app = window.app_handle();
+                            if let Some(wv) = app.get_webview_window("main") {
+                                let _ = wv.eval("window.dispatchEvent(new Event('resize')); window.dispatchEvent(new Event('focus'));");
+                            }
                         }
                     }
                 }
                 tauri::WindowEvent::Focused(false) => {
                     if window.label() == "main" {
+                        let now = now_secs();
                         main_focused().store(false, std::sync::atomic::Ordering::SeqCst);
-                        last_focus_change().store(now_secs(), std::sync::atomic::Ordering::SeqCst);
-                        write_diag("RUST: window UNFOCUSED (blurred - alt-tab or click-away)");
+                        last_focus_change().store(now, std::sync::atomic::Ordering::SeqCst);
+                        let prev = last_blur_log().swap(now, std::sync::atomic::Ordering::SeqCst);
+                        if now != prev {
+                            write_diag("RUST: window UNFOCUSED (blurred - alt-tab or click-away)");
+                        }
                     }
                 }
                 _ => {}
