@@ -691,9 +691,12 @@ fn main() {
                     // WM_CANCELMODE is the documented way to tell a window to leave
                     // whatever modal loop it's in; posting it from this thread doesn't
                     // need the blocked loop's cooperation. A real drag is over in
-                    // seconds, so 25s of a dead event loop is never a legitimate drag.
+                    // seconds, so a dead event loop this long is never a legitimate
+                    // drag. The threshold used to be 25s, which was longer than anyone
+                    // waits before killing the app — so this never actually got to run
+                    // during the freezes it was written for.
                     #[cfg(windows)]
-                    if main_age > 25 {
+                    if main_age > 12 {
                         #[link(name = "user32")]
                         extern "system" {
                             fn PostMessageW(hwnd: isize, msg: u32, wparam: usize, lparam: isize) -> i32;

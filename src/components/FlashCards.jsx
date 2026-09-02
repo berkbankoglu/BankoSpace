@@ -1,8 +1,17 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { proxyFetch } from '../platform';
 import './FlashCards.css';
 import { pushKeyToSupabase } from '../supabase';
-import { playTypeSoundThrottled, playClickSound, playAddSound, playDeleteSound } from '../utils/sounds';
+import { playTypeSoundThrottled, playClickSound, playAddSound, playDeleteSound, playCompleteSound, playUncompleteSound } from '../utils/sounds';
+
+// Marks you put on a card yourself, replacing the automatic New/Learning/
+// Mastered status: what "needs work" means is a judgement, and the point is
+// being able to drill just the reds, or just the yellows.
+const CARD_MARKS = [
+  { id: 'red',    hex: '#f85149', label: 'Needs work' },
+  { id: 'yellow', hex: '#d29922', label: 'Shaky' },
+  { id: 'green',  hex: '#3fb950', label: 'Solid' },
+];
 
 const DECK_COLORS = [
   '#5c7cfa', '#7ee787', '#f85149', '#d29922', '#bc8cff',
@@ -33,7 +42,7 @@ function FlashCards({ fullscreen = false }) {
     return [];
   });
   const [selectedDeck, setSelectedDeck] = useState(null);
-  const [activeView, setActiveView] = useState('decks'); // 'decks', 'cards', 'study', 'results'
+  const [activeView, setActiveView] = useState('decks'); // 'decks', 'cards', 'study', 'practice', 'results'
   const [editingCard, setEditingCard] = useState(null);
   const [editingDeckName, setEditingDeckName] = useState(null);
   const [editingDeckTitle, setEditingDeckTitle] = useState('');
@@ -41,6 +50,31 @@ function FlashCards({ fullscreen = false }) {
   const [isFlipped, setIsFlipped] = useState(false);
   const [studyStats, setStudyStats] = useState({ known: 0, unknown: 0 });
   const [shuffledCards, setShuffledCards] = useState([]);
+  // Practice mode: type the answer instead of self-rating a flip. Same drilling
+  // mechanic the kana Practice tab uses — a card you miss comes back a few
+  // cards later, and the round only ends once everything has been answered
+  // right once.
+  // Cards ticked in the table. Empty means "no filter" — study and practice
+  // then run over the whole deck, which is the common case.
+  const [selectedCardIds, setSelectedCardIds] = useState(() => new Set());
+  // Empty means every colour, including unmarked.
+  const [markFilter, setMarkFilter] = useState(() => new Set());
+  const [practiceDirection, setPracticeDirection] = useState(() => localStorage.getItem('fc_practice_dir') || 'front');
+  const [practiceCard, setPracticeCard] = useState(null);
+  const [practiceInput, setPracticeInput] = useState('');
+  const [practiceFeedback, setPracticeFeedback] = useState(null); // null | 'correct' | 'wrong'
+  const [practiceStreak, setPracticeStreak] = useState(0);
+  const [practiceStats, setPracticeStats] = useState({ correct: 0, wrong: 0, total: 0 });
+  const practiceInputRef = useRef(null);
+  const practiceContinueRef = useRef(null);
+  const practiceUnseenRef = useRef([]);
+  const practiceWrongRef = useRef([]);
+  const practiceCountRef = useRef(0);
+  const practiceLastRef = useRef(null);
+  // The set this session drills, fixed when it starts — refilling a cleared
+  // round must not read live filter state through a stale closure.
+  const practicePoolRef = useRef([]);
+  const practiceTimerRef = useRef(null);
   const [newDeckName, setNewDeckName] = useState('');
   const [showNewDeckInput, setShowNewDeckInput] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(null);
@@ -363,6 +397,18 @@ function FlashCards({ fullscreen = false }) {
     setApiKeyDraft('');
   };
 
+  const setCardMark = (cardId, mark) => {
+    setCards(cards.map(c => (c.id === cardId ? { ...c, mark: c.mark === mark ? null : mark } : c)));
+  };
+
+  const toggleMarkFilter = (mark) => {
+    setMarkFilter(prev => {
+      const next = new Set(prev);
+      if (next.has(mark)) next.delete(mark); else next.add(mark);
+      return next;
+    });
+  };
+
   const updateCard = (cardId, front, reading, back) => {
     if (!front.trim() || !back.trim()) return;
 
@@ -498,9 +544,38 @@ Kurallar:
     setCards(cards.filter(c => c.id !== id));
   };
 
+  // A tick list is a filter over the deck, not a separate list: clearing it
+  // falls straight back to studying everything.
+  const getStudyPool = () => {
+    let cards = getDeckCards();
+    // Colour marks and ticks stack: mark first, then any explicit ticks.
+    if (markFilter.size > 0) {
+      const byMark = cards.filter(c => markFilter.has(c.mark || 'none'));
+      if (byMark.length > 0) cards = byMark;
+    }
+    if (selectedCardIds.size === 0) return cards;
+    const picked = cards.filter(c => selectedCardIds.has(c.id));
+    return picked.length > 0 ? picked : cards;
+  };
+
+  const toggleCardSelected = (id) => {
+    setSelectedCardIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = (cards) => {
+    setSelectedCardIds(prev => (prev.size === cards.length ? new Set() : new Set(cards.map(c => c.id))));
+  };
+
+  // A different deck's ids mean nothing here.
+  useEffect(() => { setSelectedCardIds(new Set()); }, [selectedDeck]);
+
   // Study operations
   const startStudy = () => {
-    const deckCards = getDeckCards();
+    const deckCards = getStudyPool();
     if (deckCards.length === 0) return;
 
     const shuffled = [...deckCards].sort(() => Math.random() - 0.5);
@@ -510,6 +585,137 @@ Kurallar:
     setStudyStats({ known: 0, unknown: 0 });
     setActiveView('study');
   };
+
+  // ---- Practice mode -------------------------------------------------------
+  const practiceQuestion = (card) => (practiceDirection === 'front' ? card?.front : card?.back);
+  const practiceAnswer = (card) => (practiceDirection === 'front' ? card?.back : card?.front);
+
+  const normalizeAnswer = (v) => String(v || '')
+    .toLowerCase()
+    .replace(/[　\s]+/g, ' ')
+    .replace(/[.,!?;:"'`’´]/g, '')
+    .trim();
+
+  // Cards are often written as "さん (san)" — one field holding both the script and
+  // its reading. Typing either should count, so the stored answer is expanded
+  // into every form it reasonably stands for: the whole string, the part
+  // outside the brackets, what's inside them, and any slash/comma separated
+  // alternatives. The card's own reading field counts too when the answer is
+  // the front side.
+  const answerVariants = (card) => {
+    const raw = practiceAnswer(card);
+    const out = new Set();
+    const add = (v) => { const n = normalizeAnswer(v); if (n) out.add(n); };
+
+    add(raw);
+    const withoutBrackets = String(raw || '').replace(/[（(][^）)]*[）)]/g, ' ');
+    add(withoutBrackets);
+    (String(raw || '').match(/[（(]([^）)]*)[）)]/g) || [])
+      .forEach(part => add(part.replace(/[（(）)]/g, '')));
+    [raw, withoutBrackets].forEach(src => {
+      String(src || '').split(/[\/,;、]/).forEach(add);
+    });
+    if (practiceDirection === 'back' && card?.reading) add(card.reading);
+
+    return out;
+  };
+
+  const nextPracticeCard = useCallback(() => {
+    practiceCountRef.current += 1;
+    const count = practiceCountRef.current;
+
+    // Missed cards come back after a short gap rather than immediately, so the
+    // answer isn't still on screen when they reappear.
+    const due = practiceWrongRef.current.filter(w => w.dueAfter <= count && w.card.id !== practiceLastRef.current);
+    practiceWrongRef.current = practiceWrongRef.current.filter(w => !(w.dueAfter <= count && w.card.id !== practiceLastRef.current));
+
+    let next = null;
+    if (due.length > 0) {
+      due.sort((a, b) => a.dueAfter - b.dueAfter);
+      next = due[0].card;
+    } else if (practiceUnseenRef.current.length > 0) {
+      const candidates = practiceUnseenRef.current.filter(c => c.id !== practiceLastRef.current);
+      const pool = candidates.length > 0 ? candidates : practiceUnseenRef.current;
+      next = pool[Math.floor(Math.random() * pool.length)];
+    } else if (practiceWrongRef.current.length > 0) {
+      // Nothing new left, but cards are still owed a repeat.
+      next = practiceWrongRef.current.shift().card;
+    }
+
+    if (!next) {
+      // Round cleared — start another one over the same cards rather than
+      // stopping, so practice runs until you leave it.
+      practiceUnseenRef.current = [...practicePoolRef.current];
+      practiceWrongRef.current = [];
+      const pool = practiceUnseenRef.current.filter(c => c.id !== practiceLastRef.current);
+      const from = pool.length > 0 ? pool : practiceUnseenRef.current;
+      if (from.length === 0) { setActiveView('cards'); return; }
+      next = from[Math.floor(Math.random() * from.length)];
+    }
+
+    practiceLastRef.current = next.id;
+    setPracticeCard(next);
+    setPracticeInput('');
+    setPracticeFeedback(null);
+    setTimeout(() => practiceInputRef.current?.focus(), 60);
+  }, []);
+
+  const startPractice = () => {
+    const cards = getStudyPool();
+    if (cards.length === 0) return;
+    practicePoolRef.current = cards;
+    practiceUnseenRef.current = [...cards];
+    practiceWrongRef.current = [];
+    practiceCountRef.current = 0;
+    practiceLastRef.current = null;
+    setPracticeStats({ correct: 0, wrong: 0, total: 0 });
+    setPracticeStreak(0);
+    setStudyStats({ known: 0, unknown: 0 });
+    setActiveView('practice');
+    nextPracticeCard();
+  };
+
+  const submitPractice = (raw) => {
+    if (!practiceCard || practiceFeedback !== null) return;
+    const value = normalizeAnswer(typeof raw === 'string' ? raw : practiceInput);
+    if (!value) return;
+    const isCorrect = answerVariants(practiceCard).has(value);
+
+    setPracticeStats(st => ({
+      correct: st.correct + (isCorrect ? 1 : 0),
+      wrong: st.wrong + (isCorrect ? 0 : 1),
+      total: st.total + 1,
+    }));
+
+    if (isCorrect) {
+      practiceUnseenRef.current = practiceUnseenRef.current.filter(c => c.id !== practiceCard.id);
+      playCompleteSound();
+      setPracticeFeedback('correct');
+      setPracticeStreak(v => v + 1);
+      practiceTimerRef.current = setTimeout(() => nextPracticeCard(), 320);
+    } else {
+      practiceUnseenRef.current = practiceUnseenRef.current.filter(c => c.id !== practiceCard.id);
+      const delay = 2 + Math.floor(Math.random() * 4); // 2-5 cards from now
+      practiceWrongRef.current.push({ card: practiceCard, dueAfter: practiceCountRef.current + delay });
+      playUncompleteSound();
+      setPracticeFeedback('wrong');
+      setPracticeStreak(0);
+      setTimeout(() => practiceContinueRef.current?.focus(), 50);
+    }
+  };
+
+  const practiceKeyDown = (e) => {
+    if (e.key !== 'Enter') return;
+    if (practiceFeedback === 'wrong') { nextPracticeCard(); return; }
+    if (practiceFeedback === null) submitPractice();
+  };
+
+  const endPractice = () => {
+    clearTimeout(practiceTimerRef.current);
+    setActiveView('cards');
+  };
+
+  useEffect(() => { localStorage.setItem('fc_practice_dir', practiceDirection); }, [practiceDirection]);
 
   const handleKnown = () => {
     if (currentCardIndex >= shuffledCards.length) return;
@@ -534,7 +740,10 @@ Kurallar:
       setCurrentCardIndex(prev => prev + 1);
       setIsFlipped(false);
     } else {
-      setActiveView('results');
+      // No end screen: the deck reshuffles and keeps going until you exit.
+      setShuffledCards(prev => [...prev].sort(() => Math.random() - 0.5));
+      setCurrentCardIndex(0);
+      setIsFlipped(false);
     }
   };
 
@@ -980,9 +1189,42 @@ Kurallar:
                 <button onClick={resetDeckProgress}>Reset Progress</button>
                 <button onClick={() => deleteDeck(selectedDeck)}>Delete Deck</button>
                 {deckCards.length > 0 && (
-                  <button className="fc-study-btn" onClick={startStudy}>
-                    Study
-                  </button>
+                  <>
+                    <div className="fc-mark-filter">
+                      {CARD_MARKS.map(m => (
+                        <button
+                          key={m.id}
+                          className={`fc-mark-chip${markFilter.has(m.id) ? ' active' : ''}`}
+                          style={{ '--mark': m.hex }}
+                          title={`Only ${m.label.toLowerCase()} cards`}
+                          onClick={() => toggleMarkFilter(m.id)}
+                        >
+                          <span className="fc-mark-dot" style={{ background: m.hex }} />
+                          {deckCards.filter(c => c.mark === m.id).length}
+                        </button>
+                      ))}
+                      <button
+                        className={`fc-mark-chip${markFilter.has('none') ? ' active' : ''}`}
+                        title="Only unmarked cards"
+                        onClick={() => toggleMarkFilter('none')}
+                      >
+                        <span className="fc-mark-dot fc-mark-dot--none" />
+                        {deckCards.filter(c => !c.mark).length}
+                      </button>
+                    </div>
+                    {selectedCardIds.size > 0 && (
+                      <span className="fc-selection-note">
+                        {selectedCardIds.size} selected
+                        <button className="fc-selection-clear" onClick={() => setSelectedCardIds(new Set())}>clear</button>
+                      </span>
+                    )}
+                    <button className="fc-practice-btn" onClick={startPractice}>
+                      {selectedCardIds.size > 0 ? `Practice ${selectedCardIds.size}` : 'Practice'}
+                    </button>
+                    <button className="fc-study-btn" onClick={startStudy}>
+                      {selectedCardIds.size > 0 ? `Study ${selectedCardIds.size}` : 'Study'}
+                    </button>
+                  </>
                 )}
               </div>
             </div>
@@ -1030,19 +1272,28 @@ Kurallar:
                   <table className="fc-cards-table">
                     <thead>
                       <tr>
+                        <th className="fc-check-col">
+                          <input
+                            type="checkbox"
+                            checked={deckCards.length > 0 && selectedCardIds.size === deckCards.length}
+                            ref={el => { if (el) el.indeterminate = selectedCardIds.size > 0 && selectedCardIds.size < deckCards.length; }}
+                            onChange={() => toggleSelectAll(deckCards)}
+                            title="Select all"
+                          />
+                        </th>
                         <th>#</th>
                         <th>Front</th>
                         <th>Reading</th>
                         <th>Back</th>
-                        <th>Status</th>
+                        <th>Mark</th>
                         <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {deckCards.map((card, index) => (
-                        <tr key={card.id}>
+                        <tr key={card.id} className={selectedCardIds.has(card.id) ? 'fc-row-selected' : ''}>
                           {editingCard === card.id ? (
-                            <td colSpan="6">
+                            <td colSpan="7">
                               <CardForm
                                 initialFront={card.front}
                                 initialReading={card.reading || ''}
@@ -1053,14 +1304,29 @@ Kurallar:
                             </td>
                           ) : (
                             <>
+                              <td className="fc-check-col">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedCardIds.has(card.id)}
+                                  onChange={() => toggleCardSelected(card.id)}
+                                />
+                              </td>
                               <td>{index + 1}</td>
                               <td>{card.front}</td>
                               <td className="fc-reading-cell">{card.reading || '—'}</td>
                               <td>{card.back}</td>
                               <td>
-                                <span className={`fc-status ${card.known === true ? 'known' : card.known === false ? 'unknown' : 'fresh'}`}>
-                                  {card.known === true ? '✓ Mastered' : card.known === false ? '✗ Learning' : '○ New'}
-                                </span>
+                                <div className="fc-mark-cell">
+                                  {CARD_MARKS.map(m => (
+                                    <button
+                                      key={m.id}
+                                      className={`fc-mark-btn${card.mark === m.id ? ' active' : ''}`}
+                                      style={{ background: m.hex }}
+                                      title={m.label}
+                                      onClick={() => setCardMark(card.id, m.id)}
+                                    />
+                                  ))}
+                                </div>
                               </td>
                               <td>
                                 <button onClick={() => setEditingCard(card.id)}>Edit</button>
@@ -1105,6 +1371,7 @@ Kurallar:
               </div>
             </div>
 
+            <div className="fc-study-body">
             <div
               className={`fc-study-card ${isFlipped ? 'flipped' : ''}`}
               style={{ '--fc-scale': studyScale }}
@@ -1139,6 +1406,69 @@ Kurallar:
                 </button>
               </div>
             )}
+            </div>
+          </div>
+        )}
+
+        {/* Practice Mode */}
+        {activeView === 'practice' && practiceCard && (
+          <div className="fc-study-view">
+            <div className="fc-study-header">
+              <button onClick={endPractice}>✕ Exit Practice</button>
+              <div className="fc-study-progress">
+                <span>{practiceUnseenRef.current.length + practiceWrongRef.current.length} left</span>
+                <div className="fc-study-progress-bar">
+                  <div
+                    className="fc-study-progress-fill"
+                    style={{ width: `${deckCards.length ? ((deckCards.length - practiceUnseenRef.current.length) / deckCards.length) * 100 : 0}%` }}
+                  />
+                </div>
+              </div>
+              <div className="fc-practice-meta">
+                <span className="fc-practice-streak">🔥 {practiceStreak}</span>
+                <button
+                  className="fc-practice-dir"
+                  title="Swap which side is asked"
+                  onClick={() => setPracticeDirection(d => (d === 'front' ? 'back' : 'front'))}
+                >
+                  {practiceDirection === 'front' ? 'Front → Back' : 'Back → Front'}
+                </button>
+              </div>
+            </div>
+
+            <div className="fc-study-body">
+              <div className={`fc-practice-card ${practiceFeedback || ''}`}>
+                <span className="fc-card-label">Question</span>
+                {practiceDirection === 'front' && practiceCard.reading && (
+                  <p className="fc-practice-reading">{practiceCard.reading}</p>
+                )}
+                <p className="fc-practice-question">{practiceQuestion(practiceCard)}</p>
+              </div>
+
+              <input
+                ref={practiceInputRef}
+                className={`fc-practice-input ${practiceFeedback || ''}`}
+                placeholder="Type the answer…"
+                value={practiceInput}
+                disabled={practiceFeedback !== null}
+                onChange={e => setPracticeInput(e.target.value)}
+                onKeyDown={practiceKeyDown}
+                autoFocus
+              />
+
+              {practiceFeedback === 'wrong' ? (
+                <div className="fc-practice-feedback wrong">
+                  <span>Answer: <b>{practiceAnswer(practiceCard)}</b></span>
+                  <button ref={practiceContinueRef} onClick={() => nextPracticeCard()} onKeyDown={practiceKeyDown}>
+                    Continue (Enter)
+                  </button>
+                </div>
+              ) : practiceFeedback === 'correct' ? (
+                <div className="fc-practice-feedback correct">Correct</div>
+              ) : (
+                <div className="fc-study-hint">Press Enter to check</div>
+              )}
+            </div>
           </div>
         )}
 

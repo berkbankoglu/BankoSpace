@@ -2,9 +2,43 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { notifyPermission, notify } from '../platform';
 import {
   PLANNER_EVENT, COLORS, colorHex, minutesToTime, timeToMinutes, nowMinutes, todayStr,
-  loadBlocks, loadQTasks, saveBlocks, todayBlocks, dayAgenda, findFreeSlot,
+  loadBlocks, loadQTasks, saveBlocks, saveQTasks, todayBlocks, dayAgenda, findFreeSlot,
 } from '../utils/plannerStore';
+import { useUndoScope } from '../utils/undoHistory';
 import './DashPlanner.css';
+
+// A block whose title matches a habit ticks that habit off for the day — worth
+// showing on the block itself so the link isn't invisible.
+function loadHabits() {
+  try { return JSON.parse(localStorage.getItem('habitTracker_habits')) || []; } catch { return []; }
+}
+
+// Same set the Habits view offers, so a colour edited here looks identical there.
+const HABIT_COLORS = ['#ef4444', '#fb923c', '#facc15', '#9ca3af'];
+
+function saveHabits(next) {
+  localStorage.setItem('habitTracker_habits', JSON.stringify(next));
+  window.dispatchEvent(new CustomEvent('habits-updated'));
+}
+
+// Habit colours are raw hex; quick-task colours are palette ids. Both end up here.
+const resolveColor = (c) => (typeof c === 'string' && c.startsWith('#') ? c : colorHex(c));
+
+// A block created from a habit still has to render correctly on the full
+// Planner page, which only understands palette ids — so the habit's hex is
+// snapped to the nearest palette colour rather than stored raw.
+function nearestPaletteId(hex) {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || '');
+  if (!m) return 'blue';
+  const [r, g, b] = m.slice(1).map(v => parseInt(v, 16));
+  let best = COLORS[0], bestD = Infinity;
+  COLORS.forEach(c => {
+    const p = /^#(..)(..)(..)$/.exec(c.hex).slice(1).map(v => parseInt(v, 16));
+    const d = (p[0] - r) ** 2 + (p[1] - g) ** 2 + (p[2] - b) ** 2;
+    if (d < bestD) { bestD = d; best = c; }
+  });
+  return best.id;
+}
 
 // How far ahead of a start/end the "get ready" warning fires.
 const LEAD_MINUTES = 10;
@@ -23,19 +57,43 @@ function relLabel(mins) {
   return m ? `${h}h ${m}m` : `${h}h`;
 }
 
-// Side-by-side lanes for blocks that overlap in time, same idea as the Planner page.
+// Side-by-side lanes for blocks that overlap in time. Splitting is scoped to
+// each run of overlapping blocks: two blocks sharing an hour halve each other,
+// and everything else on the day stays full width instead of the whole grid
+// narrowing because of one collision somewhere.
 function layoutLanes(blocks) {
   const sorted = [...blocks].sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
-  const cols = [];
+  const map = new Map();
+
+  let cluster = [];
+  let clusterEnd = -1;
+
+  const flush = () => {
+    if (cluster.length === 0) return;
+    // Greedy column packing within this cluster only.
+    const cols = [];
+    cluster.forEach(block => {
+      const startM = timeToMinutes(block.startTime);
+      let ci = cols.findIndex(col => timeToMinutes(col[col.length - 1].endTime) <= startM);
+      if (ci === -1) { ci = cols.length; cols.push([]); }
+      cols[ci].push(block);
+    });
+    const total = cols.length || 1;
+    cols.forEach((col, ci) => col.forEach(b => map.set(b.id, { left: ci / total, width: 1 / total })));
+    cluster = [];
+    clusterEnd = -1;
+  };
+
   sorted.forEach(block => {
     const startM = timeToMinutes(block.startTime);
-    let ci = cols.findIndex(col => timeToMinutes(col[col.length - 1].endTime) <= startM);
-    if (ci === -1) { ci = cols.length; cols.push([]); }
-    cols[ci].push(block);
+    const endM = timeToMinutes(block.endTime);
+    // A gap with nothing running closes the cluster and starts a new one.
+    if (cluster.length && startM >= clusterEnd) flush();
+    cluster.push(block);
+    clusterEnd = Math.max(clusterEnd, endM);
   });
-  const map = new Map();
-  const total = cols.length || 1;
-  cols.forEach((col, ci) => col.forEach(b => map.set(b.id, { left: ci / total, width: 1 / total })));
+  flush();
+
   return map;
 }
 
@@ -49,6 +107,7 @@ export default function DashPlanner({ onOpenPlanner, onPlannerToast, collapsed: 
 
   const [blocks, setBlocks] = useState(loadBlocks);
   const [qTasks, setQTasks] = useState(loadQTasks);
+  const [habitList, setHabitList] = useState(loadHabits);
   const [now, setNow] = useState(nowMinutes);
   const [modal, setModal] = useState(null); // { mode:'add'|'edit', block? }
   const [form, setForm] = useState({ title: '', startTime: '09:00', endTime: '10:00', color: 'blue' });
@@ -56,21 +115,30 @@ export default function DashPlanner({ onOpenPlanner, onPlannerToast, collapsed: 
   const firedRef = useRef(new Set());
   const gridRef = useRef(null);
   const scrolledRef = useRef(false);
-  // Quick task being dragged onto the grid: { task, startM } while in flight.
-  const [ghost, setGhost] = useState(null);
+  // Where a dragged quick task would land. Tracked in a ref only — the chip
+  // following the cursor already shows what is being dragged, so drawing a
+  // second placeholder on the grid was just noise.
   const ghostRef = useRef(null);
   // Existing block being dragged to a new time: { id, startM, duration }.
   const [moving, setMoving] = useState(null);
   const movingRef = useRef(null);
+  // Where the cursor is while dragging a chip, so the chip itself can follow it.
+  const [dragChip, setDragChip] = useState(null); // { task, x, y }
+  // Clicking a chip edits it rather than scheduling it — dragging schedules.
+  const [chipEdit, setChipEdit] = useState(null);
+  // Blocks picked out on the grid. Delete removes them; the per-block x does one.
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
 
   // Stay in step with the full Planner page: it writes through the same store
   // and announces every change, so an edit there lands here immediately.
   useEffect(() => {
-    const reload = () => { setBlocks(loadBlocks()); setQTasks(loadQTasks()); };
+    const reload = () => { setBlocks(loadBlocks()); setQTasks(loadQTasks()); setHabitList(loadHabits()); };
     window.addEventListener(PLANNER_EVENT, reload);
+    window.addEventListener('habits-updated', reload);
     window.addEventListener('storage', reload);
     return () => {
       window.removeEventListener(PLANNER_EVENT, reload);
+      window.removeEventListener('habits-updated', reload);
       window.removeEventListener('storage', reload);
     };
   }, []);
@@ -85,6 +153,19 @@ export default function DashPlanner({ onOpenPlanner, onPlannerToast, collapsed: 
   }, []);
 
   const sorted = useMemo(() => todayBlocks(blocks), [blocks]);
+  const habitNameSet = useMemo(
+    () => new Set(habitList.map(h => String(h.name || '').trim().toLowerCase())),
+    [habitList]
+  );
+  // Habits show up alongside the quick tasks so they can be dropped onto an
+  // hour the same way; scheduling one is what ticks it off for the day.
+  const habitTasks = useMemo(() => habitList.map(h => ({
+    id: `habit-${h.id}`,
+    title: h.name,
+    color: h.color || '#9ca3af',
+    defaultDuration: 60,
+    isHabit: true,
+  })), [habitList]);
   const agenda = useMemo(() => dayAgenda(blocks), [blocks]);
   const lanes = useMemo(() => layoutLanes(sorted), [sorted]);
 
@@ -122,13 +203,47 @@ export default function DashPlanner({ onOpenPlanner, onPlannerToast, collapsed: 
 
   const commit = useCallback((next) => { setBlocks(next); saveBlocks(next); }, []);
 
+  // Scheduling, moving, resizing and deleting all flow through `blocks`, so
+  // tracking that one value covers every edit made on the grid.
+  useUndoScope('planner_blocks', blocks, useCallback((v) => { setBlocks(v); saveBlocks(v); }, []));
+
+  const removeBlocks = useCallback((ids) => {
+    const drop = new Set(ids);
+    if (drop.size === 0) return;
+    setBlocks(prev => { const next = prev.filter(b => !drop.has(b.id)); saveBlocks(next); return next; });
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      drop.forEach(id => next.delete(id));
+      return next;
+    });
+  }, []);
+
+  // Delete clears the current selection. Ignored while typing, so the key still
+  // works normally in the title field or a time input.
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') {
+        if (e.key === 'Escape') setSelectedIds(new Set());
+        return;
+      }
+      const el = document.activeElement;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
+      if (selectedIds.size === 0) return;
+      e.preventDefault();
+      removeBlocks([...selectedIds]);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectedIds, removeBlocks]);
+
   const assignQTask = (task) => {
     const duration = Number(task.defaultDuration) || 60;
     const start = findFreeSlot(sorted, duration);
     commit([...blocks, {
       id: Date.now(), date: todayStr(), title: task.title,
       startTime: minutesToTime(start), endTime: minutesToTime(start + duration),
-      color: task.color || 'blue', recur: 'none', note: task.note || '',
+      color: task.isHabit ? nearestPaletteId(task.color) : (task.color || 'blue'),
+      recur: 'none', note: task.note || '',
     }]);
   };
 
@@ -168,7 +283,16 @@ export default function DashPlanner({ onOpenPlanner, onPlannerToast, collapsed: 
       const m = movingRef.current;
       movingRef.current = null;
       setMoving(null);
-      if (!dragged || !m) { openEdit(block); return; }
+      if (!dragged || !m) {
+        // A plain press selects; hold Ctrl/Cmd to build up a selection.
+        setSelectedIds(prev => {
+          if (!(e.ctrlKey || e.metaKey)) return new Set([block.id]);
+          const next = new Set(prev);
+          if (next.has(block.id)) next.delete(block.id); else next.add(block.id);
+          return next;
+        });
+        return;
+      }
       commit(blocks.map(b => b.id === block.id
         ? { ...b, startTime: minutesToTime(m.startM), endTime: minutesToTime(m.startM + m.duration) }
         : b));
@@ -220,29 +344,75 @@ export default function DashPlanner({ onOpenPlanner, onPlannerToast, collapsed: 
   // events rather than HTML5 drag-and-drop so the ghost can follow live and the
   // drop time can snap as it moves.
   const startQTaskDrag = (task) => (e) => {
+    if (e.button !== 0) return;
     e.preventDefault();
     const duration = Number(task.defaultDuration) || 60;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    let moved = false;
+
     const move = (ev) => {
+      if (!moved && Math.abs(ev.clientX - startX) < 4 && Math.abs(ev.clientY - startY) < 4) return;
+      moved = true;
+      // The chip follows the cursor, and the grid shows where it would land.
+      setDragChip({ task, x: ev.clientX, y: ev.clientY });
       const startM = Math.min(minutesAtClientY(ev.clientY), 24 * 60 - duration);
-      const next = { task, startM, duration };
-      ghostRef.current = next;
-      setGhost(next);
+      ghostRef.current = { task, startM, duration };
     };
     const up = () => {
       window.removeEventListener('mousemove', move);
       window.removeEventListener('mouseup', up);
       const g = ghostRef.current;
       ghostRef.current = null;
-      setGhost(null);
-      if (!g) { assignQTask(task); return; } // treated as a plain click
+      setDragChip(null);
+      // A press that never travelled is a click, and a click edits.
+      if (!moved || !g) { openChipEdit(task); return; }
       commit([...blocks, {
         id: Date.now(), date: todayStr(), title: task.title,
         startTime: minutesToTime(g.startM), endTime: minutesToTime(g.startM + g.duration),
-        color: task.color || 'blue', recur: 'none', note: task.note || '',
+        color: task.isHabit ? nearestPaletteId(task.color) : (task.color || 'blue'),
+        recur: 'none', note: task.note || '',
       }]);
     };
     window.addEventListener('mousemove', move);
     window.addEventListener('mouseup', up);
+  };
+
+  const openChipEdit = (task) => {
+    if (task.isHabit) {
+      const id = Number(String(task.id).slice('habit-'.length));
+      setChipEdit({ kind: 'habit', id, title: task.title, color: task.color });
+    } else {
+      setChipEdit({
+        kind: 'task', id: task.id, title: task.title, color: task.color,
+        duration: Number(task.defaultDuration) || 60,
+      });
+    }
+  };
+
+  const saveChipEdit = () => {
+    const title = chipEdit.title.trim();
+    if (!title) return;
+    if (chipEdit.kind === 'habit') {
+      const next = habitList.map(h => (h.id === chipEdit.id ? { ...h, name: title, color: chipEdit.color } : h));
+      saveHabits(next);
+      setHabitList(next);
+    } else {
+      const next = qTasks.map(t => (t.id === chipEdit.id
+        ? { ...t, title, color: chipEdit.color, defaultDuration: chipEdit.duration }
+        : t));
+      setQTasks(next);
+      saveQTasks(next);
+    }
+    setChipEdit(null);
+  };
+
+  const deleteChip = () => {
+    if (chipEdit.kind !== 'task') { setChipEdit(null); return; }
+    const next = qTasks.filter(t => t.id !== chipEdit.id);
+    setQTasks(next);
+    saveQTasks(next);
+    setChipEdit(null);
   };
 
   const openEdit = (block) => {
@@ -282,8 +452,8 @@ export default function DashPlanner({ onOpenPlanner, onPlannerToast, collapsed: 
         )}
       </div>
 
-      {!collapsed && (
-        <>
+      <div className={`dash-collapsible${collapsed ? ' collapsed' : ''}`}>
+        <div className="dp-collapsible-inner">
           <div className="dp-now">
             {current ? (
               <div className="dp-now-row">
@@ -306,7 +476,11 @@ export default function DashPlanner({ onOpenPlanner, onPlannerToast, collapsed: 
           </div>
 
           <div className="dp-grid-scroll" ref={gridRef}>
-            <div className="dp-grid" style={{ height: 24 * HOUR_H }}>
+            <div
+              className="dp-grid"
+              style={{ height: 24 * HOUR_H }}
+              onMouseDown={(ev) => { if (!ev.target.closest('.dp-block')) setSelectedIds(new Set()); }}
+            >
               {Array.from({ length: 24 }, (_, h) => (
                 <div key={h} className="dp-hour" style={{ top: h * HOUR_H, height: HOUR_H }}>
                   <span className="dp-hour-label">{String(h).padStart(2, '0')}:00</span>
@@ -326,7 +500,7 @@ export default function DashPlanner({ onOpenPlanner, onPlannerToast, collapsed: 
                   return (
                     <div
                       key={b.id}
-                      className={`dp-block${now >= e ? ' past' : ''}${active ? ' active' : ''}${dragged ? ' dragging' : ''}`}
+                      className={`dp-block${now >= e ? ' past' : ''}${active ? ' active' : ''}${dragged ? ' dragging' : ''}${selectedIds.has(b.id) ? ' selected' : ''}`}
                       style={{
                         top: (s / 60) * HOUR_H,
                         height: Math.max(14, ((e - s) / 60) * HOUR_H - 2),
@@ -337,31 +511,26 @@ export default function DashPlanner({ onOpenPlanner, onPlannerToast, collapsed: 
                       }}
                       title={`${b.title} · ${b.startTime}–${b.endTime}`}
                       onMouseDown={startBlockDrag(b)}
+                      onDoubleClick={(ev) => { ev.stopPropagation(); openEdit(b); }}
                     >
+                      <button
+                        className="dp-block-del"
+                        title="Delete"
+                        onMouseDown={(ev) => ev.stopPropagation()}
+                        onClick={(ev) => { ev.stopPropagation(); removeBlocks([b.id]); }}
+                      >×</button>
                       <span className="dp-resize dp-resize-top" onMouseDown={startBlockResize(b, 'top')} />
-                      <span className="dp-block-title">{b.title}</span>
+                      <span className="dp-block-title">
+                        {habitNameSet.has(String(b.title || '').trim().toLowerCase()) && (
+                          <span className="dp-habit-mark" title="Also checks off the matching habit today">✓</span>
+                        )}
+                        {b.title}
+                      </span>
                       <span className="dp-block-time">{minutesToTime(s)}–{minutesToTime(e)}</span>
                       <span className="dp-resize dp-resize-bottom" onMouseDown={startBlockResize(b, 'bottom')} />
                     </div>
                   );
                 })}
-
-                {ghost && (
-                  <div
-                    className="dp-block dp-ghost"
-                    style={{
-                      top: (ghost.startM / 60) * HOUR_H,
-                      height: Math.max(14, (ghost.duration / 60) * HOUR_H - 2),
-                      left: 0,
-                      width: 'calc(100% - 3px)',
-                      background: `${colorHex(ghost.task.color)}33`,
-                      borderLeftColor: colorHex(ghost.task.color),
-                    }}
-                  >
-                    <span className="dp-block-title">{ghost.task.title}</span>
-                    <span className="dp-block-time">{minutesToTime(ghost.startM)}–{minutesToTime(ghost.startM + ghost.duration)}</span>
-                  </div>
-                )}
               </div>
 
               <div className="dp-nowline" style={{ top: (now / 60) * HOUR_H }}>
@@ -370,20 +539,44 @@ export default function DashPlanner({ onOpenPlanner, onPlannerToast, collapsed: 
             </div>
           </div>
 
-          {qTasks.length > 0 && (
+          {(qTasks.length > 0 || habitTasks.length > 0) && (
             <div className="dp-qtasks">
-              {qTasks.map(t => (
-                <button
-                  key={t.id}
-                  className="dp-qtask"
-                  style={{ borderLeftColor: colorHex(t.color) }}
-                  title={`Drag onto an hour, or click for the next free slot (${t.defaultDuration || 60} min)`}
-                  onMouseDown={startQTaskDrag(t)}
-                >
-                  <span className="dp-qtask-dot" style={{ background: colorHex(t.color) }} />
-                  {t.title}
-                </button>
-              ))}
+              {habitTasks.length > 0 && (
+                <div className="dp-qgroup">
+                  <div className="dp-qgroup-label">Habits</div>
+                  <div className="dp-qgroup-chips">
+                    {habitTasks.map(t => (
+                      <button
+                        key={t.id}
+                        className="dp-qtask dp-qtask--habit"
+                        style={{ background: `${resolveColor(t.color)}22`, borderLeftColor: resolveColor(t.color) }}
+                        title="Drag onto an hour to schedule it (and check it off today) - click to edit"
+                        onMouseDown={startQTaskDrag(t)}
+                      >
+                        {t.title}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {qTasks.length > 0 && (
+                <div className="dp-qgroup">
+                  <div className="dp-qgroup-label">Tasks</div>
+                  <div className="dp-qgroup-chips">
+                    {qTasks.map(t => (
+                      <button
+                        key={t.id}
+                        className="dp-qtask"
+                        style={{ background: `${resolveColor(t.color)}22`, borderLeftColor: resolveColor(t.color) }}
+                        title="Drag onto an hour to schedule it - click to edit"
+                        onMouseDown={startQTaskDrag(t)}
+                      >
+                        {t.title}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -392,7 +585,60 @@ export default function DashPlanner({ onOpenPlanner, onPlannerToast, collapsed: 
             setForm({ title: '', startTime: minutesToTime(start), endTime: minutesToTime(start + 60), color: 'blue' });
             setModal({ mode: 'add' });
           }}>+ Add block</button>
-        </>
+        </div>
+      </div>
+
+      {dragChip && (
+        <div
+          className={`dp-drag-preview${dragChip.task.isHabit ? ' dp-qtask--habit' : ''}`}
+          style={{
+            left: dragChip.x,
+            top: dragChip.y,
+            background: `${resolveColor(dragChip.task.color)}33`,
+            borderLeftColor: resolveColor(dragChip.task.color),
+          }}
+        >
+          {dragChip.task.title}
+        </div>
+      )}
+
+      {chipEdit && (
+        <div className="dp-modal-overlay" onClick={() => setChipEdit(null)}>
+          <div className="dp-modal" onClick={e => e.stopPropagation()}>
+            <div className="dp-modal-title">{chipEdit.kind === 'habit' ? 'Edit habit' : 'Edit quick task'}</div>
+            <input
+              className="dp-input" autoFocus value={chipEdit.title}
+              onChange={e => setChipEdit(c => ({ ...c, title: e.target.value }))}
+              onKeyDown={e => { if (e.key === 'Enter') saveChipEdit(); if (e.key === 'Escape') setChipEdit(null); }}
+            />
+            {chipEdit.kind === 'task' && (
+              <div className="dp-add-row">
+                <span className="dp-dash">Duration</span>
+                <input
+                  className="dp-input dp-time-input" type="number" min="15" step="15"
+                  value={chipEdit.duration}
+                  onChange={e => setChipEdit(c => ({ ...c, duration: Number(e.target.value) || 60 }))}
+                />
+                <span className="dp-dash">min</span>
+              </div>
+            )}
+            <div className="dp-swatches">
+              {(chipEdit.kind === 'habit' ? HABIT_COLORS.map(hex => ({ id: hex, hex })) : COLORS).map(c => (
+                <button
+                  key={c.id}
+                  className={`dp-swatch${chipEdit.color === c.id ? ' active' : ''}`}
+                  style={{ background: c.hex }}
+                  onClick={() => setChipEdit(x => ({ ...x, color: c.id }))}
+                />
+              ))}
+            </div>
+            <div className="dp-modal-actions">
+              {chipEdit.kind === 'task' && <button className="dp-delete" onClick={deleteChip}>Delete</button>}
+              <button className="dp-cancel" onClick={() => setChipEdit(null)}>Cancel</button>
+              <button className="dp-save" onClick={saveChipEdit} disabled={!chipEdit.title.trim()}>Save</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {modal && (

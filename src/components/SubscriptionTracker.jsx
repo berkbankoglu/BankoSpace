@@ -269,7 +269,7 @@ export default function SubscriptionTracker({ isMobile, collapsible, collapsed: 
         <button className="sub-add-btn" onClick={(e) => { e.stopPropagation(); setShowAdd(true); }} title="Add">+</button>
       </div>
 
-      {!(canCollapse && collapsed) && (
+      <div className={`dash-collapsible${canCollapse && collapsed ? ' collapsed' : ''}`}>
       <div className="sub-list">
         {items.length === 0 && (
           <div className="sub-empty">
@@ -317,7 +317,7 @@ export default function SubscriptionTracker({ isMobile, collapsible, collapsed: 
           </div>
         )}
       </div>
-      )}
+      </div>
 
       {showAdd && <AddModal onSave={save} onDelete={remove} onClose={() => setShowAdd(false)} />}
       {editing && <AddModal initial={editing} onSave={save} onDelete={remove} onClose={() => setEditing(null)} />}

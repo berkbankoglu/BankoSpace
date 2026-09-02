@@ -128,8 +128,11 @@ export default function DashColumns({ colWidths, startColResize, resetColWidths,
                         <div className="dash-stack-resize" onMouseDown={startStackResize(col, prevExpanded, id)} />
                       )}
                       <div
-                        className={`dash-col-pane${drag && drag.id === id ? ' dragging' : ''}`}
-                        style={collapsedHere ? { flex: '0 0 auto' } : { flex: `${weights[id] ?? 2} 1 0` }}
+                        className={`dash-col-pane${drag && drag.id === id ? ' dragging' : ''}${collapsedHere ? ' collapsed' : ''}`}
+                        // Only flex-grow changes between the two states, so the
+                        // pane can animate between them; min-height keeps the
+                        // header visible once it has shrunk away to nothing.
+                        style={{ flex: `${collapsedHere ? 0 : (weights[id] ?? 2)} 1 0` }}
                         onMouseDown={PANEL_IDS.includes(id) ? startPanelDrag(id) : undefined}
                       >
                         {renderPanel(id, {

@@ -11,7 +11,11 @@
 }
 
 .fc-wrapper.fullscreen {
-  height: 100vh;
+  /* Its container, not the viewport: 100vh is taller than the space left under
+     the app's title bar and the Language Learn tab strip, and the overflow is
+     what made the whole page scroll and carry the headers off screen. */
+  height: 100%;
+  min-height: 0;
 }
 
 /* ==========================================
@@ -260,9 +264,13 @@
 
 .fc-content {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
+  /* The pane itself doesn't scroll — the deck header and the add-card form stay
+     put and only the card list moves, instead of the whole page sliding and
+     taking the header off screen. */
+  overflow: hidden;
   background: var(--bg-base);
   position: relative;
 }
@@ -270,10 +278,13 @@
 .fc-main-view {
   padding: 20px 32px 24px;
   width: 100%;
+  height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   position: relative;
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 .fc-main-header {
@@ -611,7 +622,7 @@
    ========================================== */
 
 .fc-cards-section {
-  margin-bottom: 32px;
+  margin-bottom: 0;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -619,8 +630,9 @@
 }
 
 .fc-cards-section .fc-cards-table-wrapper {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  max-height: 800px;
   border-radius: 8px;
   border: 1px solid var(--border);
 }
@@ -772,17 +784,32 @@
 .fc-study-view {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px;
-  min-height: 100%;
+  align-items: stretch;
+  justify-content: flex-start;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
+/* The card and its controls, centred in whatever room is left under the header. */
+.fc-study-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 40px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Sticky within the view rather than fixed to the window: pinned to the
+   viewport it sat underneath the app's own 32px title bar, which is what cut
+   its top off — and its left offset assumed a 260px sidebar that isn't there
+   once the sidebar is collapsed. */
 .fc-study-header {
-  position: fixed;
+  position: sticky;
   top: 0;
-  left: 260px;
-  right: 0;
   background: var(--bg-base);
   border-bottom: 1px solid var(--border);
   padding: 16px 24px;
@@ -841,8 +868,15 @@
 .fc-study-card {
   width: 100%;
   max-width: calc(760px * var(--fc-scale, 1));
-  height: calc(460px * var(--fc-scale, 1));
-  margin: 80px 0 20px 0;
+  /* Preferred height, but allowed to shrink: the study view is meant to fit the
+     window with nothing to scroll, so when the card, the hint and the rating
+     buttons don't all fit, the card gives up the space rather than pushing the
+     buttons off screen. The old 80px top margin cleared a header that used to
+     be fixed to the window and no longer is. */
+  flex: 0 1 calc(460px * var(--fc-scale, 1));
+  height: auto;
+  min-height: 0;
+  margin: 0 0 20px 0;
   cursor: pointer;
   perspective: 1000px;
 }
@@ -1788,3 +1822,243 @@
     display: none;
   }
 }
+
+/* Study mode fills the pane exactly, so the page behind it has nothing to scroll. */
+.fc-content:has(.fc-study-view) {
+  overflow: hidden;
+}
+
+.fc-study-hint,
+.fc-study-actions {
+  flex-shrink: 0;
+}
+
+/* Everything above the card list keeps its size; the list absorbs what's left. */
+.fc-main-header,
+.fc-main-view > .fc-add-card-section {
+  flex-shrink: 0;
+}
+
+/* Host for the fullscreen flash cards inside the Language Learn tab */
+.flashcards-fullscreen {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+
+/* ── Practice mode ──────────────────────────────────────────────────────────
+   Typing drill over the same deck: a card you miss is requeued a few cards
+   later, and the round ends only once every card has been answered right. */
+.fc-practice-btn {
+  padding: 8px 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-hover);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.fc-practice-btn:hover { background: var(--bg-hover); }
+
+.fc-practice-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.fc-practice-streak {
+  font-size: 14px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.fc-practice-dir {
+  padding: 6px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.fc-practice-dir:hover { color: var(--text-primary); border-color: var(--border-hover); }
+
+.fc-practice-card {
+  width: 100%;
+  max-width: 960px;
+  min-height: 285px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  padding: 42px;
+  box-sizing: border-box;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.fc-practice-card.correct { border-color: var(--success); }
+.fc-practice-card.wrong { border-color: var(--danger); }
+
+.fc-practice-reading {
+  margin: 0;
+  font-size: 24px;
+  color: var(--text-muted);
+}
+
+.fc-practice-question {
+  margin: 0;
+  font-size: 57px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: center;
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+.fc-practice-input {
+  width: 100%;
+  max-width: 660px;
+  margin-top: 33px;
+  padding: 21px 27px;
+  box-sizing: border-box;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  color: var(--text-primary);
+  font-size: 28px;
+  text-align: center;
+  outline: none;
+}
+.fc-practice-input:focus { border-color: var(--border-hover); }
+.fc-practice-input.correct { border-color: var(--success); }
+.fc-practice-input.wrong { border-color: var(--danger); }
+.fc-practice-input::placeholder { color: var(--text-muted); font-size: 24px; }
+
+.fc-practice-feedback {
+  display: flex;
+  align-items: center;
+  gap: 21px;
+  margin-top: 27px;
+  font-size: 24px;
+}
+.fc-practice-feedback.correct { color: var(--success); font-weight: 600; }
+.fc-practice-feedback.wrong { color: var(--danger); }
+.fc-practice-feedback.wrong b { color: var(--text-primary); }
+
+.fc-practice-feedback button {
+  padding: 12px 24px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-hover);
+  border-radius: 9px;
+  color: var(--text-primary);
+  font-size: 20px;
+  cursor: pointer;
+}
+.fc-practice-feedback button:hover { background: var(--bg-hover); }
+
+/* Card selection — study or practice just the ticked cards */
+.fc-check-col {
+  width: 34px;
+  text-align: center;
+}
+
+.fc-check-col input {
+  cursor: pointer;
+  width: 15px;
+  height: 15px;
+  accent-color: var(--text-secondary);
+}
+
+.fc-row-selected {
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.fc-selection-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  margin-right: 4px;
+}
+
+.fc-selection-clear {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+}
+.fc-selection-clear:hover { color: var(--text-primary); }
+
+/* Colour marks on cards — replaces the automatic New/Learning/Mastered status */
+.fc-mark-cell {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.fc-mark-btn {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  padding: 0;
+  cursor: pointer;
+  opacity: 0.28;
+  transition: opacity 0.12s, transform 0.12s;
+}
+.fc-mark-btn:hover { opacity: 0.7; transform: scale(1.12); }
+.fc-mark-btn.active {
+  opacity: 1;
+  border-color: rgba(255, 255, 255, 0.55);
+}
+
+.fc-mark-filter {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  margin-right: 4px;
+}
+
+.fc-mark-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.fc-mark-chip:hover { background: var(--bg-hover); color: var(--text-primary); }
+.fc-mark-chip.active {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border-color: var(--mark, var(--border-hover));
+}
+
+.fc-mark-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.fc-mark-dot--none {
+  border: 1px solid var(--text-muted);
+  background: transparent;
+}
+
+/* The hint under the input tracks the practice UI's scale */
+.fc-study-body .fc-study-hint { font-size: 22px; }

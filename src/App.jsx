@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, Component } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, Component } from 'react';
 import { flushSync } from 'react-dom';
 import { isTauri, proxyFetch, confirmAsync, notifyPermission, notify, exportJSON, importJSON, windowControls } from './platform';
 import logo from './assets/logo.svg';
@@ -16,6 +16,10 @@ import SubscriptionTracker, { SubscriptionWidget, SubscriptionPopup } from './co
 import Planner from './components/Planner';
 import DashPlanner from './components/DashPlanner';
 import DashColumns from './components/DashColumns';
+import ReviewTracker from './components/ReviewTracker';
+import { syncHabitsFromPlanner } from './utils/habitPlannerSync';
+import { useUndoScope, useUndoHotkeys } from './utils/undoHistory';
+import { PLANNER_EVENT } from './utils/plannerStore';
 import Notes from './components/Notes';
 import HabitTracker from './components/HabitTracker';
 import MobileTabBar from './components/MobileTabBar';
@@ -256,7 +260,7 @@ function TaskContributionGraph({ todos, contributionLog }) {
 }
 import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, setVolume, getVolume } from './utils/sounds';
 
-const APP_VERSION = '4.3.0';
+const APP_VERSION = '4.4.0';
 const MIN_COL_PX = 220;
 const DEFAULT_COL_PX = [null, null, null]; // [dailyPx, weeklyPx, monthlyPx] — null = auto (flex:1)
 
@@ -555,6 +559,18 @@ function App({ session, onLogout }) {
     }
   }, [appUpdate]);
 
+  // A planner block and a habit sharing a name are the same commitment, so
+  // scheduling one ticks the other off for that day. Runs app-wide rather than
+  // inside either view, since neither is guaranteed to be open.
+  useEffect(() => {
+    syncHabitsFromPlanner();
+    const onPlanner = () => syncHabitsFromPlanner();
+    window.addEventListener(PLANNER_EVENT, onPlanner);
+    // Also catches the day rolling over while the app is left open.
+    const iv = setInterval(() => syncHabitsFromPlanner(), 60000);
+    return () => { window.removeEventListener(PLANNER_EVENT, onPlanner); clearInterval(iv); };
+  }, []);
+
   const [plannerToasts, setPlannerToasts] = useState([]);
   const showPlannerToast = useCallback((title, body) => {
     const id = Date.now();
@@ -585,6 +601,7 @@ function App({ session, onLogout }) {
       { id: 'japanesekana', label: 'Language Learn',  view: 'japanesekana', hidden: false, icon: 'あ' },
       { id: 'fitness',      label: 'Fitness',          view: 'fitness',      hidden: false, icon: '◈' },
       { id: 'planner',      label: 'Planner',          view: 'planner',      hidden: false, icon: '≡' },
+      { id: 'review',       label: 'Review',           view: 'review',       hidden: false, icon: '★' },
       { id: 'notes',        label: 'Notes',            view: 'notes',        hidden: false, icon: '✎' },
     ];
     const saved = localStorage.getItem('sidebarOrder');
@@ -725,6 +742,10 @@ const [dailyChecklistCollapsed, setDailyChecklistCollapsed] = useState(() => {
     };
   });
 
+
+  // Ctrl+Z / Ctrl+Shift+Z across the app, and todos as one undoable scope.
+  useUndoHotkeys();
+  useUndoScope('todos', todos, setTodos);
 
   // Save to localStorage when todos change
   useEffect(() => {
@@ -2311,6 +2332,14 @@ useEffect(() => {
           )}
 
           {/* Notes */}
+          {activeView === 'review' && (
+            <ViewErrorBoundary>
+            <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <ReviewTracker />
+            </div>
+            </ViewErrorBoundary>
+          )}
+
           {activeView === 'notes' && (
             <ViewErrorBoundary>
             <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
@@ -2495,12 +2524,12 @@ function ActivityBox({ todos, contributionLog, collapsed, onToggle }) {
         <span className={`activity-chevron${collapsed ? ' collapsed' : ''}`}>▾</span>
         <span className="activity-box-title">Activity</span>
       </div>
-      {!collapsed && (
+      <div className={`dash-collapsible${collapsed ? ' collapsed' : ''}`}>
         <div className="activity-box-body">
           <GithubContributionGraph />
           <TaskContributionGraph todos={todos} contributionLog={contributionLog} />
         </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useState, useRef, Fragment } from 'react';
+import { useState, useEffect, useRef, Fragment } from 'react';
 import { confirmAsync } from '../platform';
 import './HabitTracker.css';
 import { playAddSound, playDeleteSound, playCompleteSound, playUncompleteSound } from '../utils/sounds';
@@ -65,6 +65,17 @@ export default function HabitTracker() {
     setHabits(next);
     localStorage.setItem('habitTracker_habits', JSON.stringify(next));
   };
+  // The planner can tick habits off on its own (see habitPlannerSync) — pick
+  // those writes up instead of showing a stale grid until the next remount.
+  useEffect(() => {
+    const reload = () => {
+      try { setHabits(JSON.parse(localStorage.getItem('habitTracker_habits')) || []); } catch {}
+      try { setLog(JSON.parse(localStorage.getItem('habitTracker_log')) || {}); } catch {}
+    };
+    window.addEventListener('habits-updated', reload);
+    return () => window.removeEventListener('habits-updated', reload);
+  }, []);
+
   const persistLog = (next) => {
     setLog(next);
     localStorage.setItem('habitTracker_log', JSON.stringify(next));

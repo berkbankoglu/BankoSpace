@@ -12,6 +12,14 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: flex-grow 0.4s ease;
+}
+
+/* Collapsed panes keep just their header on screen; the body is still mounted
+   and simply clipped, which is what makes the close animate rather than snap. */
+.dash-col-pane.collapsed {
+  min-height: 37px;
+  flex-shrink: 0;
 }
 
 /* Panels fill their pane, or shrink to their header strip when collapsed. */
@@ -23,9 +31,7 @@
   min-height: 0;
 }
 
-.dash-col-pane > .dp-panel.collapsed,
-.dash-col-pane > .sub-tracker.collapsed,
-.dash-col-pane > .activity-box.collapsed {
+.dash-col-pane > .dp-panel.collapsed {
   flex: 0 0 auto;
   height: auto;
 }
@@ -88,4 +94,25 @@
 .dash-col-pane.dragging .sub-header,
 .dash-col-pane.dragging .activity-box-header {
   cursor: grabbing;
+}
+
+/* Same technique as the todo list's own open/close (see .cc-subtasks-wrapper),
+   a grid row animating between 0fr and 1fr — but at twice its duration, since
+   these panels are much larger and 0.2s read as a snap rather than a move. */
+.dash-collapsible {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 0.4s ease;
+  overflow: hidden;
+  min-height: 0;
+  flex: 1;
+}
+
+.dash-collapsible.collapsed {
+  grid-template-rows: 0fr;
+}
+
+.dash-collapsible > * {
+  min-height: 0;
+  overflow: hidden;
 }
