@@ -260,9 +260,9 @@ function TaskContributionGraph({ todos, contributionLog }) {
 }
 import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, setVolume, getVolume } from './utils/sounds';
 
-const APP_VERSION = '4.4.0';
+const APP_VERSION = '4.5.0';
 const MIN_COL_PX = 220;
-const DEFAULT_COL_PX = [null, null, null]; // [dailyPx, weeklyPx, monthlyPx] — null = auto (flex:1)
+const DEFAULT_COL_PX = [null, null, null, null]; // one per dashboard column — null = auto (flex:1)
 
 function App({ session, onLogout }) {
   // Platform detection for OS-specific UI
@@ -296,7 +296,7 @@ function App({ session, onLogout }) {
   const [colWidths, setColWidths] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('dashColWidths'));
-      if (Array.isArray(saved) && saved.length === 3 &&
+      if (Array.isArray(saved) && saved.length === DEFAULT_COL_PX.length &&
           saved.every(w => w === null || (typeof w === 'number' && w >= MIN_COL_PX && w <= 1200))) {
         // If saved px values exceed available width, reset to auto
         const total = saved.reduce((s, w) => s + (w || 0), 0);
@@ -345,7 +345,7 @@ function App({ session, onLogout }) {
       const next = [...startPx];
       next[handleIdx] = newLeft;
       next[handleIdx + 1] = newRight;
-      setColWidths([next[0], next[1], next[2]]);
+      setColWidths(next.slice(0, DEFAULT_COL_PX.length));
     };
     const onUp = () => {
       document.removeEventListener('mousemove', onMove);

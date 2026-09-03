@@ -9,6 +9,9 @@ import './DashColumns.css';
 // owns the layout, the drag, and the collapse state.
 export const PANEL_IDS = ['planner', 'payments', 'activity'];
 const FIXED_BY_COL = { 0: 'daily', 1: 'weekly' };
+// Four columns: the two todo lists, and two free ones the side panels can be
+// dragged between — so Payments can sit in a column of its own.
+const COLUMN_COUNT = 4;
 const DEFAULT_PANEL_COL = { planner: 2, payments: 2, activity: 2 };
 const DEFAULT_WEIGHT = { daily: 3, weekly: 3, planner: 3, payments: 2, activity: 2 };
 const HEADER_SELECTOR = '.dp-header, .sub-header, .activity-box-header';
@@ -102,7 +105,7 @@ export default function DashColumns({ colWidths, startColResize, resetColWidths,
 
   return (
     <>
-      {[0, 1, 2].map(col => {
+      {Array.from({ length: COLUMN_COUNT }, (_, i) => i).map(col => {
         const members = membersOf(col);
         return (
           <Fragment key={col}>

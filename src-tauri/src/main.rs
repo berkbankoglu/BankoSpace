@@ -76,6 +76,14 @@ fn write_diag(line: &str) {
     let _ = diag_tx().send(line.to_string());
 }
 
+// For the handful of lines that are the whole point of the log — a wedge being
+// detected, a recovery being attempted. The async writer is the right default,
+// but a queued line is lost if the process is killed (or restarts itself) in
+// the moments after, which is exactly when these get written.
+fn write_diag_now(line: &str) {
+    write_diag_blocking(line);
+}
+
 #[tauri::command]
 fn diag_log(line: String) {
     write_diag(&line);
@@ -696,6 +704,8 @@ fn main() {
                     // waits before killing the app — so this never actually got to run
                     // during the freezes it was written for.
                     #[cfg(windows)]
+                    let is_focused_now = main_focused().load(std::sync::atomic::Ordering::SeqCst);
+                    #[cfg(windows)]
                     if main_age > 12 {
                         #[link(name = "user32")]
                         extern "system" {
@@ -703,18 +713,23 @@ fn main() {
                         }
                         const WM_CANCELMODE: u32 = 0x001F;
                         const WM_LBUTTONUP: u32 = 0x0202;
-                        if let Some(window) = app_handle.get_webview_window("main") {
-                            if let Ok(hwnd) = window.hwnd() {
-                                let raw = hwnd.0 as isize;
-                                unsafe {
-                                    PostMessageW(raw, WM_CANCELMODE, 0, 0);
-                                    PostMessageW(raw, WM_LBUTTONUP, 0, 0);
+                        write_diag_now(&format!(
+                            "RUST: !!! main thread wedged {}s (focused={}) -> attempting WM_CANCELMODE break",
+                            main_age, is_focused_now
+                        ));
+                        match app_handle.get_webview_window("main") {
+                            Some(window) => match window.hwnd() {
+                                Ok(hwnd) => {
+                                    let raw = hwnd.0 as isize;
+                                    unsafe {
+                                        PostMessageW(raw, WM_CANCELMODE, 0, 0);
+                                        PostMessageW(raw, WM_LBUTTONUP, 0, 0);
+                                    }
+                                    write_diag_now("RUST: posted WM_CANCELMODE + WM_LBUTTONUP");
                                 }
-                                write_diag(&format!(
-                                    "RUST: !!! main thread wedged {}s -> posted WM_CANCELMODE + WM_LBUTTONUP to break a stuck native modal loop (title-bar drag?)",
-                                    main_age
-                                ));
-                            }
+                                Err(e) => write_diag_now(&format!("RUST: breaker could not get hwnd: {}", e)),
+                            },
+                            None => write_diag_now("RUST: breaker could not find the main window"),
                         }
                     }
 
@@ -806,11 +821,21 @@ fn main() {
                     let is_focused = main_focused().load(std::sync::atomic::Ordering::SeqCst);
                     let fast_path = is_focused && ping_age > 100;
                     let unfocused_safety_net = !is_focused && ping_age > 900;
-                    if (fast_path || unfocused_safety_net) && now.saturating_sub(last_restart_attempt) > 60 {
+                    // js_ping going stale on an unfocused window is normal —
+                    // WebView2 suspends a backgrounded renderer by design, which is
+                    // why that path waits 15 minutes. main_thread_age is different:
+                    // it comes from run_on_main_thread, so it only climbs when the
+                    // host's own event loop has stopped servicing work. That is a
+                    // real hang no matter which window has focus, and on this machine
+                    // it is what actually happens — the window never comes back on
+                    // its own, so waiting 15 minutes to recover is the same as never.
+                    let event_loop_dead = main_age > 40;
+                    if (fast_path || unfocused_safety_net || event_loop_dead)
+                        && now.saturating_sub(last_restart_attempt) > 60 {
                         last_restart_attempt = now;
-                        write_diag(&format!(
-                            "RUST: !!! js_ping still stale ({}s) after Reload attempt(s) -> restarting the whole process",
-                            ping_age
+                        write_diag_now(&format!(
+                            "RUST: !!! restarting the whole process (js_ping {}s, main_thread {}s, focused={})",
+                            ping_age, main_age, is_focused
                         ));
                         if incident_active {
                             write_incident(&format!("[{}] recovery: full process restart triggered (ping_age={}s)", incident_id, ping_age));
