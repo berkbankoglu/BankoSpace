@@ -409,11 +409,6 @@ function CategoryColumn({ title, category, todos, currentFilter, actions, isMobi
             onClick={() => { if (todo.subtasks && todo.subtasks.length > 0) toggleExpand(todo.id); }}
           >
             {todo.color && <div className="cc-item-color-bar" style={{ background: todo.color }} />}
-            {/* Invisible strip along the item's top edge. The row below is
-                collapsed to zero height, so it has no area of its own to hover —
-                this gives the cursor something to hit up there without taking
-                any layout space itself. */}
-            <div className="cc-item-hotzone" />
             {/* Top row: drag handle + checkbox + actions */}
             <div className="cc-item-top">
               <div className="cc-drag-handle" title="Drag" onMouseDown={(e) => onTodoDragStart(e, todo)}>⠿</div>

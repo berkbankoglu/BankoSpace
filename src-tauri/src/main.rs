@@ -30,8 +30,13 @@ fn diag_path() -> std::path::PathBuf {
     std::path::Path::new(&base).join("bankospace-diag.log")
 }
 
+static DIAG_FILE_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+
 fn write_diag_blocking(line: &str) {
     use std::io::Write;
+    // The synchronous path and the writer thread both append here; without this
+    // they interleave and lines come out spliced together.
+    let _guard = DIAG_FILE_LOCK.get_or_init(|| Mutex::new(())).lock();
     let path = diag_path();
     // simple rotation so the file can't grow without bound
     if let Ok(meta) = std::fs::metadata(&path) {
@@ -319,6 +324,18 @@ fn last_js_ping() -> &'static std::sync::atomic::AtomicU64 {
 // donma "window_focused=false, Xs önce odak kaybedildi" ile eşleşiyorsa,
 // bu WebView2'nin kendi occlusion/visibility davranışının donmayı
 // tetiklediğini kesin olarak doğrular (ana JS thread'i çökmeden durur).
+// The watchdog needs the main window's HWND to post messages at it, but asking
+// Tauri for the window from another thread can block on the main thread — the
+// exact thread the watchdog is trying to rescue. Caught live: the breaker logged
+// "attempting WM_CANCELMODE break" and the heartbeat never wrote another line,
+// because get_webview_window/hwnd() hung the watchdog itself, taking out the
+// auto-restart with it. So the handle is resolved once at startup and after that
+// posting is a plain Win32 call that cannot block.
+static MAIN_HWND: OnceLock<std::sync::atomic::AtomicIsize> = OnceLock::new();
+fn main_hwnd() -> &'static std::sync::atomic::AtomicIsize {
+    MAIN_HWND.get_or_init(|| std::sync::atomic::AtomicIsize::new(0))
+}
+
 static MAIN_FOCUSED: OnceLock<std::sync::atomic::AtomicBool> = OnceLock::new();
 fn main_focused() -> &'static std::sync::atomic::AtomicBool {
     MAIN_FOCUSED.get_or_init(|| std::sync::atomic::AtomicBool::new(true))
@@ -605,6 +622,14 @@ fn main() {
             // goes stale past a threshold we force a NATIVE reload via
             // ICoreWebView2::Reload() — the same COM-level call the crash-recovery
             // path uses — which doesn't require the frozen JS thread's cooperation.
+            #[cfg(windows)]
+            if let Some(win) = app.get_webview_window("main") {
+                if let Ok(hwnd) = win.hwnd() {
+                    main_hwnd().store(hwnd.0 as isize, std::sync::atomic::Ordering::SeqCst);
+                    write_diag(&format!("RUST: cached main hwnd {}", hwnd.0 as isize));
+                }
+            }
+
             let app_handle = app.handle().clone();
             std::thread::spawn(move || {
                 use sysinfo::{Pid, System};
@@ -612,6 +637,7 @@ fn main() {
                 let mut sys = System::new_all();
                 let mut last_recovery_attempt: u64 = 0;
                 let mut last_restart_attempt: u64 = 0;
+                let mut last_stuck_break: u64 = 0;
                 let mut incident_active = false;
                 let mut incident_start: u64 = 0;
                 let mut incident_id: u64 = 0;
@@ -705,6 +731,43 @@ fn main() {
                     // during the freezes it was written for.
                     #[cfg(windows)]
                     let is_focused_now = main_focused().load(std::sync::atomic::Ordering::SeqCst);
+
+                    // The suspected mechanism is a stuck native move loop: dragging the
+                    // custom title bar enters DefWindowProc's modal loop, which exits
+                    // only on the matching button-up. If a global input hook (this
+                    // machine runs mouse-remapping software) swallows that button-up,
+                    // the loop never ends.
+                    //
+                    // That leaves a signature nothing else produces: the event loop is
+                    // dead while the left button is physically NOT held. Reading the
+                    // real key state costs nothing and can't be fooled by a hook that
+                    // ate the message. If the button were genuinely down, someone is
+                    // just dragging, and this stays out of the way.
+                    #[cfg(windows)]
+                    if main_age > 3 {
+                        #[link(name = "user32")]
+                        extern "system" {
+                            fn GetAsyncKeyState(v_key: i32) -> i16;
+                            fn PostMessageW(hwnd: isize, msg: u32, wparam: usize, lparam: isize) -> i32;
+                        }
+                        const VK_LBUTTON: i32 = 0x01;
+                        const WM_CANCELMODE: u32 = 0x001F;
+                        const WM_LBUTTONUP: u32 = 0x0202;
+                        let button_down = unsafe { (GetAsyncKeyState(VK_LBUTTON) as u16 & 0x8000) != 0 };
+                        let raw = main_hwnd().load(std::sync::atomic::Ordering::SeqCst);
+                        if !button_down && raw != 0 && now.saturating_sub(last_stuck_break) > 5 {
+                            last_stuck_break = now;
+                            write_diag_now(&format!(
+                                "RUST: !!! event loop dead {}s with the mouse button UP -> a native modal loop is stuck waiting for a button-up that never came; breaking it",
+                                main_age
+                            ));
+                            unsafe {
+                                PostMessageW(raw, WM_CANCELMODE, 0, 0);
+                                PostMessageW(raw, WM_LBUTTONUP, 0, 0);
+                            }
+                        }
+                    }
+
                     #[cfg(windows)]
                     if main_age > 12 {
                         #[link(name = "user32")]
@@ -717,19 +780,15 @@ fn main() {
                             "RUST: !!! main thread wedged {}s (focused={}) -> attempting WM_CANCELMODE break",
                             main_age, is_focused_now
                         ));
-                        match app_handle.get_webview_window("main") {
-                            Some(window) => match window.hwnd() {
-                                Ok(hwnd) => {
-                                    let raw = hwnd.0 as isize;
-                                    unsafe {
-                                        PostMessageW(raw, WM_CANCELMODE, 0, 0);
-                                        PostMessageW(raw, WM_LBUTTONUP, 0, 0);
-                                    }
-                                    write_diag_now("RUST: posted WM_CANCELMODE + WM_LBUTTONUP");
-                                }
-                                Err(e) => write_diag_now(&format!("RUST: breaker could not get hwnd: {}", e)),
-                            },
-                            None => write_diag_now("RUST: breaker could not find the main window"),
+                        let raw = main_hwnd().load(std::sync::atomic::Ordering::SeqCst);
+                        if raw != 0 {
+                            unsafe {
+                                PostMessageW(raw, WM_CANCELMODE, 0, 0);
+                                PostMessageW(raw, WM_LBUTTONUP, 0, 0);
+                            }
+                            write_diag_now("RUST: posted WM_CANCELMODE + WM_LBUTTONUP");
+                        } else {
+                            write_diag_now("RUST: breaker has no cached hwnd, skipping");
                         }
                     }
 

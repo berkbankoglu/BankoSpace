@@ -241,52 +241,33 @@
   color: var(--text-muted);
 }
 
-/* Collapsed to nothing until the item is hovered, then it opens upward above
-   the text — same idea as .cc-subtask-toolbar, which opens downward below it.
-   .cc-item's flex `gap` is deliberately not used for the spacing here: a gap
-   still applies around a zero-height child, so the row would keep reserving
-   space even while collapsed. The margin below animates with it instead. */
+/* Hidden until the item is hovered, but as an overlay rather than a row that
+   opens: growing a real row pushed the text down, which moved the thing you
+   were pointing at, and needing to hold the cursor on a thin top strip for half
+   a second to trigger it made every interaction feel slow. Floating it over the
+   item's top-right corner costs no layout at all, so it can appear instantly
+   from a hover anywhere on the item and nothing shifts. */
 .cc-item-top {
+  position: absolute;
+  top: 3px;
+  right: 5px;
+  z-index: 3;
   display: flex;
   align-items: center;
   gap: 8px;
-  min-width: 0;
-  max-height: 0;
+  padding: 3px 6px;
+  border-radius: 6px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
   opacity: 0;
-  margin-bottom: 0;
-  overflow: hidden;
-  transition: max-height 0.15s ease, opacity 0.15s ease, margin-bottom 0.15s ease;
-  /* Closing is immediate; the wait lives on the hover rule below, so passing
-     the cursor over an item doesn't pop the row open. */
-  transition-delay: 0s;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
 }
 
-/* Only the top edge opens it — hovering the text below leaves it closed.
-   Once it's open the row itself is under the cursor, so hovering the row keeps
-   it open (otherwise it would snap shut the moment you moved onto a button).
-   The hot zone sits behind the row (z-index) so the buttons stay clickable. */
-.cc-item-hotzone {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 22px;
-  z-index: 0;
-}
-
-/* Not while the item is sitting collapsed over hidden subtasks — there the row
-   is closed and hovering the top edge should leave it that way. */
-.cc-item:not(.collapsed-parent) .cc-item-hotzone:hover + .cc-item-top,
-.cc-item:not(.collapsed-parent) .cc-item-top:hover {
-  max-height: 32px;
+.cc-item:hover .cc-item-top {
   opacity: 1;
-  margin-bottom: 5px;
-  transition-delay: 0.5s;
-}
-
-.cc-item-top {
-  position: relative;
-  z-index: 1;
+  pointer-events: auto;
 }
 
 .cc-item-top .cc-item-actions {
@@ -566,28 +547,28 @@
 /* A second row below the text, not a side rail — the text always gets the
    item's full width. Collapsed to nothing when not hovered (not just faded
    out) so it doesn't hold the row open; hovering grows the row to reveal it. */
+/* Same overlay approach as .cc-item-top — no reflow, no dwell. */
 .cc-subtask-toolbar {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  z-index: 3;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  max-height: 0;
+  gap: 6px;
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
   opacity: 0;
-  margin-bottom: 0;
-  overflow: hidden;
-  position: relative;
-  z-index: 1;
-  transition: max-height 0.15s ease, opacity 0.15s ease, margin-bottom 0.15s ease;
-  transition-delay: 0s;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
 }
 
-/* Unlike the top-level item, these open from a hover anywhere on the row —
-   the rows are short, and aiming for a top edge on each one is fussy. The dwell
-   is what keeps them from popping open as the cursor passes through. */
 .cc-subtask:hover .cc-subtask-toolbar {
-  max-height: 22px;
   opacity: 1;
-  margin-bottom: 4px;
-  transition-delay: 0.7s;
+  pointer-events: auto;
 }
 
 .cc-subtask-drag {
@@ -693,10 +674,8 @@
 }
 
 .cc-subtask-child:hover .cc-subtask-toolbar {
-  max-height: 20px;
   opacity: 1;
-  margin-bottom: 3px;
-  transition-delay: 0.7s;
+  pointer-events: auto;
 }
 
 .cc-subtask-child .cc-label {
