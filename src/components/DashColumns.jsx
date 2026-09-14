@@ -23,7 +23,10 @@ function readStored(key, fallback) {
   } catch { return fallback; }
 }
 
-export default function DashColumns({ colWidths, startColResize, resetColWidths, renderPanel }) {
+// `panelIds` lets the caller drop a panel entirely (an opt-in feature that is
+// switched off), without the panel's stored column, weight or collapse state
+// being lost — turning it back on restores it where it was.
+export default function DashColumns({ colWidths, startColResize, resetColWidths, renderPanel, panelIds = PANEL_IDS }) {
   const [panelCol, setPanelCol] = useState(() => readStored('dashPanelCol', DEFAULT_PANEL_COL));
   const [weights, setWeights] = useState(() => readStored('dashPanelWeights', DEFAULT_WEIGHT));
   const [collapsed, setCollapsed] = useState(() => readStored('dashPanelCollapsed', { planner: false, payments: false, activity: false }));
@@ -32,13 +35,13 @@ export default function DashColumns({ colWidths, startColResize, resetColWidths,
 
   const store = (key, value, setter) => { localStorage.setItem(key, JSON.stringify(value)); setter(value); };
   const toggleCollapsed = (id) => store('dashPanelCollapsed', { ...collapsed, [id]: !collapsed[id] }, setCollapsed);
-  const isCollapsed = (id) => PANEL_IDS.includes(id) && !!collapsed[id];
+  const isCollapsed = (id) => panelIds.includes(id) && !!collapsed[id];
 
   // Top to bottom in a column: its fixed category column (if it has one), then
   // whichever panels have been moved into it.
   const membersOf = (col) => [
     ...(FIXED_BY_COL[col] ? [FIXED_BY_COL[col]] : []),
-    ...PANEL_IDS.filter(id => panelCol[id] === col),
+    ...panelIds.filter(id => panelCol[id] === col),
   ];
 
   // Vertical split between two stacked members of one column.
@@ -136,7 +139,7 @@ export default function DashColumns({ colWidths, startColResize, resetColWidths,
                         // pane can animate between them; min-height keeps the
                         // header visible once it has shrunk away to nothing.
                         style={{ flex: `${collapsedHere ? 0 : (weights[id] ?? 2)} 1 0` }}
-                        onMouseDown={PANEL_IDS.includes(id) ? startPanelDrag(id) : undefined}
+                        onMouseDown={panelIds.includes(id) ? startPanelDrag(id) : undefined}
                       >
                         {renderPanel(id, {
                           collapsed: !!collapsed[id],

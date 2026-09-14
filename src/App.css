@@ -8119,12 +8119,97 @@ body.light .sidebar-settings-version {
 .sidebar-footer {
   flex-shrink: 0;
   display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 10px 12px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+/* The version line and the update button keep the row they always had; the
+   account sits above them as the footer's main element. */
+.sidebar-footer-meta {
+  display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 10px 16px;
-  border-top: 1px solid rgba(255,255,255,0.06);
+  padding: 0 4px;
 }
+
+/* Account chip. Round photo, chosen name, and nothing else — the email and
+   the actions it belongs with open in the menu above it. */
+.sidebar-account {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  text-align: left;
+  overflow: hidden;
+  transition: background 0.15s, border-color 0.15s;
+}
+.sidebar-account:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-hover);
+}
+.sidebar-account.collapsed {
+  justify-content: center;
+  padding: 8px 0;
+  gap: 0;
+  border-radius: var(--radius-lg);
+}
+
+/* A solid colour behind the initials instead of a photo — recognisable at a
+   glance, nothing to upload, and it costs nothing to sync. */
+.sidebar-account-avatar {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-account-initials {
+  font-size: 17px;
+  font-weight: 700;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.sidebar-account-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-account-chevron {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.18s ease, color 0.15s;
+}
+.sidebar-account:hover .sidebar-account-chevron { color: var(--text-primary); }
+
 .sidebar-footer-score,
 .sidebar-footer-version {
   font-size: 11px;
@@ -8656,13 +8741,6 @@ body.light .references-header {
 /* Checklists Full Screen */
 .checklists-fullscreen {
   padding: 20px;
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
-
-/* Income Tracker Full Screen */
-.income-fullscreen {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -10342,3 +10420,380 @@ input::placeholder, textarea::placeholder { color: var(--text-muted) !important;
   cursor: default;
 }
 
+
+
+/* ---- App update prompt -------------------------------------------------
+   Centered instead of a corner toast: an available update is worth one
+   deliberate decision, and the old bottom-right card was easy to miss.  */
+.update-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(3px);
+  animation: update-modal-fade 0.18s ease;
+}
+
+.update-modal {
+  width: 100%;
+  max-width: 440px;
+  box-sizing: border-box;
+  padding: 32px 36px 28px;
+  text-align: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+  animation: update-modal-rise 0.22s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.update-modal-badge {
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  line-height: 1;
+  color: var(--accent);
+  border: 1px solid var(--border-hover, var(--border));
+  border-radius: 50%;
+  background: var(--bg-elevated, var(--bg-surface));
+}
+
+.update-modal-eyebrow {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.update-modal-title {
+  margin: 8px 0 0;
+  font-size: 25px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--text-primary);
+  text-wrap: balance;
+}
+
+.update-modal-from {
+  margin-top: 5px;
+  font-size: 12px;
+  color: var(--text-muted, var(--text-secondary));
+  font-variant-numeric: tabular-nums;
+}
+
+.update-modal-text {
+  margin: 16px auto 24px;
+  max-width: 34ch;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.update-modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.update-modal-primary,
+.update-modal-secondary {
+  width: 100%;
+  padding: 12px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  border-radius: var(--radius-md, 8px);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+/* Inverted rather than accent-filled: the noir accent is a mid-grey, so
+   white-on-accent falls below a readable contrast. */
+.update-modal-primary {
+  background: var(--text-primary);
+  border: 1px solid var(--text-primary);
+  color: var(--bg-base);
+}
+.update-modal-primary:hover:not(:disabled) { filter: brightness(1.12); }
+.update-modal-primary:disabled { opacity: 0.6; cursor: default; }
+
+.update-modal-secondary {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+.update-modal-secondary:hover {
+  color: var(--text-primary);
+  border-color: var(--border-hover, var(--border));
+  background: var(--bg-hover, transparent);
+}
+
+@keyframes update-modal-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes update-modal-rise {
+  from { opacity: 0; transform: translateY(14px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .update-modal-overlay,
+  .update-modal { animation: none; }
+}
+
+/* Labs rows carry a second line, so the toggle aligns to the top of the pair
+   rather than floating in the middle of a two-line block. */
+.settings-page-row--labs {
+  align-items: flex-start;
+  gap: 20px;
+}
+.settings-page-row--labs .settings-row-sub {
+  max-width: 46ch;
+  line-height: 1.5;
+}
+.settings-page-row--labs .settings-toggle { margin-top: 2px; }
+
+/* Profile, inside Settings — where the account's own details live now that the
+   sidebar chip carries only the chosen name. */
+.profile-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 26px 20px 22px;
+  margin-bottom: 22px;
+  text-align: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.profile-hero-avatar {
+  width: 76px;
+  height: 76px;
+  margin-bottom: 12px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  font-weight: 700;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.profile-hero-name {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.profile-hero-mail {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+  overflow-wrap: anywhere;
+}
+
+.profile-rename {
+  width: 100%;
+  max-width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-top: 4px;
+}
+.profile-rename input {
+  width: 100%;
+  padding: 9px 12px;
+  font-family: inherit;
+  font-size: 15px;
+  text-align: center;
+  color: var(--text-primary);
+  background: var(--bg-input);
+  border: 1px solid var(--border-hover);
+  border-radius: var(--radius-sm);
+  outline: none;
+}
+.profile-rename input:focus { border-color: var(--text-muted); }
+.profile-rename-actions {
+  display: flex;
+  gap: 7px;
+}
+.profile-rename-actions .settings-action-btn { flex: 1; }
+.settings-action-btn.primary {
+  background: var(--text-primary);
+  border-color: var(--text-primary);
+  color: var(--bg-base);
+  font-weight: 600;
+}
+
+.profile-error {
+  margin-top: 10px;
+  font-size: 11.5px;
+  color: var(--danger);
+}
+
+.profile-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 11px;
+  margin-bottom: 22px;
+}
+
+.profile-swatch {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.09) inset;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.profile-swatch:hover { transform: scale(1.1); }
+/* The ring sits outside the circle, so the colour itself is never covered. */
+.profile-swatch.selected {
+  box-shadow: 0 0 0 2px var(--bg-base), 0 0 0 4px var(--text-primary);
+}
+
+.profile-hero .settings-action-btn {
+  padding: 8px 17px;
+  font-size: 12.5px;
+  font-family: inherit;
+}
+
+/* Signed-in accounts */
+.account-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.account-row {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.account-row.current { border-color: var(--border-hover); }
+
+.account-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 12px;
+  background: none;
+  border: none;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.13s;
+}
+.account-row-main:hover:not(:disabled) { background: var(--bg-hover); }
+.account-row-main:disabled { cursor: default; }
+
+.account-row-avatar {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  text-transform: uppercase;
+}
+
+.account-row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.account-row-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.account-row-mail {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.account-row-state {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.account-row.current .account-row-state { color: var(--success); }
+
+.account-row-remove {
+  flex-shrink: 0;
+  width: 34px;
+  background: none;
+  border: none;
+  border-left: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.13s, background 0.13s;
+}
+.account-row-remove:hover { color: var(--danger); background: rgba(248, 81, 73, 0.08); }
+
+.account-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.account-actions .settings-action-btn { font-family: inherit; padding: 8px 15px; }
+.settings-action-btn:disabled { opacity: 0.55; cursor: default; }
+
+/* Settings > Data > Completed tasks */
+.completed-restore-list {
+  max-height: 320px;
+  overflow-y: auto;
+  margin-bottom: 6px;
+  padding-right: 4px;
+}
+.completed-restore-list .settings-data-row { gap: 14px; }
+.completed-restore-text { min-width: 0; }
+.completed-restore-text .settings-row-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Account confirmed &middot; BankoSpace</title>
+<link rel="icon" href="/icons/icon-192.png">
+<style>
+  :root {
+    --bg-base: #1a1a1a;
+    --bg-card: #1e1e1e;
+    --border: #333;
+    --border-strong: #444;
+    --text-primary: #f0f0f0;
+    --text-secondary: #b0b0b0;
+    --text-muted: #727272;
+    --good: #3fb950;
+    --bad: #f85149;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: var(--bg-base);
+    color: var(--text-primary);
+    font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .card {
+    width: 100%;
+    max-width: 420px;
+    padding: 40px 36px 32px;
+    text-align: center;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  }
+  .mark {
+    width: 62px;
+    height: 62px;
+    margin: 0 auto 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 27px;
+    line-height: 1;
+    border-radius: 50%;
+    background: rgba(63, 185, 80, 0.12);
+    border: 1px solid rgba(63, 185, 80, 0.4);
+    color: var(--good);
+  }
+  .card.error .mark {
+    background: rgba(248, 81, 73, 0.12);
+    border-color: rgba(248, 81, 73, 0.4);
+    color: var(--bad);
+  }
+  h1 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+  }
+  p {
+    margin: 14px auto 0;
+    max-width: 32ch;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+  }
+  .close {
+    margin-top: 26px;
+    padding: 11px 20px;
+    width: 100%;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--bg-base);
+    background: var(--text-primary);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .close:hover { filter: brightness(0.92); }
+  .foot {
+    margin-top: 20px;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+</style>
+</head>
+<body>
+  <main class="card" id="card">
+    <div class="mark" id="mark">&#10003;</div>
+    <h1 id="title">Your account is active</h1>
+    <p id="body">You can close this tab now. Go back to BankoSpace &mdash; it signs you in on its own.</p>
+    <button class="close" id="close">Close this tab</button>
+    <div class="foot">BankoSpace</div>
+  </main>
+
+<script>
+  // Supabase reports a failed verification in the URL fragment rather than as a
+  // status code, so an expired link would otherwise land on a page cheerfully
+  // saying everything worked.
+  var params = new URLSearchParams(location.hash.slice(1));
+  var err = params.get('error_description') || params.get('error');
+  if (err) {
+    document.getElementById('card').className = 'card error';
+    document.getElementById('mark').innerHTML = '&#33;';
+    document.getElementById('title').textContent = 'This link did not work';
+    document.getElementById('body').textContent =
+      decodeURIComponent(err).replace(/\+/g, ' ') +
+      '. Go back to BankoSpace and use "Send it again" to get a fresh link.';
+  }
+
+  // A tab the browser opened itself can't always be closed by script; say so
+  // rather than leaving a button that silently does nothing.
+  document.getElementById('close').addEventListener('click', function () {
+    window.close();
+    setTimeout(function () {
+      document.getElementById('close').textContent = 'You can close this tab manually';
+    }, 200);
+  });
+</script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback, Component } from 'react';
 import { flushSync } from 'react-dom';
-import { isTauri, proxyFetch, confirmAsync, notifyPermission, notify, exportJSON, importJSON, windowControls } from './platform';
+import { isTauri, proxyFetch, confirmAsync, notifyPermission, notify, exportJSON, importJSON, windowControls, startWindowDrag } from './platform';
 import logo from './assets/logo.svg';
 import './App.css';
 import { supabase, pullFromSupabase, pushKeyToSupabase, pushAllToSupabase, purgeApiKeyFromSupabase, SYNC_KEYS } from './supabase';
@@ -8,14 +8,16 @@ import Login from './components/Login';
 import CategoryColumn from './components/CategoryColumn';
 import FlashCards from './components/FlashCards';
 import DailyChecklist from './components/DailyChecklist';
-import IncomeTracker from './components/IncomeTracker';
 import FitnessTracker from './components/FitnessTracker';
 import JapaneseKana from './components/JapaneseKana';
 import ToolsChat from './components/ToolsChat';
 import SubscriptionTracker, { SubscriptionWidget, SubscriptionPopup } from './components/SubscriptionTracker';
 import Planner from './components/Planner';
 import DashPlanner from './components/DashPlanner';
-import DashColumns from './components/DashColumns';
+import DashColumns, { PANEL_IDS } from './components/DashColumns';
+import { BETA_FEATURES, BETA_EVENT, getBetaFlags, setBetaFlag } from './utils/betaFeatures';
+import { PROFILE_EVENT, AVATAR_COLORS, getProfile, setProfile, displayName, initials, avatarColor, validateUsername, accountSubtitle } from './utils/profile';
+import { ACCOUNTS_EVENT, MAX_ACCOUNTS, listAccounts, rememberAccount, forgetAccount, clearAccountData } from './utils/accounts';
 import ReviewTracker from './components/ReviewTracker';
 import { syncHabitsFromPlanner } from './utils/habitPlannerSync';
 import { useUndoScope, useUndoHotkeys } from './utils/undoHistory';
@@ -260,7 +262,7 @@ function TaskContributionGraph({ todos, contributionLog }) {
 }
 import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, setVolume, getVolume } from './utils/sounds';
 
-const APP_VERSION = '4.5.0';
+const APP_VERSION = '4.6.0';
 const MIN_COL_PX = 220;
 const DEFAULT_COL_PX = [null, null, null, null]; // one per dashboard column — null = auto (flex:1)
 
@@ -596,7 +598,6 @@ function App({ session, onLogout }) {
       { id: 'dashboard',    label: 'Dashboard',      view: 'dashboard',    hidden: false, icon: '⊞' },
       { id: 'checklists',   label: 'Checklists',      view: 'checklists',   hidden: false, icon: '✓' },
       { id: 'habits',       label: 'Habits',           view: 'habits',       hidden: false, icon: '⟳' },
-      { id: 'income',       label: 'Income Tracker',  view: 'income',       hidden: false, icon: '$' },
       { id: 'tools',        label: 'Tools',            view: 'tools',        hidden: false, icon: '⚙' },
       { id: 'japanesekana', label: 'Language Learn',  view: 'japanesekana', hidden: false, icon: 'あ' },
       { id: 'fitness',      label: 'Fitness',          view: 'fitness',      hidden: false, icon: '◈' },
@@ -627,6 +628,151 @@ function App({ session, onLogout }) {
     }
     return defaults;
   });
+  // Opt-in sections. The flags gate what renders; the underlying state (sidebar
+  // order, panel positions, the data itself) is left untouched, so switching a
+  // feature back on returns it exactly as it was.
+  const [betaFlags, setBetaFlags] = useState(getBetaFlags);
+  useEffect(() => {
+    const sync = () => setBetaFlags(getBetaFlags());
+    window.addEventListener(BETA_EVENT, sync);
+    window.addEventListener('storage', sync);
+    return () => { window.removeEventListener(BETA_EVENT, sync); window.removeEventListener('storage', sync); };
+  }, []);
+  const betaSidebarIds = useMemo(
+    () => new Set(BETA_FEATURES.filter(f => f.sidebarId && !betaFlags[f.id]).map(f => f.sidebarId)),
+    [betaFlags],
+  );
+  const availableSidebarItems = useMemo(
+    () => sidebarItems.filter(item => !betaSidebarIds.has(item.id)),
+    [sidebarItems, betaSidebarIds],
+  );
+  const visiblePanelIds = useMemo(
+    () => PANEL_IDS.filter(id => !BETA_FEATURES.some(f => f.id === id && !betaFlags[f.id])),
+    [betaFlags],
+  );
+  const toggleBetaFeature = useCallback((id) => {
+    setBetaFlags(prev => setBetaFlag(id, !prev[id]));
+  }, []);
+  // Switching a section off while you are standing in it would otherwise leave
+  // a blank page behind.
+  useEffect(() => {
+    if (betaSidebarIds.has(activeView)) setActiveView('dashboard');
+  }, [betaSidebarIds, activeView]);
+
+  // Display name and picture. Only the name shows in the sidebar — anything
+  // that identifies the account lives behind the click, so a shared screen
+  // doesn't put an email address on it.
+  const [profile, setProfileState] = useState(getProfile);
+  useEffect(() => {
+    const sync = () => setProfileState(getProfile());
+    window.addEventListener(PROFILE_EVENT, sync);
+    window.addEventListener('storage', sync);
+    return () => { window.removeEventListener(PROFILE_EVENT, sync); window.removeEventListener('storage', sync); };
+  }, []);
+  const [nameDraft, setNameDraft] = useState(null); // non-null while renaming
+  const [accountError, setAccountError] = useState('');
+  const shownName = displayName(session);
+  const shownColor = avatarColor(profile, shownName);
+
+  // Signed-in accounts on this machine, and moving between them.
+  const [accounts, setAccounts] = useState(listAccounts);
+  const [switching, setSwitching] = useState(false);
+  useEffect(() => {
+    const sync = () => setAccounts(listAccounts());
+    window.addEventListener(ACCOUNTS_EVENT, sync);
+    return () => window.removeEventListener(ACCOUNTS_EVENT, sync);
+  }, []);
+  // Supabase rotates the refresh token as it renews, so the stored copy is
+  // refreshed from whatever session is live rather than captured once.
+  useEffect(() => {
+    if (session) setAccounts(rememberAccount(session, getProfile()));
+  }, [session, profile.username, profile.color]);
+
+  // Flush before leaving: the debounced writes and anything not yet pushed
+  // would otherwise be wiped by the clear below.
+  const leaveCurrentAccount = async () => {
+    await pushAllToSupabase();
+    if (session) rememberAccount(session, getProfile());
+  };
+
+  const switchAccount = async (id) => {
+    const target = listAccounts().find(a => a.id === id);
+    if (!target || switching) return;
+    if (target.id === session?.user?.id) { setShowSidebarSettings(false); return; }
+    setAccountError('');
+    setSwitching(true);
+    try {
+      await leaveCurrentAccount();
+      // Swap the session first. If the stored token has expired this fails
+      // while everything local is still intact, so nothing is lost.
+      const { data, error } = await supabase.auth.setSession({
+        access_token: target.accessToken,
+        refresh_token: target.refreshToken,
+      });
+      if (error || !data?.session) throw error || new Error('no session');
+      rememberAccount(data.session, null);
+      clearAccountData(SYNC_KEYS);
+      window.location.reload();
+    } catch {
+      setSwitching(false);
+      setAccounts(forgetAccount(target.id));
+      setAccountError(`The saved sign-in for ${accountSubtitle(target.email) || 'that account'} had expired, so it was removed from the list. Use "Add account" to sign in to it again.`);
+    }
+  };
+
+  const addAccount = async () => {
+    if (switching) return;
+    setAccountError('');
+    setSwitching(true);
+    try {
+      await leaveCurrentAccount();
+      clearAccountData(SYNC_KEYS);
+      // Local only. The default signs the account out everywhere, which
+      // revokes the refresh token just saved for switching back to it — so
+      // adding a second account used to lock you out of the first.
+      await supabase.auth.signOut({ scope: 'local' });
+      window.location.reload();
+    } catch {
+      setSwitching(false);
+      setAccountError('Could not switch to the sign-in screen. Try again.');
+    }
+  };
+
+  // Signing out ends this account's sessions, so its saved sign-in can't be
+  // resumed and it leaves the switcher. Its data leaves this device too:
+  // otherwise the next account signed in here opens with this one's profile,
+  // todos and notes, and pushes them into its own cloud copy.
+  const signOutCurrent = async () => {
+    if (switching) return;
+    setSwitching(true);
+    try { await pushAllToSupabase(); } catch { /* sign out regardless */ }
+    const id = session?.user?.id;
+    clearAccountData(SYNC_KEYS);
+    try { await supabase.auth.signOut(); } catch { /* the local session is cleared either way */ }
+    if (id) forgetAccount(id);
+    // A reload rather than onLogout: in-memory state would otherwise be
+    // written straight back into the storage just cleared.
+    window.location.reload();
+  };
+
+  const removeAccount = async (id) => {
+    const target = listAccounts().find(a => a.id === id);
+    const ok = await confirmAsync(
+      `Remove ${accountSubtitle(target?.email) || 'this account'} from this device? Nothing stored in the cloud is deleted \u2014 you can sign in again any time.`,
+      { title: 'Remove account', kind: 'warning', okLabel: 'Remove', cancelLabel: 'Cancel' },
+    );
+    if (!ok) return;
+    setAccounts(forgetAccount(id));
+  };
+
+  const saveName = () => {
+    const problem = validateUsername(nameDraft);
+    if (problem) { setAccountError(problem); return; }
+    setProfileState(setProfile({ username: nameDraft.trim() }));
+    setNameDraft(null);
+    setAccountError('');
+  };
+
   const [draggedSidebarItem, setDraggedSidebarItem] = useState(null);
   const [dragOverInfo, setDragOverInfo] = useState(null); // { id, position: 'before' | 'after' } — preview only, no reorder yet
   const dragOverInfoRef = useRef(null);
@@ -640,22 +786,6 @@ function App({ session, onLogout }) {
     localStorage.setItem('sidebarOrder', JSON.stringify(updated));
     const toggled = updated.find(i => i.id === id);
     if (toggled?.hidden && activeView === toggled.view) setActiveView('dashboard');
-  };
-
-  const todosHistoryRef = useRef([]);
-  const MAX_UNDO_STEPS = 30;
-
-  const pushHistory = (currentTodos) => {
-    todosHistoryRef.current.push(JSON.parse(JSON.stringify(currentTodos)));
-    if (todosHistoryRef.current.length > MAX_UNDO_STEPS) {
-      todosHistoryRef.current.shift();
-    }
-  };
-
-  const undo = () => {
-    if (todosHistoryRef.current.length === 0) return;
-    const prev = todosHistoryRef.current.pop();
-    setTodos(prev);
   };
 
   const sidebarDragPosRef = useRef({ x: 0, y: 0 });
@@ -984,18 +1114,6 @@ useEffect(() => {
     setShowSidebarSettings(false);
   };
 
-  // Ctrl+Z undo
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
-        e.preventDefault();
-        undo();
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
 
   const toggleTheme = () => {
     setTheme(prev => prev === 'dark' ? 'light' : 'dark');
@@ -1003,7 +1121,6 @@ useEffect(() => {
 
 
   const addTodo = (category, text, dueDate = null) => {
-    pushHistory(todos);
     const newTodo = {
       id: Date.now(),
       text,
@@ -1020,7 +1137,6 @@ useEffect(() => {
   };
 
   const addSubtask = (todoId, subtaskText) => {
-    pushHistory(todos);
     setTodos(todos.map(todo => {
       if (todo.id === todoId) {
         const newSubtask = {
@@ -1038,7 +1154,6 @@ useEffect(() => {
   };
 
   const toggleSubtask = (todoId, subtaskId) => {
-    pushHistory(todos);
     const parentTodo = todos.find(t => t.id === todoId);
     const subtask = parentTodo?.subtasks?.find(st => st.id === subtaskId);
     const willComplete = subtask ? !subtask.completed : false;
@@ -1056,7 +1171,6 @@ useEffect(() => {
   };
 
   const deleteSubtask = (todoId, subtaskId) => {
-    pushHistory(todos);
     setTodos(todos.map(todo => {
       if (todo.id === todoId) {
         return {
@@ -1107,7 +1221,6 @@ useEffect(() => {
   // Subtask'ın bir alt kademesi daha: her subtask kendi "children" listesini
   // taşıyabiliyor — todo -> subtask -> child, aynı toggle/delete deseniyle.
   const addSubtaskChild = (todoId, subtaskId, childText) => {
-    pushHistory(todos);
     setTodos(todos.map(todo => {
       if (todo.id !== todoId) return todo;
       return {
@@ -1123,7 +1236,6 @@ useEffect(() => {
   };
 
   const toggleSubtaskChild = (todoId, subtaskId, childId) => {
-    pushHistory(todos);
     const parentTodo = todos.find(t => t.id === todoId);
     const parentSubtask = parentTodo?.subtasks?.find(st => st.id === subtaskId);
     const child = parentSubtask?.children?.find(c => c.id === childId);
@@ -1146,7 +1258,6 @@ useEffect(() => {
   };
 
   const deleteSubtaskChild = (todoId, subtaskId, childId) => {
-    pushHistory(todos);
     setTodos(todos.map(todo => {
       if (todo.id !== todoId) return todo;
       return {
@@ -1211,7 +1322,6 @@ useEffect(() => {
   // with its adjacent same-category neighbor, mirroring the same
   // order-field reassignment the desktop mouse-drag system uses.
   const moveTodoInCategory = (todoId, category, direction) => {
-    pushHistory(todos);
     setTodos(prev => {
       const catTodos = prev.filter(t => t.category === category).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
       const idx = catTodos.findIndex(t => t.id === todoId);
@@ -1226,7 +1336,6 @@ useEffect(() => {
   };
 
   const toggleTodo = (id) => {
-    pushHistory(todos);
     const todo = todos.find(t => t.id === id);
     const willComplete = todo ? !todo.completed : false;
     if (todo) {
@@ -1298,13 +1407,11 @@ useEffect(() => {
   };
 
   const deleteTodo = (id) => {
-    pushHistory(todos);
     playDeleteSound();
     setTodos(todos.filter(todo => todo.id !== id));
   };
 
   const updateTodo = (id, updates) => {
-    pushHistory(todos);
     setTodos(todos.map(todo =>
       todo.id === id ? { ...todo, ...updates } : todo
     ));
@@ -1323,7 +1430,6 @@ useEffect(() => {
     const rect = itemEl.getBoundingClientRect();
     const offX = e.clientX - rect.left;
     const offY = e.clientY - rect.top;
-    pushHistory(todos);
 
     let ghost = null;
     let dragOverEl = null;
@@ -1699,44 +1805,14 @@ useEffect(() => {
                 </button>
               </div>
             )}
-            <div className="titlebar-workspace" style={{ width: sidebarCollapsed ? 50 : 240, flexShrink: 0, marginLeft: isTauri ? '70px' : 0 }}>
-              <button
-                className="titlebar-workspace-btn"
-                onClick={() => { setShowSidebarSettings(true); setSettingsTab('account'); }}
-              >
-                <span className="titlebar-workspace-avatar">
-                  {session?.user?.email ? session.user.email[0].toUpperCase() : 'B'}
-                </span>
-                {!sidebarCollapsed && (
-                  <span className="titlebar-workspace-name">
-                    {session?.user?.email ? session.user.email.split('@')[0] : 'BankoSpace'}
-                  </span>
-                )}
-              </button>
-            </div>
-            {isTauri && <div className="titlebar-drag-region" data-tauri-drag-region onDoubleClick={maximizeWindow} />}
+            {isTauri && <div className="titlebar-drag-region" onMouseDown={startWindowDrag} onDoubleClick={maximizeWindow} />}
           </>
         )}
 
         {/* Windows: Workspace LEFT, controls RIGHT */}
         {currentPlatform === 'windows' && (
           <>
-            <div className="titlebar-workspace" style={{ width: sidebarCollapsed ? 50 : 240, flexShrink: 0 }}>
-              <button
-                className="titlebar-workspace-btn"
-                onClick={() => { setShowSidebarSettings(true); setSettingsTab('account'); }}
-              >
-                <span className="titlebar-workspace-avatar">
-                  {session?.user?.email ? session.user.email[0].toUpperCase() : 'B'}
-                </span>
-                {!sidebarCollapsed && (
-                  <span className="titlebar-workspace-name">
-                    {session?.user?.email ? session.user.email.split('@')[0] : 'BankoSpace'}
-                  </span>
-                )}
-              </button>
-            </div>
-            {isTauri && <div className="titlebar-drag-region" data-tauri-drag-region onDoubleClick={maximizeWindow} />}
+            {isTauri && <div className="titlebar-drag-region" onMouseDown={startWindowDrag} onDoubleClick={maximizeWindow} />}
             {isTauri && (
               <div className="titlebar-controls">
                 <button className="titlebar-btn minimize" onClick={minimizeWindow} title="Minimize">
@@ -1825,6 +1901,9 @@ useEffect(() => {
                     <button className={`settings-modal-nav-item ${settingsTab === 'pages' ? 'active' : ''}`} onClick={() => setSettingsTab('pages')}>
                       <span className="settings-nav-icon">📄</span> Pages
                     </button>
+                    <button className={`settings-modal-nav-item ${settingsTab === 'labs' ? 'active' : ''}`} onClick={() => setSettingsTab('labs')}>
+                      <span className="settings-nav-icon">🧪</span> Labs
+                    </button>
                     <button className={`settings-modal-nav-item ${settingsTab === 'data' ? 'active' : ''}`} onClick={() => setSettingsTab('data')}>
                       <span className="settings-nav-icon">💾</span> Data
                     </button>
@@ -1841,17 +1920,107 @@ useEffect(() => {
                       <h2 className="settings-modal-title">Profile</h2>
                       {session ? (
                         <>
-                          <div className="settings-row-card">
-                            <div className="settings-row-info">
-                              <div className="settings-row-avatar">{session.user?.email?.[0]?.toUpperCase()}</div>
-                              <div>
-                                <div className="settings-row-name">{session.user?.email}</div>
-                                <div className="settings-row-sub">Active session</div>
-                              </div>
+                          <div className="profile-hero">
+                            <div className="profile-hero-avatar" style={{ background: shownColor }}>
+                              {initials(shownName)}
                             </div>
+                            {nameDraft === null ? (
+                              <>
+                                <div className="profile-hero-name">{shownName}</div>
+                                <div className="profile-hero-mail">{accountSubtitle(session.user?.email, session.user?.user_metadata?.contact_email)}</div>
+                                <button
+                                  className="settings-action-btn"
+                                  onClick={() => { setNameDraft(shownName); setAccountError(''); }}
+                                >Change username</button>
+                              </>
+                            ) : (
+                              <div className="profile-rename">
+                                <input
+                                  value={nameDraft}
+                                  onChange={(e) => setNameDraft(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') saveName();
+                                    if (e.key === 'Escape') { setNameDraft(null); setAccountError(''); }
+                                  }}
+                                  maxLength={24}
+                                  autoFocus
+                                  placeholder="Your name"
+                                />
+                                <div className="profile-rename-actions">
+                                  <button className="settings-action-btn primary" onClick={saveName}>Save</button>
+                                  <button className="settings-action-btn" onClick={() => { setNameDraft(null); setAccountError(''); }}>Cancel</button>
+                                </div>
+                              </div>
+                            )}
+                            {accountError && <div className="profile-error">{accountError}</div>}
+                          </div>
+
+                          <div className="settings-section-title">Avatar colour</div>
+                          <div className="profile-colors">
+                            {AVATAR_COLORS.map(c => (
+                              <button
+                                key={c}
+                                className={`profile-swatch${shownColor === c ? ' selected' : ''}`}
+                                style={{ background: c }}
+                                aria-label={`Use colour ${c}`}
+                                onClick={() => setProfileState(setProfile({ color: c }))}
+                              />
+                            ))}
+                          </div>
+
+                          <div className="settings-section-title">Accounts</div>
+                          <div className="settings-field-desc" style={{ marginBottom: '12px' }}>
+                            Switching saves what you have open first, then loads the other
+                            account&rsquo;s data from the cloud.
+                          </div>
+                          <div className="account-list">
+                            {accounts.map(a => {
+                              const isCurrent = a.id === session.user?.id;
+                              const name = isCurrent ? shownName : (a.username || (a.email || '').split('@')[0] || 'Account');
+                              const color = isCurrent ? shownColor : avatarColor(a, name);
+                              return (
+                                <div key={a.id} className={`account-row${isCurrent ? ' current' : ''}`}>
+                                  <button
+                                    className="account-row-main"
+                                    disabled={switching || isCurrent}
+                                    onClick={() => switchAccount(a.id)}
+                                  >
+                                    <span className="account-row-avatar" style={{ background: color }}>
+                                      {initials(name)}
+                                    </span>
+                                    <span className="account-row-text">
+                                      <span className="account-row-name">{name}</span>
+                                      <span className="account-row-mail">{accountSubtitle(a.email, a.contactEmail)}</span>
+                                    </span>
+                                    <span className="account-row-state">
+                                      {isCurrent ? 'Current' : switching ? '' : 'Switch'}
+                                    </span>
+                                  </button>
+                                  {!isCurrent && (
+                                    <button
+                                      className="account-row-remove"
+                                      title="Remove from this device"
+                                      disabled={switching}
+                                      onClick={() => removeAccount(a.id)}
+                                    >&times;</button>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                          {accounts.length >= MAX_ACCOUNTS && (
+                            <div className="settings-field-desc" style={{ marginBottom: '10px' }}>
+                              This device keeps up to {MAX_ACCOUNTS} accounts. Remove one to add another.
+                            </div>
+                          )}
+                          <div className="account-actions">
+                            <button className="settings-action-btn" disabled={switching || accounts.length >= MAX_ACCOUNTS} onClick={addAccount}>
+                              {switching ? 'Working…' : '+ Add account'}
+                            </button>
                             <button
                               className="settings-action-btn danger"
-                              onClick={async () => { await supabase.auth.signOut(); if (onLogout) onLogout(); }}
+                              disabled={switching}
+                              onClick={signOutCurrent}
                             >Sign Out</button>
                           </div>
                         </>
@@ -2070,12 +2239,34 @@ useEffect(() => {
                     <div className="settings-modal-section">
                       <h2 className="settings-modal-title">Pages</h2>
                       <div className="settings-field-desc" style={{marginBottom:'16px'}}>Select pages to show in the sidebar</div>
-                      {sidebarItems.filter(item => item.id !== 'dashboard').map(item => (
+                      {availableSidebarItems.filter(item => item.id !== 'dashboard').map(item => (
                         <div key={item.id} className="settings-page-row" onClick={() => togglePageVisibility(item.id)}>
                           <div>
                             <div className="settings-row-name">{item.label}</div>
                           </div>
                           <div className={`settings-toggle ${item.hidden ? '' : 'on'}`}>
+                            <div className="settings-toggle-knob" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {settingsTab === 'labs' && (
+                    <div className="settings-modal-section">
+                      <h2 className="settings-modal-title">Labs</h2>
+                      <div className="settings-field-desc" style={{marginBottom:'16px'}}>
+                        Extra sections that stay off unless you want them. Turning one off
+                        only hides it &mdash; nothing you have saved in it is deleted, and it
+                        comes back exactly as you left it.
+                      </div>
+                      {BETA_FEATURES.map(f => (
+                        <div key={f.id} className="settings-page-row settings-page-row--labs" onClick={() => toggleBetaFeature(f.id)}>
+                          <div>
+                            <div className="settings-row-name">{f.label}</div>
+                            <div className="settings-row-sub">{f.description}</div>
+                          </div>
+                          <div className={`settings-toggle ${betaFlags[f.id] ? 'on' : ''}`}>
                             <div className="settings-toggle-knob" />
                           </div>
                         </div>
@@ -2116,6 +2307,37 @@ useEffect(() => {
                         <button className="settings-action-btn" onClick={() => exportSection('all')}>Export All</button>
                       </div>
 
+                      <div className="settings-section-title" style={{marginTop:'20px'}}>Completed tasks</div>
+                      <div className="settings-field-desc" style={{marginBottom:'10px'}}>
+                        Ticked tasks disappear from the dashboard. Restore puts one back where it was.
+                      </div>
+                      {(() => {
+                        const done = todos
+                          .filter(t => t.completed)
+                          .sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0))
+                          .slice(0, 50);
+                        if (done.length === 0) {
+                          return <div className="settings-row-sub" style={{marginBottom:'6px'}}>No completed tasks.</div>;
+                        }
+                        return (
+                          <div className="completed-restore-list">
+                            {done.map(t => (
+                              <div key={t.id} className="settings-data-row">
+                                <div className="completed-restore-text">
+                                  <div className="settings-row-name">{t.text}</div>
+                                  <div className="settings-row-sub">
+                                    {categoryNames[t.category] || t.category}
+                                    {t.subtasks?.length ? ` · ${t.subtasks.length} subtask${t.subtasks.length === 1 ? '' : 's'}` : ''}
+                                    {t.completedAt ? ` · ${new Date(t.completedAt).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` : ''}
+                                  </div>
+                                </div>
+                                <button className="settings-action-btn" onClick={() => toggleTodo(t.id)}>Restore</button>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
+
                       <div className="settings-section-title" style={{marginTop:'20px'}}>Import</div>
                       <div className="settings-data-row">
                         <div>
@@ -2143,7 +2365,7 @@ useEffect(() => {
           {!sidebarCollapsed && (
             <div className="sidebar-content">
               {/* Draggable Sidebar Items */}
-              {sidebarItems.filter(item => !item.hidden).map((item, index) => (
+              {availableSidebarItems.filter(item => !item.hidden).map((item, index) => (
                 <div
                   key={item.id}
                   className={`sidebar-item-group ${dragOverInfo?.id === item.id ? `sidebar-drop-${dragOverInfo.position}` : ''}`}
@@ -2245,6 +2467,25 @@ useEffect(() => {
           )}
 
           <div className="sidebar-footer">
+            {/* Moved down from the title bar, and reduced to the chosen name:
+                the email that used to sit here is account detail, so it lives
+                one click away instead of on screen all day. */}
+            <button
+              className={`sidebar-account${sidebarCollapsed ? ' collapsed' : ''}`}
+              onClick={() => { setShowSidebarSettings(true); setSettingsTab('account'); setNameDraft(null); setAccountError(''); }}
+              title={shownName}
+            >
+              <span className="sidebar-account-avatar" style={{ background: shownColor }}>
+                <span className="sidebar-account-initials">{initials(shownName)}</span>
+              </span>
+              {!sidebarCollapsed && (
+                <>
+                  <span className="sidebar-account-name">{shownName}</span>
+                  <span className="sidebar-account-chevron">&#9662;</span>
+                </>
+              )}
+            </button>
+            <div className="sidebar-footer-meta">
             {appUpdate && appUpdate.version !== updateButtonHiddenVersion && (
               <span className="sidebar-footer-update">
                 <button
@@ -2265,6 +2506,7 @@ useEffect(() => {
               </span>
             )}
             <span className="sidebar-footer-version" title="Version">v{APP_VERSION}</span>
+            </div>
           </div>
         </div>
 
@@ -2299,15 +2541,6 @@ useEffect(() => {
             <ViewErrorBoundary>
             <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
               <HabitTracker />
-            </div>
-            </ViewErrorBoundary>
-          )}
-
-          {/* Income Tracker Full Screen View */}
-          {activeView === 'income' && (
-            <ViewErrorBoundary>
-            <div className="income-fullscreen">
-              <IncomeTracker />
             </div>
             </ViewErrorBoundary>
           )}
@@ -2370,6 +2603,7 @@ useEffect(() => {
             {/* Todo Columns - resizable */}
             <div className="todo-columns" ref={columnsRef}>
               <DashColumns
+                panelIds={visiblePanelIds}
                 colWidths={colWidths}
                 startColResize={startColResize}
                 resetColWidths={() => { setColWidths(DEFAULT_COL_PX); localStorage.setItem('dashColWidths', JSON.stringify(DEFAULT_COL_PX)); }}
@@ -2453,50 +2687,40 @@ useEffect(() => {
         </div>
       )}
 
-      {/* Native App Update Banner */}
+      {/* Native App Update — a centered prompt rather than a corner toast,
+          which was routinely missed. */}
       {appUpdate && appUpdate.version !== updateSkippedVersion && (
-        <div style={{
-          position: 'fixed', bottom: 24, right: 24, zIndex: 9999,
-          background: 'var(--bg-surface)',
-          border: '1px solid var(--border)',
-          borderLeft: '4px solid var(--accent)',
-          borderRadius: 8,
-          padding: '14px 16px',
-          minWidth: 260,
-          maxWidth: 320,
-          boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
-        }}>
-          <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)', marginBottom: 4 }}>
-            New version ready: v{appUpdate.version}
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 10 }}>
-            {updateStatus === 'downloading' ? 'Downloading and installing…' : updateStatus === 'error' ? 'Update failed, please try again.' : 'Download and restart to install.'}
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              onClick={applyUpdate}
-              disabled={updateStatus === 'downloading'}
-              style={{
-                background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6,
-                padding: '6px 12px', fontSize: 12, fontWeight: 600,
-                cursor: updateStatus === 'downloading' ? 'default' : 'pointer',
-                opacity: updateStatus === 'downloading' ? 0.6 : 1,
-              }}
-            >
-              {updateStatus === 'downloading' ? 'Updating…' : 'Update Now'}
-            </button>
-            {updateStatus !== 'downloading' && (
+        <div className="update-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="update-modal-title">
+          <div className="update-modal">
+            <div className="update-modal-badge">↓</div>
+            <div className="update-modal-eyebrow">Update available</div>
+            <h2 className="update-modal-title" id="update-modal-title">BankoSpace v{appUpdate.version}</h2>
+            <div className="update-modal-from">You’re on v{APP_VERSION}</div>
+            <p className="update-modal-text">
+              {updateStatus === 'downloading'
+                ? 'Downloading and installing — the app restarts on its own when it’s done.'
+                : updateStatus === 'error'
+                  ? 'The update failed. Check your connection and try again.'
+                  : 'It downloads in the background, then restarts to finish installing.'}
+            </p>
+            <div className="update-modal-actions">
               <button
-                onClick={skipUpdateVersion}
-                title="You won't be asked again for this version — you can install anytime from the Update button in the bottom left"
-                style={{
-                  background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border)',
-                  borderRadius: 6, padding: '6px 12px', fontSize: 12, cursor: 'pointer',
-                }}
+                className="update-modal-primary"
+                onClick={applyUpdate}
+                disabled={updateStatus === 'downloading'}
               >
-                Skip this version
+                {updateStatus === 'downloading' ? 'Updating…' : 'Update now'}
               </button>
-            )}
+              {updateStatus !== 'downloading' && (
+                <button
+                  className="update-modal-secondary"
+                  onClick={skipUpdateVersion}
+                  title="You won’t be asked again for this version — you can still install it from the Update button in the bottom left"
+                >
+                  Later
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -2505,7 +2729,7 @@ useEffect(() => {
     {/* Rendered outside the zoomed .container so its own text/icons stay at
         their designed size regardless of the mobile content-zoom level. */}
     {isMobile && (
-      <MobileTabBar items={sidebarItems} activeView={activeView} onNavigate={setActiveView} />
+      <MobileTabBar items={availableSidebarItems} activeView={activeView} onNavigate={setActiveView} />
     )}
     </>
   );

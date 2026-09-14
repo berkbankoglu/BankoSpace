@@ -353,9 +353,24 @@ fn last_focus_change() -> &'static std::sync::atomic::AtomicU64 {
 // thread posts a closure to the main thread each tick, and the closure stamps
 // this. If it stops advancing while the heartbeat thread keeps logging, the
 // event loop itself is wedged — not the renderer, not scheduling.
-static LAST_MAIN_TICK: OnceLock<std::sync::atomic::AtomicU64> = OnceLock::new();
-fn last_main_tick() -> &'static std::sync::atomic::AtomicU64 {
-    LAST_MAIN_TICK.get_or_init(|| std::sync::atomic::AtomicU64::new(now_secs()))
+// How many times the event loop has run a probe closure. A counter rather than
+// a timestamp: two runs inside the same second are indistinguishable by time,
+// and the whole question here is "did it run at all".
+static MAIN_TICK_COUNT: OnceLock<std::sync::atomic::AtomicU64> = OnceLock::new();
+fn main_tick_count() -> &'static std::sync::atomic::AtomicU64 {
+    MAIN_TICK_COUNT.get_or_init(|| std::sync::atomic::AtomicU64::new(0))
+}
+
+// Seconds the event loop has been failing to run anything; 0 means healthy.
+// Measured by the probe thread below at 1s resolution.
+//
+// The previous version derived this from a timestamp read in the same 10s
+// heartbeat iteration that posted the probe — so a perfectly healthy app always
+// read about one interval stale (10s), and a 3s threshold on top of that fired
+// constantly. Nothing was wrong with the app; the ruler was wrong.
+static MAIN_WEDGE_SECS: OnceLock<std::sync::atomic::AtomicU64> = OnceLock::new();
+fn main_wedge_secs() -> &'static std::sync::atomic::AtomicU64 {
+    MAIN_WEDGE_SECS.get_or_init(|| std::sync::atomic::AtomicU64::new(0))
 }
 
 // Second-granularity throttles for the focus handlers — see the comment there.
@@ -418,6 +433,69 @@ async fn fetch_get(url: String, headers: std::collections::HashMap<String, Strin
     }.await;
     let n2 = inflight_counter().fetch_sub(1, Ordering::SeqCst) - 1;
     write_diag(&format!("RUST: fetch_get END -> {} {}ms ok={} (inflight={})", host, t0.elapsed().as_millis(), result.is_ok(), n2));
+    result
+}
+
+// What the JS side needs to rebuild a real fetch Response. `fetch_get` and
+// `fetch_post` hand back only the body, which erased HTTP errors entirely —
+// Supabase's clients decide success from the status code, so every 4xx looked
+// like it worked (a wrong password-reset code "verified", for one). They also
+// only knew GET and POST, so PUT and DELETE went out as POST.
+#[derive(serde::Serialize)]
+struct HttpReply {
+    status: u16,
+    content_type: String,
+    body: String,
+}
+
+#[tauri::command]
+async fn fetch_http(
+    url: String,
+    method: String,
+    headers: std::collections::HashMap<String, String>,
+    body: Option<String>,
+) -> Result<HttpReply, String> {
+    use std::sync::atomic::Ordering;
+    let host = url_host(&url);
+    if !is_allowed_host(&host) {
+        write_diag(&format!("RUST: fetch_http REJECTED -> {} (not allowlisted)", host));
+        return Err(format!("Host not allowed: {}", host));
+    }
+    let verb = reqwest::Method::from_bytes(method.to_uppercase().as_bytes())
+        .map_err(|_| format!("Unsupported method: {}", method))?;
+    let n = inflight_counter().fetch_add(1, Ordering::SeqCst) + 1;
+    write_diag(&format!("RUST: fetch_http START -> {} {} (inflight={})", verb.as_str(), host, n));
+    let t0 = std::time::Instant::now();
+    let mut req = get_client().request(verb.clone(), &url);
+    for (k, v) in &headers {
+        req = req.header(k.as_str(), v.as_str());
+    }
+    if let Some(b) = body {
+        if verb != reqwest::Method::GET && verb != reqwest::Method::HEAD {
+            req = req.body(b);
+        }
+    }
+    let result = async {
+        let response = req.send().await.map_err(|e| e.to_string())?;
+        let status = response.status().as_u16();
+        let content_type = response
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("")
+            .to_string();
+        let body = response.text().await.map_err(|e| e.to_string())?;
+        Ok::<HttpReply, String>(HttpReply { status, content_type, body })
+    }.await;
+    let n2 = inflight_counter().fetch_sub(1, Ordering::SeqCst) - 1;
+    let outcome = match &result {
+        Ok(r) => format!("status={}", r.status),
+        Err(e) => format!("err={}", e),
+    };
+    write_diag(&format!(
+        "RUST: fetch_http END -> {} {} {}ms {} (inflight={})",
+        verb.as_str(), host, t0.elapsed().as_millis(), outcome, n2
+    ));
     result
 }
 
@@ -630,6 +708,31 @@ fn main() {
                 }
             }
 
+            // Liveness probe on its own thread at 1s resolution: post a closure to
+            // the event loop, give it a moment, and see whether it ran. Cheap
+            // enough to run every second, which is what makes a stuck loop
+            // detectable in a few seconds instead of a few tens of seconds.
+            let probe_handle = app.handle().clone();
+            std::thread::spawn(move || {
+                let mut last_seen = main_tick_count().load(std::sync::atomic::Ordering::SeqCst);
+                let mut misses: u64 = 0;
+                loop {
+                    std::thread::sleep(std::time::Duration::from_millis(750));
+                    let _ = probe_handle.run_on_main_thread(|| {
+                        main_tick_count().fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    });
+                    std::thread::sleep(std::time::Duration::from_millis(250));
+                    let seen = main_tick_count().load(std::sync::atomic::Ordering::SeqCst);
+                    if seen == last_seen {
+                        misses += 1;
+                    } else {
+                        misses = 0;
+                        last_seen = seen;
+                    }
+                    main_wedge_secs().store(misses, std::sync::atomic::Ordering::SeqCst);
+                }
+            });
+
             let app_handle = app.handle().clone();
             std::thread::spawn(move || {
                 use sysinfo::{Pid, System};
@@ -695,18 +798,13 @@ fn main() {
                     let now = now_secs();
                     let ping_age = now.saturating_sub(last_js_ping().load(std::sync::atomic::Ordering::SeqCst));
 
-                    // Probe the event loop itself — see last_main_tick(). Posting is
-                    // non-blocking; if the loop is alive the closure runs almost
-                    // immediately and the age below reads ~0, if it's wedged the
-                    // closure never runs and the age climbs in lockstep with the
-                    // freeze, which separates "renderer stopped" from "host stopped".
-                    let _ = app_handle.run_on_main_thread(|| {
-                        last_main_tick().store(now_secs(), std::sync::atomic::Ordering::SeqCst);
-                    });
-                    let main_age = now.saturating_sub(last_main_tick().load(std::sync::atomic::Ordering::SeqCst));
+                    // Straight from the probe thread — 0 while the event loop is
+                    // servicing work, otherwise how long it has not been. This is
+                    // what separates "renderer stopped" from "host stopped".
+                    let main_age = main_wedge_secs().load(std::sync::atomic::Ordering::SeqCst);
 
                     write_diag(&format!(
-                        "RUST-HB alive (inflight_http={}, host_cpu={:.1}%, webview_cpu={:.1}% across {} proc, js_ping_age={}s, main_thread_age={}s, focused={})",
+                        "RUST-HB alive (inflight_http={}, host_cpu={:.1}%, webview_cpu={:.1}% across {} proc, js_ping_age={}s, loop_wedged={}s, focused={})",
                         n, my_cpu, wv_cpu, wv_count, ping_age, main_age, main_focused().load(std::sync::atomic::Ordering::SeqCst)
                     ));
 
@@ -744,7 +842,7 @@ fn main() {
                     // ate the message. If the button were genuinely down, someone is
                     // just dragging, and this stays out of the way.
                     #[cfg(windows)]
-                    if main_age > 3 {
+                    if main_age >= 3 {
                         #[link(name = "user32")]
                         extern "system" {
                             fn GetAsyncKeyState(v_key: i32) -> i16;
@@ -769,7 +867,7 @@ fn main() {
                     }
 
                     #[cfg(windows)]
-                    if main_age > 12 {
+                    if main_age >= 10 {
                         #[link(name = "user32")]
                         extern "system" {
                             fn PostMessageW(hwnd: isize, msg: u32, wparam: usize, lparam: isize) -> i32;
@@ -888,7 +986,7 @@ fn main() {
                     // real hang no matter which window has focus, and on this machine
                     // it is what actually happens — the window never comes back on
                     // its own, so waiting 15 minutes to recover is the same as never.
-                    let event_loop_dead = main_age > 40;
+                    let event_loop_dead = main_age >= 30;
                     if (fast_path || unfocused_safety_net || event_loop_dead)
                         && now.saturating_sub(last_restart_attempt) > 60 {
                         last_restart_attempt = now;
@@ -978,6 +1076,7 @@ fn main() {
 toggle_kana_window,
             fetch_post,
             fetch_get,
+            fetch_http,
             fetch_tts,
             diag_log,
             js_ping,

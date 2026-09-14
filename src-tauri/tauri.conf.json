@@ -1,6 +1,6 @@
 {
   "productName": "BankoSpace",
-  "version": "4.5.0",
+  "version": "4.6.0",
   "identifier": "com.berkbankoglu.bankospace",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -85,6 +85,10 @@
             "core:window:allow-set-fullscreen",
             "core:window:allow-set-always-on-top",
             "core:window:allow-start-dragging",
+            "core:window:allow-set-position",
+            "core:window:allow-outer-position",
+            "core:window:allow-outer-size",
+            "core:window:allow-scale-factor",
             "core:webview:allow-create-webview-window",
             "core:webview:allow-create-webview",
             "core:webview:allow-webview-close",
@@ -115,7 +119,11 @@
           "permissions": [
             "core:window:allow-hide",
             "core:window:allow-set-always-on-top",
-            "core:window:allow-start-dragging"
+            "core:window:allow-start-dragging",
+            "core:window:allow-set-position",
+            "core:window:allow-outer-position",
+            "core:window:allow-outer-size",
+            "core:window:allow-scale-factor"
           ]
         }
       ]

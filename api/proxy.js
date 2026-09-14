@@ -35,7 +35,11 @@ export default async function handler(req, res) {
       body: method.toUpperCase() === 'GET' || method.toUpperCase() === 'HEAD' ? undefined : body,
     });
     const text = await upstream.text();
-    res.status(upstream.ok ? 200 : upstream.status).send(text);
+    // Passed through as-is: Supabase's clients read both to tell success from
+    // failure and JSON from text.
+    const type = upstream.headers.get('content-type');
+    if (type) res.setHeader('content-type', type);
+    res.status(upstream.status).send(text);
   } catch (e) {
     res.status(502).send(e?.message || 'Upstream request failed');
   }

@@ -1,14 +1,21 @@
 import { createClient } from '@supabase/supabase-js';
-import { proxyFetch } from './platform';
+import { isTauri } from './platform';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY;
 
 // Desktop: routed through the Rust backend (bypasses WebView2 network
 // quirks). Web: routed through /api/proxy (same host-allowlist as Rust's
-// fetch_get/fetch_post — see src-tauri/src/main.rs `is_allowed_host`).
-// Either way, calls stay off the page's own fetch() so nothing here depends
-// on Supabase's CORS headers.
+// fetch commands — see src-tauri/src/main.rs `is_allowed_host`). Either way,
+// calls stay off the page's own fetch() so nothing here depends on Supabase's
+// CORS headers.
+//
+// The upstream status code, content type and HTTP method all come through
+// intact. Supabase's clients decide success from the status alone; this used
+// to answer 200 for everything, so a wrong reset code "verified", and a failed
+// sign-in or save looked like it had worked.
+const NULL_BODY_STATUS = new Set([204, 205, 304]);
+
 async function tauriFetch(input, init) {
   const url = typeof input === 'string' ? input : input.url;
   const method = (init?.method || 'GET').toUpperCase();
@@ -21,11 +28,27 @@ async function tauriFetch(input, init) {
       Object.assign(headers, h);
     }
   }
-  const body = init?.body ? String(init.body) : '';
+  const body = init?.body != null ? String(init.body) : undefined;
 
-  const text = await proxyFetch(url, { method, headers, body });
+  let reply;
+  if (isTauri) {
+    const { invoke } = await import('@tauri-apps/api/core');
+    reply = await invoke('fetch_http', { url, method, headers, body: body ?? null });
+  } else {
+    const res = await fetch('/api/proxy', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ url, method, headers, body }),
+    });
+    reply = { status: res.status, content_type: res.headers.get('content-type') || '', body: await res.text() };
+  }
 
-  return new Response(text, { status: 200, headers: { 'content-type': 'application/json' } });
+  // Response() only accepts 200-599 and refuses a body on the no-content codes.
+  const status = reply.status >= 200 && reply.status <= 599 ? reply.status : 502;
+  return new Response(NULL_BODY_STATUS.has(status) ? null : reply.body, {
+    status,
+    headers: { 'content-type': reply.content_type || 'application/json' },
+  });
 }
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
@@ -95,6 +118,8 @@ export const SYNC_KEYS = [
   'chat_username',
   'planner_blocks',
   'planner_qtasks',
+  'betaFeatures_v1',
+  'profile_v1',
 ];
 
 // Cache userId to avoid network call on every push
