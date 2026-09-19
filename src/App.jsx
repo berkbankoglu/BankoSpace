@@ -17,6 +17,7 @@ import DashColumns, { PANEL_IDS } from './components/DashColumns';
 import { BETA_FEATURES, BETA_EVENT, getBetaFlags, setBetaFlag } from './utils/betaFeatures';
 import { PROFILE_EVENT, AVATAR_COLORS, getProfile, setProfile, displayName, initials, avatarColor, validateUsername, accountSubtitle } from './utils/profile';
 import { ACCOUNTS_EVENT, MAX_ACCOUNTS, listAccounts, rememberAccount, forgetAccount, clearAccountData } from './utils/accounts';
+import { getApiKey, setApiKey, forgetApiKey, claimLegacyApiKey } from './utils/apiKey';
 import ReviewTracker from './components/ReviewTracker';
 import { syncHabitsFromPlanner } from './utils/habitPlannerSync';
 import { useUndoScope, useUndoHotkeys } from './utils/undoHistory';
@@ -261,7 +262,7 @@ function TaskContributionGraph({ todos, contributionLog }) {
 }
 import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, setVolume, getVolume } from './utils/sounds';
 
-const APP_VERSION = '4.6.2';
+const APP_VERSION = '4.6.3';
 const MIN_COL_PX = 220;
 const DEFAULT_COL_PX = [null, null, null, null]; // one per dashboard column — null = auto (flex:1)
 
@@ -694,6 +695,13 @@ function App({ session, onLogout }) {
     window.addEventListener(ACCOUNTS_EVENT, sync);
     return () => window.removeEventListener(ACCOUNTS_EVENT, sync);
   }, []);
+  // The API key used to be one slot shared by every account on the device.
+  // Whoever is signed in when this version first runs takes it over; after
+  // that each account only ever sees its own.
+  useEffect(() => {
+    if (session?.user?.id) claimLegacyApiKey(session.user.id);
+  }, [session?.user?.id]);
+
   // Supabase rotates the refresh token as it renews, so the stored copy is
   // refreshed from whatever session is live rather than captured once.
   useEffect(() => {
@@ -763,7 +771,7 @@ function App({ session, onLogout }) {
     const id = session?.user?.id;
     await clearAccountData();
     try { await supabase.auth.signOut(); } catch { /* the local session is cleared either way */ }
-    if (id) forgetAccount(id);
+    if (id) { forgetAccount(id); forgetApiKey(id); }
     // A reload rather than onLogout: in-memory state would otherwise be
     // written straight back into the storage just cleared.
     window.location.reload();
@@ -772,11 +780,12 @@ function App({ session, onLogout }) {
   const removeAccount = async (id) => {
     const target = listAccounts().find(a => a.id === id);
     const ok = await confirmAsync(
-      `Remove ${accountSubtitle(target?.email) || 'this account'} from this device? Nothing stored in the cloud is deleted \u2014 you can sign in again any time.`,
+      `Remove ${accountSubtitle(target?.email) || 'this account'} from this device? Its API key is removed from this device too. Nothing stored in the cloud is deleted \u2014 you can sign in again any time.`,
       { title: 'Remove account', kind: 'warning', okLabel: 'Remove', cancelLabel: 'Cancel' },
     );
     if (!ok) return;
     setAccounts(forgetAccount(id));
+    forgetApiKey(id);
   };
 
   const saveName = () => {
@@ -2049,20 +2058,13 @@ useEffect(() => {
                       <h2 className="settings-modal-title">AI</h2>
                       <div className="settings-field">
                         <label className="settings-field-label">Anthropic API Key</label>
-                        <div className="settings-field-desc">Enter your API key to use Claude AI features. Stored on this device only — not synced to the cloud.</div>
+                        <div className="settings-field-desc">Enter your API key to use Claude AI features. It belongs to this account only: other accounts on this device never see or use it, and it is never synced or exported.</div>
                         <input
                           type="password"
                           className="settings-field-input"
-                          defaultValue={localStorage.getItem('anthropic_api_key') || ''}
+                          defaultValue={getApiKey()}
                           placeholder="sk-ant-..."
-                          onBlur={e => {
-                            const val = e.target.value.trim();
-                            if (val) {
-                              localStorage.setItem('anthropic_api_key', val);
-                            } else {
-                              localStorage.removeItem('anthropic_api_key');
-                            }
-                          }}
+                          onBlur={e => setApiKey(e.target.value)}
                         />
                       </div>
                     </div>

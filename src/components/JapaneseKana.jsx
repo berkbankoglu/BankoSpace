@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { isTauri, proxyFetch } from "../platform";
+import { jsonSchema, readStructured } from "../utils/claude";
+import { getApiKey } from "../utils/apiKey";
 import { getAudioContext, getMasterGain, getVolume } from "../utils/sounds";
 import { pushKeyToSupabase } from "../supabase";
 import { KANA_INFO } from "./kanaInfoData";
@@ -2961,13 +2963,21 @@ function VocabularyTab() {
     setModalLookupLoading(true);
     setModalLookupError('');
     try {
-      const apiKey = localStorage.getItem('anthropic_api_key') || '';
+      const apiKey = getApiKey();
       const body = JSON.stringify({
         model: 'claude-opus-4-8',
-        max_tokens: 200,
+        // A backstop, not a target — the answer is three short fields.
+        max_tokens: 1024,
+        output_config: {
+          format: jsonSchema({
+            kana: { type: 'string' },
+            meaning_tr: { type: 'string' },
+            meaning_en: { type: 'string' },
+          }),
+        },
         messages: [{
           role: 'user',
-          content: `Given the Japanese romaji "${romaji}", provide:\n1. The Japanese writing (hiragana/katakana/kanji)\n2. The Turkish meaning\n3. The English meaning\n\nReply ONLY in this exact JSON format:\n{"kana":"<japanese>","meaning_tr":"<turkish>","meaning_en":"<english>"}`,
+          content: `Japanese romaji: "${romaji}"\n\nkana: its Japanese writing (hiragana/katakana/kanji)\nmeaning_tr: its Turkish meaning\nmeaning_en: its English meaning`,
         }],
       });
       const text = await proxyFetch('https://api.anthropic.com/v1/messages', {
@@ -2975,13 +2985,9 @@ function VocabularyTab() {
         headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
         body,
       });
-      const resp = JSON.parse(text);
-      const content = resp.content?.[0]?.text || '';
-      const match = content.match(/\{[\s\S]*\}/);
-      if (!match) throw new Error('No response received');
-      const parsed = JSON.parse(match[0]);
+      const parsed = readStructured(JSON.parse(text));
       setModalKana(parsed.kana || '');
-      setModalMeaning(parsed.meaning_tr || parsed.meaning || '');
+      setModalMeaning(parsed.meaning_tr || '');
       setModalMeaningEn(parsed.meaning_en || '');
     } catch (e) {
       setModalLookupError('Search failed: ' + (e.message || e));

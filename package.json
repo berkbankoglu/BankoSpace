@@ -1,6 +1,6 @@
 {
   "name": "bankospace",
-  "version": "4.6.2",
+  "version": "4.6.3",
   "description": "BankoSpace - Modern productivity application with task management, references, and flashcards",
   "main": "index.js",
   "type": "module",

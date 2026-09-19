@@ -400,6 +400,12 @@ async fn fetch_post(url: String, headers: std::collections::HashMap<String, Stri
     write_diag(&format!("RUST: fetch_post START -> {} (inflight={})", host, n));
     let t0 = std::time::Instant::now();
     let mut req = get_client().post(&url).body(body);
+    // Claude writes long answers slowly — a big batch of flash cards can take
+    // a couple of minutes — and the client-wide 45s limit would drop the
+    // connection after the reply had already been billed.
+    if host == "api.anthropic.com" {
+        req = req.timeout(std::time::Duration::from_secs(180));
+    }
     for (k, v) in &headers {
         req = req.header(k.as_str(), v.as_str());
     }

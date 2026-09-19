@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { proxyFetch } from '../platform';
+import { jsonSchema, objectOf, readStructured } from '../utils/claude';
+import { getApiKey, setApiKey } from '../utils/apiKey';
 import './FlashCards.css';
 import { pushKeyToSupabase } from '../supabase';
 import { playTypeSoundThrottled, playClickSound, playAddSound, playDeleteSound, playCompleteSound, playUncompleteSound } from '../utils/sounds';
@@ -268,7 +270,7 @@ function FlashCards({ fullscreen = false }) {
 
   const askAI = async () => {
     if (!aiWord.trim()) return;
-    const key = localStorage.getItem('anthropic_api_key');
+    const key = getApiKey();
     if (!key) { setShowApiKeyInput(true); return; }
 
     setAiLoading(true);
@@ -278,11 +280,19 @@ function FlashCards({ fullscreen = false }) {
     try {
       const bodyStr = JSON.stringify({
         model: 'claude-opus-4-8',
-        max_tokens: 400,
+        // A backstop, not a target — the answer is a few sentences.
+        max_tokens: 1024,
+        output_config: {
+          format: jsonSchema({
+            word: { type: 'string' },
+            translation: { type: 'string' },
+            explanation: { type: 'string' },
+          }),
+        },
         messages: [{
           role: 'user',
-          content: `Word/concept: "${aiWord}"\n\nRespond in this JSON format only (nothing else, just JSON):\n{"word":"original word/concept","translation":"short Turkish translation or equivalent (max 5 words)","explanation":"detailed Turkish explanation in 2-3 sentences, what it means and how it is used"}`
-        }]
+          content: `Word/concept: "${aiWord}"\n\nword: the original word or concept\ntranslation: a short Turkish translation or equivalent (max 5 words)\nexplanation: a detailed Turkish explanation in 2-3 sentences - what it means and how it is used`,
+        }],
       });
       const text = await proxyFetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -293,13 +303,7 @@ function FlashCards({ fullscreen = false }) {
         },
         body: bodyStr,
       });
-      const data = JSON.parse(text);
-      if (data.error) throw new Error(data.error.message);
-      const content = data.content[0].text.trim();
-      const jsonStart = content.indexOf('{');
-      const jsonEnd = content.lastIndexOf('}');
-      const parsed = JSON.parse(content.slice(jsonStart, jsonEnd + 1));
-      setAiResult(parsed);
+      setAiResult(readStructured(JSON.parse(text)));
     } catch (e) {
       setAiError('AI failed to respond: ' + (e?.message || 'Unknown error'));
     } finally {
@@ -328,7 +332,7 @@ function FlashCards({ fullscreen = false }) {
 
   const generateBulk = async () => {
     if (!bulkPrompt.trim()) return;
-    const key = localStorage.getItem('anthropic_api_key');
+    const key = getApiKey();
     if (!key) { setShowApiKeyInput(true); return; }
 
     setAiLoading(true);
@@ -338,11 +342,21 @@ function FlashCards({ fullscreen = false }) {
     try {
       const bodyStr = JSON.stringify({
         model: 'claude-opus-4-8',
-        max_tokens: 2000,
+        // Room for a large topic. The old 2000 cut long lists off mid-way,
+        // and a truncated reply is billed and then thrown away.
+        max_tokens: 8000,
+        output_config: {
+          format: jsonSchema({
+            cards: {
+              type: 'array',
+              items: objectOf({ front: { type: 'string' }, back: { type: 'string' } }),
+            },
+          }),
+        },
         messages: [{
           role: 'user',
-          content: `Create flash cards for: "${bulkPrompt}"\n\nRespond ONLY with a JSON array, no extra text. Each item must have "front" and "back" keys. Example:\n[{"front":"January","back":"Ocak"},{"front":"February","back":"Şubat"}]\n\nMake one card for EACH individual item. Do not combine multiple items into one card.`
-        }]
+          content: `Create flash cards for: "${bulkPrompt}"\n\nMake one card for EACH individual item - do not combine several items into one card. "front" is the item and "back" is its meaning or answer, e.g. front "January", back "Ocak".`,
+        }],
       });
       const text = await proxyFetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -353,15 +367,9 @@ function FlashCards({ fullscreen = false }) {
         },
         body: bodyStr,
       });
-      const data = JSON.parse(text);
-      if (data.error) throw new Error(data.error.message);
-      const content = data.content[0].text.trim();
-      const arrStart = content.indexOf('[');
-      const arrEnd = content.lastIndexOf(']');
-      if (arrStart === -1 || arrEnd === -1) throw new Error('AI returned unexpected format');
-      const parsed = JSON.parse(content.slice(arrStart, arrEnd + 1));
-      if (!Array.isArray(parsed) || parsed.length === 0) throw new Error('No cards generated');
-      setBulkResults(parsed);
+      const { cards } = readStructured(JSON.parse(text));
+      if (cards.length === 0) throw new Error('No cards generated');
+      setBulkResults(cards);
     } catch (e) {
       setAiError('AI failed: ' + (e?.message || 'Unknown error'));
     } finally {
@@ -390,9 +398,7 @@ function FlashCards({ fullscreen = false }) {
   };
 
   const saveApiKey = () => {
-    if (apiKeyDraft.trim()) {
-      localStorage.setItem('anthropic_api_key', apiKeyDraft.trim());
-    }
+    if (apiKeyDraft.trim()) setApiKey(apiKeyDraft);
     setShowApiKeyInput(false);
     setApiKeyDraft('');
   };
@@ -420,30 +426,52 @@ function FlashCards({ fullscreen = false }) {
     setEditingCard(null);
   };
 
-  // Görsel → base64 (Fitness AI görsel yükleme deseniyle aynı)
-  function fileToBase64(file) {
+  // Photos are resized before they are sent. Vision input is billed by pixel
+  // area, so a phone photo sent whole costs several times what the same page
+  // costs at this size — and 1600px on the long edge still keeps handwritten
+  // kana legible.
+  const MAX_IMAGE_EDGE = 1600;
+
+  function loadImageFile(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => resolve({ img, dataUrl: reader.result });
+        img.onerror = reject;
+        img.src = reader.result;
+      };
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
+  }
+
+  async function prepareImage(file) {
+    const { img, dataUrl } = await loadImageFile(file);
+    const longest = Math.max(img.naturalWidth, img.naturalHeight);
+    if (longest <= MAX_IMAGE_EDGE) return { dataUrl, mediaType: file.type };
+    const scale = MAX_IMAGE_EDGE / longest;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(img.naturalWidth * scale);
+    canvas.height = Math.round(img.naturalHeight * scale);
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    return { dataUrl: canvas.toDataURL('image/jpeg', 0.9), mediaType: 'image/jpeg' };
   }
 
   async function handleImageFiles(files) {
     const imgs = [];
     for (const f of files) {
       if (!f.type.startsWith('image/')) continue;
-      const dataUrl = await fileToBase64(f);
-      imgs.push({ dataUrl, mediaType: f.type });
+      imgs.push(await prepareImage(f));
     }
     if (imgs.length) setAiImages(prev => [...prev, ...imgs]);
   }
 
-  // Görseldeki Japonca kelime notlarını (yazılış + okunuş + Türkçe) çıkar
   const extractFromImages = async () => {
     if (aiImages.length === 0) return;
-    const key = localStorage.getItem('anthropic_api_key');
+    const key = getApiKey();
     if (!key) { setShowApiKeyInput(true); return; }
 
     setAiLoading(true);
@@ -463,9 +491,6 @@ görseldeki Türkçe karşılık yanlışsa, eksikse veya okunuş hatalıysa, DO
 yaz ve "corrected" alanını true yap. Kullanıcı bu kartlardan çalışıp
 öğrenecek — yanlış bilgiyi asla olduğu gibi geçirme.
 
-SADECE şu JSON formatında yanıt ver, başka hiçbir şey yazma:
-[{"writing":"漢字","reading":"かんじ","turkish":"Türkçe karşılığı","corrected":false}]
-
 Kurallar:
 - Görseldeki TÜM kelimeleri ekle, hiçbirini atlama
 - writing: kelimenin Japonca yazılışı (kanji/kana), okunuş değil
@@ -475,8 +500,27 @@ Kurallar:
 
       const body = JSON.stringify({
         model: 'claude-opus-5',
-        max_tokens: 2048,
-        output_config: { effort: 'low' },
+        // Thinking is on by default on this model and shares this ceiling with
+        // the answer, so a dense page of notes needs the headroom. The old
+        // 2048 could cut the reply off — billed, then thrown away.
+        max_tokens: 8000,
+        // If a safety classifier declines, the API re-runs the request on its
+        // recommended fallback model instead of returning a refusal.
+        fallbacks: 'default',
+        output_config: {
+          effort: 'low',
+          format: jsonSchema({
+            words: {
+              type: 'array',
+              items: objectOf({
+                writing: { type: 'string' },
+                reading: { type: 'string' },
+                turkish: { type: 'string' },
+                corrected: { type: 'boolean' },
+              }),
+            },
+          }),
+        },
         messages: [{ role: 'user', content: [...imageBlocks, { type: 'text', text: prompt }] }],
       });
       const result = await proxyFetch('https://api.anthropic.com/v1/messages', {
@@ -484,18 +528,14 @@ Kurallar:
         headers: {
           'x-api-key': key,
           'anthropic-version': '2023-06-01',
+          'anthropic-beta': 'server-side-fallback-2026-07-01',
           'content-type': 'application/json',
         },
         body,
       });
-      const data = JSON.parse(result);
-      if (data.error) throw new Error(data.error.message);
-      const raw = data.content.find(b => b.type === 'text')?.text || '';
-      const match = raw.match(/\[[\s\S]*\]/);
-      if (!match) throw new Error('Failed to parse image: ' + raw.slice(0, 200));
-      const parsed = JSON.parse(match[0]);
-      if (!Array.isArray(parsed) || parsed.length === 0) throw new Error('No words found in the image.');
-      setImageResults(parsed);
+      const { words } = readStructured(JSON.parse(result));
+      if (words.length === 0) throw new Error('No words found in the image.');
+      setImageResults(words);
       setImageTargetDeck(selectedDeck || decks[0]?.name || '');
       setImageNewDeckName('');
     } catch (e) {
@@ -865,7 +905,7 @@ Kurallar:
               <span className="fc-ai-panel-title">AI Assistant</span>
               <button
                 className="fc-ai-key-btn"
-                onClick={() => { setApiKeyDraft(localStorage.getItem('anthropic_api_key') || ''); setShowApiKeyInput(true); }}
+                onClick={() => { setApiKeyDraft(getApiKey()); setShowApiKeyInput(true); }}
                 title="Set API key"
               >🔑</button>
             </div>

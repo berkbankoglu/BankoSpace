@@ -74,16 +74,19 @@ export function forgetAccount(id) {
 const KEEP_EXACT = new Set([
   'accounts_v1',                 // the switcher itself
   'appVersion',                  // which release this install last ran
-  'anthropic_api_key',           // the key belongs to the device, never synced
   'apiKeyPurgedFromCloud',
   'supabase_sync_enabled',
   'updateSkippedVersion',
   'updateButtonHiddenVersion',
 ]);
 
-// The live Supabase session. Cleared here it would sign out the account that
-// was just switched to.
-const KEEP_PREFIXES = ['sb-', 'supabase.auth'];
+// Kept across a switch:
+// - the live Supabase session (cleared here, it would sign out the account
+//   that was just switched to);
+// - each account's own API key, stored under its account id. Only the signed-in
+//   account's is ever read (src/utils/apiKey.js), so keeping them means switching
+//   back doesn't ask for the key again, without any account seeing another's.
+const KEEP_PREFIXES = ['sb-', 'supabase.auth', 'anthropic_api_key:'];
 
 export async function clearAccountData() {
   const doomed = [];
