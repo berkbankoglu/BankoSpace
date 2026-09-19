@@ -166,6 +166,14 @@ export default function DashPlanner({ onOpenPlanner, onPlannerToast, collapsed: 
     defaultDuration: 60,
     isHabit: true,
   })), [habitList]);
+
+  // Habits already on today's grid show as done: scheduling a habit is what
+  // ticks it off for the day, so the chip reflects that instead of looking
+  // exactly like one still to do.
+  const scheduledToday = useMemo(
+    () => new Set(sorted.map(b => String(b.title || '').trim().toLowerCase())),
+    [sorted],
+  );
   const agenda = useMemo(() => dayAgenda(blocks), [blocks]);
   const lanes = useMemo(() => layoutLanes(sorted), [sorted]);
 
@@ -543,35 +551,50 @@ export default function DashPlanner({ onOpenPlanner, onPlannerToast, collapsed: 
             <div className="dp-qtasks">
               {habitTasks.length > 0 && (
                 <div className="dp-qgroup">
-                  <div className="dp-qgroup-label">Habits</div>
+                  <div className="dp-qgroup-label" lang="en">
+                    Habits
+                    <span className="dp-qgroup-count">
+                      {habitTasks.filter(t => scheduledToday.has(String(t.title).trim().toLowerCase())).length}/{habitTasks.length}
+                    </span>
+                  </div>
                   <div className="dp-qgroup-chips">
-                    {habitTasks.map(t => (
-                      <button
-                        key={t.id}
-                        className="dp-qtask dp-qtask--habit"
-                        style={{ background: `${resolveColor(t.color)}22`, borderLeftColor: resolveColor(t.color) }}
-                        title="Drag onto an hour to schedule it (and check it off today) - click to edit"
-                        onMouseDown={startQTaskDrag(t)}
-                      >
-                        {t.title}
-                      </button>
-                    ))}
+                    {habitTasks.map(t => {
+                      const done = scheduledToday.has(String(t.title).trim().toLowerCase());
+                      return (
+                        <button
+                          key={t.id}
+                          className={`dp-qtask dp-qtask--habit${done ? ' is-done' : ''}`}
+                          style={{ '--chip': resolveColor(t.color) }}
+                          title={done
+                            ? "Already on today's plan - drag to add another block, click to edit"
+                            : 'Drag onto an hour to schedule it (and check it off today) - click to edit'}
+                          onMouseDown={startQTaskDrag(t)}
+                        >
+                          <span className="dp-qtask-mark" aria-hidden="true">{done ? '✓' : ''}</span>
+                          <span className="dp-qtask-title">{t.title}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}
               {qTasks.length > 0 && (
                 <div className="dp-qgroup">
-                  <div className="dp-qgroup-label">Tasks</div>
+                  <div className="dp-qgroup-label" lang="en">
+                    Tasks
+                    <span className="dp-qgroup-count">{qTasks.length}</span>
+                  </div>
                   <div className="dp-qgroup-chips">
                     {qTasks.map(t => (
                       <button
                         key={t.id}
                         className="dp-qtask"
-                        style={{ background: `${resolveColor(t.color)}22`, borderLeftColor: resolveColor(t.color) }}
+                        style={{ '--chip': resolveColor(t.color) }}
                         title="Drag onto an hour to schedule it - click to edit"
                         onMouseDown={startQTaskDrag(t)}
                       >
-                        {t.title}
+                        <span className="dp-qtask-mark" aria-hidden="true" />
+                        <span className="dp-qtask-title">{t.title}</span>
                       </button>
                     ))}
                   </div>
@@ -590,15 +613,11 @@ export default function DashPlanner({ onOpenPlanner, onPlannerToast, collapsed: 
 
       {dragChip && (
         <div
-          className={`dp-drag-preview${dragChip.task.isHabit ? ' dp-qtask--habit' : ''}`}
-          style={{
-            left: dragChip.x,
-            top: dragChip.y,
-            background: `${resolveColor(dragChip.task.color)}33`,
-            borderLeftColor: resolveColor(dragChip.task.color),
-          }}
+          className={`dp-qtask dp-drag-preview${dragChip.task.isHabit ? ' dp-qtask--habit' : ''}`}
+          style={{ left: dragChip.x, top: dragChip.y, '--chip': resolveColor(dragChip.task.color) }}
         >
-          {dragChip.task.title}
+          <span className="dp-qtask-mark" aria-hidden="true" />
+          <span className="dp-qtask-title">{dragChip.task.title}</span>
         </div>
       )}
 

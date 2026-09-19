@@ -228,38 +228,7 @@
   background: #ef4444;
 }
 
-/* Quick tasks — one click drops them into the next free slot */
-.dp-qtasks {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 9px 10px;
-  border-top: 1px solid var(--border);
-  flex-shrink: 0;
-}
 
-/* Same chrome as a block on the grid above — tinted fill, thin outline, thick
-   colour stripe on the left — so a quick task reads as the block it becomes. */
-.dp-qtask {
-  display: inline-flex;
-  align-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-left: 3px solid;
-  border-radius: 4px;
-  color: var(--text-primary);
-  font-size: 12.5px;
-  font-weight: 600;
-  /* One hour row on the grid above (HOUR_H is 68px in DashPlanner.jsx). */
-  height: 68px;
-  padding: 0 13px;
-  box-sizing: border-box;
-  cursor: pointer;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.dp-qtask:hover { filter: brightness(1.35); }
 
 /* Add / edit */
 .dp-add-btn {
@@ -365,8 +334,6 @@
 .dp-delete { background: rgba(239, 68, 68, 0.15); color: #ef4444; margin-right: auto; }
 .dp-delete:hover { background: rgba(239, 68, 68, 0.28); }
 
-.dp-qtask { cursor: grab; user-select: none; }
-.dp-qtask:active { cursor: grabbing; }
 
 /* Edge grips for changing a block's start or end time */
 .dp-resize {
@@ -388,74 +355,12 @@
   margin-right: 4px;
 }
 
-/* Habits pulled in next to the quick tasks — dashed outline so it's obvious
-   which chips are habits rather than plain quick tasks. */
-.dp-qtask--habit {
-  border-style: dashed;
-  border-left-style: solid;
-}
-.dp-qtask--habit::before {
-  content: '↻';
-  font-size: 11px;
-  opacity: 0.75;
-  margin-right: 6px;
-}
 
-/* Quick tasks split into two groups: habits on one side, plain tasks on the
-   other, so it's clear which is which even before reading the outline style. */
-.dp-qtasks {
-  align-items: stretch;
-  gap: 10px;
-}
 
-.dp-qgroup {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  min-width: 0;
-  flex: 1 1 auto;
-}
 
-.dp-qgroup + .dp-qgroup {
-  border-left: 1px solid var(--border);
-  padding-left: 10px;
-}
 
-.dp-qgroup-label {
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
 
-.dp-qgroup-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
 
-/* The chip itself follows the cursor while dragging */
-.dp-drag-preview {
-  position: fixed;
-  z-index: 9500;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  display: inline-flex;
-  align-items: center;
-  height: 68px;
-  padding: 0 13px;
-  box-sizing: border-box;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-left: 3px solid;
-  border-radius: 4px;
-  color: var(--text-primary);
-  font-size: 12.5px;
-  font-weight: 600;
-  white-space: nowrap;
-  box-shadow: var(--shadow-md);
-  opacity: 0.92;
-}
 
 /* Selected on the grid — Delete removes every selected block */
 .dp-block.selected {
@@ -490,4 +395,134 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+}
+
+/* ── Quick tasks ──────────────────────────────────────────────────────────
+   Habits and tasks share one chip: a quiet card whose colour lives in a small
+   marker and on the hover edge, so a row of different hues still reads as one
+   set. The marker tells them apart — a ring for a habit (filled with a tick
+   once it is on today's plan), a solid dot for a task. */
+.dp-qtasks {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 11px 12px 12px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.dp-qgroup {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+.dp-qgroup-label {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.dp-qgroup-count {
+  font-weight: 600;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+
+/* One column template for both groups, so habit and task chips line up. */
+.dp-qgroup-chips {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+  gap: 6px;
+}
+
+.dp-qtask {
+  --chip: #9ca3af;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 40px;
+  padding: 0 11px;
+  box-sizing: border-box;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: left;
+  cursor: grab;
+  user-select: none;
+  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+}
+.dp-qtask:hover {
+  background: var(--bg-elevated);
+  border-color: color-mix(in srgb, var(--chip) 55%, var(--border));
+  transform: translateY(-1px);
+}
+.dp-qtask:active { cursor: grabbing; transform: none; }
+.dp-qtask:focus-visible { outline: 2px solid var(--chip); outline-offset: 1px; }
+
+.dp-qtask-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Task: a solid dot in the task's colour. */
+.dp-qtask-mark {
+  flex-shrink: 0;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--chip);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--chip) 18%, transparent);
+}
+
+/* Habit: a ring, filled with a tick once it is on today's plan. */
+.dp-qtask--habit .dp-qtask-mark {
+  width: 14px;
+  height: 14px;
+  box-sizing: border-box;
+  background: transparent;
+  border: 2px solid var(--chip);
+  box-shadow: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--bg-base);
+}
+.dp-qtask--habit.is-done .dp-qtask-mark { background: var(--chip); }
+.dp-qtask--habit.is-done .dp-qtask-title { color: var(--text-secondary); }
+
+/* The chip itself follows the cursor while dragging. */
+.dp-drag-preview {
+  position: fixed;
+  z-index: 9500;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  min-width: 120px;
+  max-width: 220px;
+  background: var(--bg-elevated);
+  border-color: color-mix(in srgb, var(--chip) 60%, var(--border));
+  box-shadow: var(--shadow-md);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dp-qtask { transition: none; }
+  .dp-qtask:hover { transform: none; }
 }

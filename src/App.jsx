@@ -10,7 +10,6 @@ import FlashCards from './components/FlashCards';
 import DailyChecklist from './components/DailyChecklist';
 import FitnessTracker from './components/FitnessTracker';
 import JapaneseKana from './components/JapaneseKana';
-import ToolsChat from './components/ToolsChat';
 import SubscriptionTracker, { SubscriptionWidget, SubscriptionPopup } from './components/SubscriptionTracker';
 import Planner from './components/Planner';
 import DashPlanner from './components/DashPlanner';
@@ -262,7 +261,7 @@ function TaskContributionGraph({ todos, contributionLog }) {
 }
 import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, setVolume, getVolume } from './utils/sounds';
 
-const APP_VERSION = '4.6.1';
+const APP_VERSION = '4.6.2';
 const MIN_COL_PX = 220;
 const DEFAULT_COL_PX = [null, null, null, null]; // one per dashboard column — null = auto (flex:1)
 
@@ -612,7 +611,6 @@ function App({ session, onLogout }) {
       { id: 'dashboard',    label: 'Dashboard',      view: 'dashboard',    hidden: false, icon: '⊞' },
       { id: 'checklists',   label: 'Checklists',      view: 'checklists',   hidden: false, icon: '✓' },
       { id: 'habits',       label: 'Habits',           view: 'habits',       hidden: false, icon: '⟳' },
-      { id: 'tools',        label: 'Tools',            view: 'tools',        hidden: false, icon: '⚙' },
       { id: 'japanesekana', label: 'Language Learn',  view: 'japanesekana', hidden: false, icon: 'あ' },
       { id: 'fitness',      label: 'Fitness',          view: 'fitness',      hidden: false, icon: '◈' },
       { id: 'planner',      label: 'Planner',          view: 'planner',      hidden: false, icon: '≡' },
@@ -2597,11 +2595,6 @@ useEffect(() => {
             </ViewErrorBoundary>
           )}
 
-          {activeView === 'tools' && (
-            <ViewErrorBoundary>
-            <ToolsView />
-            </ViewErrorBoundary>
-          )}
 
           {/* Language Learn full page */}
           {activeView === 'japanesekana' && (
@@ -2772,10 +2765,6 @@ function ActivityBox({ todos, contributionLog, collapsed, onToggle }) {
       </div>
     </div>
   );
-}
-
-function ToolsView() {
-  return <ToolsChat />;
 }
 
 function AppWrapper() {
