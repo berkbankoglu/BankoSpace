@@ -106,6 +106,7 @@ export const SYNC_KEYS = [
   'todoFontSize',
   'subtaskFontSize',
   'theme',
+  'colorTheme',
   'soundVolume',
   'translate_rules',
   'dailyChecklistColor',
@@ -127,6 +128,10 @@ let cachedUserId = null;
 supabase.auth.onAuthStateChange((_event, session) => {
   cachedUserId = session?.user?.id || null;
 });
+
+// Who the cached session belongs to right now, without awaiting anything —
+// callers use it to stamp a queued write with the account that made it.
+export function getCachedUserId() { return cachedUserId; }
 
 // Get current user ID (uses cache, falls back to network once)
 async function getUserId() {
@@ -246,11 +251,18 @@ export async function purgeApiKeyFromSupabase() {
 }
 
 // Tek bir key'i Supabase'e yaz (value === null ise Supabase'den sil)
-export async function pushKeyToSupabase(key, value) {
+export async function pushKeyToSupabase(key, value, expectedUserId) {
   if (!SYNC_KEYS.includes(key)) return;
   try {
     const userId = await getUserId();
     if (!userId) return;
+    // A write is queued for a couple of seconds before it leaves. If the
+    // account changed in between, this value belongs to the previous one and
+    // must not be filed under the new account.
+    if (expectedUserId && expectedUserId !== userId) {
+      console.warn(`Skipped a queued sync of "${key}": it belonged to the previous account.`);
+      return;
+    }
 
     if (value === null || value === undefined) {
       await supabase

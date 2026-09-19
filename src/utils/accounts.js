@@ -64,11 +64,53 @@ export function forgetAccount(id) {
   return write(read().filter(a => a.id !== id));
 }
 
-// Every key the app keeps per account. Cleared on a switch so the incoming
-// account's data is pulled fresh from the cloud rather than merged into
-// whatever the previous one left behind.
-export function clearAccountData(syncKeys) {
-  syncKeys.forEach(key => localStorage.removeItem(key));
+// Everything on this device belongs to the account that is signed in, so a
+// switch clears all of it and lets the incoming account's data come down from
+// the cloud. Written as "keep these, drop the rest" on purpose: the previous
+// version cleared a list of known keys, and anything missing from that list
+// survived the switch. That is how one account's notes turned up in the next
+// one — Notes keeps an unsynced `notes_local_backup` and restores from it when
+// it holds more than the live copy, so the cleared notes came straight back.
+const KEEP_EXACT = new Set([
+  'accounts_v1',                 // the switcher itself
+  'appVersion',                  // which release this install last ran
+  'anthropic_api_key',           // the key belongs to the device, never synced
+  'apiKeyPurgedFromCloud',
+  'supabase_sync_enabled',
+  'updateSkippedVersion',
+  'updateButtonHiddenVersion',
+]);
+
+// The live Supabase session. Cleared here it would sign out the account that
+// was just switched to.
+const KEEP_PREFIXES = ['sb-', 'supabase.auth'];
+
+export async function clearAccountData() {
+  const doomed = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key) continue;
+    if (KEEP_EXACT.has(key)) continue;
+    if (KEEP_PREFIXES.some(p => key.startsWith(p))) continue;
+    doomed.push(key);
+  }
+  // Logged because a leak between accounts is invisible after the fact: this
+  // says exactly what was on the device at the moment it was handed over.
+  const sizeOf = (k) => (localStorage.getItem(k) || '').length;
+  const before = `notes=${sizeOf('notes')} notes_local_backup=${sizeOf('notes_local_backup')} todos=${sizeOf('todos')}`;
+  doomed.forEach(key => localStorage.removeItem(key));
+  const after = `notes=${sizeOf('notes')} notes_local_backup=${sizeOf('notes_local_backup')} todos=${sizeOf('todos')}`;
+  if (window.__diag) window.__diag(`ACCOUNT: wiped ${doomed.length} keys | before ${before} | after ${after}`);
+
+  // Note images and drawings live in IndexedDB, keyed from inside the notes.
+  const { clearAllMedia } = await import('./imageStore');
+  await clearAllMedia();
+
+  // The undo timeline holds earlier copies of todos and planner blocks, which
+  // is content. Every switch reloads the page, so this is belt and braces.
+  const { clearHistory } = await import('./undoHistory');
+  clearHistory();
+
   // Makes the next load run its initial pull instead of assuming this tab is
   // already in sync.
   try { sessionStorage.removeItem('supabase_synced'); } catch { /* ignore */ }

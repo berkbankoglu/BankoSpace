@@ -137,3 +137,24 @@ export async function getStrokes(id) {
     return null;
   }
 }
+
+// Wipes every store in the database. Used when an account leaves this device:
+// note images and strokes are keyed by ids that live inside the notes, so
+// leaving them behind means the next account holds the previous one's images.
+export async function clearAllMedia() {
+  try {
+    const db = await openDB();
+    const names = Array.from(db.objectStoreNames);
+    if (names.length === 0) return;
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(names, 'readwrite');
+      names.forEach(n => tx.objectStore(n).clear());
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+    memCache.clear();
+  } catch {
+    // A blocked or missing database is not a reason to block the switch.
+  }
+}

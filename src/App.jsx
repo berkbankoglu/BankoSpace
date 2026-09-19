@@ -3,7 +3,7 @@ import { flushSync } from 'react-dom';
 import { isTauri, proxyFetch, confirmAsync, notifyPermission, notify, exportJSON, importJSON, windowControls, startWindowDrag } from './platform';
 import logo from './assets/logo.svg';
 import './App.css';
-import { supabase, pullFromSupabase, pushKeyToSupabase, pushAllToSupabase, purgeApiKeyFromSupabase, SYNC_KEYS } from './supabase';
+import { supabase, pullFromSupabase, pushKeyToSupabase, pushAllToSupabase, purgeApiKeyFromSupabase, getCachedUserId, SYNC_KEYS } from './supabase';
 import Login from './components/Login';
 import CategoryColumn from './components/CategoryColumn';
 import FlashCards from './components/FlashCards';
@@ -262,7 +262,7 @@ function TaskContributionGraph({ todos, contributionLog }) {
 }
 import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, setVolume, getVolume } from './utils/sounds';
 
-const APP_VERSION = '4.6.0';
+const APP_VERSION = '4.6.1';
 const MIN_COL_PX = 220;
 const DEFAULT_COL_PX = [null, null, null, null]; // one per dashboard column — null = auto (flex:1)
 
@@ -358,7 +358,6 @@ function App({ session, onLogout }) {
     document.addEventListener('mouseup', onUp);
   };
 
-  const [showUpdateWarning, setShowUpdateWarning] = useState(false);
 
 
   // Planner notification tap → navigate to planner (native notification action
@@ -405,7 +404,14 @@ function App({ session, onLogout }) {
           localStorage.setItem('apiKeyPurgedFromCloud', '1');
         });
 
+        const sizeOf = (k) => (localStorage.getItem(k) || '').length;
+        if (window.__diag) {
+          window.__diag(`ACCOUNT: session ${session?.user?.id || '?'} (${session?.user?.email || '?'}) | before pull: notes=${sizeOf('notes')} backup=${sizeOf('notes_local_backup')} todos=${sizeOf('todos')}`);
+        }
         purge.then(() => pullFromSupabase()).then(changed => {
+          if (window.__diag) {
+            window.__diag(`ACCOUNT: pull changed=${changed} | after pull: notes=${sizeOf('notes')} backup=${sizeOf('notes_local_backup')} todos=${sizeOf('todos')}`);
+          }
           if (changed) window.location.reload();
         });
       }
@@ -430,11 +436,12 @@ function App({ session, onLogout }) {
           // Same value already pending/synced → don't schedule another push
           // (autosave effects often re-write identical data on unrelated renders).
           if (lastPushed[key] === value) return;
-          pendingKeys[key] = value;
+          const owner = getCachedUserId();
+          pendingKeys[key] = { value, owner };
           clearTimeout(debounceTimers[key]);
           debounceTimers[key] = setTimeout(() => {
             lastPushed[key] = value;
-            pushKeyToSupabase(key, value);
+            pushKeyToSupabase(key, value, owner);
             delete pendingKeys[key];
           }, 2000);
         }
@@ -443,11 +450,19 @@ function App({ session, onLogout }) {
       // Kapanmadan önce bekleyen tüm keyleri hemen gönder — dönen promise'ler
       // pencere gerçekten kapanmadan önce beklenebilsin diye return ediliyor.
       const flushAll = () => {
-        return Object.entries(pendingKeys).map(([key, value]) => {
+        return Object.entries(pendingKeys).map(([key, { value, owner }]) => {
           clearTimeout(debounceTimers[key]);
           delete pendingKeys[key];
-          return pushKeyToSupabase(key, value);
+          return pushKeyToSupabase(key, value, owner);
         });
+      };
+
+      // Leaving an account drops whatever is still queued: those values belong
+      // to the account on the way out, and the push they were scheduled for
+      // would otherwise land after the session has already swapped.
+      window.__cancelPendingPushes = () => {
+        Object.keys(debounceTimers).forEach(k => clearTimeout(debounceTimers[k]));
+        Object.keys(pendingKeys).forEach(k => delete pendingKeys[k]);
       };
       window.addEventListener('beforeunload', flushAll);
 
@@ -494,6 +509,7 @@ function App({ session, onLogout }) {
     return () => {
       mounted = false;
       localStorage.setItem = origSetItem;
+      delete window.__cancelPendingPushes;
     };
   }, []);
 
@@ -502,8 +518,6 @@ function App({ session, onLogout }) {
     const savedVersion = localStorage.getItem('appVersion');
     if (savedVersion && savedVersion !== APP_VERSION) {
       console.log(`Version updated from ${savedVersion} to ${APP_VERSION}`);
-      // Show old version warning
-      setShowUpdateWarning(true);
       // Cache'i temizle
       if ('caches' in window) {
         caches.keys().then(names => {
@@ -692,6 +706,7 @@ function App({ session, onLogout }) {
   // would otherwise be wiped by the clear below.
   const leaveCurrentAccount = async () => {
     await pushAllToSupabase();
+    window.__cancelPendingPushes?.();
     if (session) rememberAccount(session, getProfile());
   };
 
@@ -711,7 +726,7 @@ function App({ session, onLogout }) {
       });
       if (error || !data?.session) throw error || new Error('no session');
       rememberAccount(data.session, null);
-      clearAccountData(SYNC_KEYS);
+      await clearAccountData();
       window.location.reload();
     } catch {
       setSwitching(false);
@@ -726,7 +741,7 @@ function App({ session, onLogout }) {
     setSwitching(true);
     try {
       await leaveCurrentAccount();
-      clearAccountData(SYNC_KEYS);
+      await clearAccountData();
       // Local only. The default signs the account out everywhere, which
       // revokes the refresh token just saved for switching back to it — so
       // adding a second account used to lock you out of the first.
@@ -746,8 +761,9 @@ function App({ session, onLogout }) {
     if (switching) return;
     setSwitching(true);
     try { await pushAllToSupabase(); } catch { /* sign out regardless */ }
+    window.__cancelPendingPushes?.();
     const id = session?.user?.id;
-    clearAccountData(SYNC_KEYS);
+    await clearAccountData();
     try { await supabase.auth.signOut(); } catch { /* the local session is cleared either way */ }
     if (id) forgetAccount(id);
     // A reload rather than onLogout: in-memory state would otherwise be
@@ -2775,7 +2791,7 @@ function AppWrapper() {
   if (session === undefined) return null;
   if (!session) return <Login onLogin={setSession} />;
 
-  return <App key="main-app" session={session} onLogout={() => setSession(null)} />;
+  return <App key={session.user?.id || 'main-app'} session={session} onLogout={() => setSession(null)} />;
 }
 
 export default AppWrapper;
