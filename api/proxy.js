@@ -6,6 +6,25 @@ function isAllowedHost(host) {
   return host === 'api.anthropic.com' || host === 'github.com' || host.endsWith('.supabase.co');
 }
 
+// Only the app's own pages may use this relay. Without the check, anyone on
+// the internet could post to it and use the deployment as an anonymising proxy
+// to the allowlisted hosts.
+function isSameOrigin(req) {
+  const { origin, host } = req.headers;
+  if (!origin || !host) return false;
+  try { return new URL(origin).host === host; } catch { return false; }
+}
+
+// Headers the upstream APIs actually need. Anything else the caller sets -
+// cookies, forwarding headers, a different Host - is dropped rather than
+// relayed.
+const FORWARDED_HEADERS = new Set([
+  'authorization', 'apikey', 'x-api-key', 'x-client-info',
+  'anthropic-version', 'anthropic-beta',
+  'content-type', 'accept', 'accept-profile', 'content-profile',
+  'prefer', 'range', 'range-unit', 'x-upsert',
+]);
+
 function hostOf(url) {
   try { return new URL(url).host; } catch { return ''; }
 }
@@ -13,6 +32,11 @@ function hostOf(url) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).send('Method not allowed');
+    return;
+  }
+
+  if (!isSameOrigin(req)) {
+    res.status(403).send('Forbidden');
     return;
   }
 
@@ -29,9 +53,12 @@ export default async function handler(req, res) {
   }
 
   try {
+    const safeHeaders = Object.fromEntries(
+      Object.entries(headers).filter(([k]) => FORWARDED_HEADERS.has(k.toLowerCase())),
+    );
     const upstream = await fetch(url, {
       method: method.toUpperCase(),
-      headers,
+      headers: safeHeaders,
       body: method.toUpperCase() === 'GET' || method.toUpperCase() === 'HEAD' ? undefined : body,
     });
     const text = await upstream.text();

@@ -59,6 +59,13 @@ export function initDiag() {
     diag(`REJECTION: ${(r && (r.message || r.toString())) || r}`, true);
   });
 
+  // A request the Content Security Policy blocks raises no exception - the
+  // resource just never arrives. After tightening the policy that is exactly
+  // the failure that would otherwise go unnoticed.
+  window.addEventListener('securitypolicyviolation', (e) => {
+    diag(`CSP BLOCKED ${e.violatedDirective}: ${e.blockedURI || '(inline)'}`, true);
+  });
+
   // Any main-thread task ≥200ms blocks the UI; log it.
   try {
     new PerformanceObserver((list) => {

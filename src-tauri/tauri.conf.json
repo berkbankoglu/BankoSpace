@@ -1,6 +1,6 @@
 {
   "productName": "BankoSpace",
-  "version": "4.6.3",
+  "version": "4.6.4",
   "identifier": "com.berkbankoglu.bankospace",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -56,9 +56,9 @@
         "skipTaskbar": true
       }
     ],
-    "withGlobalTauri": true,
+    "withGlobalTauri": false,
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' https://accounts.google.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com https://*.cloudfunctions.net https://api.anthropic.com https://translate.google.com https://translate.googleapis.com https://*.supabase.co wss://*.supabase.co; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data: https://fonts.gstatic.com; media-src 'self' https://translate.google.com https://translate.googleapis.com; frame-src https://accounts.google.com https://*.firebaseapp.com",
+      "csp": "default-src 'self'; connect-src 'self' https://api.anthropic.com https://*.supabase.co wss://*.supabase.co; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; media-src 'self' data:",
       "capabilities": [
         {
           "identifier": "main-capability",
@@ -71,8 +71,6 @@
             "fs:default",
             "fs:allow-read-text-file",
             "fs:allow-write-text-file",
-            "fs:allow-read-file",
-            "fs:allow-read-dir",
             "notification:default",
             "core:event:default",
             "core:window:allow-create",
@@ -89,15 +87,6 @@
             "core:window:allow-outer-position",
             "core:window:allow-outer-size",
             "core:window:allow-scale-factor",
-            "core:webview:allow-create-webview-window",
-            "core:webview:allow-create-webview",
-            "core:webview:allow-webview-close",
-            "core:webview:allow-webview-hide",
-            "core:webview:allow-webview-show",
-            "core:webview:allow-set-webview-position",
-            "core:webview:allow-set-webview-size",
-            "core:webview:allow-set-webview-focus",
-            "core:webview:allow-get-all-webviews",
             "core:window:allow-destroy",
             "core:window:allow-show",
             "core:window:allow-hide",
@@ -106,7 +95,6 @@
             "core:window:allow-set-size",
             "core:window:allow-set-decorations",
             "core:window:allow-internal-toggle-maximize",
-            "shell:allow-open",
             "deep-link:default",
             "updater:default",
             "process:allow-restart"

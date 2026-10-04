@@ -262,7 +262,7 @@ function TaskContributionGraph({ todos, contributionLog }) {
 }
 import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, setVolume, getVolume } from './utils/sounds';
 
-const APP_VERSION = '4.6.3';
+const APP_VERSION = '4.6.4';
 const MIN_COL_PX = 220;
 const DEFAULT_COL_PX = [null, null, null, null]; // one per dashboard column — null = auto (flex:1)
 

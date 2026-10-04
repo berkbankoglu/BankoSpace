@@ -19,15 +19,36 @@ function slotFor(userId) {
   return userId ? PREFIX + userId : null;
 }
 
+// Who is signed in. The cached id is set as soon as the Supabase client
+// restores the session, but a read that lands before that would look like "no
+// account" — and a write would be dropped on the floor — so fall back to the
+// session the client has already persisted.
+function currentUserId() {
+  const cached = getCachedUserId();
+  if (cached) return cached;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith('sb-') || !k.endsWith('-auth-token')) continue;
+      let raw = localStorage.getItem(k);
+      if (!raw) continue;
+      if (raw.startsWith('base64-')) raw = atob(raw.slice(7));
+      const id = JSON.parse(raw)?.user?.id;
+      if (id) return id;
+    }
+  } catch { /* unreadable session — treat it as signed out */ }
+  return null;
+}
+
 export function getApiKey() {
-  const slot = slotFor(getCachedUserId());
+  const slot = slotFor(currentUserId());
   return slot ? (localStorage.getItem(slot) || '') : '';
 }
 
 // An empty value removes the key. With no account signed in there is nowhere
 // it could belong, so nothing is written.
 export function setApiKey(value) {
-  const slot = slotFor(getCachedUserId());
+  const slot = slotFor(currentUserId());
   if (!slot) return;
   const v = String(value || '').trim();
   if (v) localStorage.setItem(slot, v);

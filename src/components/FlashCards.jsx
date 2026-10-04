@@ -970,7 +970,13 @@ Kurallar:
                 )}
                 <input
                   type="file" accept="image/*" multiple ref={imageFileRef} style={{ display: 'none' }}
-                  onChange={e => { handleImageFiles([...e.target.files]); e.target.value = ''; }}
+                  onChange={e => {
+                    // A file the browser cannot decode (HEIC, a corrupt photo)
+                    // rejects here; without this it failed silently.
+                    handleImageFiles([...e.target.files])
+                      .catch(err => setAiError('Could not read that image: ' + (err?.message || 'unknown error')));
+                    e.target.value = '';
+                  }}
                 />
                 <div className="fc-ai-image-btn-row">
                   <button className="fc-ai-attach-btn" onClick={() => imageFileRef.current?.click()} disabled={aiLoading} title="Select image">

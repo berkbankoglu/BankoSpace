@@ -157,6 +157,37 @@ function migrateNote(note) {
   };
 }
 
+// Pasted HTML comes from wherever the user copied it and is then stored and
+// re-rendered for good. The app's CSP already refuses inline scripts, so this
+// is the second line of defence: strip what could run code or pull in a frame,
+// keep the formatting. Parsing into a <template> is inert — nothing in it
+// runs or loads while it is being cleaned.
+const PASTE_FORBIDDEN_TAGS = new Set([
+  'SCRIPT', 'IFRAME', 'OBJECT', 'EMBED', 'LINK', 'META', 'STYLE', 'BASE',
+  'FORM', 'INPUT', 'BUTTON', 'TEXTAREA', 'SELECT', 'NOSCRIPT',
+]);
+
+function sanitizePastedHtml(html) {
+  const template = document.createElement('template');
+  template.innerHTML = html;
+  const elements = template.content.querySelectorAll('*');
+  const doomed = [];
+  elements.forEach(el => {
+    if (PASTE_FORBIDDEN_TAGS.has(el.tagName)) { doomed.push(el); return; }
+    Array.from(el.attributes).forEach(attr => {
+      const name = attr.name.toLowerCase();
+      const value = attr.value.trim().toLowerCase();
+      const isUrl = name === 'href' || name === 'src' || name === 'xlink:href' || name === 'action';
+      if (name.startsWith('on') || name === 'srcdoc') el.removeAttribute(attr.name);
+      else if (isUrl && (value.startsWith('javascript:') || value.startsWith('vbscript:'))) {
+        el.removeAttribute(attr.name);
+      }
+    });
+  });
+  doomed.forEach(el => el.remove());
+  return template.innerHTML;
+}
+
 const RichTextEditor = forwardRef(({ content, placeholder, onChange, style, onPasteImage }, ref) => {
   const editorRef = useRef(null);
   const [isEmpty, setIsEmpty] = useState(!content);
@@ -318,7 +349,14 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style, onPa
     lastPasteRef.current = now;
     const items = Array.from(e.clipboardData?.items || []);
     const imageItem = items.find(item => item.type.startsWith('image/'));
-    if (!imageItem) return;
+    if (!imageItem) {
+      const html = e.clipboardData?.getData('text/html');
+      if (html) {
+        e.preventDefault();
+        document.execCommand('insertHTML', false, sanitizePastedHtml(html));
+      }
+      return;
+    }
     e.preventDefault();
     const file = imageItem.getAsFile();
     if (!file || !onPasteImage) return;
