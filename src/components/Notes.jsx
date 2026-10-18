@@ -1830,7 +1830,7 @@ ${body}
   };
 
   return (
-    <div className="notes-container">
+    <div className={`notes-container${selected ? ' notes-has-selection' : ''}`}>
       {shortcutToast && (
         <div style={{
           position: 'fixed', bottom: 32, left: '50%', transform: 'translateX(-50%)',
@@ -2093,6 +2093,10 @@ ${body}
         {selectedNote ? (
           <div ref={editorScrollRef} key={animKey} className="notes-editor-fade">
             <div className="notes-editor-header">
+              {/* Narrow windows show one pane at a time, so there has to be a
+                  way back to the list; the CSS hides this where both panes are
+                  on screen together and the button would be redundant. */}
+              <button className="notes-back-btn" onClick={() => setSelected(null)} title="Back to notes">‹</button>
               <input
                 className="notes-title-input"
                 placeholder="title..."

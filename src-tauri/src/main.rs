@@ -660,6 +660,271 @@ fn boost_pid_priority(pid: u32) {
     }
 }
 
+// ── Edge snapping ────────────────────────────────────────────────────────────
+//
+// Windows' own snap is a behaviour of the native move loop: you drag by the
+// caption, the loop watches the pointer, and dropping at an edge tiles the
+// window. This app deliberately does NOT use that loop — see the long note in
+// the watchdog about it blocking the event loop and never recovering when the
+// button-up is swallowed — so the drag is done by hand with set_position, and
+// snapping went with it.
+//
+// This puts it back without re-entering the loop: at the end of a drag the
+// front end asks where the pointer ended up, and if that is against an edge of
+// the monitor's WORK AREA (which excludes the taskbar — the reason this has to
+// be done here rather than in JS, where only the full screen size is visible)
+// the window is tiled to match.
+#[cfg(windows)]
+#[derive(Clone, Copy)]
+struct SnapTarget { x: i32, y: i32, w: i32, h: i32, maximize: bool, name: &'static str }
+
+// Where would the window land if the drag ended right now? Shared by the
+// preview (drawn while dragging) and the snap itself (applied on release), so
+// the outline you see is by construction the rectangle you get.
+#[cfg(windows)]
+fn snap_target_at_cursor() -> Option<SnapTarget> {
+    #[repr(C)]
+    #[derive(Default, Clone, Copy)]
+    struct POINT { x: i32, y: i32 }
+    #[repr(C)]
+    #[derive(Default, Clone, Copy)]
+    struct RECT { left: i32, top: i32, right: i32, bottom: i32 }
+    #[repr(C)]
+    struct MONITORINFO { cb_size: u32, rc_monitor: RECT, rc_work: RECT, dw_flags: u32 }
+
+    #[link(name = "user32")]
+    extern "system" {
+        fn GetCursorPos(p: *mut POINT) -> i32;
+        fn MonitorFromPoint(p: POINT, flags: u32) -> isize;
+        fn GetMonitorInfoW(h: isize, mi: *mut MONITORINFO) -> i32;
+    }
+
+    // How close to an edge counts as "at" it, and how far down the side still
+    // counts as a corner rather than the middle of that side.
+    const EDGE: i32 = 12;
+    const CORNER: i32 = 140;
+    const MONITOR_DEFAULTTONEAREST: u32 = 2;
+
+    let mut pt = POINT::default();
+    if unsafe { GetCursorPos(&mut pt) } == 0 { return None; }
+    let hmon = unsafe { MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST) };
+    if hmon == 0 { return None; }
+
+    let mut mi = MONITORINFO {
+        cb_size: std::mem::size_of::<MONITORINFO>() as u32,
+        rc_monitor: RECT::default(),
+        rc_work: RECT::default(),
+        dw_flags: 0,
+    };
+    if unsafe { GetMonitorInfoW(hmon, &mut mi) } == 0 { return None; }
+
+    let w = mi.rc_work;
+    let width = w.right - w.left;
+    let height = w.bottom - w.top;
+    if width <= 0 || height <= 0 { return None; }
+
+    let near_left = pt.x - w.left <= EDGE;
+    let near_right = w.right - pt.x <= EDGE;
+    let near_top = pt.y - w.top <= EDGE;
+    let upper = pt.y - w.top <= CORNER;
+    let lower = w.bottom - pt.y <= CORNER;
+
+    let half_w = width / 2;
+    let half_h = height / 2;
+
+    let t = if near_left && upper {
+        SnapTarget { x: w.left, y: w.top, w: half_w, h: half_h, maximize: false, name: "top-left" }
+    } else if near_left && lower {
+        SnapTarget { x: w.left, y: w.top + half_h, w: half_w, h: height - half_h, maximize: false, name: "bottom-left" }
+    } else if near_left {
+        SnapTarget { x: w.left, y: w.top, w: half_w, h: height, maximize: false, name: "left" }
+    } else if near_right && upper {
+        SnapTarget { x: w.left + half_w, y: w.top, w: width - half_w, h: half_h, maximize: false, name: "top-right" }
+    } else if near_right && lower {
+        SnapTarget { x: w.left + half_w, y: w.top + half_h, w: width - half_w, h: height - half_h, maximize: false, name: "bottom-right" }
+    } else if near_right {
+        SnapTarget { x: w.left + half_w, y: w.top, w: width - half_w, h: height, maximize: false, name: "right" }
+    } else if near_top {
+        // Dropping at the top is Windows' gesture for "fill the screen".
+        SnapTarget { x: w.left, y: w.top, w: width, h: height, maximize: true, name: "maximize" }
+    } else {
+        return None;
+    };
+    Some(t)
+}
+
+// ── Edge snapping ────────────────────────────────────────────────────────────
+//
+// Windows' own snap — both the translucent outline while you drag and the tile
+// when you let go — is a behaviour of the native move loop. This app does NOT
+// use that loop (see the long note in the watchdog: it blocks the event loop
+// and never recovers when the button-up is swallowed), so the window is moved
+// by hand and Windows never knows a drag is happening. Both halves are
+// therefore reimplemented here: the outline is a transparent always-on-top
+// window, and the tile is applied on release.
+#[cfg(windows)]
+#[tauri::command]
+fn snap_window_at_cursor(window: tauri::WebviewWindow) -> String {
+    snap_preview::hide();
+
+    let Some(t) = snap_target_at_cursor() else { return "none".into() };
+
+    if t.maximize {
+        let _ = window.maximize();
+        write_diag("RUST: snap -> maximize");
+        return "maximize".into();
+    }
+
+    // Tiling a maximized window has to un-maximize it first, or the position is
+    // applied to a window still in the maximized state and snaps back.
+    if window.is_maximized().unwrap_or(false) { let _ = window.unmaximize(); }
+
+    let _ = window.set_position(tauri::PhysicalPosition::new(t.x, t.y));
+    let _ = window.set_size(tauri::PhysicalSize::new(t.w as u32, t.h as u32));
+    write_diag(&format!("RUST: snap -> {} ({}x{} at {},{})", t.name, t.w, t.h, t.x, t.y));
+    t.name.into()
+}
+
+// The outline shown while the drag is in flight.
+//
+// This is a bare Win32 layered window rather than a second Tauri window: a
+// webview would have to load a page, and the PWA service worker injected into
+// every page answered the request with index.html — so the thing meant to draw
+// one rectangle booted a whole second copy of the app, update check and all.
+// A layered popup needs no document, no renderer process, and nothing can
+// intercept it.
+#[cfg(windows)]
+mod snap_preview {
+    #[repr(C)]
+    struct WNDCLASSW {
+        style: u32,
+        lpfn_wnd_proc: Option<unsafe extern "system" fn(isize, u32, usize, isize) -> isize>,
+        cb_cls_extra: i32,
+        cb_wnd_extra: i32,
+        h_instance: isize,
+        h_icon: isize,
+        h_cursor: isize,
+        hbr_background: isize,
+        lpsz_menu_name: *const u16,
+        lpsz_class_name: *const u16,
+    }
+
+    #[link(name = "user32")]
+    extern "system" {
+        fn RegisterClassW(c: *const WNDCLASSW) -> u16;
+        fn CreateWindowExW(ex: u32, class: *const u16, name: *const u16, style: u32,
+                           x: i32, y: i32, w: i32, h: i32,
+                           parent: isize, menu: isize, inst: isize, param: *const core::ffi::c_void) -> isize;
+        fn DefWindowProcW(h: isize, msg: u32, w: usize, l: isize) -> isize;
+        fn SetLayeredWindowAttributes(h: isize, key: u32, alpha: u8, flags: u32) -> i32;
+        fn SetWindowPos(h: isize, after: isize, x: i32, y: i32, cx: i32, cy: i32, flags: u32) -> i32;
+        fn ShowWindow(h: isize, cmd: i32) -> i32;
+    }
+    #[link(name = "gdi32")]
+    extern "system" { fn CreateSolidBrush(color: u32) -> isize; }
+    #[link(name = "kernel32")]
+    extern "system" { fn GetModuleHandleW(name: *const u16) -> isize; }
+
+    const WS_POPUP: u32 = 0x8000_0000;
+    const WS_EX_LAYERED: u32 = 0x0008_0000;
+    const WS_EX_TRANSPARENT: u32 = 0x0000_0020;   // click-through
+    const WS_EX_TOOLWINDOW: u32 = 0x0000_0080;    // keep it out of alt-tab
+    const WS_EX_NOACTIVATE: u32 = 0x0800_0000;    // never steal the drag's focus
+    const WS_EX_TOPMOST: u32 = 0x0000_0008;
+    const LWA_ALPHA: u32 = 0x2;
+    const HWND_TOPMOST: isize = -1;
+    const SWP_NOACTIVATE: u32 = 0x0010;
+    const SWP_SHOWWINDOW: u32 = 0x0040;
+    const SW_HIDE: i32 = 0;
+
+    static PREVIEW_HWND: std::sync::OnceLock<std::sync::atomic::AtomicIsize> = std::sync::OnceLock::new();
+    fn hwnd_slot() -> &'static std::sync::atomic::AtomicIsize {
+        PREVIEW_HWND.get_or_init(|| std::sync::atomic::AtomicIsize::new(0))
+    }
+
+    unsafe extern "system" fn wnd_proc(h: isize, msg: u32, w: usize, l: isize) -> isize {
+        DefWindowProcW(h, msg, w, l)
+    }
+
+    fn wide(s: &str) -> Vec<u16> { s.encode_utf16().chain(std::iter::once(0)).collect() }
+
+    // Created once, on the thread that first needs it, and reused after that.
+    fn ensure() -> isize {
+        let slot = hwnd_slot();
+        let existing = slot.load(std::sync::atomic::Ordering::SeqCst);
+        if existing != 0 { return existing; }
+
+        let class = wide("BankoSnapPreview");
+        unsafe {
+            let inst = GetModuleHandleW(std::ptr::null());
+            // A soft blue, the colour Windows uses for the same thing.
+            let brush = CreateSolidBrush(0x00FF_B68E & 0x00FF_FFFF); // BGR: 8E B6 FF
+            let wc = WNDCLASSW {
+                style: 0,
+                lpfn_wnd_proc: Some(wnd_proc),
+                cb_cls_extra: 0,
+                cb_wnd_extra: 0,
+                h_instance: inst,
+                h_icon: 0,
+                h_cursor: 0,
+                hbr_background: brush,
+                lpsz_menu_name: std::ptr::null(),
+                lpsz_class_name: class.as_ptr(),
+            };
+            RegisterClassW(&wc);
+            let hwnd = CreateWindowExW(
+                WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_TOPMOST,
+                class.as_ptr(), wide("").as_ptr(), WS_POPUP,
+                0, 0, 10, 10, 0, 0, inst, std::ptr::null(),
+            );
+            if hwnd != 0 {
+                SetLayeredWindowAttributes(hwnd, 0, 96, LWA_ALPHA);
+                slot.store(hwnd, std::sync::atomic::Ordering::SeqCst);
+            }
+            hwnd
+        }
+    }
+
+    pub fn show(x: i32, y: i32, w: i32, h: i32) {
+        let hwnd = ensure();
+        if hwnd == 0 { return; }
+        unsafe { SetWindowPos(hwnd, HWND_TOPMOST, x, y, w, h, SWP_NOACTIVATE | SWP_SHOWWINDOW); }
+    }
+
+    pub fn hide() {
+        let hwnd = hwnd_slot().load(std::sync::atomic::Ordering::SeqCst);
+        if hwnd != 0 { unsafe { ShowWindow(hwnd, SW_HIDE); } }
+    }
+}
+
+// Called while the drag is in flight: outline the zone the pointer is in, or
+// take the outline away when it is not near an edge.
+#[cfg(windows)]
+#[tauri::command]
+fn update_snap_preview() {
+    match snap_target_at_cursor() {
+        Some(t) => snap_preview::show(t.x, t.y, t.w, t.h),
+        None => snap_preview::hide(),
+    }
+}
+
+#[cfg(windows)]
+#[tauri::command]
+fn hide_snap_preview() { snap_preview::hide(); }
+
+#[cfg(not(windows))]
+#[tauri::command]
+fn snap_window_at_cursor(_window: tauri::WebviewWindow) -> String { "unsupported".into() }
+
+#[cfg(not(windows))]
+#[tauri::command]
+fn update_snap_preview() {}
+
+#[cfg(not(windows))]
+#[tauri::command]
+fn hide_snap_preview() {}
+
+
 fn main() {
     #[cfg(windows)]
     boost_process_priority();
@@ -1086,6 +1351,9 @@ toggle_kana_window,
             fetch_tts,
             diag_log,
             js_ping,
+            snap_window_at_cursor,
+            update_snap_preview,
+            hide_snap_preview,
         ])
         .on_window_event(|window, event| {
             match event {

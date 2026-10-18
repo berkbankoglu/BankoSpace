@@ -2062,3 +2062,44 @@
 
 /* The hint under the input tracks the practice UI's scale */
 .fc-study-body .fc-study-hint { font-size: 22px; }
+
+/* ── Narrow window ───────────────────────────────────────────────────────
+ *
+ * The deck menu alone asks for 400px before the study area gets anything, so
+ * on a narrow window the deck cards were sliced down the middle — "26% maste"
+ * and nothing after it. Stacked, the menu takes the full width and the study
+ * area sits under it, with the page doing the scrolling. */
+@media (max-width: 900px) {
+  .fc-wrapper {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .fc-sidebar {
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    flex-direction: column;
+    border-right: none;
+    overflow: visible;
+  }
+
+  /* Stacked it should be as tall as its decks, not a column's worth of
+     empty space before the cards below it. */
+  .fc-deck-col {
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .fc-content {
+    width: 100%;
+    min-width: 0;
+    overflow: visible;
+  }
+
+  .fc-main-view {
+    height: auto;
+  }
+}

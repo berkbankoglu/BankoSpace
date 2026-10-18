@@ -117,6 +117,10 @@ export const SYNC_KEYS = [
   'chat_username',
   'planner_blocks',
   'planner_qtasks',
+  'planner_calendars',
+  'calendar_week_start',
+  'meds_v1',
+  'meds_log_v1',
   'betaFeatures_v1',
   'profile_v1',
 ];

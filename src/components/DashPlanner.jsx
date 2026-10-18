@@ -1,44 +1,18 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { notifyPermission, notify } from '../platform';
 import {
-  PLANNER_EVENT, COLORS, colorHex, minutesToTime, timeToMinutes, nowMinutes, todayStr,
-  loadBlocks, loadQTasks, saveBlocks, saveQTasks, todayBlocks, dayAgenda, findFreeSlot,
+  PLANNER_EVENT, COLORS, colorHex, resolveColor, nearestPaletteId,
+  HABIT_COLORS, loadHabitList as loadHabits, saveHabitList as saveHabits,
+  minutesToTime, timeToMinutes, nowMinutes, todayStr,
+  loadBlocks, loadQTasks, saveBlocks, saveQTasks, todayBlocks, todayAllDay, dayAgenda, findFreeSlot,
 } from '../utils/plannerStore';
+import { editEvent, deleteEvent, MODEL_VERSION } from '../utils/calendarModel';
+import { ScopeDialog } from './EventEditor';
 import { useUndoScope } from '../utils/undoHistory';
 import './DashPlanner.css';
 
 // A block whose title matches a habit ticks that habit off for the day — worth
 // showing on the block itself so the link isn't invisible.
-function loadHabits() {
-  try { return JSON.parse(localStorage.getItem('habitTracker_habits')) || []; } catch { return []; }
-}
-
-// Same set the Habits view offers, so a colour edited here looks identical there.
-const HABIT_COLORS = ['#ef4444', '#fb923c', '#facc15', '#9ca3af'];
-
-function saveHabits(next) {
-  localStorage.setItem('habitTracker_habits', JSON.stringify(next));
-  window.dispatchEvent(new CustomEvent('habits-updated'));
-}
-
-// Habit colours are raw hex; quick-task colours are palette ids. Both end up here.
-const resolveColor = (c) => (typeof c === 'string' && c.startsWith('#') ? c : colorHex(c));
-
-// A block created from a habit still has to render correctly on the full
-// Planner page, which only understands palette ids — so the habit's hex is
-// snapped to the nearest palette colour rather than stored raw.
-function nearestPaletteId(hex) {
-  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || '');
-  if (!m) return 'blue';
-  const [r, g, b] = m.slice(1).map(v => parseInt(v, 16));
-  let best = COLORS[0], bestD = Infinity;
-  COLORS.forEach(c => {
-    const p = /^#(..)(..)(..)$/.exec(c.hex).slice(1).map(v => parseInt(v, 16));
-    const d = (p[0] - r) ** 2 + (p[1] - g) ** 2 + (p[2] - b) ** 2;
-    if (d < bestD) { bestD = d; best = c; }
-  });
-  return best.id;
-}
 
 // How far ahead of a start/end the "get ready" warning fires.
 const LEAD_MINUTES = 10;
@@ -211,6 +185,20 @@ export default function DashPlanner({ onOpenPlanner, onPlannerToast, collapsed: 
 
   const commit = useCallback((next) => { setBlocks(next); saveBlocks(next); }, []);
 
+  // Editing something on the dashboard can hit a repeating event just as easily
+  // as on the calendar page, so the same question gets asked here rather than
+  // silently rewriting the whole series.
+  const [scopeAsk, setScopeAsk] = useState(null);
+  const askScope = useCallback((block, action, run) => {
+    const stored = blocks.find(e => e.id === (block?.eventId ?? block?.id));
+    if (!stored?.rrule) { run('all'); return; }
+    setScopeAsk({ action, title: stored.title, apply: run });
+  }, [blocks]);
+
+  // All-day and multi-day events don't belong on an hour grid, so they sit in
+  // their own strip above it — the same split the calendar page uses.
+  const allDay = useMemo(() => todayAllDay(blocks), [blocks]);
+
   // Scheduling, moving, resizing and deleting all flow through `blocks`, so
   // tracking that one value covers every edit made on the grid.
   useUndoScope('planner_blocks', blocks, useCallback((v) => { setBlocks(v); saveBlocks(v); }, []));
@@ -218,13 +206,24 @@ export default function DashPlanner({ onOpenPlanner, onPlannerToast, collapsed: 
   const removeBlocks = useCallback((ids) => {
     const drop = new Set(ids);
     if (drop.size === 0) return;
-    setBlocks(prev => { const next = prev.filter(b => !drop.has(b.id)); saveBlocks(next); return next; });
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      drop.forEach(id => next.delete(id));
-      return next;
-    });
-  }, []);
+    const day = todayStr();
+    const targets = blocks.filter(b => drop.has(b.id));
+    if (!targets.length) return;
+    const apply = (scope) => {
+      let next = blocks;
+      for (const b of targets) next = deleteEvent(next, b.id, day, b.rrule ? scope : 'all');
+      commit(next);
+      setSelectedIds(prev => {
+        const s2 = new Set(prev);
+        drop.forEach(id => s2.delete(id));
+        return s2;
+      });
+      setScopeAsk(null);
+    };
+    const repeating = targets.find(b => b.rrule);
+    if (repeating) setScopeAsk({ action: 'delete', title: repeating.title, apply });
+    else apply('all');
+  }, [blocks, commit]);
 
   // Delete clears the current selection. Ignored while typing, so the key still
   // works normally in the title field or a time input.
@@ -301,9 +300,12 @@ export default function DashPlanner({ onOpenPlanner, onPlannerToast, collapsed: 
         });
         return;
       }
-      commit(blocks.map(b => b.id === block.id
-        ? { ...b, startTime: minutesToTime(m.startM), endTime: minutesToTime(m.startM + m.duration) }
-        : b));
+      askScope(block, 'edit', (scope) => {
+        commit(editEvent(blocks, block.eventId ?? block.id, block.occDate ?? todayStr(), scope, {
+          startTime: minutesToTime(m.startM), endTime: minutesToTime(m.startM + m.duration),
+        }));
+        setScopeAsk(null);
+      });
     };
     window.addEventListener('mousemove', move);
     window.addEventListener('mouseup', up);
@@ -340,9 +342,12 @@ export default function DashPlanner({ onOpenPlanner, onPlannerToast, collapsed: 
       movingRef.current = null;
       setMoving(null);
       if (!m) return;
-      commit(blocks.map(b => b.id === block.id
-        ? { ...b, startTime: minutesToTime(m.startM), endTime: minutesToTime(m.startM + m.duration) }
-        : b));
+      askScope(block, 'edit', (scope) => {
+        commit(editEvent(blocks, block.eventId ?? block.id, block.occDate ?? todayStr(), scope, {
+          startTime: minutesToTime(m.startM), endTime: minutesToTime(m.startM + m.duration),
+        }));
+        setScopeAsk(null);
+      });
     };
     window.addEventListener('mousemove', move);
     window.addEventListener('mouseup', up);
@@ -432,14 +437,24 @@ export default function DashPlanner({ onOpenPlanner, onPlannerToast, collapsed: 
     const title = form.title.trim();
     if (!title) return;
     if (modal.mode === 'add') {
-      commit([...blocks, { id: Date.now(), date: todayStr(), ...form, title, recur: 'none', note: '' }]);
+      const date = todayStr();
+      commit([...blocks, {
+        id: Date.now(), calendarId: 'personal', date, endDate: date, ...form, title,
+        allDay: false, notes: '', location: '', rrule: null, exdates: [], overrides: {},
+        alerts: [], v: MODEL_VERSION,
+      }]);
+      setModal(null);
     } else {
-      commit(blocks.map(b => b.id === modal.block.id ? { ...b, ...form, title } : b));
+      const block = modal.block;
+      askScope(block, 'edit', (scope) => {
+        commit(editEvent(blocks, block.eventId ?? block.id, block.occDate ?? todayStr(), scope, { ...form, title }));
+        setScopeAsk(null);
+        setModal(null);
+      });
     }
-    setModal(null);
   };
 
-  const removeBlock = (id) => { commit(blocks.filter(b => b.id !== id)); setModal(null); };
+  const removeBlock = (id) => { removeBlocks([id]); setModal(null); };
 
   const d = new Date();
   const dateLabel = `${DAY_NAMES[d.getDay()]}, ${MONTH_NAMES[d.getMonth()]} ${d.getDate()}`;
@@ -482,6 +497,26 @@ export default function DashPlanner({ onOpenPlanner, onPlannerToast, collapsed: 
               </div>
             )}
           </div>
+
+          {allDay.length > 0 && (
+            <div className="dp-allday">
+              <span className="dp-allday-label">all-day</span>
+              <div className="dp-allday-items">
+                {allDay.map(occ => (
+                  <button
+                    key={occ.instanceId}
+                    className="dp-allday-bar"
+                    style={{ '--block-color': colorHex(occ.color) }}
+                    onClick={() => openEdit?.(occ)}
+                    title={occ.title}
+                  >
+                    {occ.title || '(No title)'}
+                    {occ.isRecurring && <span className="dp-allday-mark">↻</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="dp-grid-scroll" ref={gridRef}>
             <div
@@ -687,6 +722,15 @@ export default function DashPlanner({ onOpenPlanner, onPlannerToast, collapsed: 
             </div>
           </div>
         </div>
+      )}
+
+      {scopeAsk && (
+        <ScopeDialog
+          action={scopeAsk.action}
+          title={scopeAsk.title}
+          onPick={(scope) => scopeAsk.apply(scope)}
+          onCancel={() => setScopeAsk(null)}
+        />
       )}
     </div>
   );

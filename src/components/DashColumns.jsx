@@ -7,14 +7,14 @@ import './DashColumns.css';
 // Heights are weighted per panel id, so a panel keeps its share wherever it
 // ends up. What each panel actually renders stays with the caller — this only
 // owns the layout, the drag, and the collapse state.
-export const PANEL_IDS = ['planner', 'payments', 'activity'];
+export const PANEL_IDS = ['planner', 'payments', 'activity', 'meds'];
 const FIXED_BY_COL = { 0: 'daily', 1: 'weekly' };
 // Four columns: the two todo lists, and two free ones the side panels can be
 // dragged between — so Payments can sit in a column of its own.
 const COLUMN_COUNT = 4;
-const DEFAULT_PANEL_COL = { planner: 2, payments: 2, activity: 2 };
-const DEFAULT_WEIGHT = { daily: 3, weekly: 3, planner: 3, payments: 2, activity: 2 };
-const HEADER_SELECTOR = '.dp-header, .sub-header, .activity-box-header';
+const DEFAULT_PANEL_COL = { planner: 2, payments: 2, activity: 2, meds: 3 };
+const DEFAULT_WEIGHT = { daily: 3, weekly: 3, planner: 3, payments: 2, activity: 2, meds: 2 };
+const HEADER_SELECTOR = '.dp-header, .sub-header, .activity-box-header, .meds-header';
 
 function readStored(key, fallback) {
   try {
@@ -29,7 +29,7 @@ function readStored(key, fallback) {
 export default function DashColumns({ colWidths, startColResize, resetColWidths, renderPanel, panelIds = PANEL_IDS }) {
   const [panelCol, setPanelCol] = useState(() => readStored('dashPanelCol', DEFAULT_PANEL_COL));
   const [weights, setWeights] = useState(() => readStored('dashPanelWeights', DEFAULT_WEIGHT));
-  const [collapsed, setCollapsed] = useState(() => readStored('dashPanelCollapsed', { planner: false, payments: false, activity: false }));
+  const [collapsed, setCollapsed] = useState(() => readStored('dashPanelCollapsed', { planner: false, payments: false, activity: false, meds: false }));
   const [drag, setDrag] = useState(null); // { id, overCol } while moving a panel
   const colRefs = useRef([]);
 

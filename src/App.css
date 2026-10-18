@@ -8092,12 +8092,19 @@ body.light .sidebar-settings-version {
 
 .sidebar-content {
   flex: 1;
+  /* Without this the list cannot shrink below its own height, so overflow-y
+     never engages: in a short window the bottom entries were simply cut off
+     with no way to reach them. */
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
   padding: 4px 0 8px;
-  scrollbar-width: none;
+  scrollbar-width: thin;
 }
+.sidebar-content::-webkit-scrollbar { width: 6px; }
+.sidebar-content::-webkit-scrollbar-track { background: transparent; }
+.sidebar-content::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 3px; }
 .sidebar-content::-webkit-scrollbar { display: none; }
 
 .sidebar-footer {
@@ -9180,25 +9187,66 @@ body.light .font-size-option:hover {
   }
 }
 
-@media (max-width: 900px) {
+/* ── Narrow window: the dashboard becomes one tall scrolling column ───────
+ *
+ * Four columns side by side need roughly 1150px before the text inside them
+ * starts wrapping every other word. Below that the row becomes a stack and the
+ * page scrolls, which is the same shape the phone layout uses — so there is one
+ * narrow design rather than a cramped desktop and a separate mobile one.
+ *
+ * The old rule here stacked the columns at 900px but left the container on
+ * `overflow: hidden`, so everything below the first column was simply
+ * unreachable. The stack has to own the scrolling for the layout to work.
+ *
+ * Column widths are set inline per column (they are drag-resizable), hence the
+ * !important — at this width a saved width is meaningless anyway. */
+@media (max-width: 1150px) {
   .todo-columns {
     flex-direction: column;
+    flex-wrap: nowrap;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .todo-col-wrapper {
+    flex: 0 0 auto !important;
+    width: 100% !important;
+    height: auto;
+    overflow: visible;
+  }
+
+  /* Each column's stack grows to its content instead of sharing a fixed
+     height, and the page — not the column — scrolls. */
+  .dash-col-stack {
+    height: auto;
+    overflow-y: visible;
+  }
+
+  /* The panes themselves are handled in DashColumns.css, which owns those
+     rules and is loaded after this file — stating them here as well would be
+     overridden and look like the change had no effect. */
+  .todo-columns .category-column,
+  .todo-columns .category-column-v2 {
+    overflow-y: visible !important;
+    height: auto;
+  }
+
+  /* Nothing to resize when everything is full width and stacked. */
+  .col-resize-handle,
+  .dash-stack-resize {
+    display: none !important;
+  }
+
+  .todo-columns .category-column,
+  .todo-columns .category-column-v2 {
+    min-width: 0;
+    width: 100%;
+    overflow-y: visible;
   }
 }
 
 /* Small window responsive */
 @media (max-width: 750px) {
-  .todo-columns {
-    flex-direction: column;
-    overflow-x: hidden;
-    height: auto;
-    overflow-y: visible;
-  }
-  .todo-columns .category-column-v2 {
-    min-width: unset;
-    width: 100%;
-    overflow-y: visible;
-  }
   .page-title, .dashboard-title {
     font-size: 18px !important;
   }
@@ -9208,9 +9256,11 @@ body.light .font-size-option:hover {
 }
 
 /* ==========================================
-   MOBILE (phone-width web/PWA) — gated at the same 768px breakpoint as
-   src/hooks/useIsMobile.js, which drives MobileTabBar. Desktop (Tauri) never
-   hits this width, so none of this touches the desktop app. Width/overflow
+   MOBILE (phone-width web/PWA, and the desktop window dragged this narrow) —
+   gated at the same 768px breakpoint as src/hooks/useIsMobile.js, which drives
+   MobileTabBar. The desktop window's minimum width used to be 1200px so it
+   could never reach here; it is 360px now, so these rules apply to the desktop
+   app too and must stay safe for a mouse as well as a finger. Width/overflow
    is used to collapse the sidebar rather than display:none, because the
    Settings modal is a position:fixed element nested inside .notion-sidebar
    and display:none on an ancestor would hide it too.
@@ -9698,8 +9748,14 @@ body.light .search-no-results {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  /* Two heatmaps of a fixed height live in here. When the box is too short for
+     both, scroll them - clipping made the second graph look like it had run
+     into the first. */
+  overflow-y: auto;
 }
+.activity-box-body::-webkit-scrollbar { width: 6px; }
+.activity-box-body::-webkit-scrollbar-track { background: transparent; }
+.activity-box-body::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 3px; }
 .activity-box-body .cg-panel:first-child {
   border-bottom: 1px solid var(--border);
 }
@@ -9717,7 +9773,9 @@ body.light .search-no-results {
   display: flex;
   flex-direction: column;
   flex: 1;
-  min-height: 0;
+  /* A heatmap is 7 rows of fixed-size cells plus its header and legend; below
+     this it has no room left and starts cutting into itself. */
+  min-height: 186px;
   padding: 14px;
   box-sizing: border-box;
   overflow: hidden;

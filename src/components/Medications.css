@@ -1,0 +1,435 @@
+/* Medications — a section of the Habits view, and a panel on the dashboard.
+ * Each medication carries one colour, set once and used everywhere it appears,
+ * so a dose on the dashboard is recognisable without reading it. */
+
+.med-root {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 20px 24px;
+  overflow-y: auto;
+}
+
+.med-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.med-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.med-add-btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.med-add-btn:hover { opacity: 0.9; }
+
+.med-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.med-progress {
+  letter-spacing: 0;
+  text-transform: none;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.med-empty {
+  padding: 14px 16px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  background: var(--bg-card);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+}
+
+/* ── The day in view, and the days behind it ─────────────────────────────── */
+
+.med-day-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.med-day-arrow {
+  width: 22px;
+  height: 22px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  cursor: pointer;
+}
+.med-day-arrow:hover:not(:disabled) { color: var(--text-primary); border-color: var(--border-hover); }
+.med-day-arrow:disabled { opacity: 0.3; cursor: default; }
+
+.med-day-label {
+  min-width: 96px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.med-day-today {
+  padding: 2px 9px;
+  font-size: 11px;
+  color: var(--accent);
+  background: none;
+  border: 1px solid var(--accent-dim);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.med-day-today:hover { border-color: var(--accent); }
+/* Present but not shown, so the row does not re-flow when you step off today. */
+.med-day-today.idle { visibility: hidden; }
+
+/* Two weeks at a glance. The states say different things and must not be
+   confused: a full day is green, a partly-taken day amber, a wholly missed day
+   red — and a day with nothing due stays blank, because treating "nothing to
+   take" as a success would quietly inflate the adherence figure beside it. */
+.med-history {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.med-hist-day {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.med-hist-day:hover { border-color: var(--border-hover); }
+.med-hist-day.current { outline: 2px solid var(--text-primary); outline-offset: 1px; }
+
+.med-hist-all     { background: rgba(63, 185, 80, 0.22);  border-color: rgba(63, 185, 80, 0.5);  color: var(--text-primary); }
+.med-hist-partial { background: rgba(210, 153, 34, 0.22); border-color: rgba(210, 153, 34, 0.5); color: var(--text-primary); }
+.med-hist-none    { background: rgba(248, 81, 73, 0.18);  border-color: rgba(248, 81, 73, 0.45); color: var(--text-primary); }
+.med-hist-empty   { opacity: 0.4; }
+/* Today, nothing ticked yet — due, not missed. */
+.med-hist-pending { border-style: dashed; border-color: var(--border-hover); color: var(--text-secondary); }
+
+.med-adherence {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* A dose on a past day that was never ticked. Not the same as one still to
+   come today, so it does not look the same. */
+.med-dose.missed {
+  border-color: rgba(248, 81, 73, 0.4);
+}
+.med-dose.missed .med-dose-check {
+  border-color: var(--danger);
+  color: var(--danger);
+  background: transparent;
+}
+.med-dose.missed .med-dose-name { color: var(--text-secondary); }
+
+/* ── Today's doses ───────────────────────────────────────────────────────── */
+
+.med-dose-list,
+.med-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.med-dose {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 13.5px;
+  text-align: left;
+  color: var(--text-primary);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--med-color);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.med-dose:hover { border-color: var(--border-hover); background: var(--bg-hover); }
+
+/* A taken dose stays visible here (unlike the dashboard, where it leaves) so
+ * that undoing a mis-tap is possible without hunting for it. */
+.med-dose.taken {
+  opacity: 0.5;
+}
+.med-dose.taken .med-dose-name,
+.med-dose.taken .med-dose-time {
+  text-decoration: line-through;
+}
+
+.med-dose-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--bg-base);
+  background: transparent;
+  border: 2px solid var(--med-color);
+  border-radius: 6px;
+}
+.med-dose.taken .med-dose-check { background: var(--med-color); }
+
+.med-dose-time {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.med-dose-name { flex: 1; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.med-dose-amount { flex: 0 0 auto; font-size: 12px; color: var(--text-muted); }
+
+/* ── The list of medications ─────────────────────────────────────────────── */
+
+.med-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--med-color);
+  border-radius: 8px;
+}
+.med-row:hover { border-color: var(--border-hover); }
+
+.med-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.med-row-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.med-row-dose { font-size: 12px; font-weight: 400; color: var(--text-muted); }
+.med-row-sched { font-size: 12px; color: var(--text-secondary); }
+
+.med-row-times { display: flex; gap: 4px; flex-wrap: wrap; }
+.med-time-chip {
+  padding: 2px 7px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border-radius: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.med-row-left {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.med-row-left.done { color: var(--success); }
+
+/* ── Editor ──────────────────────────────────────────────────────────────── */
+
+.med-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.med-modal {
+  width: 420px;
+  max-width: 92vw;
+  max-height: 88vh;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-hover);
+  border-radius: 14px;
+  box-shadow: var(--shadow-md);
+}
+
+.med-modal-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+
+.med-field { display: flex; align-items: flex-start; gap: 10px; }
+.med-field > label {
+  flex: 0 0 72px;
+  padding-top: 7px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.med-field > *:not(label) { flex: 1; min-width: 0; }
+
+.med-input {
+  padding: 6px 9px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text-primary);
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  outline: none;
+}
+.med-input:focus { border-color: var(--accent-dim); }
+.med-num { width: 64px; flex: 0 0 auto; }
+.med-time-input { width: 110px; }
+
+.med-stack { display: flex; flex-direction: column; gap: 8px; }
+.med-inline { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-secondary); }
+
+.med-times { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.med-time-row { display: flex; align-items: center; gap: 6px; }
+.med-time-del,
+.med-clear {
+  padding: 2px 7px;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  cursor: pointer;
+}
+.med-time-del:hover { color: var(--danger); border-color: var(--danger); }
+.med-time-add {
+  padding: 3px 9px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.med-time-add:hover { color: var(--text-primary); border-color: var(--border-hover); }
+
+.med-daypick { display: flex; gap: 4px; }
+.med-day {
+  width: 28px;
+  height: 28px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  cursor: pointer;
+}
+.med-day.active { background: var(--accent); border-color: var(--accent); color: var(--bg-base); font-weight: 700; }
+
+/* Reads back the schedule in plain words while it is being built, so a repeat
+ * rule, a day list and a dose count never have to be held in your head at the
+ * same time. */
+.med-sched-preview {
+  font-size: 12px;
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+.med-hint {
+  margin-left: 82px;
+  margin-top: -4px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.med-swatches { display: flex; gap: 6px; flex-wrap: wrap; padding-top: 4px; }
+.med-swatch {
+  width: 19px;
+  height: 19px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.med-swatch.active { border-color: var(--text-primary); }
+
+.med-modal-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.med-foot-right { display: flex; gap: 8px; margin-left: auto; }
+
+.med-save, .med-cancel, .med-danger {
+  padding: 7px 15px;
+  font-size: 13px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.med-save { background: var(--accent); color: #fff; border: none; font-weight: 600; }
+.med-save:disabled { opacity: 0.45; cursor: default; }
+.med-cancel { background: none; color: var(--text-secondary); border: 1px solid var(--border); }
+.med-cancel:hover { color: var(--text-primary); border-color: var(--border-hover); }
+.med-danger { background: none; color: var(--danger); border: 1px solid transparent; }
+.med-danger:hover { border-color: var(--danger); }
+
+@media (max-width: 900px) {
+  .med-root { padding: 14px; gap: 14px; }
+  .med-field { flex-direction: column; gap: 4px; }
+  .med-field > label { flex: 0 0 auto; padding-top: 0; }
+  .med-hint { margin-left: 0; }
+  .med-row { flex-wrap: wrap; }
+}

@@ -1,6 +1,6 @@
 {
   "productName": "BankoSpace",
-  "version": "4.6.4",
+  "version": "4.7.0",
   "identifier": "com.berkbankoglu.bankospace",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -11,7 +11,11 @@
   "bundle": {
     "active": true,
     "createUpdaterArtifacts": true,
-    "targets": ["nsis", "dmg", "app"],
+    "targets": [
+      "nsis",
+      "dmg",
+      "app"
+    ],
     "publisher": "Berk Bankoglu",
     "icon": [
       "icons/icon.png",
@@ -33,8 +37,8 @@
         "label": "main",
         "width": 1400,
         "height": 800,
-        "minWidth": 1200,
-        "minHeight": 600,
+        "minWidth": 360,
+        "minHeight": 480,
         "resizable": true,
         "maximized": true,
         "fullscreen": false,
@@ -63,7 +67,9 @@
         {
           "identifier": "main-capability",
           "description": "Main app capabilities",
-          "windows": ["main"],
+          "windows": [
+            "main"
+          ],
           "permissions": [
             "dialog:default",
             "dialog:allow-save",
@@ -103,7 +109,9 @@
         {
           "identifier": "kana-popup-capability",
           "description": "Kana practice popup — no filesystem/dialog/notification access, it only shows a small always-on-top word list",
-          "windows": ["kana-popup"],
+          "windows": [
+            "kana-popup"
+          ],
           "permissions": [
             "core:window:allow-hide",
             "core:window:allow-set-always-on-top",
@@ -121,7 +129,9 @@
     "deep-link": {
       "mobile": [],
       "desktop": {
-        "schemes": ["bankospace"]
+        "schemes": [
+          "bankospace"
+        ]
       }
     },
     "updater": {

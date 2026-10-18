@@ -182,8 +182,38 @@ export function startWindowDrag(e) {
     window.removeEventListener('keydown', onKey, true);
   };
 
-  const stop = () => cleanup();
-  const onKey = (ev) => { if (ev.key === 'Escape') cleanup(); };
+  // Dropping the window against an edge tiles it, the way Windows does when it
+  // drives the drag itself. It can't be done here: deciding needs the monitor's
+  // work area (the screen minus the taskbar), which the web side can't see — so
+  // the back end is asked once, at the end of the drag, and it both decides and
+  // applies. `moved` keeps a plain click on the title bar from snapping.
+  let moved = false;
+  // The back end draws the outline and applies the tile; this side only says
+  // when the drag is moving and when it ended. Throttled because a drag fires
+  // dozens of moves a second and each call is an IPC round trip.
+  let lastPreview = 0;
+  const invokeLater = (cmd) => import('@tauri-apps/api/core')
+    .then(({ invoke }) => invoke(cmd))
+    .catch(() => {});
+
+  const previewTick = () => {
+    const t = performance.now();
+    if (t - lastPreview < 90) return;
+    lastPreview = t;
+    invokeLater('update_snap_preview');
+  };
+
+  const stop = () => {
+    cleanup();
+    if (!moved) { invokeLater('hide_snap_preview'); return; }
+    invokeLater('snap_window_at_cursor');
+  };
+  const onKey = (ev) => {
+    if (ev.key !== 'Escape') return;
+    moved = false;           // cancelled: no snap on release
+    cleanup();
+    invokeLater('hide_snap_preview');
+  };
 
   const flush = () => {
     frame = null;
@@ -199,6 +229,8 @@ export function startWindowDrag(e) {
     // A move with no button held means the button-up went missing — the very
     // failure the native loop can't recover from. End the drag.
     if ((ev.buttons & 1) === 0) { cleanup(); return; }
+    if (Math.abs(ev.screenX - startClientX) > 3 || Math.abs(ev.screenY - startClientY) > 3) moved = true;
+    if (moved) previewTick();
     pending = { x: ev.screenX, y: ev.screenY };
     if (!frame) frame = requestAnimationFrame(flush);
   };

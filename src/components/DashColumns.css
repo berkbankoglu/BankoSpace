@@ -1,14 +1,23 @@
-/* Vertical stack of whatever a column currently holds */
+/* Vertical stack of whatever a column currently holds. In a short window the
+   panes cannot all keep their share, so the column scrolls instead of
+   squeezing each one until its contents collapse into each other. */
 .dash-col-stack {
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: 0;
   gap: 0;
+  overflow-y: auto;
 }
 
+.dash-col-stack::-webkit-scrollbar { width: 6px; }
+.dash-col-stack::-webkit-scrollbar-track { background: transparent; }
+.dash-col-stack::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 3px; }
+
 .dash-col-pane {
-  min-height: 0;
+  /* Enough for a header and a usable strip of content. Without a floor a pane
+     keeps shrinking until what is inside it has nowhere to go. */
+  min-height: 150px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -115,4 +124,66 @@
 .dash-collapsible > * {
   min-height: 0;
   overflow: hidden;
+}
+
+/* ── Narrow window: one tall scrolling column ─────────────────────────────
+ *
+ * On the desktop the columns divide the window's height between them and each
+ * pane scrolls inside its own share. Stacked on a narrow window that is the
+ * wrong model: five panes sharing 900px leaves each one a letterbox with its
+ * list cut off mid-item. Here every pane is as tall as its contents and the
+ * page scrolls instead.
+ *
+ * These live beside the rules they override rather than in App.css, which is
+ * loaded first — at equal specificity the later file wins, so the same rules
+ * written there simply had no effect. */
+@media (max-width: 1150px) {
+  .dash-col-stack {
+    height: auto;
+    overflow-y: visible;
+  }
+
+  /* Each pane carries an inline `flex: <weight> 1 0` so the panes can share a
+     column's height on the desktop and animate when one collapses. Stacked,
+     that basis of 0 is what squeezed every panel into an equal letterbox, and
+     an inline style only yields to !important. */
+  .dash-col-pane {
+    min-height: 0;
+    flex: 0 0 auto !important;
+    overflow: visible;
+  }
+
+  .dash-col-pane.collapsed {
+    min-height: 37px;
+  }
+
+  .dash-col-pane > .dp-panel,
+  .dash-col-pane > .sub-tracker,
+  .dash-col-pane > .activity-box,
+  .dash-col-pane > .category-column-v2 {
+    flex: 0 0 auto;
+    height: auto;
+    min-height: 0;
+  }
+
+  /* The day planner is a timeline, not a list: it keeps a usable height
+     instead of shrinking to whatever happens to be scheduled. */
+  .dash-col-pane > .dp-panel {
+    min-height: 430px;
+  }
+
+  /* Not collapsed, so it must not clip — the collapse animation still needs
+     the hidden overflow, so only the open state opens up. */
+  .dash-collapsible:not(.collapsed) {
+    overflow: visible;
+    flex: 0 0 auto;
+  }
+
+  .dash-collapsible:not(.collapsed) > * {
+    overflow: visible;
+  }
+
+  .dash-stack-resize {
+    display: none;
+  }
 }

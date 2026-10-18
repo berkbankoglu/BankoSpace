@@ -11,7 +11,8 @@ import DailyChecklist from './components/DailyChecklist';
 import FitnessTracker from './components/FitnessTracker';
 import JapaneseKana from './components/JapaneseKana';
 import SubscriptionTracker, { SubscriptionWidget, SubscriptionPopup } from './components/SubscriptionTracker';
-import Planner from './components/Planner';
+import Calendar from './components/Calendar';
+import MedsToday from './components/MedsToday';
 import DashPlanner from './components/DashPlanner';
 import DashColumns, { PANEL_IDS } from './components/DashColumns';
 import { BETA_FEATURES, BETA_EVENT, getBetaFlags, setBetaFlag } from './utils/betaFeatures';
@@ -21,7 +22,7 @@ import { getApiKey, setApiKey, forgetApiKey, claimLegacyApiKey } from './utils/a
 import ReviewTracker from './components/ReviewTracker';
 import { syncHabitsFromPlanner } from './utils/habitPlannerSync';
 import { useUndoScope, useUndoHotkeys } from './utils/undoHistory';
-import { PLANNER_EVENT } from './utils/plannerStore';
+import { PLANNER_EVENT, ensureCalendarMigrated } from './utils/plannerStore';
 import Notes from './components/Notes';
 import HabitTracker from './components/HabitTracker';
 import MobileTabBar from './components/MobileTabBar';
@@ -262,7 +263,7 @@ function TaskContributionGraph({ todos, contributionLog }) {
 }
 import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, setVolume, getVolume } from './utils/sounds';
 
-const APP_VERSION = '4.6.4';
+const APP_VERSION = '4.7.0';
 const MIN_COL_PX = 220;
 const DEFAULT_COL_PX = [null, null, null, null]; // one per dashboard column — null = auto (flex:1)
 
@@ -371,7 +372,7 @@ function App({ session, onLogout }) {
         const { onAction, registerActionTypes } = await import('@tauri-apps/plugin-notification');
         await registerActionTypes([{
           id: 'planner-block',
-          actions: [{ id: 'open', title: 'Open Planner' }],
+          actions: [{ id: 'open', title: 'Open Calendar' }],
         }]);
         unlisten = await onAction((action) => {
           if (action.actionTypeId === 'planner-block' || action.notification?.data?.type === 'planner') {
@@ -575,6 +576,12 @@ function App({ session, onLogout }) {
     }
   }, [appUpdate]);
 
+  // Calendar events moved to a richer shape (real repeat rules, all-day and
+  // multi-day spans, per-occurrence edits). Upgrading here rather than when the
+  // calendar first renders means the dashboard never reads a half-migrated list,
+  // and the v1 rows are kept as a local backup in case anything looks wrong.
+  useEffect(() => { ensureCalendarMigrated(); }, []);
+
   // A planner block and a habit sharing a name are the same commitment, so
   // scheduling one ticks the other off for that day. Runs app-wide rather than
   // inside either view, since neither is guaranteed to be open.
@@ -614,7 +621,7 @@ function App({ session, onLogout }) {
       { id: 'habits',       label: 'Habits',           view: 'habits',       hidden: false, icon: '⟳' },
       { id: 'japanesekana', label: 'Language Learn',  view: 'japanesekana', hidden: false, icon: 'あ' },
       { id: 'fitness',      label: 'Fitness',          view: 'fitness',      hidden: false, icon: '◈' },
-      { id: 'planner',      label: 'Planner',          view: 'planner',      hidden: false, icon: '≡' },
+      { id: 'planner',      label: 'Calendar',         view: 'planner',      hidden: false, icon: '≡' },
       { id: 'review',       label: 'Review',           view: 'review',       hidden: false, icon: '★' },
       { id: 'notes',        label: 'Notes',            view: 'notes',        hidden: false, icon: '✎' },
     ];
@@ -2234,15 +2241,15 @@ useEffect(() => {
                           className="settings-size-btn"
                           style={{ background: '#ef4444', color: '#fff', border: 'none', fontWeight: 700, padding: '6px 14px' }}
                           onClick={async () => {
-                            showPlannerToast('Starting: Test Block', '09:00 — Click to open Planner');
+                            showPlannerToast('Starting: Test Block', '09:00 — Click to open Calendar');
                             try {
                               if (isTauri) {
                                 const { sendNotification, isPermissionGranted, requestPermission } = await import('@tauri-apps/plugin-notification');
                                 let ok = await isPermissionGranted();
                                 if (!ok) ok = (await requestPermission()) === 'granted';
-                                if (ok) await sendNotification({ title: 'Starting: Test Block', body: 'Click to open Planner', actionTypeId: 'planner-block', data: { type: 'planner' } });
+                                if (ok) await sendNotification({ title: 'Starting: Test Block', body: 'Click to open Calendar', actionTypeId: 'planner-block', data: { type: 'planner' } });
                               } else if (await notifyPermission()) {
-                                await notify('Starting: Test Block', 'Click to open Planner');
+                                await notify('Starting: Test Block', 'Click to open Calendar');
                               }
                             } catch {}
                           }}
@@ -2571,11 +2578,11 @@ useEffect(() => {
           )}
 
 
-          {/* Planner */}
+          {/* Calendar */}
           {activeView === 'planner' && (
             <ViewErrorBoundary>
             <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-              <Planner onPlannerToast={showPlannerToast} onOpenPlanner={() => setActiveView('planner')} />
+              <Calendar onPlannerToast={showPlannerToast} />
             </div>
             </ViewErrorBoundary>
           )}
@@ -2641,6 +2648,15 @@ useEffect(() => {
                       />
                     );
                   }
+                  if (id === 'meds') {
+                    return (
+                      <MedsToday
+                        collapsed={collapsed}
+                        onToggle={onToggle}
+                        onOpenMeds={() => setActiveView('habits')}
+                      />
+                    );
+                  }
                   if (id === 'payments') {
                     return (
                       <SubscriptionTracker
@@ -2692,7 +2708,7 @@ useEffect(() => {
             >
               <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)', marginBottom: 2 }}>{t.title}</div>
               <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{t.body}</div>
-              <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 4 }}>Click to open Planner</div>
+              <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 4 }}>Click to open Calendar</div>
             </div>
           ))}
         </div>

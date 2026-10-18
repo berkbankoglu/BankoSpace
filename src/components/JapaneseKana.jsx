@@ -1247,6 +1247,7 @@ function buildTransposedGrid(rows) {
 }
 
 const CELL_COLORS = [null, '#f85149', '#d2a800', '#3fb950']; // null=none, red, yellow, green
+const MARK_LABELS = ['none', 'red', 'yellow', 'green'];
 
 // A different, stable color per character in the info panel — same character
 // always gets the same color (so it stays a useful visual cue), different
@@ -1333,13 +1334,11 @@ function KanaInfoPanel({ selected }) {
   const [notes, setNotes] = useState(loadCharNotes);
   const noteTimerRef = useRef(null);
 
-  if (!selected) {
-    return (
-      <div className="guide-info-panel">
-        <div className="guide-info-empty">Click a character to see its mnemonics, example words, and your notes here.</div>
-      </div>
-    );
-  }
+  // Nothing selected: render nothing at all rather than a 340px box saying so.
+  // The panel used to hold that column open with a sentence in it, which is a
+  // third of the width spent on an instruction you read once. The same hint now
+  // sits in the toolbar as a few words, and the tables get the space.
+  if (!selected) return null;
 
   const equiv = KANA_EQUIV[selected.romaji];
   const otherChar = selected.isKatakana ? equiv?.hira : equiv?.kata;
@@ -1429,7 +1428,7 @@ function GuideTab() {
             onChange={e => setSearchQuery(e.target.value)}
           />
           <div className="guide-legend">
-            <span className="guide-legend-hint">Right-click to mark:</span>
+            <span className="guide-legend-hint">Click a character for details · right-click to mark:</span>
             {CELL_COLORS.slice(1).map((c, i) => (
               <span key={i} className="guide-legend-dot" style={{ background: c }} />
             ))}
@@ -1517,7 +1516,20 @@ function WrongAnalysis({ pool, stats, onPracticeWrong, onResetWrong }) {
 
 // ── Stats bar ─────────────────────────────────────────────────────────────────
 
-function StatsBar({ pool, stats }) {
+// The strip under the practice card: every character in the current pool, and
+// the mark you put on it yourself.
+//
+// Clicking a cell cycles its colour through the same four states the Guide's
+// tables use (none → red → yellow → green) and writes to the same store, so a
+// character marked here is marked there, and the colour filter above the
+// practice card picks it up immediately.
+//
+// The strip deliberately does NOT colour itself by how the last attempt went.
+// It used to, and the result was a wall of green and red that changed under you
+// every round — your own marks were lost in it. The last attempt is still
+// recorded and still shown, in the tooltip, where it doesn't compete with the
+// one thing here you control.
+function StatsBar({ pool, stats, cellColors = {}, onCellColor }) {
   const [tooltip, setTooltip] = useState(null);
 
   return (
@@ -1525,21 +1537,17 @@ function StatsBar({ pool, stats }) {
       <div className="stats-grid">
         {pool.map((item) => {
           const s = stats[item.char];
-          const status = !s
-            ? "unseen"
-            : s.lastResult === "correct"
-            ? "correct"
-            : "wrong";
+          const markIdx = cellColors[item.char] || 0;
+          const mark = CELL_COLORS[markIdx];
           return (
             <div
               key={item.char}
-              className={`stats-cell stats-cell--${status}`}
-              title={`${item.char} (${item.romaji})`}
-              onClick={() =>
-                setTooltip((prev) =>
-                  prev === item.char ? null : item.char
-                )
-              }
+              className={`stats-cell${mark ? " stats-cell--marked" : ""}`}
+              style={mark ? { "--mark": mark } : undefined}
+              title={`${item.char} (${item.romaji}) — click to mark`}
+              onMouseEnter={() => setTooltip(item.char)}
+              onMouseLeave={() => setTooltip((prev) => (prev === item.char ? null : prev))}
+              onClick={() => onCellColor?.(item.char)}
             >
               {item.char}
               {tooltip === item.char && (
@@ -1549,6 +1557,8 @@ function StatsBar({ pool, stats }) {
                   Correct: {s?.correct || 0}
                   <br />
                   Wrong: {s?.wrong || 0}
+                  <br />
+                  Mark: {MARK_LABELS[markIdx]}
                 </div>
               )}
             </div>
@@ -1637,7 +1647,29 @@ export function PracticeTab({ selectedRows, setSelectedRows }) {
     : basePool.filter(item => selectedRows.includes(item.char));
 
   // Filter by color mark
-  const cellColors = loadCellColors();
+  const [cellColors, setCellColors] = useState(loadCellColors);
+
+  // Set a character's mark outright. The card offers all four at once, because
+  // the moment you want it — you just got the character wrong — cycling three
+  // times to reach red is three times too many.
+  const setCellColor = useCallback((char, idx) => {
+    setCellColors(prev => {
+      const next = { ...prev };
+      if (idx) next[char] = idx; else delete next[char];
+      saveCellColors(next);
+      return next;
+    });
+  }, []);
+
+  // Same cycle as the Guide's tables, writing to the same store.
+  const cycleCellColor = useCallback((char) => {
+    setCellColors(prev => {
+      const next = { ...prev, [char]: ((prev[char] || 0) + 1) % CELL_COLORS.length };
+      if (!next[char]) delete next[char];
+      saveCellColors(next);
+      return next;
+    });
+  }, []);
   const hasColorFilter = colorFilter.size > 0;
   const colorFilteredPool = hasColorFilter
     ? basePool.filter(item => colorFilter.has(cellColors[item.char] || 0))
@@ -2019,6 +2051,23 @@ export function PracticeTab({ selectedRows, setSelectedRows }) {
                 {question}
               </span>
               <button className="speak-btn" onClick={() => speakKana(current?.char)} title="Hear pronunciation">🔊</button>
+              {/* Mark the character without leaving the card — the same four
+                  states as the strip below and the Guide's tables, written to
+                  the same store. */}
+              {current?.char && (
+                <div className="card-marks">
+                  {CELL_COLORS.map((c, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      className={`card-mark${(cellColors[current.char] || 0) === idx ? " card-mark--active" : ""}${idx === 0 ? " card-mark--none" : ""}`}
+                      style={c ? { "--mark": c } : undefined}
+                      onClick={() => setCellColor(current.char, idx)}
+                      title={`Mark ${MARK_LABELS[idx]}`}
+                    />
+                  ))}
+                </div>
+              )}
               {feedback === "correct" && (
                 <span className="feedback-icon feedback-icon--correct">✓</span>
               )}
@@ -2089,7 +2138,14 @@ export function PracticeTab({ selectedRows, setSelectedRows }) {
         </div>
       </div>
 
-      {!vocabMode && <StatsBar pool={effectivePool} stats={stats} />}
+      {!vocabMode && (
+        <StatsBar
+          pool={effectivePool}
+          stats={stats}
+          cellColors={cellColors}
+          onCellColor={cycleCellColor}
+        />
+      )}
 
       {!vocabMode && (
         <WrongAnalysis

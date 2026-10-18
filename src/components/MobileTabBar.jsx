@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import './MobileTabBar.css';
 
-const PRIMARY_IDS = ['dashboard', 'checklists', 'habits', 'notes'];
+// How many views get a tab of their own before the rest fold into "More".
+const PRIMARY_COUNT = 4;
 
 // Bottom tab bar — the mobile replacement for the desktop's persistent left
 // sidebar (that sidebar stays completely untouched; this only ever renders
@@ -10,11 +11,13 @@ const PRIMARY_IDS = ['dashboard', 'checklists', 'habits', 'notes'];
 export default function MobileTabBar({ items, activeView, onNavigate }) {
   const [showMore, setShowMore] = useState(false);
 
+  // The tabs follow the sidebar's own order rather than a list fixed here, so
+  // whatever you keep at the top of the sidebar is what you get at the bottom
+  // of the phone — and reordering the sidebar reorders these too. The previous
+  // fixed list predated the calendar and left it buried under "More".
   const visible = items.filter(i => !i.hidden);
-  const primary = PRIMARY_IDS
-    .map(id => visible.find(i => i.id === id))
-    .filter(Boolean);
-  const rest = visible.filter(i => !primary.includes(i));
+  const primary = visible.slice(0, PRIMARY_COUNT);
+  const rest = visible.slice(PRIMARY_COUNT);
   const moreIsActive = rest.some(i => i.view === activeView);
 
   const go = (view) => { onNavigate(view); setShowMore(false); };

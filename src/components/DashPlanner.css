@@ -122,6 +122,8 @@
 
 /* Day grid — same shape as the Planner page, sized down for the column */
 .dp-grid-scroll {
+  /* Keeps a usable slice of the day on screen however short the panel gets. */
+  min-height: 120px;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -405,6 +407,10 @@
 .dp-qtasks {
   display: flex;
   flex-direction: column;
+  /* The strip gives way before the hour grid does: in a short window it used
+     to take the whole panel and leave no grid at all. */
+  max-height: 40%;
+  overflow-y: auto;
   gap: 12px;
   padding: 11px 12px 12px;
   border-top: 1px solid var(--border);
@@ -526,3 +532,40 @@
   .dp-qtask { transition: none; }
   .dp-qtask:hover { transform: none; }
 }
+
+/* All-day and multi-day events, above the hour grid. They have no place on a
+ * time axis — before this they were simply invisible on the dashboard. */
+.dp-allday {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border);
+  flex: 0 0 auto;
+}
+.dp-allday-label {
+  flex: 0 0 auto;
+  padding-top: 2px;
+  font-size: 9px;
+  color: var(--text-muted);
+}
+.dp-allday-items { display: flex; flex-wrap: wrap; gap: 3px; min-width: 0; }
+.dp-allday-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 2px 7px;
+  font-size: 11px;
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--block-color) 30%, var(--bg-card));
+  border: none;
+  border-left: 3px solid var(--block-color);
+  border-radius: 3px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dp-allday-bar:hover { background: color-mix(in srgb, var(--block-color) 42%, var(--bg-card)); }
+.dp-allday-mark { font-size: 9px; color: var(--text-secondary); }

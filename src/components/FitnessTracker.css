@@ -1429,3 +1429,70 @@
 }
 
 .ft-mini-cal-day--selected .ft-mini-cal-day-dot { background: var(--accent); }
+
+/* ── Narrow window ───────────────────────────────────────────────────────
+ *
+ * Two things break here below about 900px. The hero's numbers are laid out in
+ * a row with 1px vertical rules between them; once that row wraps, the rules
+ * end up stranded between lines and the labels no longer line up with their
+ * figures — which is why the top of the page read as scrambled. And the panels
+ * below it are a row of resizable columns whose widths are set inline, so they
+ * simply ran off the right-hand edge.
+ *
+ * Stacked: the stats become a two-column grid without separators, and each
+ * panel takes the full width with the page scrolling. */
+@media (max-width: 900px) {
+  /* The hero is itself a row: the numbers on the left, the Composition / Goal
+     / Profile buttons on the right. Narrow, the buttons kept their width and
+     the numbers were compressed underneath them — which is why they appeared
+     to sit on top of each other. */
+  .ft-hero {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 16px;
+  }
+
+  .ft-hero-stats {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 0;
+    width: 100%;
+  }
+
+  .ft-hstat {
+    padding: 0 10px;
+  }
+
+  .ft-hstat-val {
+    font-size: 27px;
+    letter-spacing: -0.5px;
+  }
+
+  /* Dividers only make sense between items on one line. */
+  .ft-hstat-sep {
+    display: none;
+  }
+
+  .ft-main-layout {
+    flex-direction: column;
+  }
+
+  /* Inline width/flex per column, so these have to shout. */
+  .ft-resizable-col {
+    width: 100% !important;
+    min-width: 0 !important;
+    flex: 0 0 auto !important;
+    overflow: visible;
+  }
+
+  .ft-resize-handle,
+  .ft-resize-handle-v {
+    display: none !important;
+  }
+
+  .ft-menu-sidebar {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+}

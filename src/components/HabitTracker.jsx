@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, Fragment } from 'react';
 import { confirmAsync } from '../platform';
+import Medications from './Medications';
 import './HabitTracker.css';
 import { playAddSound, playDeleteSound, playCompleteSound, playUncompleteSound } from '../utils/sounds';
 
@@ -49,6 +50,7 @@ export default function HabitTracker() {
   const [newName, setNewName] = useState('');
   const [newIcon, setNewIcon] = useState(ICON_CHOICES[0]);
   const [newColor, setNewColor] = useState(DEFAULT_HABIT_COLOR);
+  const [tab, setTab] = useState('habits');
   const [newIconPage, setNewIconPage] = useState(0);
   const [editingHabitId, setEditingHabitId] = useState(null);
   const [editName, setEditName] = useState('');
@@ -245,13 +247,22 @@ export default function HabitTracker() {
   return (
     <div className="ht-root">
       <div className="ht-header">
-        <div className="ht-title">Habits</div>
-        {habits.length > 0 && (
+        {/* Two things live on this page now: the habit grid, and medications.
+            They are different shapes — a grid of daily ticks versus a list of
+            doses with times — so they get a tab each rather than being stacked
+            on one scrolling page. */}
+        <div className="ht-tabs">
+          <button className={`ht-tab${tab === 'habits' ? ' active' : ''}`} onClick={() => setTab('habits')}>Habits</button>
+          <button className={`ht-tab${tab === 'meds' ? ' active' : ''}`} onClick={() => setTab('meds')}>Medications</button>
+        </div>
+        {tab === 'habits' && habits.length > 0 && (
           <button className="ht-add-btn" onClick={() => { setNewIconPage(0); setShowAdd(true); }}>+ Add Habit</button>
         )}
       </div>
 
-      {habits.length > 0 && (
+      {tab === 'meds' && <Medications />}
+
+      {tab === 'habits' && habits.length > 0 && (
         <div className="ht-month-nav">
           <button className="ht-month-arrow" onClick={goPrevMonth} title="Previous month">‹</button>
           <button className="ht-month-label" onClick={goToday} title="Jump to today">{MONTH_NAMES[viewMonth]} {viewYear}</button>
@@ -259,7 +270,7 @@ export default function HabitTracker() {
         </div>
       )}
 
-      {habits.length === 0 ? (
+      {tab === 'habits' && (habits.length === 0 ? (
         <div className="ht-empty">
           <button className="ht-add-btn-big" onClick={() => { setNewIconPage(0); setShowAdd(true); }}>+ Add Habit</button>
         </div>
@@ -338,7 +349,7 @@ export default function HabitTracker() {
             );
           })}
         </div>
-      )}
+      ))}
 
       {showAdd && (
         <div className="ht-modal-overlay" onClick={() => setShowAdd(false)}>

@@ -21,6 +21,29 @@
   color: var(--text-primary);
 }
 
+/* Habits and medications are two different shapes of thing on one page, so
+   they get a tab each rather than one long scroll. */
+.ht-tabs {
+  display: flex;
+  padding: 3px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+}
+
+.ht-tab {
+  padding: 6px 16px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.ht-tab:hover:not(.active) { color: var(--text-primary); }
+.ht-tab.active { background: var(--accent); color: #fff; }
+
 .ht-add-btn {
   background: var(--accent);
   color: #fff;
@@ -440,8 +463,47 @@
    scrolls" design at normal widths; on a phone the fixed per-habit column
    widths just don't all fit, so let it scroll horizontally instead of
    clipping. A touch-first Habit Tracker layout is its own future pass. */
-@media (max-width: 768px) {
+/* ── Narrow window ───────────────────────────────────────────────────────
+ *
+ * Seven habits need about 700px of columns; below that the grid scrolls
+ * sideways. Two things have to hold for that to be usable: the habit names must
+ * stay inside their own column instead of running into the next one, and the
+ * date column has to stay put while the habits scroll past it — otherwise you
+ * are looking at a row of ticks with no idea which day it is. */
+@media (max-width: 900px) {
   .ht-grid {
     overflow-x: auto;
+  }
+
+  /* 90px was wider than the column itself, so the name simply spilled over its
+     neighbour rather than being cut with an ellipsis. Clipping alone wasn't
+     enough though — two names cut at their own edges still touch, and
+     "Game DevJapanese" reads as one word. The smaller size plus real padding
+     is what separates them. */
+  .ht-habit-name {
+    max-width: 100%;
+    font-size: 12px;
+  }
+
+  .ht-cell-habit-header {
+    padding: 6px 7px;
+  }
+
+  .ht-cell-corner,
+  .ht-cell-date {
+    position: sticky;
+    left: 0;
+    z-index: 3;
+    background: var(--bg-card);
+  }
+
+  /* The header row sits above the dates where the two overlap. */
+  .ht-cell-corner {
+    z-index: 4;
+  }
+
+  /* An icon that size costs a third of the visible grid on a phone. */
+  .ht-habit-icon {
+    font-size: 26px;
   }
 }
