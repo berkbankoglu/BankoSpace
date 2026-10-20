@@ -3,7 +3,7 @@ import { flushSync } from 'react-dom';
 import { isTauri, proxyFetch, confirmAsync, notifyPermission, notify, exportJSON, importJSON, windowControls, startWindowDrag } from './platform';
 import logo from './assets/logo.svg';
 import './App.css';
-import { supabase, pullFromSupabase, pushKeyToSupabase, pushAllToSupabase, pushDirtyToSupabase, markDirty, purgeApiKeyFromSupabase, getCachedUserId, SYNC_KEYS } from './supabase';
+import { supabase, pullFromSupabase, pushKeyToSupabase, pushAllToSupabase, pushDirtyToSupabase, markDirty, getLatestUpdateTime, purgeApiKeyFromSupabase, getCachedUserId, SYNC_KEYS } from './supabase';
 import Login from './components/Login';
 import CategoryColumn from './components/CategoryColumn';
 import FlashCards from './components/FlashCards';
@@ -263,7 +263,7 @@ function TaskContributionGraph({ todos, contributionLog }) {
 }
 import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, setVolume, getVolume } from './utils/sounds';
 
-const APP_VERSION = '4.8.1';
+const APP_VERSION = '4.9.0';
 const MIN_COL_PX = 220;
 const DEFAULT_COL_PX = [null, null, null, null]; // one per dashboard column — null = auto (flex:1)
 
@@ -416,7 +416,7 @@ function App({ session, onLogout }) {
           if (window.__diag) {
             window.__diag(`ACCOUNT: pull changed=${changed} | after pull: notes=${sizeOf('notes')} backup=${sizeOf('notes_local_backup')} todos=${sizeOf('todos')}`);
           }
-          if (changed) window.location.reload();
+          if (changed.length) window.location.reload();
         });
       }
 
@@ -450,7 +450,7 @@ function App({ session, onLogout }) {
             lastPushed[key] = value;
             pushKeyToSupabase(key, value, owner);
             delete pendingKeys[key];
-          }, 2000);
+          }, 700);
         }
       };
 
@@ -467,6 +467,7 @@ function App({ session, onLogout }) {
       // Leaving an account drops whatever is still queued: those values belong
       // to the account on the way out, and the push they were scheduled for
       // would otherwise land after the session has already swapped.
+      window.__flushPendingPushes = flushAll;
       window.__cancelPendingPushes = () => {
         Object.keys(debounceTimers).forEach(k => clearTimeout(debounceTimers[k]));
         Object.keys(pendingKeys).forEach(k => delete pendingKeys[k]);
@@ -525,6 +526,7 @@ function App({ session, onLogout }) {
       mounted = false;
       localStorage.setItem = origSetItem;
       delete window.__cancelPendingPushes;
+      delete window.__flushPendingPushes;
     };
   }, []);
 
@@ -928,6 +930,81 @@ const [dailyChecklistCollapsed, setDailyChecklistCollapsed] = useState(() => {
     localStorage.setItem('lastUpdated', timestamp);
   }, [todos]);
 
+
+  // ── Live sync with the other machine ──────────────────────────────────────
+  //
+  // The pull used to happen once, at startup, so a task typed on the laptop was
+  // invisible on the desktop until the desktop was restarted. A cheap query
+  // asks only for the newest updated_at across this account's rows; the full
+  // pull runs only when that moves.
+  //
+  // Applying what comes back is the delicate half. `todos` lives in React
+  // state and is written back to localStorage by the effect above, so a pull
+  // that only touched localStorage would be overwritten by the stale state a
+  // moment later — and then pushed to the cloud. So state is re-hydrated here
+  // explicitly. Anything else reloads the window, but only while the window is
+  // not the one being typed in: the machine you are using keeps its scroll
+  // position and half-finished input, and the one you are not using is already
+  // current by the time you look at it.
+  const lastSeenUpdate = useRef(null);
+  const syncing = useRef(false);
+
+  const applyPull = useCallback((changedKeys) => {
+    if (!changedKeys.length) return;
+    const rest = changedKeys.filter(k => k !== 'todos');
+
+    if (changedKeys.includes('todos')) {
+      try { setTodos(JSON.parse(localStorage.getItem('todos')) || []); } catch { /* keep what we have */ }
+    }
+    // A write from this same document does not raise `storage`, so the
+    // components that already listen for it are told by hand.
+    rest.forEach(key => window.dispatchEvent(new StorageEvent('storage', { key })));
+
+    if (rest.length && !document.hasFocus()) window.location.reload();
+  }, []);
+
+  const syncNow = useCallback(async () => {
+    if (syncing.current || !getCachedUserId()) return;
+    syncing.current = true;
+    try {
+      if (window.__flushPendingPushes) await Promise.all(window.__flushPendingPushes());
+      applyPull(await pullFromSupabase());
+      lastSeenUpdate.current = await getLatestUpdateTime();
+    } finally {
+      syncing.current = false;
+    }
+  }, [applyPull]);
+
+  useEffect(() => {
+    let stopped = false;
+    const tick = async () => {
+      if (stopped || syncing.current || !getCachedUserId()) return;
+      // One row, one column — cheap enough to ask for every few seconds.
+      const latest = await getLatestUpdateTime();
+      if (stopped || !latest || latest === lastSeenUpdate.current) return;
+      lastSeenUpdate.current = latest;
+      syncing.current = true;
+      try { applyPull(await pullFromSupabase()); } finally { syncing.current = false; }
+    };
+    const iv = setInterval(tick, 4000);
+    // Coming back to a window is exactly when its contents are most likely to
+    // be out of date.
+    window.addEventListener('focus', tick);
+    return () => { stopped = true; clearInterval(iv); window.removeEventListener('focus', tick); };
+  }, [applyPull]);
+
+  // Ctrl/Cmd+S: send what is queued and pull straight away, for when four
+  // seconds is three seconds too long.
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        syncNow();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [syncNow]);
 
   // Save sidebar order
   useEffect(() => {

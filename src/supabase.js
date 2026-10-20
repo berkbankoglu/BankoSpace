@@ -179,8 +179,9 @@ function normalizeForCompare(val) {
   }
 }
 
-// Pull all data from Supabase and write to localStorage
-// Returns true only if data actually changed semantically
+// Pull all data from Supabase and write to localStorage.
+// Returns the list of keys that actually changed, so the caller can decide
+// what to re-read: a boolean only ever supported "reload the whole window".
 export async function pullFromSupabase() {
   try {
     const userId = await getUserId();
@@ -204,7 +205,7 @@ export async function pullFromSupabase() {
         || localStorage.__origSetItem
         || localStorage.setItem.bind(localStorage);
 
-      let anyChanged = false;
+      const changedKeys = [];
 
       data.forEach(({ key, value }) => {
         if (value === null || value === undefined) return;
@@ -227,19 +228,19 @@ export async function pullFromSupabase() {
         const changed = normalizeForCompare(supaVal) !== normalizeForCompare(localStr);
         if (!changed) return;
 
-        anyChanged = true;
+        changedKeys.push(key);
         // Flag to prevent overridden setItem from pushing back to Supabase
         window.__supabasePulling = true;
         rawSetItem.call(localStorage, key, supaStr);
         window.__supabasePulling = false;
       });
 
-      return anyChanged;
+      return changedKeys;
     }
-    return false;
+    return [];
   } catch (e) {
     console.error('Supabase pull error:', e);
-    return false;
+    return [];
   }
 }
 
