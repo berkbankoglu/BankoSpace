@@ -3,7 +3,7 @@ import { flushSync } from 'react-dom';
 import { isTauri, proxyFetch, confirmAsync, notifyPermission, notify, exportJSON, importJSON, windowControls, startWindowDrag } from './platform';
 import logo from './assets/logo.svg';
 import './App.css';
-import { supabase, pullFromSupabase, pushKeyToSupabase, pushAllToSupabase, purgeApiKeyFromSupabase, getCachedUserId, SYNC_KEYS } from './supabase';
+import { supabase, pullFromSupabase, pushKeyToSupabase, pushAllToSupabase, pushDirtyToSupabase, markDirty, purgeApiKeyFromSupabase, getCachedUserId, SYNC_KEYS } from './supabase';
 import Login from './components/Login';
 import CategoryColumn from './components/CategoryColumn';
 import FlashCards from './components/FlashCards';
@@ -263,7 +263,7 @@ function TaskContributionGraph({ todos, contributionLog }) {
 }
 import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, setVolume, getVolume } from './utils/sounds';
 
-const APP_VERSION = '4.8.0';
+const APP_VERSION = '4.8.1';
 const MIN_COL_PX = 220;
 const DEFAULT_COL_PX = [null, null, null, null]; // one per dashboard column — null = auto (flex:1)
 
@@ -410,6 +410,9 @@ function App({ session, onLogout }) {
           window.__diag(`ACCOUNT: session ${session?.user?.id || '?'} (${session?.user?.email || '?'}) | before pull: notes=${sizeOf('notes')} backup=${sizeOf('notes_local_backup')} todos=${sizeOf('todos')}`);
         }
         purge.then(() => pullFromSupabase()).then(changed => {
+          // Anything still marked is a local change the cloud has not seen —
+          // the pull just protected it, now let the cloud catch up.
+          pushDirtyToSupabase();
           if (window.__diag) {
             window.__diag(`ACCOUNT: pull changed=${changed} | after pull: notes=${sizeOf('notes')} backup=${sizeOf('notes_local_backup')} todos=${sizeOf('todos')}`);
           }
@@ -438,6 +441,9 @@ function App({ session, onLogout }) {
           // (autosave effects often re-write identical data on unrelated renders).
           if (lastPushed[key] === value) return;
           const owner = getCachedUserId();
+          // Written down before the timer is even set, because the timer dies
+          // with the process and this has to survive it.
+          markDirty(key);
           pendingKeys[key] = { value, owner };
           clearTimeout(debounceTimers[key]);
           debounceTimers[key] = setTimeout(() => {
@@ -466,6 +472,11 @@ function App({ session, onLogout }) {
         Object.keys(pendingKeys).forEach(k => delete pendingKeys[k]);
       };
       window.addEventListener('beforeunload', flushAll);
+      // macOS quits the app without necessarily running the window-close path
+      // below, so don't sit on a queued write while the app is in the
+      // background: send it as soon as it stops being the active window.
+      window.addEventListener('blur', flushAll);
+      window.addEventListener('pagehide', flushAll);
 
       // Pencere kapatma isteğini yakalayıp bekleyen push'lar bitmeden
       // pencereyi gerçekten kapatmıyoruz — aksi halde 2sn'lik debounce
@@ -497,12 +508,15 @@ function App({ session, onLogout }) {
       localStorage.removeItem = function(key) {
         origRemoveItem(key);
         if (SYNC_KEYS.includes(key)) {
+          markDirty(key);
           pushKeyToSupabase(key, null);
         }
       };
 
       return () => {
         window.removeEventListener('beforeunload', flushAll);
+        window.removeEventListener('blur', flushAll);
+        window.removeEventListener('pagehide', flushAll);
         if (unlistenClose) unlistenClose();
       };
     });

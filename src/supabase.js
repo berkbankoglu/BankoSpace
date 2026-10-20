@@ -194,6 +194,11 @@ export async function pullFromSupabase() {
     if (error) throw error;
 
     if (data && data.length > 0) {
+      // Local changes that never reached the cloud outrank whatever the cloud
+      // still holds for that key — taking the remote copy here is exactly what
+      // deleted work typed shortly before the app was closed.
+      const dirty = readDirtyKeys();
+
       // Use raw setItem to avoid triggering push-back to Supabase during pull
       const rawSetItem = Object.getOwnPropertyDescriptor(Storage.prototype, 'setItem')?.value
         || localStorage.__origSetItem
@@ -203,6 +208,7 @@ export async function pullFromSupabase() {
 
       data.forEach(({ key, value }) => {
         if (value === null || value === undefined) return;
+        if (dirty.has(key)) return;
 
         const supaVal = typeof value === 'string' ? (() => { try { return JSON.parse(value); } catch { return value; } })() : value;
         const supaStr = typeof value === 'string' ? value : JSON.stringify(value);
@@ -252,6 +258,64 @@ export async function purgeApiKeyFromSupabase() {
   }
 }
 
+// ── Unsynced local changes ──────────────────────────────────────────────────
+//
+// A local write is queued for a couple of seconds before it is sent. Quit the
+// app inside that window — or lose the network, or have the request fail — and
+// the cloud still holds the previous value while localStorage holds the new
+// one. The next launch then pulled the cloud copy over the top and the change
+// was gone for good. That is a silent delete of something the user typed.
+//
+// So the fact that a key is waiting to be sent is written down, and it
+// survives the restart: on the next pull those keys are left alone, because a
+// local change that never reached the cloud is by definition newer than what
+// the cloud still has. No clock comparison is involved — two machines' clocks
+// are not something to stake somebody's data on.
+export const DIRTY_KEY = '__sync_dirty';
+
+// Writes go through the untouched setItem: App.jsx replaces localStorage's own
+// with one that schedules pushes, and this bookkeeping must not feed itself.
+function rawSet(key, value) {
+  const fn = Object.getOwnPropertyDescriptor(Storage.prototype, 'setItem')?.value
+    || localStorage.__origSetItem
+    || localStorage.setItem.bind(localStorage);
+  try { fn.call(localStorage, key, value); } catch {}
+}
+
+export function readDirtyKeys() {
+  try {
+    const v = JSON.parse(localStorage.getItem(DIRTY_KEY));
+    return Array.isArray(v) ? new Set(v) : new Set();
+  } catch { return new Set(); }
+}
+
+export function markDirty(key) {
+  if (!SYNC_KEYS.includes(key)) return;
+  const d = readDirtyKeys();
+  if (d.has(key)) return;
+  d.add(key);
+  rawSet(DIRTY_KEY, JSON.stringify([...d]));
+}
+
+function clearDirty(key) {
+  const d = readDirtyKeys();
+  if (!d.delete(key)) return;
+  rawSet(DIRTY_KEY, JSON.stringify([...d]));
+}
+
+// After a pull, anything still marked is a local change the cloud has not seen.
+// Send it, so the two sides converge instead of the mark living forever.
+export async function pushDirtyToSupabase() {
+  const dirty = readDirtyKeys();
+  if (dirty.size === 0) return;
+  const userId = await getUserId();
+  if (!userId) return;
+  for (const key of dirty) {
+    const value = localStorage.getItem(key);
+    await pushKeyToSupabase(key, value === null ? null : value);
+  }
+}
+
 // Tek bir key'i Supabase'e yaz (value === null ise Supabase'den sil)
 export async function pushKeyToSupabase(key, value, expectedUserId) {
   if (!SYNC_KEYS.includes(key)) return;
@@ -267,11 +331,13 @@ export async function pushKeyToSupabase(key, value, expectedUserId) {
     }
 
     if (value === null || value === undefined) {
-      await supabase
+      const { error } = await supabase
         .from('user_data')
         .delete()
         .eq('user_id', userId)
         .eq('key', key);
+      if (error) throw error;
+      clearDirty(key);
       return;
     }
 
@@ -279,9 +345,13 @@ export async function pushKeyToSupabase(key, value, expectedUserId) {
     try { parsed = typeof value === 'string' ? JSON.parse(value) : value; }
     catch { parsed = value; }
 
-    await supabase
+    const { error } = await supabase
       .from('user_data')
       .upsert({ user_id: userId, key, value: parsed, updated_at: new Date().toISOString() });
+    if (error) throw error;
+    // Only now is the cloud actually holding this value. Clearing the mark any
+    // earlier would hand the next pull permission to overwrite it.
+    clearDirty(key);
   } catch (e) {
     console.error('Supabase push error:', e);
   }
