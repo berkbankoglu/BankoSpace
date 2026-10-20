@@ -81,13 +81,20 @@ function CategoryColumn({ title, category, todos, currentFilter, actions, isMobi
   const [completingIds, setCompletingIds] = useState(new Set());
   const [colorPickerTodoId, setColorPickerTodoId] = useState(null);
   const [colorPickerPos, setColorPickerPos] = useState(null);
+  // The row's actions live behind one button rather than a strip of icons, so
+  // a list of tasks reads as a list of tasks.
+  const [menuTodoId, setMenuTodoId] = useState(null);
+  const [menuPos, setMenuPos] = useState(null);
   const [copiedSubtaskId, setCopiedSubtaskId] = useState(null);
   const inputRef = useRef(null);
   const editInputRef = useRef(null);
   const editSubtaskInputRef = useRef(null);
 
   useEffect(() => {
-    const close = () => { setColorPickerTodoId(null); setColorPickerPos(null); };
+    const close = () => {
+      setColorPickerTodoId(null); setColorPickerPos(null);
+      setMenuTodoId(null); setMenuPos(null);
+    };
     window.addEventListener('close-color-pickers', close);
     document.addEventListener('click', close);
     return () => { window.removeEventListener('close-color-pickers', close); document.removeEventListener('click', close); };
@@ -409,23 +416,9 @@ function CategoryColumn({ title, category, todos, currentFilter, actions, isMobi
             onClick={() => { if (todo.subtasks && todo.subtasks.length > 0) toggleExpand(todo.id); }}
           >
             {todo.color && <div className="cc-item-color-bar" style={{ background: todo.color }} />}
-            {/* Top row: drag handle + checkbox + actions */}
+            {/* One row: handle, checkbox, the text itself, and a single
+                button for everything you can do to it. */}
             <div className="cc-item-top">
-              <div className="cc-drag-handle" title="Drag" onMouseDown={(e) => onTodoDragStart(e, todo)}>⠿</div>
-              {/* Touch-friendly stand-in for the mouse-only drag handle above —
-                  hidden by default, shown only under the mobile breakpoint (App.css). */}
-              <div className="cc-reorder-btns" onClick={e => e.stopPropagation()}>
-                <button
-                  className="cc-reorder-btn"
-                  disabled={idx === 0}
-                  onClick={() => onMoveTodo(todo.id, category, -1)}
-                >▲</button>
-                <button
-                  className="cc-reorder-btn"
-                  disabled={idx === sortedTodos.length - 1}
-                  onClick={() => onMoveTodo(todo.id, category, 1)}
-                >▼</button>
-              </div>
               <label className="cc-inline-check" onClick={e => e.stopPropagation()}>
                 <input type="checkbox" className="cc-checkbox" checked={todo.completed} onChange={() => {
                   if (!todo.completed) {
@@ -440,46 +433,7 @@ function CategoryColumn({ title, category, todos, currentFilter, actions, isMobi
                 }} />
                 <span className="cc-checkmark"></span>
               </label>
-              <div className="cc-item-actions">
-                {todo.subtasks && todo.subtasks.length > 0 && (
-                  <span className="cc-subtask-badge">
-                    {todo.subtasks.filter(s => s.completed).length}/{todo.subtasks.length}
-                  </span>
-                )}
-                <button
-                  className="cc-action-btn color-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const isOpen = colorPickerTodoId === todo.id;
-                    window.dispatchEvent(new Event('close-color-pickers'));
-                    if (!isOpen) {
-                      const rect = e.currentTarget.getBoundingClientRect();
-                      setColorPickerPos({ bottom: window.innerHeight - rect.top + 4, left: rect.left });
-                      setColorPickerTodoId(todo.id);
-                    }
-                  }}
-                  title="Color"
-                  style={{ color: todo.color || '#333' }}
-                >●</button>
-                <button
-                  className="cc-action-btn edit-btn"
-                  onClick={(e) => { e.stopPropagation(); setEditingTodoId(todo.id); setEditingTodoText(todo.text); }}
-                  title="Edit"
-                >✎</button>
-                <button
-                  className="cc-action-btn expand"
-                  onClick={(e) => { e.stopPropagation(); toggleExpand(todo.id); }}
-                  title="Subtasks"
-                >{expandedTodos.has(todo.id) ? '−' : '+'}</button>
-                <button
-                  className="cc-action-btn delete"
-                  onClick={(e) => { e.stopPropagation(); playDeleteSound(); onDeleteTodo(todo.id); }}
-                  title="Delete"
-                >×</button>
-              </div>
-            </div>
-            {/* Bottom row: text */}
-            <label className="cc-label">
+              <label className="cc-label">
               {editingTodoId === todo.id ? (
                 <GrowTextarea
                   ref={editInputRef}
@@ -503,14 +457,53 @@ function CategoryColumn({ title, category, todos, currentFilter, actions, isMobi
                   autoFocus
                 />
               ) : (
-                <>
-                  <span className="cc-text" onDoubleClick={() => { setEditingTodoId(todo.id); setEditingTodoText(todo.text); }}>{todo.text}</span>
-                  {todo.subtasks && todo.subtasks.length > 0 && !expandedTodos.has(todo.id) && (
-                    <span className="cc-subtask-count-hint">+{todo.subtasks.length}</span>
-                  )}
-                </>
+                <span className="cc-text" onDoubleClick={() => { setEditingTodoId(todo.id); setEditingTodoText(todo.text); }}>{todo.text}</span>
               )}
-            </label>
+              </label>
+
+              {todo.subtasks && todo.subtasks.length > 0 && (
+                /* The slot is one text line tall and centres the pill in it;
+                   the pill keeps its own small size. */
+                <span className="cc-badge-slot">
+                  <span className="cc-subtask-badge">
+                    {todo.subtasks.filter(s => s.completed).length}/{todo.subtasks.length}
+                  </span>
+                </span>
+              )}
+              <div className="cc-drag-handle" title="Drag" onMouseDown={(e) => onTodoDragStart(e, todo)}>⠿</div>
+              {/* Touch-friendly stand-in for the mouse-only drag handle —
+                  hidden by default, shown only under the mobile breakpoint (App.css). */}
+              <div className="cc-reorder-btns" onClick={e => e.stopPropagation()}>
+                <button
+                  className="cc-reorder-btn"
+                  disabled={idx === 0}
+                  onClick={() => onMoveTodo(todo.id, category, -1)}
+                >▲</button>
+                <button
+                  className="cc-reorder-btn"
+                  disabled={idx === sortedTodos.length - 1}
+                  onClick={() => onMoveTodo(todo.id, category, 1)}
+                >▼</button>
+              </div>
+              <button
+                className="cc-menu-btn"
+                title="Actions"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const isOpen = menuTodoId === todo.id;
+                  window.dispatchEvent(new Event('close-color-pickers'));
+                  if (isOpen) return;
+                  const r = e.currentTarget.getBoundingClientRect();
+                  // Open upwards when there is no room below, so the menu is
+                  // never half off the bottom of a short column.
+                  const below = window.innerHeight - r.bottom;
+                  setMenuPos(below > 190
+                    ? { top: r.bottom + 4, right: window.innerWidth - r.right }
+                    : { bottom: window.innerHeight - r.top + 4, right: window.innerWidth - r.right });
+                  setMenuTodoId(todo.id);
+                }}
+              >⋯</button>
+            </div>
 
             {/* Subtasks */}
             <div className={`cc-subtasks-wrapper${expandedTodos.has(todo.id) ? ' expanded' : ''}`} onClick={(e) => e.stopPropagation()}>
@@ -701,6 +694,69 @@ function CategoryColumn({ title, category, todos, currentFilter, actions, isMobi
         </div>
       )}
         </>
+      )}
+
+      {/* The row's actions. One button opens this instead of five icons
+          sitting on top of the task you were trying to read. Portalled for the
+          same reason as the colour picker: it must escape the column's
+          overflow and the page zoom. */}
+      {menuTodoId && menuPos && ReactDOM.createPortal(
+        (() => {
+          const todo = todos.find(t => t.id === menuTodoId);
+          if (!todo) return null;
+          const hasSubs = !!(todo.subtasks && todo.subtasks.length > 0);
+          const expanded = expandedTodos.has(todo.id);
+          const close = () => { setMenuTodoId(null); setMenuPos(null); };
+          return (
+            <div
+              className="cc-menu"
+              style={{ position: 'fixed', ...menuPos }}
+              onMouseDown={e => e.stopPropagation()}
+              onClick={e => e.stopPropagation()}
+            >
+              <button
+                className="cc-menu-item"
+                onClick={() => {
+                  // Hand the colour picker the menu's own corner, so it opens
+                  // where the menu was rather than jumping across the column.
+                  setMenuTodoId(null);
+                  setColorPickerPos({
+                    bottom: menuPos.bottom ?? (window.innerHeight - menuPos.top),
+                    left: Math.max(8, window.innerWidth - menuPos.right - 150),
+                  });
+                  setColorPickerTodoId(todo.id);
+                  setMenuPos(null);
+                }}
+              >
+                <span className="cc-menu-icon" style={{ color: todo.color || 'var(--text-muted)' }}>●</span>
+                Color
+              </button>
+              <button
+                className="cc-menu-item"
+                onClick={() => { setEditingTodoId(todo.id); setEditingTodoText(todo.text); close(); }}
+              >
+                <span className="cc-menu-icon">✎</span>
+                Edit
+              </button>
+              <button
+                className="cc-menu-item"
+                onClick={() => { toggleExpand(todo.id); close(); }}
+              >
+                <span className="cc-menu-icon">{hasSubs && expanded ? '−' : '+'}</span>
+                {hasSubs ? (expanded ? 'Hide subtasks' : 'Show subtasks') : 'Add subtask'}
+              </button>
+              <div className="cc-menu-sep" />
+              <button
+                className="cc-menu-item danger"
+                onClick={() => { playDeleteSound(); onDeleteTodo(todo.id); close(); }}
+              >
+                <span className="cc-menu-icon">×</span>
+                Delete
+              </button>
+            </div>
+          );
+        })(),
+        document.body
       )}
 
       {/* Color picker rendered into document.body to escape zoom/overflow */}

@@ -10839,3 +10839,65 @@ input::placeholder, textarea::placeholder { color: var(--text-muted) !important;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ── Settings in a narrow window ─────────────────────────────────────────────
+   The modal is 800px wide with a fixed 220px nav beside it. In a phone-shaped
+   window that left roughly a hundred pixels for the actual settings, so the
+   two panes stack: the nav becomes a row of chips that scrolls sideways above
+   the content it switches. */
+@media (max-width: 860px) {
+  .settings-modal-overlay {
+    padding: 10px;
+    align-items: stretch;
+  }
+
+  .settings-modal {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    flex-direction: column;
+    border-radius: 10px;
+  }
+
+  .settings-modal-nav {
+    width: auto;
+    flex-shrink: 0;
+    flex-direction: row;
+    gap: 6px;
+    padding: 8px;
+    border-right: none;
+    border-bottom: 1px solid var(--border, var(--border-hover));
+    overflow-x: auto;
+    overflow-y: hidden;
+    /* Keeps the chips on one line and the row scrolling rather than wrapping
+       into a block that eats the content area. */
+    scrollbar-width: none;
+  }
+  .settings-modal-nav::-webkit-scrollbar { height: 0; }
+
+  .settings-modal-nav-section {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 0;
+  }
+
+  /* The two group headings only make sense stacked; as chips the labels
+     would read as buttons. */
+  .settings-modal-nav-label,
+  .settings-modal-nav-version { display: none; }
+
+  .settings-modal-nav-item {
+    width: auto;
+    flex: 0 0 auto;
+    padding: 6px 11px;
+    white-space: nowrap;
+    border: 1px solid var(--border, var(--border-hover));
+    border-radius: 14px;
+  }
+  .settings-modal-nav-item.active {
+    border-color: var(--accent-dim, var(--accent));
+    color: var(--accent, #e6edf3);
+  }
+
+  .settings-modal-content { padding: 20px 16px 24px; }
+}

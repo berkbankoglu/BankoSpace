@@ -241,38 +241,47 @@
   color: var(--text-muted);
 }
 
-/* Hidden until the item is hovered, but as an overlay rather than a row that
-   opens: growing a real row pushed the text down, which moved the thing you
-   were pointing at, and needing to hold the cursor on a thin top strip for half
-   a second to trigger it made every interaction feel slow. Floating it over the
-   item's top-right corner costs no layout at all, so it can appear instantly
-   from a hover anywhere on the item and nothing shifts. */
+/* The task's own row: handle, checkbox, the text, the subtask count, and one
+   button for everything else. This used to be a small floating panel of five
+   icons pinned over the item's top-right corner — it covered the first line of
+   the task you were reading, and the checkbox lived inside it, so whether a
+   task was done was invisible until you hovered. Nothing floats now and
+   nothing is hidden that tells you the task's state. */
 .cc-item-top {
-  position: absolute;
-  top: 3px;
-  right: 5px;
-  z-index: 3;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+/* The drag handle sits with the menu button rather than ahead of the checkbox:
+   it is hover-only but still reserves its width, and on the left that width
+   pushed every checkbox and title inwards by a different-looking amount. */
+.cc-item-top > .cc-drag-handle { margin-left: 2px; }
+
+/* Everything beside the text lines up with the text's FIRST line — not with
+   the top of the row, which left the checkbox floating above the letters, and
+   not with the middle of a title that wraps to three lines. The box is exactly
+   one line tall, derived from the same custom property the text is sized from,
+   so it follows the font-size setting instead of a hard-coded number. */
+.cc-item-top > .cc-inline-check,
+.cc-item-top > .cc-badge-slot,
+.cc-item-top > .cc-drag-handle,
+.cc-item-top > .cc-menu-btn,
+.cc-item-top > .cc-reorder-btns {
+  min-height: calc(var(--todo-font-size, 15px) * 1.65);
+}
+
+.cc-item-top > .cc-badge-slot,
+.cc-item-top > .cc-drag-handle,
+.cc-item-top > .cc-menu-btn {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 3px 6px;
-  border-radius: 6px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.12s ease;
+  justify-content: center;
 }
 
-.cc-item:hover .cc-item-top {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.cc-item-top .cc-item-actions {
-  margin-left: auto;
-}
+.cc-badge-slot { flex-shrink: 0; }
 
 /* Drag Handle */
 .cc-drag-handle {
@@ -282,14 +291,15 @@
   user-select: none;
   flex-shrink: 0;
   line-height: 1;
-  transition: color 0.15s ease;
+  transition: color 0.15s ease, opacity 0.12s ease;
   padding: 2px 4px;
   border-radius: 4px;
 }
 
-.cc-item:hover .cc-drag-handle {
-  color: #b1bac4;
-}
+/* Keeps its width while invisible, so showing it on hover never shifts the
+   text beside it. */
+.cc-item > .cc-item-top > .cc-drag-handle { opacity: 0; }
+.cc-item:hover > .cc-item-top > .cc-drag-handle { opacity: 1; color: #b1bac4; }
 
 /* Touch reorder buttons — hidden by default (desktop keeps the mouse-drag
    handle above); shown only under the mobile breakpoint, see App.css. */
@@ -330,7 +340,7 @@
 /* Label & text only */
 .cc-label {
   display: block;
-  width: 100%;
+  flex: 1;
   min-width: 0;
   cursor: default;
 }
@@ -415,22 +425,83 @@
   color: var(--text-muted);
 }
 
-/* Visibility is handled by .cc-item-top collapsing as a whole — see above. */
-.cc-item-actions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  flex-shrink: 0;
-  position: relative;
-}
 
 .cc-subtask-badge {
+  flex-shrink: 0;
   font-size: 10px;
   background: #111111;
-  color: #444;
+  color: #666;
   padding: 2px 6px;
   border-radius: 4px;
-  margin-right: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── The one button, and its menu ───────────────────────────────────────── */
+
+.cc-menu-btn {
+  flex-shrink: 0;
+  width: 22px;
+  padding: 0;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+/* Quiet until you are on the row, but its width is always there, so the text
+   does not reflow when it appears. */
+.cc-item:hover .cc-menu-btn { opacity: 1; }
+.cc-menu-btn:hover { background: rgba(255, 255, 255, 0.09); color: var(--text-primary); }
+.cc-menu-btn:focus-visible { opacity: 1; outline: 1px solid var(--border-hover); }
+
+.cc-menu {
+  z-index: 10001;
+  min-width: 158px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-hover);
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+}
+
+.cc-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 9px;
+  font-size: 13px;
+  font-family: inherit;
+  text-align: left;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.cc-menu-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+.cc-menu-item.danger { color: var(--danger); }
+.cc-menu-item.danger:hover { background: rgba(248, 81, 73, 0.14); color: var(--danger); }
+
+.cc-menu-icon {
+  flex: 0 0 14px;
+  font-size: 13px;
+  line-height: 1;
+  text-align: center;
+  opacity: 0.85;
+}
+
+.cc-menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border);
 }
 
 
@@ -499,21 +570,19 @@
   grid-template-rows: 1fr;
 }
 
+/* The gap above the subtasks belongs to the open state. On the collapsed row
+   the margin still took up space below the title, which pushed the title up
+   off the box's centre and made every closed box look top-heavy. */
+.cc-subtasks-wrapper.expanded > .cc-subtasks {
+  margin-top: 8px;
+}
+
 .cc-subtasks {
   min-height: 0;
-  margin-top: 8px;
   padding-left: 8px;
   display: flex;
   flex-direction: column;
   gap: 4px;
-}
-
-.cc-subtask-count-hint {
-  font-size: 11px;
-  color: var(--text-muted);
-  margin-left: 6px;
-  flex-shrink: 0;
-  opacity: 1 !important;
 }
 
 .cc-subtask {

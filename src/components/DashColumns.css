@@ -21,7 +21,10 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  transition: flex-grow 0.4s ease;
+  /* Must stay in step with .dash-collapsible below: the pane's height and the
+     body inside it are two halves of the same movement, and any difference
+     between them shows up as the content lurching at one end. */
+  transition: flex-grow 0.62s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Collapsed panes keep just their header on screen; the body is still mounted
@@ -35,6 +38,7 @@
 .dash-col-pane > .dp-panel,
 .dash-col-pane > .sub-tracker,
 .dash-col-pane > .activity-box,
+.dash-col-pane > .meds-panel,
 .dash-col-pane > .category-column-v2 {
   flex: 1;
   min-height: 0;
@@ -106,12 +110,13 @@
 }
 
 /* Same technique as the todo list's own open/close (see .cc-subtasks-wrapper),
-   a grid row animating between 0fr and 1fr — but at twice its duration, since
-   these panels are much larger and 0.2s read as a snap rather than a move. */
+   a grid row animating between 0fr and 1fr — but slower, since these panels are
+   several hundred pixels tall and a duration that suits a two-line subtask row
+   reads as a snap on a whole day's timeline. */
 .dash-collapsible {
   display: grid;
   grid-template-rows: 1fr;
-  transition: grid-template-rows 0.4s ease;
+  transition: grid-template-rows 0.62s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
   min-height: 0;
   flex: 1;
@@ -160,6 +165,7 @@
   .dash-col-pane > .dp-panel,
   .dash-col-pane > .sub-tracker,
   .dash-col-pane > .activity-box,
+  .dash-col-pane > .meds-panel,
   .dash-col-pane > .category-column-v2 {
     flex: 0 0 auto;
     height: auto;
@@ -186,4 +192,11 @@
   .dash-stack-resize {
     display: none;
   }
+}
+
+/* A slower collapse is a longer thing to sit through for anyone who asked the
+   system not to animate. */
+@media (prefers-reduced-motion: reduce) {
+  .dash-col-pane,
+  .dash-collapsible { transition: none; }
 }

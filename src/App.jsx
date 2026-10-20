@@ -263,7 +263,7 @@ function TaskContributionGraph({ todos, contributionLog }) {
 }
 import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, setVolume, getVolume } from './utils/sounds';
 
-const APP_VERSION = '4.7.0';
+const APP_VERSION = '4.8.0';
 const MIN_COL_PX = 220;
 const DEFAULT_COL_PX = [null, null, null, null]; // one per dashboard column — null = auto (flex:1)
 
@@ -1468,18 +1468,25 @@ useEffect(() => {
 
     function onMove(ev) {
       if (!ghost) {
-        ghost = document.createElement('div');
-        ghost.textContent = todo.text;
+        // What follows the cursor is the box itself, cloned at its real size.
+        // A small blue pill with the title in it read as "something is being
+        // dragged" rather than "you are holding this box", and it told you
+        // nothing about where the box would fit.
+        ghost = itemEl.cloneNode(true);
+        ghost.removeAttribute('data-todo-id');
+        ghost.classList.add('cc-drag-ghost');
         ghost.style.cssText = `
-          position:fixed;z-index:9999;pointer-events:none;
-          max-width:${rect.width}px;
-          white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-          background:#1a2d44;border:1.5px solid #58a6ff88;
-          color:#c9d1d9;font-size:13px;font-weight:500;
-          padding:6px 14px;border-radius:20px;
-          transform:rotate(-1deg);
-          box-shadow:0 4px 16px rgba(88,166,255,0.2);
-          font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+          position:fixed;z-index:9999;pointer-events:none;margin:0;
+          width:${rect.width}px;height:${rect.height}px;
+          box-sizing:border-box;
+          /* The item's own background is translucent, which over the page
+             would show the content underneath through the box it is meant to
+             be. An opaque card colour keeps it looking like the box. */
+          background:var(--bg-elevated);
+          box-shadow:0 12px 32px rgba(0,0,0,0.55);
+          /* An expanded box with many subtasks would otherwise be taller than
+             the screen and cover everything you are aiming at. */
+          max-height:60vh;overflow:hidden;
         `;
         document.body.appendChild(ghost);
         itemEl.style.opacity = '0.35';
@@ -1519,6 +1526,20 @@ useEffect(() => {
     function onUp() {
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
+
+      // The browser still delivers a click to the row after the mouse comes
+      // back up, and the row's own click handler opens or closes the box. So
+      // picking a box up and putting it back where it was flipped it open or
+      // shut — a drag that changed nothing still changed something. Swallow
+      // that click in the capture phase, before the row ever sees it.
+      //
+      // Disarmed on a timeout rather than from inside the handler, because a
+      // click only fires when the button goes down and up on the same element:
+      // release the box anywhere else and no click ever arrives, which would
+      // leave this armed and eat the next real one the user makes.
+      const swallowClick = (ev) => { ev.stopPropagation(); ev.preventDefault(); };
+      window.addEventListener('click', swallowClick, true);
+      setTimeout(() => window.removeEventListener('click', swallowClick, true), 0);
       if (ghost) { ghost.remove(); ghost = null; }
       if (dragOverEl) { dragOverEl.classList.remove('cc-drag-over'); dragOverEl = null; }
       document.querySelectorAll('.col-drop-glow').forEach(el => el.classList.remove('col-drop-glow'));

@@ -396,3 +396,15 @@
 @media (prefers-reduced-motion: reduce) {
   .login-confirm-dot { animation: none; opacity: 1; }
 }
+
+/* A real phone is often 360–414 CSS pixels wide, which the fixed 360px card
+   fills edge to edge or overflows. Below that it stays inside the screen. */
+@media (max-width: 420px) {
+  .login-wrapper { padding: 0 12px; }
+
+  .login-box {
+    width: 100%;
+    max-width: 360px;
+    padding: 28px 20px;
+  }
+}
