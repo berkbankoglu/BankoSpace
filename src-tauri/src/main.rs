@@ -499,10 +499,20 @@ async fn fetch_http(
         Err(e) => format!("err={}", e),
     };
     write_diag(&format!(
-        "RUST: fetch_http END -> {} {} {}ms {} (inflight={})",
-        verb.as_str(), host, t0.elapsed().as_millis(), outcome, n2
+        "RUST: fetch_http END -> {} {}{} {}ms {} (inflight={})",
+        verb.as_str(), host, url_route(&url), t0.elapsed().as_millis(), outcome, n2
     ));
     result
+}
+
+// The path of a request, without its query string: enough to tell a token
+// refresh from a data write in the log (both were just "POST <host>"), and
+// nothing a log reader should not see — the query carries the account id and
+// filters, and headers and bodies are never logged at all.
+fn url_route(url: &str) -> String {
+    let after_scheme = url.splitn(2, "://").nth(1).unwrap_or(url);
+    let path = after_scheme.find('/').map(|i| &after_scheme[i..]).unwrap_or("");
+    path.split('?').next().unwrap_or("").to_string()
 }
 
 // Renderer/GPU process çöktüğünde veya yanıt vermez hale geldiğinde WebView2

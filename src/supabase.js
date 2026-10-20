@@ -150,11 +150,12 @@ export async function getLatestUpdateTime() {
     if (!userId) return null;
     const { data, error } = await supabase
       .from('user_data')
-      .select('updated_at')
+      .select('key, updated_at')
       .eq('user_id', userId)
       .order('updated_at', { ascending: false })
       .limit(1);
     if (error || !data?.length) return null;
+    window.__lastCloudWriteKey = data[0].key;
     return data[0].updated_at;
   } catch { return null; }
 }
@@ -185,7 +186,9 @@ function normalizeForCompare(val) {
 export async function pullFromSupabase() {
   try {
     const userId = await getUserId();
-    if (!userId) return false;
+    // null, not []: "could not reach the cloud" must not read as "nothing new",
+    // or a caller would treat this device's possibly stale copy as current.
+    if (!userId) return null;
 
     const { data, error } = await supabase
       .from('user_data')
@@ -194,54 +197,91 @@ export async function pullFromSupabase() {
 
     if (error) throw error;
 
-    if (data && data.length > 0) {
-      // Local changes that never reached the cloud outrank whatever the cloud
-      // still holds for that key — taking the remote copy here is exactly what
-      // deleted work typed shortly before the app was closed.
-      const dirty = readDirtyKeys();
-
-      // Use raw setItem to avoid triggering push-back to Supabase during pull
-      const rawSetItem = Object.getOwnPropertyDescriptor(Storage.prototype, 'setItem')?.value
-        || localStorage.__origSetItem
-        || localStorage.setItem.bind(localStorage);
-
-      const changedKeys = [];
-
-      data.forEach(({ key, value }) => {
-        if (value === null || value === undefined) return;
-        if (dirty.has(key)) return;
-
-        const supaVal = typeof value === 'string' ? (() => { try { return JSON.parse(value); } catch { return value; } })() : value;
-        const supaStr = typeof value === 'string' ? value : JSON.stringify(value);
-        const localStr = localStorage.getItem(key);
-
-        // Supabase'deki değer boşsa ve localStorage doluysa, localStorage'ı koru
-        if (localStr && localStr !== 'null') {
-          const supaEmpty =
-            supaVal === null ||
-            (Array.isArray(supaVal) && supaVal.length === 0) ||
-            (typeof supaVal === 'object' && !Array.isArray(supaVal) && Object.keys(supaVal).length === 0);
-          if (supaEmpty) return;
-        }
-
-        // Semantic comparison — ignore JSONB key reordering
-        const changed = normalizeForCompare(supaVal) !== normalizeForCompare(localStr);
-        if (!changed) return;
-
-        changedKeys.push(key);
-        // Flag to prevent overridden setItem from pushing back to Supabase
-        window.__supabasePulling = true;
-        rawSetItem.call(localStorage, key, supaStr);
-        window.__supabasePulling = false;
-      });
-
-      return changedKeys;
+    // More rows than keys means the table holds several rows for one key, and
+    // which of them wins below depends on the order the database happens to
+    // return them in — two machines can then settle on different values.
+    if (window.__diag && data) {
+      const distinct = new Set(data.map(r => r.key)).size;
+      if (data.length !== distinct) window.__diag(`SYNC pull: ${data.length} rows for ${distinct} keys — DUPLICATE rows in user_data`, true);
     }
-    return [];
+
+    // Local changes that never reached the cloud outrank whatever the cloud
+    // still holds for that key — taking the remote copy here is exactly what
+    // deleted work typed shortly before the app was closed.
+    const dirty = readDirtyKeys();
+
+    // Use raw setItem to avoid triggering push-back to Supabase during pull
+    const rawSetItem = Object.getOwnPropertyDescriptor(Storage.prototype, 'setItem')?.value
+      || localStorage.__origSetItem
+      || localStorage.setItem.bind(localStorage);
+
+    const changedKeys = [];
+    const seen = new Set();
+
+    (data || []).forEach(({ key, value }) => {
+      seen.add(key);
+      if (value === null || value === undefined) return;
+      if (dirty.has(key)) return;
+
+      const supaVal = typeof value === 'string' ? (() => { try { return JSON.parse(value); } catch { return value; } })() : value;
+      const supaStr = typeof value === 'string' ? value : JSON.stringify(value);
+      const localStr = localStorage.getItem(key);
+
+      // The cloud is empty for this key but this device has data. Keep it —
+      // and, unlike before, send it up. Keeping it quietly is what left two
+      // machines on one account holding different copies forever: each kept
+      // its own, neither ever offered it to the other.
+      if (localStr && localStr !== 'null') {
+        const supaEmpty =
+          supaVal === null ||
+          (Array.isArray(supaVal) && supaVal.length === 0) ||
+          (typeof supaVal === 'object' && !Array.isArray(supaVal) && Object.keys(supaVal).length === 0);
+        if (supaEmpty) {
+          if (!isEmptyValue(localStr)) markDirty(key);
+          return;
+        }
+      }
+
+      noteSynced(key, supaVal);
+
+      // Semantic comparison — ignore JSONB key reordering
+      const changed = normalizeForCompare(supaVal) !== normalizeForCompare(localStr);
+      if (!changed) return;
+
+      changedKeys.push(key);
+      // Flag to prevent overridden setItem from pushing back to Supabase
+      window.__supabasePulling = true;
+      rawSetItem.call(localStorage, key, supaStr);
+      window.__supabasePulling = false;
+    });
+
+    // Keys the cloud has never had. They exist only here, so nothing could
+    // ever bring them to another machine unless they are sent.
+    const onlyHere = [];
+    SYNC_KEYS.forEach(key => {
+      if (seen.has(key) || dirty.has(key)) return;
+      const localStr = localStorage.getItem(key);
+      if (localStr !== null && !isEmptyValue(localStr)) { markDirty(key); onlyHere.push(key); }
+    });
+    // Worth a line: each of these is something the other machines on this
+    // account have never been able to see.
+    if (onlyHere.length && window.__diag) window.__diag(`SYNC only on this device, sending: [${onlyHere.join(', ')}]`);
+
+    return changedKeys;
   } catch (e) {
     console.error('Supabase pull error:', e);
-    return [];
+    if (window.__diag) window.__diag(`SYNC pull FAILED: ${e?.message || e}`, true);
+    return null;
   }
+}
+
+function isEmptyValue(str) {
+  try {
+    const v = JSON.parse(str);
+    return v === null
+      || (Array.isArray(v) && v.length === 0)
+      || (typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === 0);
+  } catch { return str === ''; }
 }
 
 // anthropic_api_key SYNC_KEYS'ten çıkarıldı (düz metin API anahtarının uzak
@@ -317,6 +357,24 @@ export async function pushDirtyToSupabase() {
   }
 }
 
+// ── What this device and the cloud agree on ─────────────────────────────────
+//
+// The app rewrites its own data constantly — every render that saves state
+// writes the same bytes again. Treating each of those as an edit is how a
+// window holding stale state could push it over newer data from another
+// machine. This records, per key, the value both sides last agreed on: after a
+// pull, after a successful push. A write equal to it is not a change.
+const lastSynced = new Map();
+
+function noteSynced(key, value) {
+  if (value === null || value === undefined) lastSynced.delete(key);
+  else lastSynced.set(key, normalizeForCompare(value));
+}
+
+export function isInSync(key, value) {
+  return lastSynced.has(key) && lastSynced.get(key) === normalizeForCompare(value);
+}
+
 // Tek bir key'i Supabase'e yaz (value === null ise Supabase'den sil)
 export async function pushKeyToSupabase(key, value, expectedUserId) {
   if (!SYNC_KEYS.includes(key)) return;
@@ -338,7 +396,8 @@ export async function pushKeyToSupabase(key, value, expectedUserId) {
         .eq('user_id', userId)
         .eq('key', key);
       if (error) throw error;
-      clearDirty(key);
+      noteSynced(key, null);
+      if (localStorage.getItem(key) === null) clearDirty(key);
       return;
     }
 
@@ -349,10 +408,16 @@ export async function pushKeyToSupabase(key, value, expectedUserId) {
     const { error } = await supabase
       .from('user_data')
       .upsert({ user_id: userId, key, value: parsed, updated_at: new Date().toISOString() });
-    if (error) throw error;
+    if (error) {
+      if (window.__diag) window.__diag(`SYNC push FAILED ${key}: ${error.message || JSON.stringify(error)}`, true);
+      throw error;
+    }
+    noteSynced(key, parsed);
     // Only now is the cloud actually holding this value. Clearing the mark any
-    // earlier would hand the next pull permission to overwrite it.
-    clearDirty(key);
+    // earlier would hand the next pull permission to overwrite it — and it is
+    // cleared only if this is still the latest local value: a newer write made
+    // while this request was in flight is still unsent and keeps its mark.
+    if (isInSync(key, localStorage.getItem(key))) clearDirty(key);
   } catch (e) {
     console.error('Supabase push error:', e);
   }

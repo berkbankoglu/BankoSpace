@@ -3,7 +3,8 @@ import { flushSync } from 'react-dom';
 import { isTauri, proxyFetch, confirmAsync, notifyPermission, notify, exportJSON, importJSON, windowControls, startWindowDrag } from './platform';
 import logo from './assets/logo.svg';
 import './App.css';
-import { supabase, pullFromSupabase, pushKeyToSupabase, pushAllToSupabase, pushDirtyToSupabase, markDirty, getLatestUpdateTime, purgeApiKeyFromSupabase, getCachedUserId, SYNC_KEYS } from './supabase';
+import { supabase, pushDirtyToSupabase } from './supabase';
+import { startupSync, settleAfterMount, startPolling, syncNow, flushAll, cancelPending } from './sync';
 import Login from './components/Login';
 import CategoryColumn from './components/CategoryColumn';
 import FlashCards from './components/FlashCards';
@@ -263,7 +264,7 @@ function TaskContributionGraph({ todos, contributionLog }) {
 }
 import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, setVolume, getVolume } from './utils/sounds';
 
-const APP_VERSION = '4.9.0';
+const APP_VERSION = '4.9.1';
 const MIN_COL_PX = 220;
 const DEFAULT_COL_PX = [null, null, null, null]; // one per dashboard column — null = auto (flex:1)
 
@@ -384,147 +385,39 @@ function App({ session, onLogout }) {
     return () => { if (unlisten) unlisten(); };
   }, []);
 
-  // Supabase sync — active automatically if session exists (runs once, not reactive to session prop)
+  // Supabase sync. The layer itself is installed and the cloud read before this
+  // component mounts (see AppWrapper / src/sync.js); what lives here is the part
+  // that needs the window: holding a native close until queued writes are sent.
   useEffect(() => {
-    let mounted = true;
-    const origSetItem = localStorage.setItem.bind(localStorage);
+    window.__flushPendingPushes = flushAll;
+    window.__cancelPendingPushes = cancelPending;
 
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
-      if (!s || !mounted) return;
-
-      // Sadece açılışta bir kez sync — focus event yok, random reload yok
-      const alreadySynced = sessionStorage.getItem('supabase_synced');
-      if (!alreadySynced) {
-        sessionStorage.setItem('supabase_synced', '1');
-
-        // anthropic_api_key artık cloud'a senkronize edilmiyor (bkz. supabase.js) —
-        // ama önceden push edilmiş bir kopya hâlâ Supabase'de duruyor olabilir.
-        // Tek seferlik bir temizlikle sil, aksi halde pull bunu geri indirir.
-        const apiKeyPurged = localStorage.getItem('apiKeyPurgedFromCloud');
-        const purge = apiKeyPurged ? Promise.resolve() : purgeApiKeyFromSupabase().then(() => {
-          localStorage.setItem('apiKeyPurgedFromCloud', '1');
-        });
-
-        const sizeOf = (k) => (localStorage.getItem(k) || '').length;
-        if (window.__diag) {
-          window.__diag(`ACCOUNT: session ${session?.user?.id || '?'} (${session?.user?.email || '?'}) | before pull: notes=${sizeOf('notes')} backup=${sizeOf('notes_local_backup')} todos=${sizeOf('todos')}`);
-        }
-        purge.then(() => pullFromSupabase()).then(changed => {
-          // Anything still marked is a local change the cloud has not seen —
-          // the pull just protected it, now let the cloud catch up.
-          pushDirtyToSupabase();
-          if (window.__diag) {
-            window.__diag(`ACCOUNT: pull changed=${changed} | after pull: notes=${sizeOf('notes')} backup=${sizeOf('notes_local_backup')} todos=${sizeOf('todos')}`);
-          }
-          if (changed.length) window.location.reload();
-        });
-      }
-
-      const debounceTimers = {};
-      const pendingKeys = {};
-      const lastPushed = {}; // dedupe: skip re-syncing identical values
-
-      localStorage.__origSetItem = origSetItem;
-      localStorage.setItem = function(key, value) {
-        // Time the (synchronous) write so a slow, main-thread-blocking write
-        // surfaces in the console instead of being an invisible freeze.
-        const t0 = performance.now();
-        origSetItem(key, value);
-        const dt = performance.now() - t0;
-        if (dt > 60) {
-          const msg = `SLOW setItem('${key}') ${Math.round(dt)}ms (${((value?.length || 0) / 1024).toFixed(0)}KB)`;
-          if (window.__diag) window.__diag(msg, true); else console.warn('[perf]', msg);
-        }
-
-        if (!window.__supabasePulling && SYNC_KEYS.includes(key)) {
-          // Same value already pending/synced → don't schedule another push
-          // (autosave effects often re-write identical data on unrelated renders).
-          if (lastPushed[key] === value) return;
-          const owner = getCachedUserId();
-          // Written down before the timer is even set, because the timer dies
-          // with the process and this has to survive it.
-          markDirty(key);
-          pendingKeys[key] = { value, owner };
-          clearTimeout(debounceTimers[key]);
-          debounceTimers[key] = setTimeout(() => {
-            lastPushed[key] = value;
-            pushKeyToSupabase(key, value, owner);
-            delete pendingKeys[key];
-          }, 700);
-        }
-      };
-
-      // Kapanmadan önce bekleyen tüm keyleri hemen gönder — dönen promise'ler
-      // pencere gerçekten kapanmadan önce beklenebilsin diye return ediliyor.
-      const flushAll = () => {
-        return Object.entries(pendingKeys).map(([key, { value, owner }]) => {
-          clearTimeout(debounceTimers[key]);
-          delete pendingKeys[key];
-          return pushKeyToSupabase(key, value, owner);
-        });
-      };
-
-      // Leaving an account drops whatever is still queued: those values belong
-      // to the account on the way out, and the push they were scheduled for
-      // would otherwise land after the session has already swapped.
-      window.__flushPendingPushes = flushAll;
-      window.__cancelPendingPushes = () => {
-        Object.keys(debounceTimers).forEach(k => clearTimeout(debounceTimers[k]));
-        Object.keys(pendingKeys).forEach(k => delete pendingKeys[k]);
-      };
-      window.addEventListener('beforeunload', flushAll);
-      // macOS quits the app without necessarily running the window-close path
-      // below, so don't sit on a queued write while the app is in the
-      // background: send it as soon as it stops being the active window.
-      window.addEventListener('blur', flushAll);
-      window.addEventListener('pagehide', flushAll);
-
-      // Pencere kapatma isteğini yakalayıp bekleyen push'lar bitmeden
-      // pencereyi gerçekten kapatmıyoruz — aksi halde 2sn'lik debounce
-      // penceresinde kalan veya hâlâ ağ üzerinde olan bir yazma, süreç
-      // sonlanınca sessizce kayboluyordu (kullanıcının "kaydolmuyor" şikayeti).
-      // Native window-close interception — no equivalent on web (a browser
-      // tab can't be held open to await pending pushes); the `beforeunload`
-      // listener above is the web fallback, best-effort like it already was.
-      let unlistenClose = null;
-      if (isTauri) {
-        import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
-          const appWindow = getCurrentWindow();
-          appWindow.onCloseRequested(async (event) => {
-            event.preventDefault();
-            const pending = flushAll();
-            // Ağ takılırsa pencere sonsuza kadar kapanmayı reddetmesin diye
-            // güvenlik zaman aşımı — freeze-diagnostic prensibiyle aynı: sessiz
-            // asılı kalma yerine, en kötü ihtimalle veri kaybı riskini göze al.
-            await Promise.race([
-              Promise.all(pending),
-              new Promise(resolve => setTimeout(resolve, 4000)),
-            ]);
-            await appWindow.destroy();
-          }).then(fn => { unlistenClose = fn; });
-        });
-      }
-
-      const origRemoveItem = localStorage.removeItem.bind(localStorage);
-      localStorage.removeItem = function(key) {
-        origRemoveItem(key);
-        if (SYNC_KEYS.includes(key)) {
-          markDirty(key);
-          pushKeyToSupabase(key, null);
-        }
-      };
-
-      return () => {
-        window.removeEventListener('beforeunload', flushAll);
-        window.removeEventListener('blur', flushAll);
-        window.removeEventListener('pagehide', flushAll);
-        if (unlistenClose) unlistenClose();
-      };
-    });
+    // Native window-close interception — no equivalent on web (a browser tab
+    // can't be held open to await pending pushes); the sync layer's
+    // `beforeunload` listener is the web fallback.
+    let unlistenClose = null;
+    let disposed = false;
+    if (isTauri) {
+      import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
+        if (disposed) return;
+        const appWindow = getCurrentWindow();
+        appWindow.onCloseRequested(async (event) => {
+          event.preventDefault();
+          // A safety timeout so a stuck network cannot hold the window open
+          // forever — the same principle as the freeze diagnostics: rather
+          // risk a lost write than hang silently.
+          await Promise.race([
+            Promise.all(flushAll()),
+            new Promise(resolve => setTimeout(resolve, 4000)),
+          ]);
+          await appWindow.destroy();
+        }).then(fn => { unlistenClose = fn; });
+      });
+    }
 
     return () => {
-      mounted = false;
-      localStorage.setItem = origSetItem;
+      disposed = true;
+      if (unlistenClose) unlistenClose();
       delete window.__cancelPendingPushes;
       delete window.__flushPendingPushes;
     };
@@ -734,7 +627,11 @@ function App({ session, onLogout }) {
   // Flush before leaving: the debounced writes and anything not yet pushed
   // would otherwise be wiped by the clear below.
   const leaveCurrentAccount = async () => {
-    await pushAllToSupabase();
+    // Only what this device has that the cloud does not. Pushing every key
+    // would lay this device's copy over anything another machine changed
+    // in the meantime.
+    await Promise.all(flushAll());
+    await pushDirtyToSupabase();
     window.__cancelPendingPushes?.();
     if (session) rememberAccount(session, getProfile());
   };
@@ -789,7 +686,7 @@ function App({ session, onLogout }) {
   const signOutCurrent = async () => {
     if (switching) return;
     setSwitching(true);
-    try { await pushAllToSupabase(); } catch { /* sign out regardless */ }
+    try { await Promise.all(flushAll()); await pushDirtyToSupabase(); } catch { /* sign out regardless */ }
     window.__cancelPendingPushes?.();
     const id = session?.user?.id;
     await clearAccountData();
@@ -933,78 +830,29 @@ const [dailyChecklistCollapsed, setDailyChecklistCollapsed] = useState(() => {
 
   // ── Live sync with the other machine ──────────────────────────────────────
   //
-  // The pull used to happen once, at startup, so a task typed on the laptop was
-  // invisible on the desktop until the desktop was restarted. A cheap query
-  // asks only for the newest updated_at across this account's rows; the full
-  // pull runs only when that moves.
-  //
-  // Applying what comes back is the delicate half. `todos` lives in React
-  // state and is written back to localStorage by the effect above, so a pull
-  // that only touched localStorage would be overwritten by the stale state a
-  // moment later — and then pushed to the cloud. So state is re-hydrated here
-  // explicitly. Anything else reloads the window, but only while the window is
-  // not the one being typed in: the machine you are using keeps its scroll
-  // position and half-finished input, and the one you are not using is already
-  // current by the time you look at it.
-  const lastSeenUpdate = useRef(null);
-  const syncing = useRef(false);
-
-  const applyPull = useCallback((changedKeys) => {
-    if (!changedKeys.length) return;
-    const rest = changedKeys.filter(k => k !== 'todos');
-
-    if (changedKeys.includes('todos')) {
-      try { setTodos(JSON.parse(localStorage.getItem('todos')) || []); } catch { /* keep what we have */ }
-    }
-    // A write from this same document does not raise `storage`, so the
-    // components that already listen for it are told by hand.
-    rest.forEach(key => window.dispatchEvent(new StorageEvent('storage', { key })));
-
-    if (rest.length && !document.hasFocus()) window.location.reload();
+  // Changes made elsewhere are polled for (src/sync.js). The task list lives in
+  // React state and is written back to localStorage whenever that state changes,
+  // so a pull that only touched localStorage would be overwritten a moment later
+  // by this window's older state. It is re-read into state here instead; other
+  // keys make the window reload once it has been left alone for a moment.
+  const rehydrate = useCallback((key) => {
+    if (key !== 'todos') return;
+    try { setTodos(JSON.parse(localStorage.getItem('todos')) || []); } catch { /* keep what we have */ }
   }, []);
 
-  const syncNow = useCallback(async () => {
-    if (syncing.current || !getCachedUserId()) return;
-    syncing.current = true;
-    try {
-      if (window.__flushPendingPushes) await Promise.all(window.__flushPendingPushes());
-      applyPull(await pullFromSupabase());
-      lastSeenUpdate.current = await getLatestUpdateTime();
-    } finally {
-      syncing.current = false;
-    }
-  }, [applyPull]);
+  useEffect(() => startPolling(rehydrate), [rehydrate]);
 
-  useEffect(() => {
-    let stopped = false;
-    const tick = async () => {
-      if (stopped || syncing.current || !getCachedUserId()) return;
-      // One row, one column — cheap enough to ask for every few seconds.
-      const latest = await getLatestUpdateTime();
-      if (stopped || !latest || latest === lastSeenUpdate.current) return;
-      lastSeenUpdate.current = latest;
-      syncing.current = true;
-      try { applyPull(await pullFromSupabase()); } finally { syncing.current = false; }
-    };
-    const iv = setInterval(tick, 4000);
-    // Coming back to a window is exactly when its contents are most likely to
-    // be out of date.
-    window.addEventListener('focus', tick);
-    return () => { stopped = true; clearInterval(iv); window.removeEventListener('focus', tick); };
-  }, [applyPull]);
-
-  // Ctrl/Cmd+S: send what is queued and pull straight away, for when four
-  // seconds is three seconds too long.
+  // Ctrl/Cmd+S: send what is queued and pull straight away.
   useEffect(() => {
     const onKey = (e) => {
       if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
         e.preventDefault();
-        syncNow();
+        syncNow(rehydrate);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [syncNow]);
+  }, [rehydrate]);
 
   // Save sidebar order
   useEffect(() => {
@@ -2213,7 +2061,7 @@ useEffect(() => {
                           {localStorage.getItem('supabase_sync_enabled')==='1' && (
                             <button
                               className="settings-action-btn"
-                              onClick={async () => { await pushAllToSupabase(); alert('All data uploaded!'); }}
+                              onClick={async () => { const ok = await syncNow(rehydrate); alert(ok ? 'Synced with your other devices.' : 'Could not reach the cloud. Your changes are kept here and will be sent when it is reachable.'); }}
                             >Sync Now</button>
                           )}
                         </div>
@@ -2900,6 +2748,11 @@ function ActivityBox({ todos, contributionLog, collapsed, onToggle }) {
 function AppWrapper() {
   // undefined = henüz kontrol edilmedi, null = giriş yapılmamış, object = oturum var
   const [session, setSession] = useState(undefined);
+  // The account whose cloud copy has been read on this load. The app opens only
+  // after that, so its state starts from data this device and the cloud agree
+  // on — not from this device's last copy with the cloud's changing underneath.
+  const [syncedFor, setSyncedFor] = useState(null);
+  const [startupOk, setStartupOk] = useState(true);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
@@ -2907,10 +2760,29 @@ function AppWrapper() {
     return () => subscription.unsubscribe();
   }, []);
 
+  const uid = session?.user?.id || null;
+  useEffect(() => {
+    if (!uid || syncedFor === uid) return;
+    let cancelled = false;
+    startupSync().then(ok => {
+      if (cancelled) return;
+      setStartupOk(ok);
+      setSyncedFor(uid);
+    });
+    return () => { cancelled = true; };
+  }, [uid, syncedFor]);
+
+  // Opened on this device's own copy because the cloud could not be read: the
+  // writes it makes while mounting are not edits and must not go out as such.
+  useEffect(() => {
+    if (syncedFor && !startupOk) settleAfterMount();
+  }, [syncedFor, startupOk]);
+
   if (session === undefined) return null;
   if (!session) return <Login onLogin={setSession} />;
+  if (syncedFor !== uid) return <div className="startup-sync">Syncing…</div>;
 
-  return <App key={session.user?.id || 'main-app'} session={session} onLogout={() => setSession(null)} />;
+  return <App key={uid || 'main-app'} session={session} onLogout={() => setSession(null)} />;
 }
 
 export default AppWrapper;

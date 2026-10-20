@@ -101,7 +101,13 @@ export async function clearAccountData() {
   // says exactly what was on the device at the moment it was handed over.
   const sizeOf = (k) => (localStorage.getItem(k) || '').length;
   const before = `notes=${sizeOf('notes')} notes_local_backup=${sizeOf('notes_local_backup')} todos=${sizeOf('todos')}`;
-  doomed.forEach(key => localStorage.removeItem(key));
+  // Storage's own removeItem, not the instance's. The sync layer wraps the
+  // instance method so that a deletion goes to the cloud as well — right for a
+  // user clearing something, wrong here. This empties the device; called that
+  // way it sent a delete for every synced key, and since a switch swaps the
+  // session first, those deletes landed on the account being switched TO.
+  const removeLocally = (key) => Storage.prototype.removeItem.call(localStorage, key);
+  doomed.forEach(removeLocally);
   const after = `notes=${sizeOf('notes')} notes_local_backup=${sizeOf('notes_local_backup')} todos=${sizeOf('todos')}`;
   if (window.__diag) window.__diag(`ACCOUNT: wiped ${doomed.length} keys | before ${before} | after ${after}`);
 
