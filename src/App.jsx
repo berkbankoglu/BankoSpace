@@ -264,7 +264,9 @@ function TaskContributionGraph({ todos, contributionLog }) {
 }
 import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, setVolume, getVolume } from './utils/sounds';
 
-const APP_VERSION = '4.9.1';
+const APP_VERSION = '4.9.2';
+// The sync layer reports which build each device runs; it lives outside React.
+window.__APP_VERSION = APP_VERSION;
 const MIN_COL_PX = 220;
 const DEFAULT_COL_PX = [null, null, null, null]; // one per dashboard column — null = auto (flex:1)
 

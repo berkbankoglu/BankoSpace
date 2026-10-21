@@ -12,7 +12,8 @@
 // mount, so its state starts from data both sides agree on.
 import {
   pullFromSupabase, pushKeyToSupabase, pushDirtyToSupabase, markDirty,
-  isInSync, getLatestUpdateTime, getCachedUserId, purgeApiKeyFromSupabase, SYNC_KEYS,
+  isInSync, getCloudFingerprint, getCachedUserId, purgeApiKeyFromSupabase, SYNC_KEYS,
+  readDirtyKeys, syncHealth, writeDeviceStatus, readDeviceStatuses, STATUS_PREFIX,
 } from './supabase';
 
 const PUSH_DELAY_MS = 700;
@@ -149,9 +150,11 @@ export async function startupSync() {
   if (Array.isArray(changed)) {
     diag(`SYNC startup pull ok, changed: [${changed.join(', ')}]`);
     becomeReady();
-    getLatestUpdateTime().then(t => { if (t) state.lastSeenStamp = t; });
+    getCloudFingerprint().then(f => { if (f) state.lastSeenStamp = f; });
+    startStatusReports();
     return true;
   }
+  startStatusReports();
   diag('SYNC startup pull did not finish — opening on this device\'s copy', true);
   return false;
 }
@@ -233,7 +236,7 @@ export function startPolling(rehydrate, intervalMs = 4000) {
     if (busy || !getCachedUserId()) return;
     busy = true;
     try {
-      const latest = await getLatestUpdateTime();
+      const latest = await getCloudFingerprint();
       if (!latest || latest === state.lastSeenStamp) return;
       const changed = await pullFromSupabase();
       if (changed === null) return;           // unreachable: try again next tick
@@ -256,9 +259,60 @@ export async function syncNow(rehydrate) {
   const changed = await pullFromSupabase();
   if (changed === null) return false;
   if (!state.ready) becomeReady();
-  state.lastSeenStamp = (await getLatestUpdateTime()) || state.lastSeenStamp;
+  state.lastSeenStamp = (await getCloudFingerprint()) || state.lastSeenStamp;
   applyChanges(changed, rehydrate);
+  reportStatus();
   return true;
+}
+
+// ── Device status ─────────────────────────────────────────────────────────
+
+function deviceId() {
+  let id = localStorage.getItem('__device_id');
+  if (!id) {
+    id = Math.random().toString(36).slice(2, 10);
+    native.set('__device_id', id);
+  }
+  return id;
+}
+
+function platformName() {
+  const ua = navigator.userAgent || '';
+  if (/Mac/i.test(ua)) return 'mac';
+  if (/Win/i.test(ua)) return 'windows';
+  return 'other';
+}
+
+async function reportStatus() {
+  let binary = null;
+  try {
+    const { getVersion } = await import('@tauri-apps/api/app');
+    binary = await getVersion();
+  } catch { /* web build */ }
+  await writeDeviceStatus(deviceId(), {
+    platform: platformName(),
+    app: window.__APP_VERSION || null,
+    binary,
+    clock: new Date().toISOString(),
+    ready: state.ready,
+    settled: state.settled,
+    unsent: [...readDirtyKeys()],
+    ...syncHealth,
+  });
+}
+
+let statusTimer = null;
+function startStatusReports() {
+  if (statusTimer) return;
+  // Once now, so the other machines see this one as soon as it is up, then
+  // every minute while it runs.
+  setTimeout(reportStatus, 2000);
+  statusTimer = setInterval(reportStatus, 60000);
+  // What the OTHER devices last reported, for this device's log.
+  readDeviceStatuses().then(rows => {
+    const mine = STATUS_PREFIX + deviceId();
+    rows.filter(r => r.key !== mine).forEach(r => diag(`SYNC other device ${r.key.slice(STATUS_PREFIX.length)}: ${JSON.stringify(r.value)}`));
+  });
 }
 
 // Exposed for tests.

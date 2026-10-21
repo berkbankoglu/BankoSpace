@@ -143,21 +143,61 @@ async function getUserId() {
   return cachedUserId;
 }
 
-// Lightweight check: get the latest updated_at across all user rows
-export async function getLatestUpdateTime() {
+
+// What the cloud holds right now, as one string: every synced row's stamp.
+//
+// Asking only for the NEWEST stamp missed changes. A stamp is written by the
+// device that made the change, from that device's clock; if one machine's
+// clock runs behind the other's, its writes never become the newest and the
+// other machine concludes nothing has changed. Any row whose stamp moves —
+// forwards or backwards — changes this string.
+export async function getCloudFingerprint() {
   try {
     const userId = await getUserId();
     if (!userId) return null;
     const { data, error } = await supabase
-      .from('user_data')
-      .select('key, updated_at')
-      .eq('user_id', userId)
-      .order('updated_at', { ascending: false })
-      .limit(1);
-    if (error || !data?.length) return null;
-    window.__lastCloudWriteKey = data[0].key;
-    return data[0].updated_at;
+      .from('user_data').select('key, updated_at').eq('user_id', userId);
+    if (error || !data) return null;
+    return data
+      .filter(r => SYNC_KEYS.includes(r.key))
+      .map(r => `${r.key}@${r.updated_at}`)
+      .sort()
+      .join('|');
   } catch { return null; }
+}
+
+// ── How sync is going on this device ───────────────────────────────────────
+//
+// Each device files a short status row next to the account's data, so one
+// machine can show what another is doing — which build it runs, whether its
+// last pull and push worked, what it still holds unsent, what time it thinks
+// it is. The rows sit outside SYNC_KEYS: never pulled into localStorage.
+export const syncHealth = {
+  lastPullOk: null, lastPullError: null,
+  lastPushOk: null, lastPushError: null,
+};
+export const STATUS_PREFIX = '__status:';
+
+export async function writeDeviceStatus(deviceId, status) {
+  try {
+    const userId = await getUserId();
+    if (!userId) return;
+    await supabase.from('user_data').upsert({
+      user_id: userId, key: STATUS_PREFIX + deviceId, value: status, updated_at: new Date().toISOString(),
+    });
+  } catch { /* diagnostics only */ }
+}
+
+export async function readDeviceStatuses() {
+  try {
+    const userId = await getUserId();
+    if (!userId) return [];
+    const { data, error } = await supabase
+      .from('user_data').select('key, value, updated_at').eq('user_id', userId)
+      .like('key', STATUS_PREFIX + '%');
+    if (error || !data) return [];
+    return data;
+  } catch { return []; }
 }
 
 // Normalize a value for semantic comparison (handles JSONB key reordering)
@@ -219,6 +259,9 @@ export async function pullFromSupabase() {
     const seen = new Set();
 
     (data || []).forEach(({ key, value }) => {
+      // Only keys this app syncs. Status rows and anything retired from the
+      // list live in the same table and must not land in localStorage.
+      if (!SYNC_KEYS.includes(key)) return;
       seen.add(key);
       if (value === null || value === undefined) return;
       if (dirty.has(key)) return;
@@ -267,9 +310,11 @@ export async function pullFromSupabase() {
     // account have never been able to see.
     if (onlyHere.length && window.__diag) window.__diag(`SYNC only on this device, sending: [${onlyHere.join(', ')}]`);
 
+    syncHealth.lastPullOk = new Date().toISOString();
     return changedKeys;
   } catch (e) {
     console.error('Supabase pull error:', e);
+    syncHealth.lastPullError = `${new Date().toISOString()} ${e?.message || e}`;
     if (window.__diag) window.__diag(`SYNC pull FAILED: ${e?.message || e}`, true);
     return null;
   }
@@ -412,6 +457,7 @@ export async function pushKeyToSupabase(key, value, expectedUserId) {
       if (window.__diag) window.__diag(`SYNC push FAILED ${key}: ${error.message || JSON.stringify(error)}`, true);
       throw error;
     }
+    syncHealth.lastPushOk = `${new Date().toISOString()} ${key}`;
     noteSynced(key, parsed);
     // Only now is the cloud actually holding this value. Clearing the mark any
     // earlier would hand the next pull permission to overwrite it — and it is
@@ -420,6 +466,7 @@ export async function pushKeyToSupabase(key, value, expectedUserId) {
     if (isInSync(key, localStorage.getItem(key))) clearDirty(key);
   } catch (e) {
     console.error('Supabase push error:', e);
+    syncHealth.lastPushError = `${new Date().toISOString()} ${key}: ${e?.message || e}`;
   }
 }
 

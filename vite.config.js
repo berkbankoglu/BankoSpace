@@ -8,6 +8,12 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Registered by hand in main.jsx, and only on the web. In the desktop app
+      // the frontend ships inside the binary, so a service worker can only ever
+      // serve an OLDER copy of it: after every update the app came up on the
+      // previous release's code — sync logic included — until it had been
+      // opened twice.
+      injectRegister: null,
       // The service worker answers any navigation it doesn't recognise with
       // index.html — the single-page-app fallback. That is right for the app's
       // own routes and wrong for the Tauri-only windows: asking for
