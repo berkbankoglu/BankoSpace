@@ -396,7 +396,9 @@
   color: var(--text-primary);
   font-weight: 400;
   line-height: 1.65;
-  white-space: normal;
+  /* Line breaks are kept as typed: a list written one item per line
+     must not come back as a single paragraph. */
+  white-space: pre-wrap;
   word-break: break-word;
   min-width: 0;
 }
@@ -661,17 +663,31 @@
 
 .cc-subtask .cc-label {
   display: flex;
-  align-items: center;
+  /* Top, not centre: with a multi-line item the box belongs beside the first
+     line, not floating halfway down the block. */
+  align-items: flex-start;
   gap: 6px;
   flex: 1;
   min-width: 0;
   cursor: pointer;
 }
 
+/* Nudged down to sit on the first line's centre: (font size x 1.65 line
+   height - the 14px box) / 2, derived from the same variable the text is sized
+   from so it holds at every font-size setting. */
+.cc-subtask .cc-label > .cc-checkmark {
+  margin-top: max(0px, calc(var(--subtask-font-size, 12px) * 0.825 - 7px));
+}
+.cc-subtask-child .cc-label > .cc-checkmark {
+  margin-top: max(0px, calc((var(--subtask-font-size, 12px) - 1px) * 0.825 - 7px));
+}
+
 .cc-subtask .cc-text {
   font-size: var(--subtask-font-size, 12px);
   color: var(--text-primary);
-  white-space: normal;
+  /* Line breaks are kept as typed: a list written one item per line
+     must not come back as a single paragraph. */
+  white-space: pre-wrap;
   word-break: break-word;
   min-width: 0;
 }
@@ -749,7 +765,7 @@
 
 .cc-subtask-child .cc-label {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   flex: 1;
   min-width: 0;
@@ -759,7 +775,9 @@
 .cc-subtask-child .cc-text {
   font-size: calc(var(--subtask-font-size, 12px) - 1px);
   color: var(--text-secondary);
-  white-space: normal;
+  /* Line breaks are kept as typed: a list written one item per line
+     must not come back as a single paragraph. */
+  white-space: pre-wrap;
   word-break: break-word;
   min-width: 0;
 }

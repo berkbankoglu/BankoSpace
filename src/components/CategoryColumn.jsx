@@ -129,7 +129,7 @@ function CategoryColumn({ title, category, todos, currentFilter, actions, isMobi
   };
 
   const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && inputValue.trim()) {
+    if (e.key === 'Enter' && !e.shiftKey && inputValue.trim()) {
       e.preventDefault();
       handleAdd();
     }
@@ -441,7 +441,7 @@ function CategoryColumn({ title, category, todos, currentFilter, actions, isMobi
                   value={editingTodoText}
                   onChange={(e) => { playTypeSoundThrottled(); setEditingTodoText(e.target.value); }}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && editingTodoText.trim()) {
+                    if (e.key === 'Enter' && !e.shiftKey && editingTodoText.trim()) {
                       onUpdateTodo(todo.id, { text: editingTodoText.trim() });
                       setEditingTodoId(null);
                     } else if (e.key === 'Escape') {
@@ -556,7 +556,7 @@ function CategoryColumn({ title, category, todos, currentFilter, actions, isMobi
                           value={editingSubtaskText}
                           onChange={(e) => { playTypeSoundThrottled(); setEditingSubtaskText(e.target.value); }}
                           onKeyDown={(e) => {
-                            if (e.key === 'Enter' && editingSubtaskText.trim()) {
+                            if (e.key === 'Enter' && !e.shiftKey && editingSubtaskText.trim()) {
                               onUpdateSubtask && onUpdateSubtask(todo.id, subtask.id, editingSubtaskText.trim());
                               setEditingSubtaskId(null);
                             } else if (e.key === 'Escape') {
@@ -623,7 +623,7 @@ function CategoryColumn({ title, category, todos, currentFilter, actions, isMobi
                                 value={editingChildText}
                                 onChange={(e) => { playTypeSoundThrottled(); setEditingChildText(e.target.value); }}
                                 onKeyDown={(e) => {
-                                  if (e.key === 'Enter' && editingChildText.trim()) {
+                                  if (e.key === 'Enter' && !e.shiftKey && editingChildText.trim()) {
                                     onUpdateSubtaskChild && onUpdateSubtaskChild(todo.id, subtask.id, child.id, editingChildText.trim());
                                     setEditingChildId(null);
                                   } else if (e.key === 'Escape') {
@@ -653,7 +653,7 @@ function CategoryColumn({ title, category, todos, currentFilter, actions, isMobi
                             value={childInputs[subtask.id] || ''}
                             onChange={(e) => { playTypeSoundThrottled(); setChildInputs(prev => ({ ...prev, [subtask.id]: e.target.value })); }}
                             onKeyDown={(e) => {
-                              if (e.key === 'Enter' && (childInputs[subtask.id] || '').trim()) {
+                              if (e.key === 'Enter' && !e.shiftKey && (childInputs[subtask.id] || '').trim()) {
                                 handleAddChild(todo.id, subtask.id);
                               } else if (e.key === 'Escape') {
                                 setAddingChildFor(null);
@@ -675,7 +675,7 @@ function CategoryColumn({ title, category, todos, currentFilter, actions, isMobi
                     value={subtaskInputs[todo.id] || ''}
                     onChange={(e) => { playTypeSoundThrottled(); setSubtaskInputs(prev => ({ ...prev, [todo.id]: e.target.value })); }}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter' && (subtaskInputs[todo.id] || '').trim()) {
+                      if (e.key === 'Enter' && !e.shiftKey && (subtaskInputs[todo.id] || '').trim()) {
                         handleAddSubtask(todo.id);
                       }
                     }}
