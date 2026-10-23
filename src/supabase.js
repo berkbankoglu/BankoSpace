@@ -428,17 +428,18 @@ export function isInSync(key, value) {
 }
 
 // Tek bir key'i Supabase'e yaz (value === null ise Supabase'den sil)
+// Resolves true once the cloud holds the value, false otherwise.
 export async function pushKeyToSupabase(key, value, expectedUserId) {
-  if (!SYNC_KEYS.includes(key)) return;
+  if (!SYNC_KEYS.includes(key)) return false;
   try {
     const userId = await getUserId();
-    if (!userId) return;
+    if (!userId) return false;
     // A write is queued for a couple of seconds before it leaves. If the
     // account changed in between, this value belongs to the previous one and
     // must not be filed under the new account.
     if (expectedUserId && expectedUserId !== userId) {
       console.warn(`Skipped a queued sync of "${key}": it belonged to the previous account.`);
-      return;
+      return false;
     }
 
     if (value === null || value === undefined) {
@@ -450,7 +451,7 @@ export async function pushKeyToSupabase(key, value, expectedUserId) {
       if (error) throw error;
       noteSynced(key, null);
       if (localStorage.getItem(key) === null) clearDirty(key);
-      return;
+      return true;
     }
 
     let parsed;
@@ -471,9 +472,11 @@ export async function pushKeyToSupabase(key, value, expectedUserId) {
     // cleared only if this is still the latest local value: a newer write made
     // while this request was in flight is still unsent and keeps its mark.
     if (isInSync(key, localStorage.getItem(key))) clearDirty(key);
+    return true;
   } catch (e) {
     console.error('Supabase push error:', e);
     syncHealth.lastPushError = `${new Date().toISOString()} ${key}: ${e?.message || e}`;
+    return false;
   }
 }
 

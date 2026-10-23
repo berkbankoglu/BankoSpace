@@ -254,9 +254,29 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style, onPa
     if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; }
     if (!editorRef.current) return;
     const html = editorRef.current.innerHTML;
+    lastEmittedRef.current = html;
     onChangeRef.current(html);
     pushHistory(html);
   }, [pushHistory]);
+
+  // The editor is uncontrolled: it takes `content` when it mounts and is then
+  // the source of truth. A change to the open note made on another device
+  // arrives as a new `content`, and without this the screen kept the old text
+  // and the next keystroke saved the old text back over it. What this editor
+  // emitted itself comes back as `content` too and is recognised; keystrokes
+  // not yet emitted are never overwritten.
+  const lastEmittedRef = useRef(content);
+  useEffect(() => {
+    const el = editorRef.current;
+    if (!el) return;
+    if (content === lastEmittedRef.current) return;
+    if (saveTimerRef.current) return;
+    if (el.innerHTML !== (content || '')) {
+      el.innerHTML = content || '';
+      setIsEmpty(!content);
+    }
+    lastEmittedRef.current = content;
+  }, [content]);
 
   const handleInput = () => {
     playTypeSoundThrottled();
@@ -1138,17 +1158,64 @@ function flipAnimateRows(mutateFn) {
   });
 }
 
+// Notes that arrived from another device, folded into what this window holds.
+// Every note takes the incoming version except the one open in the editor, and
+// that one only if it was edited here since the last sync (`baseline`): a note
+// that is merely open takes the incoming version like the rest — otherwise
+// viewing it would quietly revert edits made to it elsewhere, the next time
+// this side saved.
+export function mergeIncomingNotes(prev, incoming, baseline, openId) {
+  if (openId == null) return incoming;
+  const open = prev.find(n => n.id === openId);
+  const base = (baseline || []).find(n => n.id === openId);
+  const editedHere = !!open && JSON.stringify(open) !== JSON.stringify(base);
+  if (!editedHere) return incoming;
+  return incoming.some(n => n.id === openId)
+    ? incoming.map(n => (n.id === openId ? open : n))
+    : [open, ...incoming];
+}
+
 function Notes() {
   const [notes, setNotes] = useState(() => {
     const saved = localStorage.getItem('notes');
     const backup = localStorage.getItem('notes_local_backup');
     const parse = s => { try { return s ? JSON.parse(s) : null; } catch { return null; } };
     const a = parse(saved), b = parse(backup);
-    const raw = (a && b) ? (a.length >= b.length ? a : b) : (a || b || []);
+    // The backup is for real loss — the live copy missing or empty — not for
+    // whenever it happens to be longer. Picking the longer list meant a note
+    // deleted on another machine came back from this one's backup and was
+    // synced out again, and a list changed elsewhere could be replaced by this
+    // device's older, longer one.
+    const raw = (a && a.length) ? a : (b && b.length ? b : (a || []));
     return sanitizeNotes(raw.map(migrateNote));
   });
 
   const [selected, setSelected] = useState(null); // { noteId, subId: number|null }
+  // The notes as they last were in storage — loaded, saved, or arrived from
+  // another device. Anything that differs from this was edited here.
+  const baselineRef = useRef(notes);
+  const selectedRef = useRef(null);
+  selectedRef.current = selected;
+
+  // Notes changed on another device arrive here (src/sync.js announces them).
+  // Every note takes the incoming version except the one open in the editor:
+  // replacing that mid-sentence would move the caret and drop whatever was
+  // typed in the last two seconds, before the save below had run. It keeps
+  // this device's version and goes back out with the next save.
+  useEffect(() => {
+    const onRemote = () => {
+      let incoming;
+      try { incoming = sanitizeNotes((JSON.parse(localStorage.getItem('notes')) || []).map(migrateNote)); }
+      catch { return; }
+      setNotes(prev => {
+        const merged = mergeIncomingNotes(prev, incoming, baselineRef.current, selectedRef.current?.noteId);
+        baselineRef.current = incoming;
+        return merged;
+      });
+    };
+    window.addEventListener('notes-updated', onRemote);
+    return () => window.removeEventListener('notes-updated', onRemote);
+  }, []);
   const [expandedNotes, setExpandedNotes] = useState(() => {
     const saved = localStorage.getItem('notes');
     try {
@@ -1200,6 +1267,7 @@ function Notes() {
       const serialized = JSON.stringify(notes);
       localStorage.setItem('notes', serialized);
       localStorage.setItem('notes_local_backup', serialized);
+      baselineRef.current = notes;
     }, 2000);
   }, [notes]);
 

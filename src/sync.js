@@ -41,7 +41,21 @@ const state = {
 const pending = {};
 const timers = {};
 
+// No interaction yet: writes made while the app is starting are not the user's.
+let lastInteraction = 0;
+['keydown', 'mousedown', 'wheel', 'touchstart'].forEach(ev =>
+  window.addEventListener(ev, () => { lastInteraction = Date.now(); }, { capture: true, passive: true }));
+
 function diag(msg, warn) { if (window.__diag) window.__diag(msg, warn); }
+
+// The last few things sync did here, filed with the device status so one
+// machine can see what another actually did with an edit — queued it, held
+// it back, sent it, failed — instead of only that nothing arrived.
+const recent = [];
+function note(event, key) {
+  recent.push(`${new Date().toISOString().slice(11, 19)} ${event}${key ? ' ' + key : ''}`);
+  if (recent.length > 15) recent.shift();
+}
 
 export function isSyncReady() { return state.ready; }
 
@@ -55,19 +69,31 @@ function onLocalWrite(key, value) {
   // This window still shows another machine's older version of this key.
   // Writing it back would undo that machine's change.
   if (state.staleUntilReload.has(key)) {
-    diag(`SYNC held back stale write of ${key} (reload pending)`);
-    return;
+    // Someone is working in this window right now: this write is their edit,
+    // made on top of what the window shows. Holding it back until a reload
+    // that never comes while they keep working would throw their work away
+    // — which is what happened. Send it; the latest writer wins this key.
+    if (Date.now() - lastInteraction < 5000) {
+      state.staleUntilReload.delete(key);
+      note('sent-over-remote', key);
+      diag(`SYNC ${key} changed elsewhere while being edited here; keeping this window's edit`);
+    } else {
+      note('held', key);
+      diag(`SYNC held back stale write of ${key} (reload pending)`);
+      return;
+    }
   }
   const owner = getCachedUserId();
   // Written down before the timer is even set, because the timer dies with
   // the process and this has to survive it.
   markDirty(key);
+  note('queued', key);
   if (!state.ready) return; // offline: it stays marked and goes once a pull succeeds
   pending[key] = { value, owner };
   clearTimeout(timers[key]);
   timers[key] = setTimeout(() => {
     delete pending[key];
-    pushKeyToSupabase(key, value, owner);
+    pushKeyToSupabase(key, value, owner).then(ok => note(ok ? 'sent' : 'push-failed', key));
   }, PUSH_DELAY_MS);
 }
 
@@ -198,13 +224,39 @@ export function settleAfterMount() {
 
 // ── Incoming while running ────────────────────────────────────────────────
 
-// Keys whose React state is re-read in place by the app; the rest need the
-// window to reload to show what arrived.
+// Keys a section re-reads in place when told, so a change made elsewhere shows
+// at once — no reload, nothing held back. Each maps to the event that section
+// already listens for (the constants live beside each store: PLANNER_EVENT in
+// plannerStore, MEDS_EVENT in medsStore, BETA_EVENT, PROFILE_EVENT…). `todos`
+// lives in App's own state and is re-read through `rehydrate`.
+const LIVE_EVENTS = {
+  notes: 'notes-updated',
+  planner_blocks: 'planner-data-changed',
+  planner_qtasks: 'planner-data-changed',
+  planner_calendars: 'planner-data-changed',
+  calendar_week_start: 'planner-data-changed',
+  habitTracker_habits: 'habits-updated',
+  habitTracker_log: 'habits-updated',
+  habitTracker_autolog: 'habits-updated',
+  meds_v1: 'meds-changed',
+  meds_log_v1: 'meds-changed',
+  flashCards: 'flashcards-updated',
+  flashCardGroups: 'flashcards-updated',
+  freeformTabs: 'storage-updated',
+  payments_v2: 'storage',
+  betaFeatures_v1: 'beta-features-changed',
+  profile_v1: 'profile-updated',
+};
 const HOT_KEYS = new Set(['todos']);
 
-let lastInteraction = Date.now();
-['keydown', 'mousedown', 'wheel', 'touchstart'].forEach(ev =>
-  window.addEventListener(ev, () => { lastInteraction = Date.now(); }, { capture: true, passive: true }));
+function announce(key) {
+  const name = LIVE_EVENTS[key];
+  try {
+    if (name === 'storage') window.dispatchEvent(new StorageEvent('storage', { key }));
+    else window.dispatchEvent(new CustomEvent(name, { detail: { key } }));
+  } catch { /* old engines */ }
+}
+
 
 function isEditingText() {
   const el = document.activeElement;
@@ -238,10 +290,12 @@ function applyChanges(changed, rehydrate) {
   if (!changed || !changed.length) return;
   const cold = [];
   changed.forEach(key => {
-    if (HOT_KEYS.has(key)) rehydrate(key);
+    if (HOT_KEYS.has(key)) { rehydrate(key); note('applied', key); }
+    else if (LIVE_EVENTS[key]) { announce(key); note('applied', key); }
     else cold.push(key);
   });
   if (!cold.length) return;
+  cold.forEach(key => note('reload-pending', key));
   // Components that listen for `storage` can refresh themselves; a write from
   // this same document does not raise that event, so they are told by hand.
   cold.forEach(key => {
@@ -320,6 +374,8 @@ async function reportStatus() {
     ready: state.ready,
     settled: state.settled,
     unsent: [...readDirtyKeys()],
+    held: [...state.staleUntilReload],
+    recent: [...recent],
     ...syncHealth,
   });
 }
