@@ -264,7 +264,7 @@ function TaskContributionGraph({ todos, contributionLog }) {
 }
 import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, setVolume, getVolume } from './utils/sounds';
 
-const APP_VERSION = '4.9.5';
+const APP_VERSION = '4.9.6';
 // The sync layer reports which build each device runs; it lives outside React.
 window.__APP_VERSION = APP_VERSION;
 const MIN_COL_PX = 220;
@@ -838,8 +838,19 @@ const [dailyChecklistCollapsed, setDailyChecklistCollapsed] = useState(() => {
   // by this window's older state. It is re-read into state here instead; other
   // keys make the window reload once it has been left alone for a moment.
   const rehydrate = useCallback((key) => {
-    if (key !== 'todos') return;
-    try { setTodos(JSON.parse(localStorage.getItem('todos')) || []); } catch { /* keep what we have */ }
+    const raw = localStorage.getItem(key);
+    const json = (fallback) => { try { return raw ? JSON.parse(raw) : fallback; } catch { return fallback; } };
+    switch (key) {
+      case 'todos': setTodos(json([])); break;
+      case 'categoryNames':
+        setCategoryNames(prev => ({ ...prev, ...json({}) })); break;
+      case 'checklistNames': setChecklistNames(prev => json(prev)); break;
+      case 'theme': if (raw) setTheme(raw); break;
+      case 'colorTheme': if (raw) setColorTheme(raw); break;
+      case 'todoFontSize': if (raw) setTodoFontSize(raw); break;
+      case 'subtaskFontSize': if (raw) setSubtaskFontSize(raw); break;
+      default: break;
+    }
   }, []);
 
   useEffect(() => startPolling(rehydrate), [rehydrate]);

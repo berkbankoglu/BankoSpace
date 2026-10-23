@@ -33,18 +33,11 @@ const state = {
   // Writes from here on come from current state and may be edits.
   settled: false,
   lastSeenStamp: null,
-  // Keys another machine changed that this window's React state has not yet
-  // picked up. Until it reloads, anything it writes for them is stale.
-  staleUntilReload: new Set(),
 };
 
 const pending = {};
 const timers = {};
 
-// No interaction yet: writes made while the app is starting are not the user's.
-let lastInteraction = 0;
-['keydown', 'mousedown', 'wheel', 'touchstart'].forEach(ev =>
-  window.addEventListener(ev, () => { lastInteraction = Date.now(); }, { capture: true, passive: true }));
 
 function diag(msg, warn) { if (window.__diag) window.__diag(msg, warn); }
 
@@ -68,21 +61,6 @@ function onLocalWrite(key, value) {
   if (isInSync(key, value)) return;
   // This window still shows another machine's older version of this key.
   // Writing it back would undo that machine's change.
-  if (state.staleUntilReload.has(key)) {
-    // Someone is working in this window right now: this write is their edit,
-    // made on top of what the window shows. Holding it back until a reload
-    // that never comes while they keep working would throw their work away
-    // — which is what happened. Send it; the latest writer wins this key.
-    if (Date.now() - lastInteraction < 5000) {
-      state.staleUntilReload.delete(key);
-      note('sent-over-remote', key);
-      diag(`SYNC ${key} changed elsewhere while being edited here; keeping this window's edit`);
-    } else {
-      note('held', key);
-      diag(`SYNC held back stale write of ${key} (reload pending)`);
-      return;
-    }
-  }
   const owner = getCachedUserId();
   // Written down before the timer is even set, because the timer dies with
   // the process and this has to survive it.
@@ -141,7 +119,6 @@ export function installSyncLayer() {
     if (this !== localStorage) return originals.removeItem.call(this, key);
     native.remove(key);
     if (!SYNC_KEYS.includes(key) || !state.settled) return;
-    if (state.staleUntilReload.has(key)) return;
     markDirty(key);
     if (state.ready) pushKeyToSupabase(key, null);
   };
@@ -247,7 +224,11 @@ const LIVE_EVENTS = {
   betaFeatures_v1: 'beta-features-changed',
   profile_v1: 'profile-updated',
 };
-const HOT_KEYS = new Set(['todos']);
+// Held in App's own state and re-read in place through `rehydrate`.
+const HOT_KEYS = new Set([
+  'todos', 'categoryNames', 'checklistNames',
+  'theme', 'colorTheme', 'todoFontSize', 'subtaskFontSize',
+]);
 
 function announce(key) {
   const name = LIVE_EVENTS[key];
@@ -258,51 +239,27 @@ function announce(key) {
 }
 
 
-function isEditingText() {
-  const el = document.activeElement;
-  if (!el) return false;
-  if (el.isContentEditable) return true;
-  if ((el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') && el.value) return true;
-  return false;
-}
-
-// Reloading drops scroll position and anything half typed, so it waits until
-// this window has been left alone for a moment. Focus alone is no guide: on two
-// machines each window can be the focused one on its own screen while you type
-// on the other.
-function canReloadNow() {
-  return Date.now() - lastInteraction > 3000 && !isEditingText();
-}
-
-let reloadTimer = null;
-function scheduleReload() {
-  if (reloadTimer) return;
-  const attempt = () => {
-    if (canReloadNow()) { diag('SYNC reloading to show changes from another device'); window.location.reload(); return; }
-    reloadTimer = setTimeout(attempt, 1000);
-  };
-  reloadTimer = setTimeout(attempt, 250);
-}
-
-// Apply what a pull brought in. `rehydrate(key)` re-reads a hot key into
-// React state.
+// Apply what a pull brought in. It is already in localStorage; this tells
+// whoever holds it in memory.
+//
+// The window is never reloaded for it. That used to happen for any key without
+// a live section, as soon as nobody had touched the window for three seconds —
+// which in the middle of kana practice, between answers, threw the user back to
+// the dashboard. A section that is not on screen reads its data afresh when it
+// next opens, so it has nothing to catch up on; one that is on screen shows the
+// change when it is next opened, rather than being torn down under the user.
 function applyChanges(changed, rehydrate) {
   if (!changed || !changed.length) return;
-  const cold = [];
   changed.forEach(key => {
     if (HOT_KEYS.has(key)) { rehydrate(key); note('applied', key); }
     else if (LIVE_EVENTS[key]) { announce(key); note('applied', key); }
-    else cold.push(key);
+    else {
+      // Components that listen for `storage` can refresh themselves; a write
+      // from this same document does not raise that event, so it is raised here.
+      try { window.dispatchEvent(new StorageEvent('storage', { key })); } catch { /* old engines */ }
+      note('stored', key);
+    }
   });
-  if (!cold.length) return;
-  cold.forEach(key => note('reload-pending', key));
-  // Components that listen for `storage` can refresh themselves; a write from
-  // this same document does not raise that event, so they are told by hand.
-  cold.forEach(key => {
-    try { window.dispatchEvent(new StorageEvent('storage', { key })); } catch { /* old engines */ }
-    state.staleUntilReload.add(key);
-  });
-  scheduleReload();
 }
 
 // Poll for changes made elsewhere. One row, one column per tick; the full pull
@@ -374,7 +331,6 @@ async function reportStatus() {
     ready: state.ready,
     settled: state.settled,
     unsent: [...readDirtyKeys()],
-    held: [...state.staleUntilReload],
     recent: [...recent],
     ...syncHealth,
   });
