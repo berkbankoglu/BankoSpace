@@ -1,3 +1,4 @@
+import { nativeRemove } from './nativeStorage';
 // The accounts signed in on this machine, so switching between them doesn't
 // mean typing a password every time.
 //
@@ -101,12 +102,12 @@ export async function clearAccountData() {
   // says exactly what was on the device at the moment it was handed over.
   const sizeOf = (k) => (localStorage.getItem(k) || '').length;
   const before = `notes=${sizeOf('notes')} notes_local_backup=${sizeOf('notes_local_backup')} todos=${sizeOf('todos')}`;
-  // Storage's own removeItem, not the instance's. The sync layer wraps the
-  // instance method so that a deletion goes to the cloud as well — right for a
+  // Storage's original removeItem, not the wrapped one. The sync layer wraps
+  // removeItem so that a deletion goes to the cloud as well — right for a
   // user clearing something, wrong here. This empties the device; called that
   // way it sent a delete for every synced key, and since a switch swaps the
   // session first, those deletes landed on the account being switched TO.
-  const removeLocally = (key) => Storage.prototype.removeItem.call(localStorage, key);
+  const removeLocally = nativeRemove;
   doomed.forEach(removeLocally);
   const after = `notes=${sizeOf('notes')} notes_local_backup=${sizeOf('notes_local_backup')} todos=${sizeOf('todos')}`;
   if (window.__diag) window.__diag(`ACCOUNT: wiped ${doomed.length} keys | before ${before} | after ${after}`);

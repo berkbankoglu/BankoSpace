@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { isTauri } from './platform';
+import { nativeSet } from './utils/nativeStorage';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY;
@@ -223,7 +224,10 @@ function normalizeForCompare(val) {
 // Pull all data from Supabase and write to localStorage.
 // Returns the list of keys that actually changed, so the caller can decide
 // what to re-read: a boolean only ever supported "reload the whole window".
-export async function pullFromSupabase() {
+// `preferLocal`: where this device's value differs from the cloud's, keep this
+// device's and send it, instead of taking the cloud's. Used once, on a device
+// whose edits could never have been sent (see recoverUnsentEdits in sync.js).
+export async function pullFromSupabase({ preferLocal = false } = {}) {
   try {
     const userId = await getUserId();
     // null, not []: "could not reach the cloud" must not read as "nothing new",
@@ -250,12 +254,11 @@ export async function pullFromSupabase() {
     // deleted work typed shortly before the app was closed.
     const dirty = readDirtyKeys();
 
-    // Use raw setItem to avoid triggering push-back to Supabase during pull
-    const rawSetItem = Object.getOwnPropertyDescriptor(Storage.prototype, 'setItem')?.value
-      || localStorage.__origSetItem
-      || localStorage.setItem.bind(localStorage);
+    // The unwrapped setItem: what the cloud sends is not a local edit.
+    const rawSetItem = { call: (_, k, v) => nativeSet(k, v) };
 
     const changedKeys = [];
+    const recovered = [];
     const seen = new Set();
 
     (data || []).forEach(({ key, value }) => {
@@ -285,10 +288,16 @@ export async function pullFromSupabase() {
         }
       }
 
-      noteSynced(key, supaVal);
-
       // Semantic comparison — ignore JSONB key reordering
       const changed = normalizeForCompare(supaVal) !== normalizeForCompare(localStr);
+
+      if (changed && preferLocal && localStr !== null && !isEmptyValue(localStr)) {
+        markDirty(key);
+        recovered.push(key);
+        return;
+      }
+
+      noteSynced(key, supaVal);
       if (!changed) return;
 
       changedKeys.push(key);
@@ -310,6 +319,7 @@ export async function pullFromSupabase() {
     // account have never been able to see.
     if (onlyHere.length && window.__diag) window.__diag(`SYNC only on this device, sending: [${onlyHere.join(', ')}]`);
 
+    if (recovered.length && window.__diag) window.__diag(`SYNC kept this device's unsent edits, sending: [${recovered.join(', ')}]`, true);
     syncHealth.lastPullOk = new Date().toISOString();
     return changedKeys;
   } catch (e) {
@@ -362,10 +372,7 @@ export const DIRTY_KEY = '__sync_dirty';
 // Writes go through the untouched setItem: App.jsx replaces localStorage's own
 // with one that schedules pushes, and this bookkeeping must not feed itself.
 function rawSet(key, value) {
-  const fn = Object.getOwnPropertyDescriptor(Storage.prototype, 'setItem')?.value
-    || localStorage.__origSetItem
-    || localStorage.setItem.bind(localStorage);
-  try { fn.call(localStorage, key, value); } catch {}
+  try { nativeSet(key, value); } catch {}
 }
 
 export function readDirtyKeys() {

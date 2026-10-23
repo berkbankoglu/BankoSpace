@@ -15,6 +15,7 @@ import {
   isInSync, getCloudFingerprint, getCachedUserId, purgeApiKeyFromSupabase, SYNC_KEYS,
   readDirtyKeys, syncHealth, writeDeviceStatus, readDeviceStatuses, STATUS_PREFIX,
 } from './supabase';
+import { nativeSet, nativeRemove, originals } from './utils/nativeStorage';
 
 const PUSH_DELAY_MS = 700;
 const STARTUP_PULL_TIMEOUT_MS = 4500;
@@ -23,10 +24,7 @@ const STARTUP_PULL_TIMEOUT_MS = 4500;
 // this long is the user's.
 const SETTLE_AFTER_MOUNT_MS = 3000;
 
-const native = {
-  set: (k, v) => Storage.prototype.setItem.call(localStorage, k, v),
-  remove: (k) => Storage.prototype.removeItem.call(localStorage, k),
-};
+const native = { set: nativeSet, remove: nativeRemove };
 
 const state = {
   installed: false,
@@ -97,8 +95,10 @@ export function installSyncLayer() {
   if (state.installed) return;
   state.installed = true;
 
-  localStorage.__origSetItem = native.set;
-  localStorage.setItem = function (key, value) {
+  // On the prototype, not the object: see src/utils/nativeStorage.js. The
+  // guard keeps sessionStorage, which shares this prototype, out of it.
+  Storage.prototype.setItem = function (key, value) {
+    if (this !== localStorage) return originals.setItem.call(this, key, value);
     // Timed because a slow, main-thread-blocking write is otherwise an
     // invisible freeze.
     const t0 = performance.now();
@@ -108,10 +108,11 @@ export function installSyncLayer() {
       const msg = `SLOW setItem('${key}') ${Math.round(dt)}ms (${((value?.length || 0) / 1024).toFixed(0)}KB)`;
       if (window.__diag) window.__diag(msg, true); else console.warn('[perf]', msg);
     }
-    onLocalWrite(key, value);
+    onLocalWrite(key, String(value));
   };
 
-  localStorage.removeItem = function (key) {
+  Storage.prototype.removeItem = function (key) {
+    if (this !== localStorage) return originals.removeItem.call(this, key);
     native.remove(key);
     if (!SYNC_KEYS.includes(key) || !state.settled) return;
     if (state.staleUntilReload.has(key)) return;
@@ -134,7 +135,28 @@ function withTimeout(promise, ms) {
 
 // Called before the app mounts. Resolves either way; returns whether the
 // cloud was actually read.
+// Earlier releases wrapped localStorage by assigning onto the object. On the
+// Mac (WebKit) that never replaced the method — it stored items named after
+// it, holding the functions' source — so not one edit made there was sent.
+// Those items are the fingerprint of a device in that state. Whatever such a
+// device holds that differs from the cloud is its own unsent work, and on its
+// first start with the fix it is kept and sent rather than overwritten by the
+// cloud's copy, which would otherwise erase it on the very update meant to
+// rescue it.
+const JUNK_KEYS = ['setItem', 'removeItem', '__origSetItem'];
+const isJunk = (k) => {
+  const v = localStorage.getItem(k);
+  return v !== null && /function|=>/.test(v);
+};
+function hadBrokenWrapper() { return JUNK_KEYS.some(isJunk); }
+// Only once the recovering pull has gone through: if it fails, the marker has
+// to survive so the next start tries again.
+function clearJunk() { JUNK_KEYS.forEach(k => { if (isJunk(k)) native.remove(k); }); }
+
 export async function startupSync() {
+  // Read before installSyncLayer clears those items away.
+  const recoverUnsentEdits = hadBrokenWrapper();
+  if (recoverUnsentEdits) diag('SYNC this device could never send its edits (old wrapper found) — keeping its copy where it differs from the cloud', true);
   installSyncLayer();
   state.ready = false;
   state.settled = false;
@@ -146,8 +168,9 @@ export async function startupSync() {
     } catch { /* tried again next start */ }
   }
 
-  const changed = await withTimeout(pullFromSupabase(), STARTUP_PULL_TIMEOUT_MS);
+  const changed = await withTimeout(pullFromSupabase({ preferLocal: recoverUnsentEdits }), STARTUP_PULL_TIMEOUT_MS);
   if (Array.isArray(changed)) {
+    clearJunk();
     diag(`SYNC startup pull ok, changed: [${changed.join(', ')}]`);
     becomeReady();
     getCloudFingerprint().then(f => { if (f) state.lastSeenStamp = f; });
