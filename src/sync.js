@@ -16,6 +16,7 @@ import {
   readDirtyKeys, syncHealth, writeDeviceStatus, readDeviceStatuses, STATUS_PREFIX,
 } from './supabase';
 import { nativeSet, nativeRemove, originals } from './utils/nativeStorage';
+import { syncNoteMedia, getMediaSyncStatus } from './utils/noteMediaSync';
 
 const PUSH_DELAY_MS = 700;
 const STARTUP_PULL_TIMEOUT_MS = 4500;
@@ -50,6 +51,87 @@ function note(event, key) {
   if (recent.length > 15) recent.shift();
 }
 
+// ── What the sync indicator shows ─────────────────────────────────────────
+//
+// Sending / up to date / changes waiting / offline, and which other devices on
+// the account are open. "Open" is judged by watching another device's status
+// row change from here — it rewrites it every minute while it runs — rather
+// than by the time written inside it: that comes from the other machine's
+// clock, which is exactly the thing that cannot be trusted.
+const ALIVE_MS = 150000;
+const live = { inflight: 0, offline: false, lastOk: null, others: new Map() };
+const statusListeners = new Set();
+
+export function getSyncStatus() {
+  const media = getMediaSyncStatus();
+  const unsent = readDirtyKeys().size + media.pending;
+  const sending = live.inflight > 0 || Object.keys(pending).length > 0 || media.uploading > 0;
+  let kind;
+  if (live.offline) kind = 'offline';
+  else if (media.failed) kind = 'media-error';
+  else if (!state.ready) kind = 'connecting';
+  else if (sending) kind = 'sending';
+  else if (unsent) kind = 'unsent';
+  else kind = 'synced';
+  const now = Date.now();
+  const others = [...live.others.values()]
+    .map(o => ({ platform: o.platform, app: o.app, active: now - o.seenAliveAt < ALIVE_MS, lastSeen: o.seenAliveAt }))
+    .sort((a, b) => b.lastSeen - a.lastSeen);
+  return { kind, unsent, lastOk: live.lastOk, others };
+}
+
+export function subscribeSyncStatus(cb) {
+  statusListeners.add(cb);
+  cb(getSyncStatus());
+  return () => statusListeners.delete(cb);
+}
+
+function emitStatus() {
+  const s = getSyncStatus();
+  statusListeners.forEach(cb => { try { cb(s); } catch { /* a listener's problem */ } });
+}
+
+function reachedCloud() {
+  live.offline = false;
+  live.lastOk = Date.now();
+  emitStatus();
+  retryUnsent();
+}
+
+// A push that failed leaves its key marked, and nothing else would send it
+// again until the same thing was edited or the app restarted — so after a
+// network blip a change sat "waiting" indefinitely. Whenever the cloud is
+// reachable again, what is still marked goes out. At most every 15 seconds,
+// so a write that keeps failing for some other reason does not hammer it.
+let lastRetry = 0;
+function retryUnsent() {
+  if (!state.ready || live.offline) return;
+  const now = Date.now();
+  if (now - lastRetry < 15000) return;
+  const waiting = [...readDirtyKeys()].filter(k => !pending[k]);
+  if (!waiting.length) return;
+  lastRetry = now;
+  waiting.forEach(key => trackedPush(key, localStorage.getItem(key)));
+}
+function couldNotReachCloud() { live.offline = true; emitStatus(); }
+
+// Every push goes through here so the indicator knows something is in flight.
+// A push that declines on purpose (signed out, or a write queued for an
+// account just left) is not a network failure; only a request that actually
+// failed marks the device offline.
+function trackedPush(key, value, owner) {
+  live.inflight++;
+  emitStatus();
+  const errBefore = syncHealth.lastPushError;
+  return pushKeyToSupabase(key, value, owner).then(ok => {
+    live.inflight--;
+    if (ok) reachedCloud();
+    else if (syncHealth.lastPushError !== errBefore) couldNotReachCloud();
+    else emitStatus();
+    return ok;
+  });
+}
+
 export function isSyncReady() { return state.ready; }
 
 // ── Outgoing ──────────────────────────────────────────────────────────────
@@ -66,13 +148,14 @@ function onLocalWrite(key, value) {
   // the process and this has to survive it.
   markDirty(key);
   note('queued', key);
-  if (!state.ready) return; // offline: it stays marked and goes once a pull succeeds
+  if (!state.ready) { emitStatus(); return; } // offline: it stays marked and goes once a pull succeeds
   pending[key] = { value, owner };
   clearTimeout(timers[key]);
   timers[key] = setTimeout(() => {
     delete pending[key];
-    pushKeyToSupabase(key, value, owner).then(ok => note(ok ? 'sent' : 'push-failed', key));
+    trackedPush(key, value, owner).then(ok => note(ok ? 'sent' : 'push-failed', key));
   }, PUSH_DELAY_MS);
+  emitStatus();
 }
 
 // Send every queued write now. Returns the requests so a caller that is about
@@ -84,7 +167,7 @@ export function flushAll() {
     const { value, owner } = pending[key];
     clearTimeout(timers[key]);
     delete pending[key];
-    return pushKeyToSupabase(key, value, owner);
+    return trackedPush(key, value, owner);
   });
 }
 
@@ -119,8 +202,12 @@ export function installSyncLayer() {
     if (this !== localStorage) return originals.removeItem.call(this, key);
     native.remove(key);
     if (!SYNC_KEYS.includes(key) || !state.settled) return;
+    clearTimeout(timers[key]);
+    delete timers[key];
+    delete pending[key];
     markDirty(key);
-    if (state.ready) pushKeyToSupabase(key, null);
+    if (state.ready) trackedPush(key, null);
+    else emitStatus();
   };
 
   // A queued write should not wait for a quit that may never run the close
@@ -128,6 +215,7 @@ export function installSyncLayer() {
   window.addEventListener('blur', flushAll);
   window.addEventListener('pagehide', flushAll);
   window.addEventListener('beforeunload', flushAll);
+  window.addEventListener('note-media-sync-status', emitStatus);
 }
 
 // ── Startup ───────────────────────────────────────────────────────────────
@@ -174,13 +262,16 @@ export async function startupSync() {
   const changed = await withTimeout(pullFromSupabase({ preferLocal: recoverUnsentEdits }), STARTUP_PULL_TIMEOUT_MS);
   if (Array.isArray(changed)) {
     clearJunk();
+    await syncNoteMedia();
+    reachedCloud();
     diag(`SYNC startup pull ok, changed: [${changed.join(', ')}]`);
     becomeReady();
-    getCloudFingerprint().then(f => { if (f) state.lastSeenStamp = f; });
+    getCloudFingerprint().then(f => { if (f !== null) state.lastSeenStamp = f; });
     startStatusReports();
     return true;
   }
   startStatusReports();
+  couldNotReachCloud();
   diag('SYNC startup pull did not finish — opening on this device\'s copy', true);
   return false;
 }
@@ -189,7 +280,9 @@ function becomeReady() {
   state.ready = true;
   state.settled = true;
   // Local work the cloud never received: protected by the pull, now sent.
-  pushDirtyToSupabase();
+  live.inflight++;
+  emitStatus();
+  pushDirtyToSupabase().finally(() => { live.inflight--; emitStatus(); });
 }
 
 // The app has mounted on this device's own copy because the cloud could not
@@ -223,6 +316,7 @@ const LIVE_EVENTS = {
   payments_v2: 'storage',
   betaFeatures_v1: 'beta-features-changed',
   profile_v1: 'profile-updated',
+  dashLayout_v1: 'dash-layout-changed',
 };
 // Held in App's own state and re-read in place through `rehydrate`.
 const HOT_KEYS = new Set([
@@ -271,9 +365,16 @@ export function startPolling(rehydrate, intervalMs = 4000) {
     busy = true;
     try {
       const latest = await getCloudFingerprint();
-      if (!latest || latest === state.lastSeenStamp) return;
+      if (latest === null) { couldNotReachCloud(); return; }
+      if (latest === state.lastSeenStamp) {
+        const media = getMediaSyncStatus();
+        if (media.pending || media.failed) await syncNoteMedia();
+        reachedCloud(); return;
+      }
       const changed = await pullFromSupabase();
-      if (changed === null) return;           // unreachable: try again next tick
+      if (changed === null) { couldNotReachCloud(); return; } // try again next tick
+      await syncNoteMedia();
+      reachedCloud();
       state.lastSeenStamp = latest;
       if (!state.ready) becomeReady();       // first contact after an offline start
       if (changed.length) diag(`SYNC tick: [${changed.join(', ')}] changed elsewhere`);
@@ -291,7 +392,9 @@ export function startPolling(rehydrate, intervalMs = 4000) {
 export async function syncNow(rehydrate) {
   await Promise.all(flushAll());
   const changed = await pullFromSupabase();
-  if (changed === null) return false;
+  if (changed === null) { couldNotReachCloud(); return false; }
+  await syncNoteMedia();
+  reachedCloud();
   if (!state.ready) becomeReady();
   state.lastSeenStamp = (await getCloudFingerprint()) || state.lastSeenStamp;
   applyChanges(changed, rehydrate);
@@ -343,11 +446,28 @@ function startStatusReports() {
   // every minute while it runs.
   setTimeout(reportStatus, 2000);
   statusTimer = setInterval(reportStatus, 60000);
-  // What the OTHER devices last reported, for this device's log.
-  readDeviceStatuses().then(rows => {
-    const mine = STATUS_PREFIX + deviceId();
-    rows.filter(r => r.key !== mine).forEach(r => diag(`SYNC other device ${r.key.slice(STATUS_PREFIX.length)}: ${JSON.stringify(r.value)}`));
+  // What the OTHER devices last reported: once into this device's log, and
+  // every half minute for the indicator.
+  refreshOthers(true);
+  setInterval(refreshOthers, 30000);
+}
+
+async function refreshOthers(logThem) {
+  const rows = await readDeviceStatuses();
+  const mine = STATUS_PREFIX + deviceId();
+  const now = Date.now();
+  rows.filter(r => r.key !== mine).forEach(r => {
+    const id = r.key.slice(STATUS_PREFIX.length);
+    if (logThem === true) diag(`SYNC other device ${id}: ${JSON.stringify(r.value)}`);
+    const prev = live.others.get(id);
+    // Seen to change since the last look: open right now. On the first look
+    // there is nothing to compare with, so its own stamp has to do.
+    const seenAliveAt = prev
+      ? (prev.stamp !== r.updated_at ? now : prev.seenAliveAt)
+      : (Math.abs(now - Date.parse(r.updated_at)) < ALIVE_MS ? now : (Date.parse(r.updated_at) || 0));
+    live.others.set(id, { platform: r.value?.platform || 'other', app: r.value?.app || null, stamp: r.updated_at, seenAliveAt });
   });
+  emitStatus();
 }
 
 // Exposed for tests.

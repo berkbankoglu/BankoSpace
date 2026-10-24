@@ -1,0 +1,188 @@
+/* Dashboard widgets. The shell matches the Payments and Medications panels —
+   same surface, radius, header type and row metrics — so the dashboard reads
+   as one thing whatever is placed on it. */
+
+.wg-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.wg-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px 8px 14px;
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--border);
+}
+.wg-panel.collapsed .wg-header { border-bottom: none; }
+
+.wg-collapse,
+.wg-open {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.wg-collapse:hover,
+.wg-open:hover { background: var(--bg-hover); color: var(--text-primary); }
+.wg-open { margin-left: auto; }
+
+.wg-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.wg-badge {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.wg-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wg-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 22px 14px;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--text-muted);
+}
+.wg-link {
+  padding: 0;
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.wg-link:hover { text-decoration: underline; }
+
+/* A row: the same card the Payments and Medications rows use. */
+.wg-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  text-align: left;
+  font-family: inherit;
+  color: var(--text-primary);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--wg-accent, var(--border));
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.wg-row:hover { background: var(--bg-hover); border-color: var(--border-hover); border-left-color: var(--wg-accent, var(--border-hover)); }
+.wg-row.done { opacity: 0.45; }
+.wg-row.done .wg-row-name { text-decoration: line-through; }
+
+.wg-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.wg-row-name {
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wg-row-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wg-row-meta {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Round tick, as in the Medications widget. */
+.wg-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--bg-base);
+  border: 2px solid var(--wg-accent, var(--text-muted));
+  border-radius: 50%;
+}
+.wg-row:hover .wg-check { background: var(--wg-accent, var(--text-muted)); }
+.wg-row.done .wg-check { background: var(--wg-accent, var(--text-muted)); }
+
+.wg-icon { flex-shrink: 0; width: 20px; text-align: center; font-size: 15px; }
+
+/* Figures: a number and what it counts. */
+.wg-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 6px; }
+.wg-stat {
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.wg-stat-value { font-size: 20px; font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.wg-stat-label { margin-top: 2px; font-size: 11px; color: var(--text-muted); }
+
+.wg-section {
+  margin-top: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.wg-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.wg-btn {
+  flex: 1;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--text-primary);
+  background: var(--bg-card);
+  border: 1px solid var(--border-hover);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.wg-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Calories against the day's target. */
+.wg-meter { height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
+.wg-meter-fill { height: 100%; border-radius: 3px; background: #3fb950; transition: width 0.3s ease; }
+.wg-meter-fill.over { background: #d29922; }
+.wg-meter-caption { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }

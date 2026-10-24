@@ -39,6 +39,7 @@
 .dash-col-pane > .sub-tracker,
 .dash-col-pane > .activity-box,
 .dash-col-pane > .meds-panel,
+.dash-col-pane > .wg-panel,
 .dash-col-pane > .category-column-v2 {
   flex: 1;
   min-height: 0;
@@ -98,6 +99,7 @@
 }
 
 /* Header of a movable panel reads as a grab handle */
+.dash-col-pane > .wg-panel > .wg-header,
 .dash-col-pane > .dp-panel > .dp-header,
 .dash-col-pane > .sub-tracker > .sub-header,
 .dash-col-pane > .activity-box > .activity-box-header {
@@ -166,6 +168,7 @@
   .dash-col-pane > .sub-tracker,
   .dash-col-pane > .activity-box,
   .dash-col-pane > .meds-panel,
+  .dash-col-pane > .wg-panel,
   .dash-col-pane > .category-column-v2 {
     flex: 0 0 auto;
     height: auto;
@@ -199,4 +202,213 @@
 @media (prefers-reduced-motion: reduce) {
   .dash-col-pane,
   .dash-collapsible { transition: none; }
+}
+
+/* ── Building the dashboard ─────────────────────────────────────────────── */
+
+/* The toolbar row above the columns: a quiet "Customize" normally, the
+   instructions and Done while editing. */
+.dash-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  min-height: 22px;
+  margin: -6px 0 6px;
+  flex-shrink: 0;
+}
+.dash-toolbar-hint {
+  margin-right: auto;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.dash-customize-btn {
+  padding: 2px 8px;
+  font-size: 11px;
+  font-family: inherit;
+  color: var(--text-muted);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.15s, color 0.15s, border-color 0.15s;
+}
+.dash-customize-btn:hover { opacity: 1; color: var(--text-primary); border-color: var(--border); }
+.dash-done-btn {
+  padding: 4px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--bg-base);
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.dash-done-btn:hover { filter: brightness(1.08); }
+
+/* A widget while editing: its content is covered and stops taking clicks;
+   the whole cover is the handle, with a bar naming it and an × to take it off. */
+.dash-col-pane.editing { position: relative; }
+.dash-edit-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  border: 1px dashed var(--border-hover);
+  border-radius: 10px;
+  background: rgba(13, 13, 13, 0.35);
+  cursor: grab;
+}
+.dash-col-pane.dragging .dash-edit-overlay { cursor: grabbing; }
+.dash-col-pane.dragging { opacity: 0.35; }
+.dash-edit-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px;
+  padding: 6px 8px 6px 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-hover);
+  border-radius: 7px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+.dash-edit-grip { color: var(--text-muted); font-size: 13px; line-height: 1; }
+.dash-edit-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dash-edit-remove {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.dash-edit-remove:hover { color: var(--danger); background: rgba(248, 81, 73, 0.14); }
+
+/* Where a dragged widget will land. */
+.dash-drop-line {
+  flex-shrink: 0;
+  height: 3px;
+  margin: 3px 4px;
+  border-radius: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.04);
+}
+
+/* Columns while editing sit a little apart, so each reads as a slot. */
+.todo-col-wrapper.editing { padding: 0 4px; }
+.todo-col-wrapper.editing .dash-col-empty { min-height: 120px; }
+
+.dash-drag-ghost {
+  position: fixed;
+  z-index: 10002;
+  pointer-events: none;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--accent);
+  border-radius: 7px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+}
+
+/* The library: every widget, the ones already placed marked as such. */
+.dash-library {
+  flex: 0 0 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-left: 10px;
+  padding: 14px 12px;
+  overflow-y: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.dash-library-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.dash-library-hint { margin: -2px 0 4px; font-size: 12px; color: var(--text-muted); }
+.dash-library-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px 10px 12px;
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: grab;
+  user-select: none;
+}
+.dash-library-item:hover { border-color: var(--border-hover); }
+.dash-library-item.placed { cursor: default; opacity: 0.55; }
+.dash-library-text { flex: 1; min-width: 0; }
+.dash-library-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.dash-library-blurb { margin-top: 2px; font-size: 11.5px; line-height: 1.4; color: var(--text-muted); }
+.dash-library-add {
+  flex-shrink: 0;
+  padding: 4px 11px;
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-hover);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.dash-library-add:hover { border-color: var(--accent); color: var(--accent); }
+.dash-library-on { flex-shrink: 0; font-size: 11px; color: var(--text-muted); }
+
+/* A new user's empty dashboard. */
+.dash-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dash-empty-card {
+  max-width: 420px;
+  padding: 32px 34px;
+  text-align: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+.dash-empty-title { font-size: 18px; font-weight: 700; color: var(--text-primary); }
+.dash-empty-text { margin: 10px 0 20px; font-size: 13px; line-height: 1.6; color: var(--text-secondary); }
+.dash-empty-btn {
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--bg-base);
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.dash-empty-btn:hover { filter: brightness(1.08); }
+
+@media (max-width: 1150px) {
+  /* Stacked: the library goes first, so it is not below every widget. */
+  .dash-library { order: -1; flex: 0 0 auto; margin: 0 0 10px; }
+  .todo-col-wrapper.editing .dash-col-empty { min-height: 80px; }
 }

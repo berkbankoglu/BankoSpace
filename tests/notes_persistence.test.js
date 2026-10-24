@@ -1,0 +1,14 @@
+import { store, ok, done } from './env.js';
+import { readSavedNotes, persistNotes } from '../src/utils/notesPersistence';
+store.notes = '[{"id":1}]';
+store.notes_local_backup = store.notes;
+persistNotes([]);
+ok('deleting the final note saves an empty array', store.notes === '[]');
+ok('the backup is cleared too', store.notes_local_backup === '[]');
+store.notes_local_backup = '[{"id":1}]';
+ok('an intentionally empty list wins over an old backup', readSavedNotes().length === 0);
+store.notes = 'broken';
+ok('a corrupted live copy can still recover its backup', readSavedNotes()[0].id === 1);
+delete store.notes;
+ok('a missing live copy recovers its backup', readSavedNotes().length === 1);
+done();

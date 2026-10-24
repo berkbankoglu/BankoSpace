@@ -15,7 +15,16 @@ import SubscriptionTracker, { SubscriptionWidget, SubscriptionPopup } from './co
 import Calendar from './components/Calendar';
 import MedsToday from './components/MedsToday';
 import DashPlanner from './components/DashPlanner';
-import DashColumns, { PANEL_IDS } from './components/DashColumns';
+import DashColumns from './components/DashColumns';
+import SyncStatus from './components/SyncStatus';
+import NotesWidget from './components/widgets/NotesWidget';
+import HabitsWidget from './components/widgets/HabitsWidget';
+import StudyWidget from './components/widgets/StudyWidget';
+import FitnessWidget from './components/widgets/FitnessWidget';
+import ChecklistWidget from './components/widgets/ChecklistWidget';
+import SectionPicker from './components/SectionPicker';
+import { needsSectionPicker, finishSectionPicker } from './utils/onboarding';
+import { WIDGETS } from './utils/dashLayout';
 import { BETA_FEATURES, BETA_EVENT, getBetaFlags, setBetaFlag } from './utils/betaFeatures';
 import { PROFILE_EVENT, AVATAR_COLORS, getProfile, setProfile, displayName, initials, avatarColor, validateUsername, accountSubtitle } from './utils/profile';
 import { ACCOUNTS_EVENT, MAX_ACCOUNTS, listAccounts, rememberAccount, forgetAccount, clearAccountData } from './utils/accounts';
@@ -25,6 +34,8 @@ import { syncHabitsFromPlanner } from './utils/habitPlannerSync';
 import { useUndoScope, useUndoHotkeys } from './utils/undoHistory';
 import { PLANNER_EVENT, ensureCalendarMigrated } from './utils/plannerStore';
 import Notes from './components/Notes';
+import { DATA_SECTIONS, createBackup, restoreBackup } from './utils/backup';
+import { syncNoteMedia, getMediaSyncStatus } from './utils/noteMediaSync';
 import HabitTracker from './components/HabitTracker';
 import MobileTabBar from './components/MobileTabBar';
 import { useIsMobile } from './hooks/useIsMobile';
@@ -264,7 +275,7 @@ function TaskContributionGraph({ todos, contributionLog }) {
 }
 import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, setVolume, getVolume } from './utils/sounds';
 
-const APP_VERSION = '4.9.6';
+const APP_VERSION = '4.10.0';
 // The sync layer reports which build each device runs; it lives outside React.
 window.__APP_VERSION = APP_VERSION;
 const MIN_COL_PX = 220;
@@ -577,10 +588,32 @@ function App({ session, onLogout }) {
     () => sidebarItems.filter(item => !betaSidebarIds.has(item.id)),
     [sidebarItems, betaSidebarIds],
   );
-  const visiblePanelIds = useMemo(
-    () => PANEL_IDS.filter(id => !BETA_FEATURES.some(f => f.id === id && !betaFlags[f.id])),
+  // Widgets that can go on the dashboard: all of them, less any opt-in
+  // feature that is switched off. A placed widget whose feature is off is
+  // hidden, not removed, so switching it back on restores it where it was.
+  const availableWidgets = useMemo(
+    () => WIDGETS.map(w => w.id).filter(id => !BETA_FEATURES.some(f => f.id === id && !betaFlags[f.id])),
     [betaFlags],
   );
+  const [editingDash, setEditingDash] = useState(false);
+  // Someone new chooses which sections they will use; the rest leave the
+  // sidebar until they are turned on in Settings → Pages.
+  const [showSectionPicker, setShowSectionPicker] = useState(needsSectionPicker);
+  const chooseSections = useCallback((chosen) => {
+    setSidebarItems(prev => prev.map(item => (
+      item.id === 'dashboard' ? item : { ...item, hidden: !chosen.has(item.id) }
+    )));
+    finishSectionPicker();
+    setShowSectionPicker(false);
+  }, []);
+  // Leaving the dashboard, or pressing Escape, ends editing.
+  useEffect(() => { if (activeView !== 'dashboard') setEditingDash(false); }, [activeView]);
+  useEffect(() => {
+    if (!editingDash) return;
+    const onKey = (e) => { if (e.key === 'Escape') setEditingDash(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [editingDash]);
   const toggleBetaFeature = useCallback((id) => {
     setBetaFlags(prev => setBetaFlag(id, !prev[id]));
   }, []);
@@ -634,6 +667,12 @@ function App({ session, onLogout }) {
     // in the meantime.
     await Promise.all(flushAll());
     await pushDirtyToSupabase();
+    await syncNoteMedia();
+    if (getMediaSyncStatus().pending) {
+      const error = new Error('Note images are still waiting to sync. Reconnect before switching accounts.');
+      error.code = 'UNSENT_MEDIA';
+      throw error;
+    }
     window.__cancelPendingPushes?.();
     if (session) rememberAccount(session, getProfile());
   };
@@ -656,8 +695,9 @@ function App({ session, onLogout }) {
       rememberAccount(data.session, null);
       await clearAccountData();
       window.location.reload();
-    } catch {
+    } catch (error) {
       setSwitching(false);
+      if (error.code === 'UNSENT_MEDIA') { setAccountError(error.message); return; }
       setAccounts(forgetAccount(target.id));
       setAccountError(`The saved sign-in for ${accountSubtitle(target.email) || 'that account'} had expired, so it was removed from the list. Use "Add account" to sign in to it again.`);
     }
@@ -675,9 +715,9 @@ function App({ session, onLogout }) {
       // adding a second account used to lock you out of the first.
       await supabase.auth.signOut({ scope: 'local' });
       window.location.reload();
-    } catch {
+    } catch (error) {
       setSwitching(false);
-      setAccountError('Could not switch to the sign-in screen. Try again.');
+      setAccountError(error.code === 'UNSENT_MEDIA' ? error.message : 'Could not switch to the sign-in screen. Try again.');
     }
   };
 
@@ -688,7 +728,8 @@ function App({ session, onLogout }) {
   const signOutCurrent = async () => {
     if (switching) return;
     setSwitching(true);
-    try { await Promise.all(flushAll()); await pushDirtyToSupabase(); } catch { /* sign out regardless */ }
+    try { await leaveCurrentAccount(); }
+    catch (error) { setSwitching(false); setAccountError(error.message || 'Could not save changes before signing out.'); return; }
     window.__cancelPendingPushes?.();
     const id = session?.user?.id;
     await clearAccountData();
@@ -1585,75 +1626,14 @@ useEffect(() => {
 
 
   // Export: Download all data as a JSON file
-  // Section definitions for import/export
-  const DATA_SECTIONS = [
-    {
-      id: 'todos',
-      label: 'Todos',
-      keys: ['todos', 'categoryNames'],
-    },
-    {
-      id: 'checklists',
-      label: 'Checklists',
-      keys: ['dailyChecklistItems', 'dailyChecklistLastReset', 'dailyChecklistColor', 'longtermChecklistItems', 'longtermChecklistLastReset', 'longtermChecklistColor', 'checklistNames'],
-    },
-    {
-      id: 'habits',
-      label: 'Habits',
-      keys: ['habitTracker_habits', 'habitTracker_log'],
-    },
-    {
-      id: 'payments',
-      label: 'Payments',
-      keys: ['payments_v2'],
-    },
-    {
-      id: 'notes',
-      label: 'Notes',
-      keys: ['notes', 'freeformTabs', 'quickNotes'],
-    },
-    {
-      id: 'flashcards',
-      label: 'Flash Cards',
-      keys: ['flashCards', 'flashCardGroups'],
-    },
-    {
-      id: 'fitness',
-      label: 'Fitness',
-      keys: ['ft_profile', 'ft_goal', 'ft_weight_log', 'ft_menu_templates', 'ft_meals', 'ft_workouts', 'ft_measurements'],
-    },
-    {
-      id: 'finance',
-      label: 'Finance',
-      keys: ['invoices', 'goals'],
-    },
-    {
-      id: 'japanese',
-      label: 'Japanese',
-      keys: ['kana_learned_words', 'kana_selected_rows', 'kana_custom_words', 'kana_selected_vocab', 'kana_stats', 'kana_prefs', 'kana_best_score', 'kana_cell_colors'],
-    },
-    {
-      id: 'settings',
-      label: 'Settings',
-      keys: ['theme', 'sidebarOrder', 'soundVolume', 'todoFontSize', 'subtaskFontSize'],
-    },
-  ];
 
   const exportSection = async (sectionIdOrIds) => {
     try {
       const isAll = sectionIdOrIds === 'all';
       const ids = isAll ? DATA_SECTIONS.map(s => s.id) : Array.isArray(sectionIdOrIds) ? sectionIdOrIds : [sectionIdOrIds];
       const sections = ids.map(id => DATA_SECTIONS.find(s => s.id === id)).filter(Boolean);
-      const keys = sections.flatMap(s => s.keys);
       const sectionLabel = isAll ? 'all' : ids.length === 1 ? sections[0]?.label.toLowerCase().replace(' ', '-') : 'selected';
-      const data = { _bankospace: true, _section: isAll ? 'all' : ids.length === 1 ? ids[0] : ids, _date: new Date().toISOString() };
-      keys.forEach(key => {
-        const val = localStorage.getItem(key);
-        if (val !== null) {
-          try { data[key] = JSON.parse(val); } catch { data[key] = val; }
-        }
-      });
-      if (ids.includes('todos')) data['todos'] = todos;
+      const data = await createBackup(sectionIdOrIds);
       const date = new Date().toISOString().split('T')[0];
       const saved = await exportJSON(`bankospace-${sectionLabel}-${date}.json`, JSON.stringify(data, null, 2));
       if (saved) {
@@ -1661,7 +1641,7 @@ useEffect(() => {
       }
     } catch (e) {
       console.error('Export error:', e);
-      alert('Export failed.');
+      alert(e?.message || 'Export failed.');
     }
   };
 
@@ -1671,22 +1651,7 @@ useEffect(() => {
       if (!raw) return;
       const data = JSON.parse(raw);
       if (!data._bankospace) { alert('Invalid file. Please select a BankoSpace export file.'); return; }
-      const sectionId = data._section;
-      const keys = sectionId === 'all' || !sectionId
-        ? DATA_SECTIONS.flatMap(s => s.keys)
-        : Array.isArray(sectionId)
-          ? sectionId.flatMap(id => DATA_SECTIONS.find(s => s.id === id)?.keys || [])
-          : (DATA_SECTIONS.find(s => s.id === sectionId)?.keys || []);
-      const sectionLabel = Array.isArray(sectionId)
-        ? sectionId.map(id => DATA_SECTIONS.find(s => s.id === id)?.label).filter(Boolean).join(', ')
-        : DATA_SECTIONS.find(s => s.id === sectionId)?.label || 'All data';
-      keys.forEach(key => {
-        if (data[key] !== undefined) {
-          const val = typeof data[key] === 'string' ? data[key] : JSON.stringify(data[key]);
-          localStorage.setItem(key, val);
-        }
-      });
-      if (data.todos) { setTodos(data.todos); localStorage.setItem('todos', JSON.stringify(data.todos)); }
+      const sectionLabel = await restoreBackup(data);
       alert(`${sectionLabel} imported successfully! Page will reload.`);
       window.location.reload();
     } catch (e) {
@@ -2501,6 +2466,7 @@ useEffect(() => {
                 </button>
               </span>
             )}
+            <SyncStatus compact={sidebarCollapsed} />
             <span className="sidebar-footer-version" title="Version">v{APP_VERSION}</span>
             </div>
           </div>
@@ -2591,10 +2557,25 @@ useEffect(() => {
           {activeView === 'dashboard' && (
           <ViewErrorBoundary>
           <div key="dashboard" className="dashboard-container" style={{ '--todo-font-size': fontSizeMap[todoFontSize], '--subtask-font-size': subtaskFontSizeMap[subtaskFontSize] }}>
+            <div className="dash-toolbar">
+              {editingDash ? (
+                <>
+                  <span className="dash-toolbar-hint">Drag widgets to arrange them, × to take one off, or add from the list.</span>
+                  <button className="dash-done-btn" onClick={() => setEditingDash(false)}>Done</button>
+                </>
+              ) : (
+                <button className="dash-customize-btn" onClick={() => setEditingDash(true)} title="Choose what is on your dashboard">⊞ Customize</button>
+              )}
+            </div>
             {/* Todo Columns - resizable */}
             <div className="todo-columns" ref={columnsRef}>
               <DashColumns
-                panelIds={visiblePanelIds}
+                available={availableWidgets}
+                editing={editingDash}
+                onStartEditing={() => setEditingDash(true)}
+                widgetTitle={(id) => (id === 'daily' || id === 'weekly')
+                  ? (categoryNames[id] || WIDGETS.find(w => w.id === id)?.title)
+                  : WIDGETS.find(w => w.id === id)?.title || id}
                 colWidths={colWidths}
                 startColResize={startColResize}
                 resetColWidths={() => { setColWidths(DEFAULT_COL_PX); localStorage.setItem('dashColWidths', JSON.stringify(DEFAULT_COL_PX)); }}
@@ -2630,6 +2611,44 @@ useEffect(() => {
                       />
                     );
                   }
+                  if (id === 'notes') {
+                    return (
+                      <NotesWidget
+                        collapsed={collapsed}
+                        onToggle={onToggle}
+                        onOpenNotes={(noteId) => {
+                          // Notes picks this up as it opens and selects the note.
+                          if (noteId != null) sessionStorage.setItem('notes_open_id', JSON.stringify(noteId));
+                          setActiveView('notes');
+                        }}
+                      />
+                    );
+                  }
+                  if (id === 'habits') {
+                    return <HabitsWidget collapsed={collapsed} onToggle={onToggle} onOpenHabits={() => setActiveView('habits')} />;
+                  }
+                  if (id === 'checklist') {
+                    return (
+                      <ChecklistWidget
+                        title={checklistNames.daily}
+                        collapsed={collapsed}
+                        onToggle={onToggle}
+                        onOpenChecklists={() => setActiveView('checklists')}
+                      />
+                    );
+                  }
+                  if (id === 'study') {
+                    return (
+                      <StudyWidget
+                        collapsed={collapsed}
+                        onToggle={onToggle}
+                        onOpenStudy={(tab) => { setKanaView(tab); setActiveView('japanesekana'); }}
+                      />
+                    );
+                  }
+                  if (id === 'fitness') {
+                    return <FitnessWidget collapsed={collapsed} onToggle={onToggle} onOpenFitness={() => setActiveView('fitness')} />;
+                  }
                   if (id === 'payments') {
                     return (
                       <SubscriptionTracker
@@ -2659,6 +2678,13 @@ useEffect(() => {
 
       {/* Subscriptions & Payments Popup */}
       {showSubPopup && <SubscriptionPopup onClose={() => setShowSubPopup(false)} />}
+
+      {showSectionPicker && (
+        <SectionPicker
+          sections={availableSidebarItems.filter(item => item.id !== 'dashboard')}
+          onDone={chooseSections}
+        />
+      )}
 
       {/* Planner Toast Notifications */}
       {plannerToasts.length > 0 && (

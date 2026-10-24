@@ -811,12 +811,13 @@ export default function Calendar({ onPlannerToast }) {
   // ── render ─────────────────────────────────────────────────────────────────
 
   const d = parse(cursor);
+  const modifierLabel = /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent || '') ? '⌘' : 'Ctrl+';
 
   return (
     <div className={`cal-root${sidebarOpen ? '' : ' no-sidebar'}${narrow ? ' is-narrow' : ''}`}>
       <div className="cal-toolbar">
         <button className="cal-icon-btn" onClick={() => setSidebarOpen(s => !s)} title="Toggle sidebar">☰</button>
-        <button className="cal-icon-btn" onClick={() => openNew(cursor, false)} title="New event (⌘N)">+</button>
+        <button className="cal-icon-btn" onClick={() => openNew(cursor, false)} title={`New event (${modifierLabel}N)`}>+</button>
 
         <div className="cal-views">
           {VIEWS.map(v => (
@@ -824,15 +825,15 @@ export default function Calendar({ onPlannerToast }) {
               key={v.id}
               className={`cal-view-btn${view === v.id ? ' active' : ''}`}
               onClick={() => setView(v.id)}
-              title={`${v.label} (⌘${v.key})`}
+              title={`${v.label} (${modifierLabel}${v.key})`}
             >{v.id === 'day' && dayCount > 1 ? `${dayCount} Days` : v.label}</button>
           ))}
         </div>
 
         <div className="cal-nav">
-          <button className="cal-nav-btn" onClick={() => step(-1)} title="Previous (⌘←)">‹</button>
-          <button className="cal-today-btn" onClick={() => setCursor(todayStr())} title="Today (⌘T)">Today</button>
-          <button className="cal-nav-btn" onClick={() => step(1)} title="Next (⌘→)">›</button>
+          <button className="cal-nav-btn" onClick={() => step(-1)} title={`Previous (${modifierLabel}←)`}>‹</button>
+          <button className="cal-today-btn" onClick={() => setCursor(todayStr())} title={`Today (${modifierLabel}T)`}>Today</button>
+          <button className="cal-nav-btn" onClick={() => step(1)} title={`Next (${modifierLabel}→)`}>›</button>
         </div>
 
         <div className="cal-title">{label}</div>
@@ -853,7 +854,7 @@ export default function Calendar({ onPlannerToast }) {
       {armed && (
         <div className="cal-arm-bar">
           <span className="cal-arm-text">
-            Tap a time to schedule <b>{armed.task.title}</b>
+            {view === 'month' ? 'Tap a day to schedule at 9 AM: ' : 'Tap a time to schedule '}<b>{armed.task.title}</b>
           </span>
           <button className="cal-arm-cancel" onClick={() => setArmed(null)}>Cancel</button>
         </div>
@@ -1025,6 +1026,8 @@ export default function Calendar({ onPlannerToast }) {
               onOpen={onOpen}
               onAddAt={(ds, allDay) => openNew(ds, allDay)}
               onItemDragStart={onMonthDragStart}
+              armed={!!armed}
+              onSlotTap={placeArmed}
               onPickDay={(ds) => { setCursor(ds); setView('day'); }}
             />
           )}

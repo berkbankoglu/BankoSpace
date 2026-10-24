@@ -4,7 +4,9 @@ import './Notes.css';
 import { exportJSON, exportText, importJSON } from '../platform';
 import { playTypeSoundThrottled, playClickSound, playAddSound, playDeleteSound } from '../utils/sounds';
 import { pushKeyToSupabase } from '../supabase';
-import { putImage, getImage, resolveEmbed, newImageId, putStrokes, getStrokes } from '../utils/imageStore';
+import { putImage, getImage, resolveEmbed, newImageId, putStrokes, getStrokes, MEDIA_EVENT } from '../utils/imageStore';
+import { externalizeNotes, inlineNotesForExport } from '../utils/noteMediaBackup';
+import { readSavedNotes, persistNotes } from '../utils/notesPersistence';
 
 // Render annotation strokes (normalized 0..1 coords) onto a 2D context of
 // css-pixel size W×H. Used by both the note thumbnail and the lightbox.
@@ -334,7 +336,7 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style, onPa
     }
   }, []);
 
-  const insertImageEmbed = (dataUrl, title) => {
+  const insertImageEmbed = async (dataUrl, title) => {
     if (!dataUrl) return; // still loading
     const range = pendingRangeRef.current;
     if (!range) return;
@@ -344,7 +346,8 @@ const RichTextEditor = forwardRef(({ content, placeholder, onChange, style, onPa
     // Store the heavy base64 in IndexedDB; keep only a tiny id in the note HTML
     // so the serialized/synced notes payload stays small.
     const imgId = newImageId();
-    putImage(imgId, dataUrl);
+    try { await putImage(imgId, dataUrl); }
+    catch { alert('Could not save the image on this device. Please try again.'); return; }
     span.setAttribute('data-img-id', imgId);
     span.textContent = title.trim() || 'Screenshot';
     range.deleteContents();
@@ -747,93 +750,6 @@ function sanitizeNotes(notes) {
   }));
 }
 
-// Move any inline base64 image (legacy `data-img="data:..."`) into IndexedDB and
-// leave only a `data-img-id` reference behind, so the note HTML stays tiny.
-async function externalizeImages(html) {
-  if (!html || html.indexOf('data-img="data:') === -1) return html;
-  const tmp = document.createElement('div');
-  tmp.innerHTML = html;
-  for (const span of tmp.querySelectorAll('.note-img-embed')) {
-    const legacy = span.getAttribute('data-img');
-    if (legacy && legacy.startsWith('data:')) {
-      const id = newImageId();
-      await putImage(id, legacy);
-      span.removeAttribute('data-img');
-      span.setAttribute('data-img-id', id);
-    }
-  }
-  return tmp.innerHTML;
-}
-
-// Canvas images: strip inline dataUrl/strokes (from an imported backup) into IndexedDB
-async function externalizeCanvasImages(arr) {
-  if (!Array.isArray(arr)) return arr;
-  const out = [];
-  for (const ci of arr) {
-    if (ci && (ci.dataUrl || ci.strokes)) {
-      const imgId = ci.imgId || newImageId();
-      if (ci.dataUrl) await putImage(imgId, ci.dataUrl);
-      if (ci.strokes) await putStrokes(imgId, ci.strokes);
-      const { dataUrl, strokes, ...rest } = ci;
-      out.push({ ...rest, imgId });
-    } else out.push(ci);
-  }
-  return out;
-}
-
-async function externalizeNotes(notesArr) {
-  const out = [];
-  for (const n of notesArr) {
-    const content = await externalizeImages(n.content);
-    const canvasImages = await externalizeCanvasImages(n.canvasImages);
-    const subNotes = [];
-    for (const s of (n.subNotes || [])) {
-      subNotes.push({ ...s, content: await externalizeImages(s.content), canvasImages: await externalizeCanvasImages(s.canvasImages) });
-    }
-    out.push({ ...n, content, subNotes, ...(canvasImages ? { canvasImages } : {}) });
-  }
-  return out;
-}
-
-// Reverse of externalize: pull images back from IndexedDB into the HTML so an
-// exported backup file is self-contained.
-async function inlineImages(html) {
-  if (!html || html.indexOf('data-img-id="') === -1) return html;
-  const tmp = document.createElement('div');
-  tmp.innerHTML = html;
-  for (const span of tmp.querySelectorAll('.note-img-embed[data-img-id]')) {
-    const url = await getImage(span.getAttribute('data-img-id'));
-    if (url) { span.setAttribute('data-img', url); span.removeAttribute('data-img-id'); }
-  }
-  return tmp.innerHTML;
-}
-
-// Canvas images: pull dataUrl + strokes back from IndexedDB so the backup is self-contained
-async function inlineCanvasImages(arr) {
-  if (!Array.isArray(arr)) return arr;
-  const out = [];
-  for (const ci of arr) {
-    const dataUrl = ci?.imgId ? await getImage(ci.imgId) : null;
-    const strokes = ci?.imgId ? await getStrokes(ci.imgId) : null;
-    out.push({ ...ci, ...(dataUrl ? { dataUrl } : {}), ...(strokes && strokes.length ? { strokes } : {}) });
-  }
-  return out;
-}
-
-async function inlineNotesForExport(notesArr) {
-  const out = [];
-  for (const n of notesArr) {
-    const content = await inlineImages(n.content);
-    const canvasImages = await inlineCanvasImages(n.canvasImages);
-    const subNotes = [];
-    for (const s of (n.subNotes || [])) {
-      subNotes.push({ ...s, content: await inlineImages(s.content), canvasImages: await inlineCanvasImages(s.canvasImages) });
-    }
-    out.push({ ...n, content, subNotes, ...(canvasImages ? { canvasImages } : {}) });
-  }
-  return out;
-}
-
 // A screenshot pasted onto the note canvas: freely positioned, draggable,
 // resizable from the corner, deletable, double-click to zoom. Image bytes live
 // in IndexedDB (imageStore); the note only stores { id, imgId, x, y, w }.
@@ -847,15 +763,19 @@ function CanvasImage({ img, onCommit, onDelete, onOpen, strokesVersion }) {
 
   useEffect(() => {
     let alive = true;
-    getImage(img.imgId).then(u => { if (alive) setSrc(u); });
-    return () => { alive = false; };
+    const reload = () => getImage(img.imgId).then(u => { if (alive) setSrc(u); });
+    reload();
+    window.addEventListener(MEDIA_EVENT, reload);
+    return () => { alive = false; window.removeEventListener(MEDIA_EVENT, reload); };
   }, [img.imgId]);
 
   // Annotations made in the lightbox; re-read when it closes (strokesVersion)
   useEffect(() => {
     let alive = true;
-    getStrokes(img.imgId).then(s => { if (alive) setStrokes(s || []); });
-    return () => { alive = false; };
+    const reload = () => getStrokes(img.imgId).then(s => { if (alive) setStrokes(s || []); });
+    reload();
+    window.addEventListener(MEDIA_EVENT, reload);
+    return () => { alive = false; window.removeEventListener(MEDIA_EVENT, reload); };
   }, [img.imgId, strokesVersion]);
 
   // Paint the annotations over the thumbnail at its current display size
@@ -1176,21 +1096,15 @@ export function mergeIncomingNotes(prev, incoming, baseline, openId) {
 }
 
 function Notes() {
-  const [notes, setNotes] = useState(() => {
-    const saved = localStorage.getItem('notes');
-    const backup = localStorage.getItem('notes_local_backup');
-    const parse = s => { try { return s ? JSON.parse(s) : null; } catch { return null; } };
-    const a = parse(saved), b = parse(backup);
-    // The backup is for real loss — the live copy missing or empty — not for
-    // whenever it happens to be longer. Picking the longer list meant a note
-    // deleted on another machine came back from this one's backup and was
-    // synced out again, and a list changed elsewhere could be replaced by this
-    // device's older, longer one.
-    const raw = (a && a.length) ? a : (b && b.length ? b : (a || []));
-    return sanitizeNotes(raw.map(migrateNote));
-  });
+  const [notes, setNotes] = useState(() => sanitizeNotes(readSavedNotes().map(migrateNote)));
 
-  const [selected, setSelected] = useState(null); // { noteId, subId: number|null }
+  // A dashboard widget can ask for a particular note to be open on arrival.
+  const [selected, setSelected] = useState(() => {
+    const asked = sessionStorage.getItem('notes_open_id');
+    if (asked == null) return null;
+    sessionStorage.removeItem('notes_open_id');
+    try { return { noteId: JSON.parse(asked), subId: null }; } catch { return null; }
+  }); // { noteId, subId: number|null }
   // The notes as they last were in storage — loaded, saved, or arrived from
   // another device. Anything that differs from this was edited here.
   const baselineRef = useRef(notes);
@@ -1252,7 +1166,6 @@ function Notes() {
   const editorRef = useRef(null);
   const gutterRef = useRef(null);
   const savedSelectionRef = useRef(null);
-  const notesSaveTimerRef = useRef(null);
   const resizeStartXRef = useRef(0);
   const resizeStartWidthRef = useRef(0);
   const isResizingRef = useRef(false);
@@ -1261,14 +1174,11 @@ function Notes() {
   const [animKey, setAnimKey] = useState(0);
 
   useEffect(() => {
-    if (notes.length === 0) return;
-    if (notesSaveTimerRef.current) clearTimeout(notesSaveTimerRef.current);
-    notesSaveTimerRef.current = setTimeout(() => {
-      const serialized = JSON.stringify(notes);
-      localStorage.setItem('notes', serialized);
-      localStorage.setItem('notes_local_backup', serialized);
-      baselineRef.current = notes;
-    }, 2000);
+    // The editor already debounces its input. Persist here without a second
+    // timer, including [], so navigation and account switches cannot leave an
+    // older snapshot queued to overwrite the current account's storage.
+    persistNotes(notes);
+    baselineRef.current = notes;
   }, [notes]);
 
   // One-time migration: move any legacy inline base64 images into IndexedDB so

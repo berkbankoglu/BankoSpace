@@ -316,7 +316,7 @@ export function TimeGrid({
 // Six rows always, so the grid doesn't change height from month to month — the
 // jump is the single most noticeable difference between a hand-rolled month
 // view and a real one.
-export function MonthView({ year, month, occurrences, today, selectedIds, weekStart = 1, dropDate, onSelect, onOpen, onAddAt, onPickDay, onItemDragStart, maxPerCell = 3 }) {
+export function MonthView({ year, month, occurrences, today, selectedIds, weekStart = 1, dropDate, onSelect, onOpen, onAddAt, onPickDay, onItemDragStart, maxPerCell = 3, armed = false, onSlotTap }) {
   const cells = useMemo(() => {
     const first = new Date(year, month, 1);
     const start = gridStart(first, weekStart);
@@ -343,13 +343,17 @@ export function MonthView({ year, month, occurrences, today, selectedIds, weekSt
           const hidden = items.length - shown.length;
           return (
             <div
-              className={`cal-month-cell${cell.inMonth ? '' : ' outside'}${cell.dateStr === today ? ' today' : ''}${cell.dow === 0 || cell.dow === 6 ? ' weekend' : ''}${cell.dateStr === dropDate ? ' drop' : ''}`}
+              className={`cal-month-cell${armed ? ' arming' : ''}${cell.inMonth ? '' : ' outside'}${cell.dateStr === today ? ' today' : ''}${cell.dow === 0 || cell.dow === 6 ? ' weekend' : ''}${cell.dateStr === dropDate ? ' drop' : ''}`}
               key={cell.dateStr}
               data-date={cell.dateStr}
+              onClick={(e) => {
+                if (!armed || e.target.closest('.cal-month-item, .cal-month-more')) return;
+                onSlotTap?.(cell.dateStr, 9 * 60);
+              }}
               onDoubleClick={(e) => { if (e.target.closest('.cal-month-item')) return; onAddAt?.(cell.dateStr, true); }}
             >
               <div className="cal-month-daynum-row">
-                <button className="cal-month-daynum" onClick={() => onPickDay?.(cell.dateStr)}>{cell.dayNum}</button>
+                <button className="cal-month-daynum" onClick={() => { if (!armed) onPickDay?.(cell.dateStr); }}>{cell.dayNum}</button>
               </div>
               <div className="cal-month-items">
                 {shown.map(occ => {

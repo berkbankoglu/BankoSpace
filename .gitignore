@@ -37,3 +37,6 @@ create-icon.ps1.claude/
 *.key.pub
 *.sig
 test_sign.txt
+
+# Test bundles (rebuilt by npm test)
+tests/.build/

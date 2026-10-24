@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { isTauri } from './platform';
-import { nativeSet } from './utils/nativeStorage';
+import { nativeSet, nativeRemove } from './utils/nativeStorage';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY;
@@ -124,6 +124,9 @@ export const SYNC_KEYS = [
   'meds_log_v1',
   'betaFeatures_v1',
   'profile_v1',
+  'dashLayout_v1',
+  'ft_goal_kcal',
+  'onboarded_v1',
 ];
 
 // Cache userId to avoid network call on every push
@@ -137,7 +140,7 @@ supabase.auth.onAuthStateChange((_event, session) => {
 export function getCachedUserId() { return cachedUserId; }
 
 // Get current user ID (uses cache, falls back to network once)
-async function getUserId() {
+export async function getUserId() {
   if (cachedUserId) return cachedUserId;
   const { data: { user } } = await supabase.auth.getUser();
   cachedUserId = user?.id || null;
@@ -160,7 +163,7 @@ export async function getCloudFingerprint() {
       .from('user_data').select('key, updated_at').eq('user_id', userId);
     if (error || !data) return null;
     return data
-      .filter(r => SYNC_KEYS.includes(r.key))
+      .filter(r => SYNC_KEYS.includes(r.key) || r.key.startsWith('__media:'))
       .map(r => `${r.key}@${r.updated_at}`)
       .sort()
       .join('|');
@@ -237,9 +240,11 @@ export async function pullFromSupabase({ preferLocal = false } = {}) {
     const { data, error } = await supabase
       .from('user_data')
       .select('key, value')
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .not('key', 'like', '__media:%');
 
     if (error) throw error;
+    if (userId !== await getUserId()) return null;
 
     // More rows than keys means the table holds several rows for one key, and
     // which of them wins below depends on the order the database happens to
@@ -260,33 +265,28 @@ export async function pullFromSupabase({ preferLocal = false } = {}) {
     const changedKeys = [];
     const recovered = [];
     const seen = new Set();
+    const known = readKnownKeys(userId);
 
     (data || []).forEach(({ key, value }) => {
       // Only keys this app syncs. Status rows and anything retired from the
       // list live in the same table and must not land in localStorage.
       if (!SYNC_KEYS.includes(key)) return;
       seen.add(key);
-      if (value === null || value === undefined) return;
       if (dirty.has(key)) return;
+
+      // A null row is a durable deletion. An absent row alone cannot tell a
+      // first-time device whether this key was deleted or was never uploaded.
+      if (value === null || value === undefined || value === 'null') {
+        if (localStorage.getItem(key) !== null) changedKeys.push(key);
+        nativeRemove(key);
+        if (key === 'notes') nativeRemove('notes_local_backup');
+        noteSynced(key, null);
+        return;
+      }
 
       const supaVal = typeof value === 'string' ? (() => { try { return JSON.parse(value); } catch { return value; } })() : value;
       const supaStr = typeof value === 'string' ? value : JSON.stringify(value);
       const localStr = localStorage.getItem(key);
-
-      // The cloud is empty for this key but this device has data. Keep it —
-      // and, unlike before, send it up. Keeping it quietly is what left two
-      // machines on one account holding different copies forever: each kept
-      // its own, neither ever offered it to the other.
-      if (localStr && localStr !== 'null') {
-        const supaEmpty =
-          supaVal === null ||
-          (Array.isArray(supaVal) && supaVal.length === 0) ||
-          (typeof supaVal === 'object' && !Array.isArray(supaVal) && Object.keys(supaVal).length === 0);
-        if (supaEmpty) {
-          if (!isEmptyValue(localStr)) markDirty(key);
-          return;
-        }
-      }
 
       // Semantic comparison — ignore JSONB key reordering
       const changed = normalizeForCompare(supaVal) !== normalizeForCompare(localStr);
@@ -304,6 +304,7 @@ export async function pullFromSupabase({ preferLocal = false } = {}) {
       // Flag to prevent overridden setItem from pushing back to Supabase
       window.__supabasePulling = true;
       rawSetItem.call(localStorage, key, supaStr);
+      if (key === 'notes') nativeSet('notes_local_backup', supaStr);
       window.__supabasePulling = false;
     });
 
@@ -313,8 +314,16 @@ export async function pullFromSupabase({ preferLocal = false } = {}) {
     SYNC_KEYS.forEach(key => {
       if (seen.has(key) || dirty.has(key)) return;
       const localStr = localStorage.getItem(key);
-      if (localStr !== null && !isEmptyValue(localStr)) { markDirty(key); onlyHere.push(key); }
+      if (known.has(key) && !preferLocal) {
+        if (localStr !== null) changedKeys.push(key);
+        nativeRemove(key);
+        if (key === 'notes') nativeRemove('notes_local_backup');
+        noteSynced(key, null);
+      } else if (localStr !== null && !isEmptyValue(localStr)) {
+        markDirty(key); onlyHere.push(key);
+      }
     });
+    saveKnownKeys(userId, new Set([...known, ...seen]));
     // Worth a line: each of these is something the other machines on this
     // account have never been able to see.
     if (onlyHere.length && window.__diag) window.__diag(`SYNC only on this device, sending: [${onlyHere.join(', ')}]`);
@@ -418,9 +427,17 @@ export async function pushDirtyToSupabase() {
 // pull, after a successful push. A write equal to it is not a change.
 const lastSynced = new Map();
 
+function readKnownKeys(userId) {
+  try { return new Set(JSON.parse(localStorage.getItem('__sync_known:' + userId)) || []); }
+  catch { return new Set(); }
+}
+
+function saveKnownKeys(userId, keys) {
+  nativeSet('__sync_known:' + userId, JSON.stringify([...keys]));
+}
+
 function noteSynced(key, value) {
-  if (value === null || value === undefined) lastSynced.delete(key);
-  else lastSynced.set(key, normalizeForCompare(value));
+  lastSynced.set(key, normalizeForCompare(value ?? null));
 }
 
 export function isInSync(key, value) {
@@ -429,7 +446,20 @@ export function isInSync(key, value) {
 
 // Tek bir key'i Supabase'e yaz (value === null ise Supabase'den sil)
 // Resolves true once the cloud holds the value, false otherwise.
+const writeQueues = new Map();
 export async function pushKeyToSupabase(key, value, expectedUserId) {
+  if (!SYNC_KEYS.includes(key)) return false;
+  const owner = expectedUserId || await getUserId();
+  if (!owner) return false;
+  const queueKey = `${owner}:${key}`;
+  const previous = writeQueues.get(queueKey) || Promise.resolve();
+  const work = previous.catch(() => {}).then(() => writeKeyToSupabase(key, value, owner));
+  writeQueues.set(queueKey, work);
+  try { return await work; }
+  finally { if (writeQueues.get(queueKey) === work) writeQueues.delete(queueKey); }
+}
+
+async function writeKeyToSupabase(key, value, expectedUserId) {
   if (!SYNC_KEYS.includes(key)) return false;
   try {
     const userId = await getUserId();
@@ -445,11 +475,13 @@ export async function pushKeyToSupabase(key, value, expectedUserId) {
     if (value === null || value === undefined) {
       const { error } = await supabase
         .from('user_data')
-        .delete()
-        .eq('user_id', userId)
-        .eq('key', key);
+        // JSON string "null" also works when value has a SQL NOT NULL
+        // constraint. Readers already parse stored JSON strings as values.
+        .upsert({ user_id: userId, key, value: 'null', updated_at: new Date().toISOString() });
       if (error) throw error;
+      if (userId !== getCachedUserId()) return false;
       noteSynced(key, null);
+      saveKnownKeys(userId, new Set([...readKnownKeys(userId), key]));
       if (localStorage.getItem(key) === null) clearDirty(key);
       return true;
     }
@@ -466,7 +498,9 @@ export async function pushKeyToSupabase(key, value, expectedUserId) {
       throw error;
     }
     syncHealth.lastPushOk = `${new Date().toISOString()} ${key}`;
+    if (userId !== getCachedUserId()) return false;
     noteSynced(key, parsed);
+    saveKnownKeys(userId, new Set([...readKnownKeys(userId), key]));
     // Only now is the cloud actually holding this value. Clearing the mark any
     // earlier would hand the next pull permission to overwrite it — and it is
     // cleared only if this is still the latest local value: a newer write made

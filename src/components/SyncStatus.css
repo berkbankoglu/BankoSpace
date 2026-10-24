@@ -1,0 +1,38 @@
+.sync-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: default;
+  white-space: nowrap;
+}
+
+.sync-dot {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.sync-label { overflow: hidden; text-overflow: ellipsis; }
+.sync-other { color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; }
+
+/* The colour carries the state; the word beside it says it in full. */
+.sync-synced  .sync-dot { background: #3fb950; }
+.sync-sending .sync-dot { background: #58a6ff; animation: sync-pulse 1s ease-in-out infinite; }
+.sync-unsent  .sync-dot { background: #d29922; }
+.sync-media-error .sync-dot { background: #d29922; }
+.sync-offline .sync-dot { background: #f85149; }
+.sync-offline .sync-label { color: #f0a29c; }
+
+@keyframes sync-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sync-sending .sync-dot { animation: none; }
+}

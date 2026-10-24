@@ -1,6 +1,6 @@
 {
   "name": "bankospace",
-  "version": "4.9.6",
+  "version": "4.10.0",
   "description": "BankoSpace - Modern productivity application with task management, references, and flashcards",
   "main": "index.js",
   "type": "module",
@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri-dev": "tauri dev",
-    "tauri-build": "tauri build"
+    "tauri-build": "tauri build",
+    "test": "node tests/run.mjs"
   },
   "keywords": [],
   "author": "",

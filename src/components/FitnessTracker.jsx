@@ -1219,6 +1219,14 @@ export default function FitnessTracker({ view = 'overview' } = {}) {
     return tdee;
   }
   const goalKcal = calcGoalKcal();
+  // The dashboard's Fitness widget shows calories against this. It is worked
+  // out here, from the profile and the goal, and only read there — one
+  // calculation, so the two can never disagree.
+  useEffect(() => {
+    const v = goalKcal ? String(Math.round(goalKcal)) : null;
+    if (v === localStorage.getItem('ft_goal_kcal')) return;
+    if (v) localStorage.setItem('ft_goal_kcal', v); else localStorage.removeItem('ft_goal_kcal');
+  }, [goalKcal]);
 
   // Hedef özet bilgileri
   const goalInfo = (() => {

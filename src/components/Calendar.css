@@ -181,6 +181,8 @@
 /* Every empty slot is a target while something is armed. */
 .cal-col.arming { cursor: copy; }
 .cal-col.arming:hover { background: var(--accent-glow); }
+.cal-month-cell.arming { cursor: copy; }
+.cal-month-cell.arming:hover { background: var(--accent-glow); }
 
 /* ── Body / sidebar ──────────────────────────────────────────────────────── */
 
