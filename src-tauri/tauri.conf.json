@@ -1,6 +1,6 @@
 {
   "productName": "BankoSpace",
-  "version": "4.10.0",
+  "version": "4.10.1",
   "identifier": "com.berkbankoglu.bankospace",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -100,10 +100,29 @@
             "core:window:allow-set-focus",
             "core:window:allow-set-size",
             "core:window:allow-set-decorations",
+            "core:webview:allow-create-webview-window",
+            "core:webview:allow-get-all-webviews",
+            "core:window:allow-get-all-windows",
+            "core:window:allow-unminimize",
             "core:window:allow-internal-toggle-maximize",
             "deep-link:default",
             "updater:default",
             "process:allow-restart"
+          ]
+        },
+        {
+          "identifier": "note-window-capability",
+          "description": "A note opened from the dashboard in its own window — it edits notes in local storage and nothing else",
+          "windows": [
+            "note-*"
+          ],
+          "permissions": [
+            "core:event:default",
+            "core:window:allow-close",
+            "core:window:allow-destroy",
+            "core:window:allow-start-dragging",
+            "core:window:allow-set-focus",
+            "core:window:allow-minimize"
           ]
         },
         {

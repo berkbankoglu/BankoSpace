@@ -186,3 +186,72 @@
 .wg-meter-fill { height: 100%; border-radius: 3px; background: #3fb950; transition: width 0.3s ease; }
 .wg-meter-fill.over { background: #d29922; }
 .wg-meter-caption { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+/* Notes: a note with sub-notes can list them under its row. */
+.wg-note { display: flex; flex-direction: column; }
+.wg-note-toggle {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  margin: -4px -4px -4px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: transform 0.18s ease, color 0.15s, background 0.15s;
+}
+.wg-note-toggle:hover { color: var(--text-primary); background: rgba(255, 255, 255, 0.07); }
+.wg-note-toggle.open { transform: rotate(90deg); }
+.wg-note-subs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 4px 0 2px 14px;
+  padding-left: 10px;
+  border-left: 1px solid var(--border);
+  animation: wg-note-subs-in 0.18s ease-out;
+}
+@keyframes wg-note-subs-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.wg-note-sub {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  padding: 6px 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.wg-note-sub:hover { background: var(--bg-hover); }
+.wg-note-sub-name {
+  flex-shrink: 0;
+  max-width: 60%;
+  font-size: 13.5px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wg-note-sub-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (prefers-reduced-motion: reduce) {
+  .wg-note-subs { animation: none; }
+  .wg-note-toggle { transition: none; }
+}

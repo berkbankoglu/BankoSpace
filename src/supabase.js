@@ -122,6 +122,8 @@ export const SYNC_KEYS = [
   'calendar_week_start',
   'meds_v1',
   'meds_log_v1',
+  'meds_skip_v1',
+  'meds_order_v1',
   'betaFeatures_v1',
   'profile_v1',
   'dashLayout_v1',

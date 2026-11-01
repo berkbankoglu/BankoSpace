@@ -14,7 +14,7 @@ const groups = [
   { id: 'finance', label: 'Finance', keys: ['invoices', 'invoiceBasePath', 'goals', 'research_watchlist', 'research_checked'] },
   { id: 'japanese', label: 'Japanese', keys: SYNC_KEYS.filter(k => k.startsWith('kana_')) },
   { id: 'calendar', label: 'Calendar', keys: ['planner_blocks', 'planner_qtasks', 'planner_calendars', 'calendar_week_start'] },
-  { id: 'medications', label: 'Medications', keys: ['meds_v1', 'meds_log_v1'] },
+  { id: 'medications', label: 'Medications', keys: ['meds_v1', 'meds_log_v1', 'meds_skip_v1', 'meds_order_v1'] },
   { id: 'review', label: 'Review', keys: ['reviews_v1'] },
   { id: 'dashboard', label: 'Dashboard', keys: ['dashLayout_v1', 'dashColWidths', 'dashPanelWeights', 'dashPanelCollapsed'] },
 ];

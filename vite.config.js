@@ -24,6 +24,7 @@ export default defineConfig({
       workbox: {
         navigateFallbackDenylist: [
           /^\/kana\.html$/,
+          /^\/note\.html$/,
           /^\/confirmed\.html$/,
         ],
       },
@@ -54,6 +55,7 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'index.html'),
 kana: resolve(__dirname, 'kana.html'),
+        note: resolve(__dirname, 'note.html'),
       }
     }
   }

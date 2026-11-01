@@ -1111,6 +1111,18 @@ function Notes() {
   const selectedRef = useRef(null);
   selectedRef.current = selected;
 
+  // …or ask while Notes is already open (↗ in a note's own window).
+  useEffect(() => {
+    const onAsk = () => {
+      const asked = sessionStorage.getItem('notes_open_id');
+      if (asked == null) return;
+      sessionStorage.removeItem('notes_open_id');
+      try { setSelected({ noteId: JSON.parse(asked), subId: null }); } catch { /* ignore */ }
+    };
+    window.addEventListener('notes-open-request', onAsk);
+    return () => window.removeEventListener('notes-open-request', onAsk);
+  }, []);
+
   // Notes changed on another device arrive here (src/sync.js announces them).
   // Every note takes the incoming version except the one open in the editor:
   // replacing that mid-sentence would move the caret and drop whatever was
@@ -2328,4 +2340,5 @@ ${body}
   );
 }
 
+export { RichTextEditor };
 export default Notes;

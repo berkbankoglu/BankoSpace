@@ -1,0 +1,162 @@
+/* Note opened from the dashboard. The card grows out of the clicked row
+   (--nq-dx/--nq-dy: that row's centre relative to the screen's centre) while
+   the backdrop fades in; closing plays it back a little faster. */
+.nq-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(3px);
+  animation: nq-fade-in 0.22s ease-out both;
+}
+.nq-overlay.closing { animation: nq-fade-out 0.18s ease-in both; }
+
+.nq-card {
+  display: flex;
+  flex-direction: column;
+  width: min(720px, 100%);
+  height: min(640px, 100%);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+  animation: nq-grow 0.32s cubic-bezier(0.2, 0.9, 0.25, 1.05) both;
+}
+.nq-overlay.closing .nq-card { animation: nq-shrink 0.18s ease-in both; }
+
+@keyframes nq-grow {
+  from { opacity: 0; transform: translate(var(--nq-dx, 0px), var(--nq-dy, 24px)) scale(0.35); }
+  60%  { opacity: 1; }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes nq-shrink {
+  from { opacity: 1; transform: none; }
+  to   { opacity: 0; transform: translate(calc(var(--nq-dx, 0px) * 0.4), calc(var(--nq-dy, 24px) * 0.4)) scale(0.7); }
+}
+@keyframes nq-fade-in  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes nq-fade-out { from { opacity: 1; } to { opacity: 0; } }
+
+.nq-head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 14px 12px 22px;
+  border-bottom: 1px solid var(--border);
+}
+.nq-dot {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--nq-accent);
+}
+.nq-grab { flex: 1; align-self: stretch; }
+.nq-title {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  outline: none;
+  padding: 4px 0;
+  font: inherit;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.nq-title::placeholder { color: var(--text-muted); }
+.nq-btn {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.nq-btn:hover { background: rgba(255, 255, 255, 0.07); color: var(--text-primary); }
+
+.nq-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.nq-body .notebook-page-editor {
+  min-height: 100%;
+  padding: 18px 24px 48px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nq-overlay, .nq-card, .nq-overlay.closing, .nq-overlay.closing .nq-card { animation-duration: 0.01s; }
+}
+
+/* Pages of the note down the left, when it has sub-notes; the editor takes
+   the rest. Long titles wrap rather than hide. */
+.nq-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.nq-pages {
+  flex-shrink: 0;
+  width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 8px;
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+}
+.nq-main .nq-body { flex: 1; min-width: 0; }
+.nq-tab {
+  flex-shrink: 0;
+  text-align: left;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.nq-tab:hover { color: var(--text-primary); background: rgba(255, 255, 255, 0.05); }
+.nq-tab.active { color: var(--text-primary); background: rgba(255, 255, 255, 0.09); }
+
+/* As its own window (note.html): the card is the window — square corners,
+   no inset, no animation; it is simply there when clicked. */
+html.nq-window-doc,
+html.nq-window-doc body,
+html.nq-window-doc #root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+.nq-window { height: 100%; display: flex; }
+.nq-window .nq-card {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  border-radius: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: none;
+  animation: none;
+}
+.nq-window .nq-head { cursor: default; user-select: none; }
+.nq-window .nq-title { flex: 0 1 auto; field-sizing: content; min-width: 4ch; max-width: 70%; cursor: text; }
+.nq-window .nq-btn { border-radius: 0; }
+.nq-window .nq-tab { border-radius: 0; }

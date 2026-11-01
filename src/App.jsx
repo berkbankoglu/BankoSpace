@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback, Component } from 're
 import { flushSync } from 'react-dom';
 import { isTauri, proxyFetch, confirmAsync, notifyPermission, notify, exportJSON, importJSON, windowControls, startWindowDrag } from './platform';
 import logo from './assets/logo.svg';
+import SidebarIcon, { MOD_LABEL } from './components/SidebarIcons';
 import './App.css';
 import { supabase, pushDirtyToSupabase } from './supabase';
 import { startupSync, settleAfterMount, startPolling, syncNow, flushAll, cancelPending } from './sync';
@@ -275,7 +276,7 @@ function TaskContributionGraph({ todos, contributionLog }) {
 }
 import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, setVolume, getVolume } from './utils/sounds';
 
-const APP_VERSION = '4.10.0';
+const APP_VERSION = '4.10.1';
 // The sync layer reports which build each device runs; it lives outside React.
 window.__APP_VERSION = APP_VERSION;
 const MIN_COL_PX = 220;
@@ -896,6 +897,62 @@ const [dailyChecklistCollapsed, setDailyChecklistCollapsed] = useState(() => {
 
   useEffect(() => startPolling(rehydrate), [rehydrate]);
 
+  // Sections with pages under them (Fitness, Language Learn) fold like a tree.
+  // Kept per device: it is how this window is arranged, not data.
+  const [openGroups, setOpenGroups] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('sidebarOpen_v1')) || {}; } catch { return {}; }
+  });
+  const toggleGroup = (id, open) => setOpenGroups(prev => {
+    const next = { ...prev, [id]: open };
+    try { localStorage.setItem('sidebarOpen_v1', JSON.stringify(next)); } catch { /* ignore */ }
+    return next;
+  });
+
+  const openSidebarItem = useCallback((item) => {
+    playNavSound();
+    if (item.id === 'japanesekana') {
+      setKanaView('guide');
+      setActiveView('japanesekana');
+      return;
+    }
+    if (item.id === 'fitness') setFitnessView('overview');
+    setActiveView(item.view);
+  }, []);
+
+  // Ctrl/Cmd+1…9 opens the sidebar entry in that position; the number is
+  // shown beside each entry.
+  const shortcutItemsRef = useRef([]);
+  useEffect(() => {
+    const onKey = (e) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
+      if (!/^[1-9]$/.test(e.key)) return;
+      const item = shortcutItemsRef.current[Number(e.key) - 1];
+      if (!item) return;
+      e.preventDefault();
+      openSidebarItem(item);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [openSidebarItem]);
+
+  // ↗ in a note's own window: show that note in Notes here.
+  useEffect(() => {
+    if (!isTauri) return;
+    let unlisten = null;
+    let disposed = false;
+    Promise.all([import('@tauri-apps/api/event'), import('@tauri-apps/api/window')])
+      .then(([{ listen }, { getCurrentWindow }]) => listen('note-open-in-notes', (e) => {
+        sessionStorage.setItem('notes_open_id', JSON.stringify(e.payload));
+        setActiveView('notes');
+        window.dispatchEvent(new Event('notes-open-request'));
+        const w = getCurrentWindow();
+        w.unminimize().catch(() => {});
+        w.setFocus().catch(() => {});
+      }))
+      .then(fn => { if (disposed) fn(); else unlisten = fn; });
+    return () => { disposed = true; if (unlisten) unlisten(); };
+  }, []);
+
   // Ctrl/Cmd+S: send what is queued and pull straight away.
   useEffect(() => {
     const onKey = (e) => {
@@ -1481,6 +1538,13 @@ useEffect(() => {
              the screen and cover everything you are aiming at. */
           max-height:60vh;overflow:hidden;
         `;
+        // The copy lives on <body>, outside the dashboard that sets the task
+        // font size; carry it over or the copy comes out smaller than the box.
+        const cs = getComputedStyle(itemEl);
+        ['--todo-font-size', '--subtask-font-size'].forEach(v => {
+          const val = cs.getPropertyValue(v);
+          if (val) ghost.style.setProperty(v, val.trim());
+        });
         document.body.appendChild(ghost);
         itemEl.style.opacity = '0.35';
         itemEl.style.transform = 'scale(0.97)';
@@ -1827,17 +1891,19 @@ useEffect(() => {
         <div className={`notion-sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
           {/* Sidebar Header */}
           <div className="sidebar-header">
+            {!sidebarCollapsed && (
+              <div className="sidebar-brand">
+                <img src={logo} alt="" className="sidebar-logo" />
+                <span className="sidebar-brand-name">BankoSpace</span>
+              </div>
+            )}
             <button
               className="sidebar-toggle"
               onClick={() => { setSidebarCollapsed(c => !c); setColWidths([null, null, null]); }}
+              title={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
             >
-              {sidebarCollapsed ? '»' : '«'}
+              <SidebarIcon name="panel" />
             </button>
-            {!sidebarCollapsed && (
-              <div className="sidebar-logo-center">
-                <img src={logo} alt="BankoSpace" className="sidebar-logo" />
-              </div>
-            )}
           </div>
 
           {/* Settings Modal - Notion Style */}
@@ -2326,87 +2392,75 @@ useEffect(() => {
           {!sidebarCollapsed && (
             <div className="sidebar-content">
               {/* Draggable Sidebar Items */}
-              {availableSidebarItems.filter(item => !item.hidden).map((item, index) => (
-                <div
-                  key={item.id}
-                  className={`sidebar-item-group ${dragOverInfo?.id === item.id ? `sidebar-drop-${dragOverInfo.position}` : ''}`}
-                  data-sidebar-id={item.id}
-                >
-                  <div
-                    className={`sidebar-item ${item.id === 'dashboard' ? 'main-item' : ''} ${activeView === item.view ? 'active' : ''} ${draggedSidebarItem?.item.id === item.id ? 'sidebar-dragging' : ''}`}
-                    onMouseDown={(e) => handleSidebarDragStart(e, item, index)}
-                    onClick={() => {
-                      if (draggedSidebarItem) return;
-                      playNavSound();
-                      if (item.id === 'japanesekana') {
-                        setKanaView('guide');
-                        setActiveView('japanesekana');
-                        return;
-                      }
-                      if (item.id === 'fitness') setFitnessView('overview');
-                      setActiveView(item.view);
-                    }}
-                  >
-                    <span className="sidebar-item-icon">{item.icon}</span>
-                    <span className="item-name">{item.label}</span>
-                    <span className="sidebar-drag-handle">⠿</span>
-                  </div>
+              {(() => {
+                const shown = availableSidebarItems.filter(item => !item.hidden);
+                shortcutItemsRef.current = shown;
+                const SUBPAGES = {
+                  fitness: [
+                    ['overview', 'Nutrition'], ['charts', 'Charts'], ['workout', 'Workout'],
+                  ],
+                  japanesekana: [
+                    ['guide', 'Guide'], ['practice', 'Practice'], ['vocabulary', 'Vocabulary'], ['flashcards', 'Flash Cards'],
+                  ],
+                };
+                return shown.map((item, index) => {
+                  const subs = SUBPAGES[item.id];
+                  const open = subs && (openGroups[item.id] ?? activeView === item.view);
+                  const subView = item.id === 'fitness' ? fitnessView : kanaView;
+                  const openSub = (v) => {
+                    playNavSound();
+                    if (item.id === 'fitness') setFitnessView(v); else setKanaView(v);
+                    setActiveView(item.view);
+                  };
+                  return (
+                    <div
+                      key={item.id}
+                      className={`sidebar-item-group ${dragOverInfo?.id === item.id ? `sidebar-drop-${dragOverInfo.position}` : ''}`}
+                      data-sidebar-id={item.id}
+                    >
+                      <div
+                        className={`sidebar-item ${activeView === item.view ? 'active' : ''} ${draggedSidebarItem?.item.id === item.id ? 'sidebar-dragging' : ''}`}
+                        onMouseDown={(e) => handleSidebarDragStart(e, item, index)}
+                        onClick={() => {
+                          if (draggedSidebarItem) return;
+                          if (subs) toggleGroup(item.id, true);
+                          openSidebarItem(item);
+                        }}
+                      >
+                        <span className="sidebar-item-icon"><SidebarIcon name={item.id} /></span>
+                        <span className="item-name">{item.label}</span>
+                        {index < 9 && (
+                          <span className="sidebar-shortcut">{MOD_LABEL}{index + 1}</span>
+                        )}
+                        {subs && (
+                          <button
+                            className={`sidebar-chevron ${open ? 'open' : ''}`}
+                            onClick={(e) => { e.stopPropagation(); toggleGroup(item.id, !open); }}
+                            title={open ? 'Collapse' : 'Expand'}
+                          >
+                            <SidebarIcon name="chevron" size={13} />
+                          </button>
+                        )}
+                        <span className="sidebar-drag-handle" title="Drag to reorder">⠿</span>
+                      </div>
 
-                  {/* Fitness altında her zaman görünen alt sekmeler: Beslenme, Grafikler, Antrenman */}
-                  {item.id === 'fitness' && (
-                    <>
-                      <div
-                        className={`sidebar-subitem ${activeView === 'fitness' && fitnessView === 'overview' ? 'active' : ''}`}
-                        onClick={() => { playNavSound(); setFitnessView('overview'); setActiveView('fitness'); }}
-                      >
-                        <span className="item-name">- Nutrition</span>
-                      </div>
-                      <div
-                        className={`sidebar-subitem ${activeView === 'fitness' && fitnessView === 'charts' ? 'active' : ''}`}
-                        onClick={() => { playNavSound(); setFitnessView('charts'); setActiveView('fitness'); }}
-                      >
-                        <span className="item-name">- Charts</span>
-                      </div>
-                      <div
-                        className={`sidebar-subitem ${activeView === 'fitness' && fitnessView === 'workout' ? 'active' : ''}`}
-                        onClick={() => { playNavSound(); setFitnessView('workout'); setActiveView('fitness'); }}
-                      >
-                        <span className="item-name">- Workout</span>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Language Learn altında her zaman görünen alt sekmeler */}
-                  {item.id === 'japanesekana' && (
-                    <>
-                      <div
-                        className={`sidebar-subitem ${activeView === 'japanesekana' && kanaView === 'guide' ? 'active' : ''}`}
-                        onClick={() => { playNavSound(); setKanaView('guide'); setActiveView('japanesekana'); }}
-                      >
-                        <span className="item-name">- Guide</span>
-                      </div>
-                      <div
-                        className={`sidebar-subitem ${activeView === 'japanesekana' && kanaView === 'practice' ? 'active' : ''}`}
-                        onClick={() => { playNavSound(); setKanaView('practice'); setActiveView('japanesekana'); }}
-                      >
-                        <span className="item-name">- Practice</span>
-                      </div>
-                      <div
-                        className={`sidebar-subitem ${activeView === 'japanesekana' && kanaView === 'vocabulary' ? 'active' : ''}`}
-                        onClick={() => { playNavSound(); setKanaView('vocabulary'); setActiveView('japanesekana'); }}
-                      >
-                        <span className="item-name">- Vocabulary</span>
-                      </div>
-                      <div
-                        className={`sidebar-subitem ${activeView === 'japanesekana' && kanaView === 'flashcards' ? 'active' : ''}`}
-                        onClick={() => { playNavSound(); setKanaView('flashcards'); setActiveView('japanesekana'); }}
-                      >
-                        <span className="item-name">- Flash Cards</span>
-                      </div>
-                    </>
-                  )}
-                </div>
-              ))}
+                      {open && (
+                        <div className="sidebar-tree">
+                          {subs.map(([v, label]) => (
+                            <div
+                              key={v}
+                              className={`sidebar-subitem ${activeView === item.view && subView === v ? 'active' : ''}`}
+                              onClick={() => openSub(v)}
+                            >
+                              <span className="item-name">{label}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
 
               {/* Floating sidebar drag ghost */}
               {draggedSidebarItem && (
@@ -2417,7 +2471,7 @@ useEffect(() => {
                     width: draggedSidebarItem.width,
                   }}
                 >
-                  <span className="sidebar-item-icon">{draggedSidebarItem.item.icon}</span>
+                  <span className="sidebar-item-icon"><SidebarIcon name={draggedSidebarItem.item.id} /></span>
                   <span className="item-name">{draggedSidebarItem.item.label}</span>
                   <span className="sidebar-drag-handle">⠿</span>
                 </div>
@@ -2428,6 +2482,14 @@ useEffect(() => {
           )}
 
           <div className="sidebar-footer">
+            <button
+              className={`sidebar-settings-row-btn${sidebarCollapsed ? ' collapsed' : ''}`}
+              onClick={() => { setShowSidebarSettings(true); setSettingsTab('appearance'); }}
+              title="Settings"
+            >
+              <span className="sidebar-item-icon"><SidebarIcon name="settings" /></span>
+              {!sidebarCollapsed && <span className="item-name">Settings</span>}
+            </button>
             {/* Moved down from the title bar, and reduced to the chosen name:
                 the email that used to sit here is account detail, so it lives
                 one click away instead of on screen all day. */}

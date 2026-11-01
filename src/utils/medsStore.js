@@ -15,12 +15,29 @@ import { ruleCoversDate } from './recurrence';
 //   { id, name, dose, color, times: ['09:00','21:00'],
 //     startDate: '2026-10-12', rrule: {…} | null, endDate: null, notes }
 //
+// notes is free text — usually what the medication is for — shown under its
+// name wherever a dose is listed. food is 'empty' (on an empty stomach),
+// 'full' (with food) or 'any'/missing (either).
+//
 // rrule null means every day. endDate closes a course: after it the medication
 // stops appearing without having to be deleted, so the record of having taken
 // it stays.
 
 export const MEDS_KEY = 'meds_v1';
 export const MEDS_LOG_KEY = 'meds_log_v1';
+// Doses deliberately not taken, same shape as the log. Its own key so a device
+// still on an older version reads the log exactly as before.
+export const MEDS_SKIP_KEY = 'meds_skip_v1';
+// The order you dragged the doses into, per part of the day:
+// { morning: ['medId@08:00', …], … }. Doses not in it follow, by time.
+export const MEDS_ORDER_KEY = 'meds_order_v1';
+
+export const FOOD = [
+  { id: 'empty', label: 'Empty stomach' },
+  { id: 'full', label: 'With food' },
+  { id: 'any', label: 'Either' },
+];
+export const foodLabel = (food) => (food === 'empty' || food === 'full' ? FOOD.find(f => f.id === food).label : '');
 export const MEDS_EVENT = 'meds-changed';
 
 // Keeps "take it in the morning" readable without asking for a clock time.
@@ -30,6 +47,45 @@ export const TIME_PRESETS = [
   { time: '19:00', label: 'Evening' },
   { time: '22:00', label: 'Night' },
 ];
+
+// The three parts of the day doses are grouped under. Late-night and
+// small-hours doses belong with the evening — they are the "before bed" ones.
+//   Morning 05:00–11:59 · Midday 12:00–16:59 · Evening 17:00–04:59
+export const PERIODS = [
+  { id: 'morning', label: 'Morning', time: '08:00' },
+  { id: 'midday', label: 'Midday', time: '13:00' },
+  { id: 'evening', label: 'Evening', time: '20:00' },
+];
+
+export function periodOf(time) {
+  const h = Number(String(time || '').slice(0, 2));
+  if (h >= 5 && h < 12) return 'morning';
+  if (h >= 12 && h < 17) return 'midday';
+  return 'evening';
+}
+
+// Doses in Morning / Midday / Evening order. Within a group, the order you
+// dragged them into comes first; anything not placed yet follows in time
+// order, the small hours after the evening's own. Empty groups are left out.
+export function groupByPeriod(doses, order = {}) {
+  const late = (t) => (Number(String(t).slice(0, 2)) < 5 ? `x${t}` : t);
+  return PERIODS
+    .map(p => {
+      const placed = order?.[p.id] || [];
+      const rank = (d) => { const i = placed.indexOf(d.key); return i < 0 ? Infinity : i; };
+      return {
+        ...p,
+        doses: doses
+          .filter(d => periodOf(d.time) === p.id)
+          .sort((a, b) => {
+            const ra = rank(a), rb = rank(b);
+            if (ra !== rb) return ra - rb;
+            return late(a.time) < late(b.time) ? -1 : late(a.time) > late(b.time) ? 1 : 0;
+          }),
+      };
+    })
+    .filter(g => g.doses.length);
+}
 
 const pad = (n) => String(n).padStart(2, '0');
 export const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
@@ -61,6 +117,28 @@ export const loadMedLog = () => {
 };
 export const saveMedLog = (log) => writeKey(MEDS_LOG_KEY, log);
 
+// { 'YYYY-MM-DD': { medId: ['09:00', …] } } — doses skipped on purpose.
+export const loadMedSkips = () => {
+  const s = readJSON(MEDS_SKIP_KEY, {});
+  return s && typeof s === 'object' && !Array.isArray(s) ? s : {};
+};
+export const saveMedSkips = (skips) => writeKey(MEDS_SKIP_KEY, skips);
+
+export const loadMedOrder = () => {
+  const o = readJSON(MEDS_ORDER_KEY, {});
+  return o && typeof o === 'object' && !Array.isArray(o) ? o : {};
+};
+export const saveMedOrder = (order) => writeKey(MEDS_ORDER_KEY, order);
+
+// Moves one dose within its part of the day. `keys` is the group as it is
+// shown; the whole shown order is stored, so it holds as it was seen.
+export function moveInPeriod(order, periodId, keys, from, to) {
+  const list = [...keys];
+  const [moved] = list.splice(from, 1);
+  list.splice(to, 0, moved);
+  return { ...(order || {}), [periodId]: list };
+}
+
 // A medication with no times still has one dose a day — "take it", whenever.
 export const timesOf = (med) => (Array.isArray(med?.times) && med.times.length ? med.times : ['09:00']);
 
@@ -79,45 +157,62 @@ export function medsDueOn(meds, dateStr) {
   return (meds || []).filter(m => isDueOn(m, dateStr));
 }
 
-// Every dose of a day, in time order, each knowing whether it has been taken.
-// This is what both the manager and the dashboard render — neither has to
-// decide what "due" means.
-export function dosesForDate(meds, log, dateStr) {
+// Every dose of a day, in time order, each knowing whether it has been taken
+// or skipped. This is what both the manager and the dashboard render — neither
+// has to decide what "due" means. Taken wins over skipped: a dose skipped and
+// then taken after all was taken.
+export function dosesForDate(meds, log, dateStr, skips = {}) {
   const day = log?.[dateStr] || {};
+  const skipDay = skips?.[dateStr] || {};
   const out = [];
   for (const med of medsDueOn(meds, dateStr)) {
     const taken = new Set(day[med.id] || []);
+    const skipped = new Set(skipDay[med.id] || []);
     for (const time of timesOf(med)) {
       out.push({
         key: `${med.id}@${time}`,
         medId: med.id,
         name: med.name,
         dose: med.dose || '',
+        notes: (med.notes || '').trim(),
+        food: med.food || 'any',
         color: med.color || 'blue',
         time,
         taken: taken.has(time),
+        skipped: !taken.has(time) && skipped.has(time),
       });
     }
   }
   return out.sort((a, b) => (a.time < b.time ? -1 : a.time > b.time ? 1 : (a.name || '').localeCompare(b.name || '')));
 }
 
-export function pendingDoses(meds, log, dateStr) {
-  return dosesForDate(meds, log, dateStr).filter(d => !d.taken);
+export function pendingDoses(meds, log, dateStr, skips) {
+  return dosesForDate(meds, log, dateStr, skips).filter(d => !d.taken && !d.skipped);
 }
 
-export function dayProgress(meds, log, dateStr) {
-  const all = dosesForDate(meds, log, dateStr);
+// A skipped dose is no longer owed, so it leaves the count rather than
+// standing in it as missed.
+export function dayProgress(meds, log, dateStr, skips) {
+  const all = dosesForDate(meds, log, dateStr, skips).filter(d => !d.skipped);
   return { taken: all.filter(d => d.taken).length, total: all.length };
 }
 
 // Marking a dose returns a NEW log; the caller saves it. Taking a dose twice is
 // the same as taking it once — the button is a state, not a counter.
 export function setDoseTaken(log, dateStr, medId, time, taken) {
+  return setDoseIn(log, dateStr, medId, time, taken);
+}
+
+// Skipping is recorded the same way, in its own map.
+export function setDoseSkipped(skips, dateStr, medId, time, skipped) {
+  return setDoseIn(skips, dateStr, medId, time, skipped);
+}
+
+function setDoseIn(log, dateStr, medId, time, on) {
   const next = { ...(log || {}) };
   const day = { ...(next[dateStr] || {}) };
   const list = new Set(day[medId] || []);
-  if (taken) list.add(time); else list.delete(time);
+  if (on) list.add(time); else list.delete(time);
   if (list.size) day[medId] = [...list].sort();
   else delete day[medId];
   if (Object.keys(day).length) next[dateStr] = day;
@@ -153,10 +248,10 @@ export function lastNDays(n, endDate = todayStr()) {
 
 // One entry per date: how much was due, how much was taken, and which of the
 // four states that puts the day in.
-export function historyFor(meds, log, dateStrs) {
+export function historyFor(meds, log, dateStrs, skips) {
   const today = todayStr();
   return dateStrs.map(date => {
-    const { taken, total } = dayProgress(meds, log, date);
+    const { taken, total } = dayProgress(meds, log, date, skips);
     const status = total === 0 ? 'empty'
       : taken === total ? 'all'
       : taken === 0 ? 'none'
@@ -167,15 +262,15 @@ export function historyFor(meds, log, dateStrs) {
 
 // Doses of a past day that were never marked. On today these are simply still
 // to come, which is why the date matters.
-export function missedDoses(meds, log, dateStr) {
+export function missedDoses(meds, log, dateStr, skips) {
   if (dateStr >= todayStr()) return [];
-  return dosesForDate(meds, log, dateStr).filter(d => !d.taken);
+  return dosesForDate(meds, log, dateStr, skips).filter(d => !d.taken && !d.skipped);
 }
 
 // How many of the last `days` days were fully taken, ignoring days with
 // nothing due — the number you would actually quote to a doctor.
-export function adherence(meds, log, days = 14, endDate = todayStr()) {
-  const hist = historyFor(meds, log, lastNDays(days, endDate)).filter(h => h.total > 0 && !h.isFuture);
+export function adherence(meds, log, days = 14, endDate = todayStr(), skips) {
+  const hist = historyFor(meds, log, lastNDays(days, endDate), skips).filter(h => h.total > 0 && !h.isFuture);
   const due = hist.reduce((n, h) => n + h.total, 0);
   const taken = hist.reduce((n, h) => n + h.taken, 0);
   return { taken, due, days: hist.length, pct: due ? Math.round((taken / due) * 100) : null };

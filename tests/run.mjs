@@ -24,7 +24,7 @@ const out = path.join(here, '.build');
 mkdirSync(out, { recursive: true });
 
 // Suites that exercise localStorage run under both engines' rules.
-const BOTH_ENGINES = new Set(['layer', 'offline', 'skew', 'live_keys', 'deletions', 'backup', 'media', 'notes_persistence']);
+const BOTH_ENGINES = new Set(['layer', 'offline', 'skew', 'live_keys', 'deletions', 'backup', 'media', 'notes_persistence', 'otherwindow']);
 const WEBKIT_ONLY = new Set(['webkit']);
 
 const only = process.argv.slice(2);

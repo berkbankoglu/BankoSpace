@@ -216,6 +216,18 @@ export function installSyncLayer() {
   window.addEventListener('pagehide', flushAll);
   window.addEventListener('beforeunload', flushAll);
   window.addEventListener('note-media-sync-status', emitStatus);
+
+  // Another window of this app (a note opened in its own window, the kana
+  // popup) shares this storage but has no sync layer of its own. Its writes
+  // reach this window only as a storage event: treat them as this device's
+  // edits, and let the section showing that key re-read it. Synthetic events
+  // this window raises itself carry no storageArea and are left alone.
+  window.addEventListener('storage', (e) => {
+    if (e.storageArea !== localStorage || !e.key || e.newValue == null) return;
+    if (!SYNC_KEYS.includes(e.key)) return;
+    onLocalWrite(e.key, e.newValue);
+    if (LIVE_EVENTS[e.key] && LIVE_EVENTS[e.key] !== 'storage') announce(e.key);
+  });
 }
 
 // ── Startup ───────────────────────────────────────────────────────────────
@@ -310,6 +322,8 @@ const LIVE_EVENTS = {
   habitTracker_autolog: 'habits-updated',
   meds_v1: 'meds-changed',
   meds_log_v1: 'meds-changed',
+  meds_skip_v1: 'meds-changed',
+  meds_order_v1: 'meds-changed',
   flashCards: 'flashcards-updated',
   flashCardGroups: 'flashcards-updated',
   freeformTabs: 'storage-updated',

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { COLORS, colorHex } from '../utils/plannerStore';
 import {
-  loadMeds, saveMeds, loadMedLog, saveMedLog, MEDS_EVENT, TIME_PRESETS,
+  loadMeds, saveMeds, loadMedLog, loadMedSkips, saveMedSkips, setDoseSkipped, saveMedLog, MEDS_EVENT, TIME_PRESETS, PERIODS, periodOf, groupByPeriod, loadMedOrder, FOOD, foodLabel,
   dosesForDate, dayProgress, toggleDose, describeSchedule, courseRemaining,
   timesOf, todayStr, addDays, lastNDays, historyFor, adherence,
 } from '../utils/medsStore';
@@ -43,6 +43,8 @@ const blankMed = (colorIdx = 0) => ({
 export default function Medications() {
   const [meds, setMeds] = useState(loadMeds);
   const [log, setLog] = useState(loadMedLog);
+  const [skips, setSkips] = useState(loadMedSkips);
+  const [order, setOrder] = useState(loadMedOrder);
   const [editing, setEditing] = useState(null);   // the med being added/edited
   const [isNew, setIsNew] = useState(false);
   const today = todayStr();
@@ -53,24 +55,29 @@ export default function Medications() {
   // Taking a dose from the dashboard has to show up here and the other way
   // round, so both read the same store and listen for its change event.
   useEffect(() => {
-    const reload = () => { setMeds(loadMeds()); setLog(loadMedLog()); };
+    const reload = () => { setMeds(loadMeds()); setLog(loadMedLog()); setSkips(loadMedSkips()); setOrder(loadMedOrder()); };
     window.addEventListener(MEDS_EVENT, reload);
     return () => window.removeEventListener(MEDS_EVENT, reload);
   }, []);
 
   const commitMeds = useCallback((next) => { setMeds(next); saveMeds(next); }, []);
   const commitLog = useCallback((next) => { setLog(next); saveMedLog(next); }, []);
+  const commitSkips = useCallback((next) => { setSkips(next); saveMedSkips(next); }, []);
 
-  const doses = useMemo(() => dosesForDate(meds, log, viewDate), [meds, log, viewDate]);
-  const progress = useMemo(() => dayProgress(meds, log, viewDate), [meds, log, viewDate]);
-  const history = useMemo(() => historyFor(meds, log, lastNDays(14, today)), [meds, log, today]);
-  const stats = useMemo(() => adherence(meds, log, 14, today), [meds, log, today]);
+  const doses = useMemo(() => dosesForDate(meds, log, viewDate, skips), [meds, log, viewDate, skips]);
+  const progress = useMemo(() => dayProgress(meds, log, viewDate, skips), [meds, log, viewDate, skips]);
+  const history = useMemo(() => historyFor(meds, log, lastNDays(14, today), skips), [meds, log, today, skips]);
+  const stats = useMemo(() => adherence(meds, log, 14, today, skips), [meds, log, today, skips]);
   const isPast = viewDate < today;
 
   // Marking works on past days too: forgetting to tick something is not the
   // same as not having taken it, and the record is only useful if it can be
   // corrected.
-  const take = (d) => commitLog(toggleDose(log, viewDate, d.medId, d.time));
+  // A skipped dose is un-skipped first, as on the dashboard.
+  const take = (d) => {
+    if (d.skipped) { commitSkips(setDoseSkipped(skips, viewDate, d.medId, d.time, false)); return; }
+    commitLog(toggleDose(log, viewDate, d.medId, d.time));
+  };
 
   const dayLabel = (() => {
     if (viewDate === today) return 'Today';
@@ -89,6 +96,7 @@ export default function Medications() {
       ...editing,
       name,
       dose: (editing.dose || '').trim(),
+      notes: (editing.notes || '').trim(),
       times: timesOf(editing),
       endDate: editing.endDate || null,
     };
@@ -125,6 +133,14 @@ export default function Medications() {
     const times = timesOf(e);
     const next = TIME_PRESETS.find(p => !times.includes(p.time))?.time || '12:00';
     return { ...e, times: [...times, next] };
+  });
+  // Morning / Midday / Evening switches over the exact times: on adds that
+  // part's usual time, off removes every time in that part of the day.
+  const togglePeriod = (p) => setEditing(e => {
+    const times = timesOf(e);
+    const has = times.some(t => periodOf(t) === p.id);
+    const next = has ? times.filter(t => periodOf(t) !== p.id) : [...times, p.time].sort();
+    return { ...e, times: next.length ? next : times };
   });
   const removeTime = (i) => setEditing(e => {
     const times = timesOf(e).filter((_, idx) => idx !== i);
@@ -189,25 +205,38 @@ export default function Medications() {
         {doses.length === 0 ? (
           <div className="med-empty">Nothing due {viewDate === today ? 'today' : 'that day'}.</div>
         ) : (
+          groupByPeriod(doses, order).map(g => (
+          <div key={g.id} className="med-group">
+          <div className="med-group-head" lang="en">
+            <span>{g.label}</span>
+            <span className="med-group-count">
+              {g.doses.filter(d => d.taken).length}/{g.doses.filter(d => !d.skipped).length}
+            </span>
+          </div>
           <ul className="med-dose-list">
-            {doses.map(d => (
+            {g.doses.map(d => (
               <li key={d.key}>
                 <button
-                  className={`med-dose${d.taken ? ' taken' : ''}${!d.taken && isPast ? ' missed' : ''}`}
+                  className={`med-dose${d.taken ? ' taken' : ''}${d.skipped ? ' skipped' : ''}${!d.taken && !d.skipped && isPast ? ' missed' : ''}`}
                   style={{ '--med-color': colorHex(d.color) }}
                   onClick={() => take(d)}
                   title={d.taken
                     ? 'Taken — click to undo'
+                    : d.skipped ? 'Skipped — click to undo'
                     : isPast ? 'Missed — click if you did take it' : 'Mark as taken'}
                 >
-                  <span className="med-dose-check">{d.taken ? '✓' : (isPast ? '!' : '')}</span>
+                  <span className="med-dose-check">{d.taken ? '✓' : d.skipped ? '–' : (isPast ? '!' : '')}</span>
                   <span className="med-dose-time">{d.time}</span>
                   <span className="med-dose-name">{d.name}</span>
+                  {foodLabel(d.food) && <span className="med-dose-amount">{foodLabel(d.food)}</span>}
                   {d.dose && <span className="med-dose-amount">{d.dose}</span>}
+                  {d.skipped && <span className="med-dose-amount">Skipped</span>}
                 </button>
               </li>
             ))}
           </ul>
+          </div>
+          ))
         )}
       </section>
 
@@ -229,6 +258,9 @@ export default function Medications() {
                       {m.dose && <span className="med-row-dose">{m.dose}</span>}
                     </span>
                     <span className="med-row-sched">{describeSchedule(m)}</span>
+                    {(m.notes || foodLabel(m.food)) && (
+                      <span className="med-row-sched">{[foodLabel(m.food), m.notes].filter(Boolean).join(' · ')}</span>
+                    )}
                   </button>
                   <span className="med-row-times">
                     {timesOf(m).map(t => <span key={t} className="med-time-chip">{t}</span>)}
@@ -272,8 +304,45 @@ export default function Medications() {
             </div>
 
             <div className="med-field">
+              <label>Notes</label>
+              <textarea
+                className="med-input med-notes"
+                rows={2}
+                placeholder="What it's for, e.g. blood pressure"
+                value={editing.notes || ''}
+                onChange={e => setEditing(x => ({ ...x, notes: e.target.value }))}
+              />
+            </div>
+
+            <div className="med-field">
+              <label>Take</label>
+              <div className="med-periods">
+                {FOOD.map(f => (
+                  <button
+                    key={f.id}
+                    className={`med-period${(editing.food || 'any') === f.id ? ' active' : ''}`}
+                    onClick={() => setEditing(x => ({ ...x, food: f.id }))}
+                  >{f.label}</button>
+                ))}
+              </div>
+            </div>
+
+            <div className="med-field">
               <label>When</label>
               <div className="med-times">
+                <div className="med-periods">
+                  {PERIODS.map(p => {
+                    const on = timesOf(editing).some(t => periodOf(t) === p.id);
+                    return (
+                      <button
+                        key={p.id}
+                        className={`med-period${on ? ' active' : ''}`}
+                        onClick={() => togglePeriod(p)}
+                        title={on ? `No ${p.label.toLowerCase()} dose` : `Add a ${p.label.toLowerCase()} dose at ${p.time}`}
+                      >{p.label}</button>
+                    );
+                  })}
+                </div>
                 {timesOf(editing).map((t, i) => (
                   <span className="med-time-row" key={i}>
                     <input className="med-input med-time-input" type="time" value={t} onChange={e => setTime(i, e.target.value)} />

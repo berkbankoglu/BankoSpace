@@ -39,6 +39,44 @@ const GrowTextarea = forwardRef(function GrowTextarea({ value, onKeyDown, classN
   );
 });
 
+// While a subtask or one of its items is dragged, a copy of its box follows the
+// cursor at its real size — the same as a whole task does (handleTodoDragStart
+// in App.jsx) — so what moves is recognisably the thing that was picked up.
+// The copy lives on <body>, outside the dashboard, so the font-size settings
+// the dashboard sets as custom properties are carried over; without them the
+// copy came out in the default size, smaller than the box it stands for.
+const FONT_VARS = ['--todo-font-size', '--subtask-font-size'];
+export function startDragGhost(sourceEl, startEvent) {
+  if (!sourceEl) return { move() {}, remove() {} };
+  const rect = sourceEl.getBoundingClientRect();
+  const offX = startEvent.clientX - rect.left;
+  const offY = startEvent.clientY - rect.top;
+  let ghost = null;
+  return {
+    move(ev) {
+      if (!ghost) {
+        ghost = sourceEl.cloneNode(true);
+        // Not a drop target or a row to count while it is in the document.
+        ['data-todo-id', 'data-subtask-todoid', 'data-child-subtaskid'].forEach(a => ghost.removeAttribute(a));
+        ghost.classList.remove('dragging', 'pressed', 'drag-target');
+        ghost.style.cssText = `
+          position:fixed;z-index:9999;pointer-events:none;margin:0;
+          width:${rect.width}px;box-sizing:border-box;
+          background:var(--bg-elevated);border-radius:6px;
+          box-shadow:0 10px 26px rgba(0,0,0,0.55);
+          max-height:60vh;overflow:hidden;opacity:1;transform:none;
+        `;
+        const cs = getComputedStyle(sourceEl);
+        FONT_VARS.forEach(v => { const val = cs.getPropertyValue(v); if (val) ghost.style.setProperty(v, val.trim()); });
+        document.body.appendChild(ghost);
+      }
+      ghost.style.left = (ev.clientX - offX) + 'px';
+      ghost.style.top = (ev.clientY - offY) + 'px';
+    },
+    remove() { if (ghost) { ghost.remove(); ghost = null; } },
+  };
+}
+
 function CategoryColumn({ title, category, todos, currentFilter, actions, isMobile }) {
   const [collapsed, setCollapsed] = useState(false);
   const {
@@ -199,6 +237,7 @@ function CategoryColumn({ title, category, todos, currentFilter, actions, isMobi
     e.stopPropagation();
     setPressedSubtaskId(subtaskId);
     subtaskDragRef.current = { todoId, subtaskId, index, started: false };
+    const ghost = startDragGhost(e.currentTarget.closest('.cc-subtask'), e);
     let crossTargetId = null; // id of a *different* todo the cursor is over
     let crossEl = null;       // its highlighted DOM element
     const clearCross = () => {
@@ -212,6 +251,7 @@ function CategoryColumn({ title, category, todos, currentFilter, actions, isMobi
         subtaskDragRef.current.started = true;
         setDraggingSubtask({ todoId, subtaskId, index });
       }
+      ghost.move(me);
 
       // Cross-todo move: is the cursor over a DIFFERENT todo (any column)?
       const under = document.elementFromPoint(me.clientX, me.clientY);
@@ -250,6 +290,7 @@ function CategoryColumn({ title, category, todos, currentFilter, actions, isMobi
     };
 
     const onMouseUp = () => {
+      ghost.remove();
       document.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('mouseup', onMouseUp);
       const started = subtaskDragRef.current?.started;
@@ -298,6 +339,7 @@ function CategoryColumn({ title, category, todos, currentFilter, actions, isMobi
     e.stopPropagation();
     setPressedChildId(childId);
     childDragRef.current = { todoId, subtaskId, childId, index, started: false };
+    const ghost = startDragGhost(e.currentTarget.closest('.cc-subtask-child'), e);
 
     const onMouseMove = (me) => {
       if (!childDragRef.current) return;
@@ -305,6 +347,7 @@ function CategoryColumn({ title, category, todos, currentFilter, actions, isMobi
         childDragRef.current.started = true;
         setDraggingChild({ todoId, subtaskId, childId, index });
       }
+      ghost.move(me);
       const els = document.querySelectorAll(`.cc-subtask-child[data-child-subtaskid="${subtaskId}"]`);
       let overIdx = null;
       els.forEach((el, i) => {
@@ -318,6 +361,7 @@ function CategoryColumn({ title, category, todos, currentFilter, actions, isMobi
     };
 
     const onMouseUp = () => {
+      ghost.remove();
       document.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('mouseup', onMouseUp);
       const started = childDragRef.current?.started;
@@ -485,6 +529,18 @@ function CategoryColumn({ title, category, todos, currentFilter, actions, isMobi
                   onClick={() => onMoveTodo(todo.id, category, 1)}
                 >▼</button>
               </div>
+              {/* On the task's own row, so a subtask can be added without
+                  first opening the task: opens it (if closed) and puts the
+                  cursor in its add field. */}
+              <button
+                className="cc-add-sub-btn"
+                title="Add subtask"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!expandedTodos.has(todo.id)) { toggleExpand(todo.id); return; }
+                  document.querySelector(`[data-todo-id="${todo.id}"] .cc-subtask-input`)?.focus();
+                }}
+              >+</button>
               <button
                 className="cc-menu-btn"
                 title="Actions"
@@ -669,6 +725,15 @@ function CategoryColumn({ title, category, todos, currentFilter, actions, isMobi
                   </Fragment>
                 ))}
                 <div className="cc-subtask-add">
+                  <button
+                    type="button"
+                    className="cc-subtask-add-btn"
+                    title="Add subtask"
+                    onClick={(e) => {
+                      if ((subtaskInputs[todo.id] || '').trim()) handleAddSubtask(todo.id);
+                      else e.currentTarget.parentElement.querySelector('textarea')?.focus();
+                    }}
+                  >+</button>
                   <GrowTextarea
                     className="cc-subtask-input"
                     placeholder="Add subtask..."

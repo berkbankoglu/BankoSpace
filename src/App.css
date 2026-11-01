@@ -9152,7 +9152,12 @@ body.light .font-size-option:hover {
 .todo-columns .category-column-v2 {
   flex: 1;
   min-width: 0;
-  overflow-y: auto;
+  /* The box stays put — header and "Add task" included — and only the task
+     list scrolls, inside the box's edges (.cc-items). With the whole column
+     scrolling as well there were two scrollers, and the box's top could
+     scroll away. Narrow windows stack the columns and let the page scroll;
+     that is handled in the max-width: 1150px block. */
+  overflow: hidden;
 }
 
 /* Sidebar main item styling */
@@ -10916,3 +10921,191 @@ input::placeholder, textarea::placeholder { color: var(--text-muted) !important;
   color: var(--text-muted, #6e7681);
   background: var(--bg-base, #0d0d0d);
 }
+
+/* ── Sidebar, quiet version ────────────────────────────────────────────────
+   One list of thin-icon rows at a single size, a muted shortcut hint on the
+   right, sub-pages folding under their section on a guide line, and plain
+   Settings / account rows at the bottom. Scoped under .notion-sidebar so it
+   wins over the older blocks above without touching them. */
+.notion-sidebar .sidebar-header {
+  justify-content: space-between;
+  padding: 10px 16px 16px 26px !important;
+  min-height: 40px;
+}
+.notion-sidebar.collapsed .sidebar-header { justify-content: center; padding: 10px 0 16px !important; }
+.notion-sidebar:not(.collapsed) { width: 272px; min-width: 272px; }
+.notion-sidebar .sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+.notion-sidebar .sidebar-logo { height: 22px; width: 22px; opacity: 0.95; }
+.notion-sidebar .sidebar-brand-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.005em;
+}
+.notion-sidebar .sidebar-toggle {
+  position: static;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: var(--text-muted);
+}
+.notion-sidebar .sidebar-toggle:hover { color: var(--text-primary); background: rgba(255,255,255,0.05); }
+
+.notion-sidebar .sidebar-content { padding: 2px 0 8px; }
+
+.notion-sidebar .sidebar-item,
+.notion-sidebar .sidebar-settings-row-btn {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  height: 34px;
+  padding: 0 10px 0 12px !important;
+  margin: 1px 14px !important;
+  font-size: 14.5px !important;
+  font-weight: 450 !important;
+  color: var(--text-secondary) !important;
+  border-radius: 7px !important;
+}
+.notion-sidebar .sidebar-item:hover,
+.notion-sidebar .sidebar-settings-row-btn:hover {
+  background: rgba(255,255,255,0.045) !important;
+  color: var(--text-primary) !important;
+}
+.notion-sidebar .sidebar-item.active {
+  background: rgba(255,255,255,0.075) !important;
+  color: var(--text-primary) !important;
+  font-weight: 500 !important;
+}
+.notion-sidebar .sidebar-item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  font-size: 0;
+  transform: scale(1.06);
+  opacity: 0.75;
+  color: currentColor;
+}
+.notion-sidebar .sidebar-item.active .sidebar-item-icon,
+.notion-sidebar .sidebar-item:hover .sidebar-item-icon { opacity: 1; }
+
+/* Shortcut hint and drag grip share the right edge: the hint at rest, the
+   grip on hover. */
+.notion-sidebar .sidebar-shortcut {
+  flex-shrink: 0;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+.notion-sidebar .sidebar-drag-handle { display: none; margin-left: 0; padding: 2px 4px; }
+.notion-sidebar .sidebar-item:hover .sidebar-drag-handle { display: inline; color: var(--text-muted); }
+.notion-sidebar .sidebar-item:hover .sidebar-shortcut { display: none; }
+
+.notion-sidebar .sidebar-chevron {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: transform 0.15s ease, color 0.15s;
+}
+.notion-sidebar .sidebar-chevron:hover { color: var(--text-primary); background: rgba(255,255,255,0.06); }
+.notion-sidebar .sidebar-chevron.open { transform: rotate(90deg); }
+.notion-sidebar .sidebar-chevron.open:hover { transform: rotate(90deg); }
+
+/* Sub-pages hang off a thin guide line under the section's icon. */
+.notion-sidebar .sidebar-tree {
+  position: relative;
+  margin: 1px 14px 4px 34px;
+  padding-left: 10px;
+  border-left: 1px solid rgba(255,255,255,0.14) !important;
+}
+.notion-sidebar .sidebar-subitem {
+  height: 31px;
+  padding: 0 10px !important;
+  margin: 1px 0 !important;
+  font-size: 14px;
+  color: var(--text-muted);
+  border-radius: 6px;
+}
+.notion-sidebar .sidebar-subitem:hover { background: rgba(255,255,255,0.045); color: var(--text-primary); }
+.notion-sidebar .sidebar-subitem.active { background: rgba(255,255,255,0.075); color: var(--text-primary); }
+
+/* Footer: Settings, then the account as a flat row. */
+.notion-sidebar .sidebar-footer { gap: 2px; padding: 10px 0 14px; }
+.notion-sidebar .sidebar-settings-row-btn {
+  width: calc(100% - 28px);
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+.notion-sidebar .sidebar-settings-row-btn.collapsed,
+.notion-sidebar.collapsed .sidebar-item { justify-content: center; padding: 0 !important; }
+
+.notion-sidebar .sidebar-account {
+  width: calc(100% - 28px);
+  margin: 0 14px;
+  gap: 11px;
+  height: 38px;
+  padding: 0 8px 0 8px;
+  background: none;
+  border: none;
+  border-radius: 7px;
+}
+.notion-sidebar .sidebar-account:hover { background: rgba(255,255,255,0.045); }
+.notion-sidebar .sidebar-account.collapsed { padding: 0; border-radius: 7px; }
+.notion-sidebar .sidebar-account-avatar { width: 24px; height: 24px; }
+.notion-sidebar .sidebar-account-initials { font-size: 10px; }
+.notion-sidebar .sidebar-account-name { font-size: 14.5px; font-weight: 500; }
+.notion-sidebar .sidebar-account-chevron {
+  width: auto;
+  height: auto;
+  background: none;
+  color: var(--text-muted);
+  font-size: 9px;
+}
+.notion-sidebar .sidebar-footer-meta { padding: 6px 26px 0; }
+
+body.light .notion-sidebar .sidebar-item:hover,
+body.light .notion-sidebar .sidebar-settings-row-btn:hover,
+body.light .notion-sidebar .sidebar-subitem:hover,
+body.light .notion-sidebar .sidebar-account:hover { background: rgba(0,0,0,0.045) !important; }
+body.light .notion-sidebar .sidebar-item.active,
+body.light .notion-sidebar .sidebar-subitem.active { background: rgba(0,0,0,0.065) !important; }
+body.light .notion-sidebar .sidebar-tree { border-left-color: rgba(0,0,0,0.1); }
+
+/* Collapsed (50px): only the icons fit. The version and the update button
+   wait for the full sidebar; the sync dot, Settings and the avatar sit
+   centred in the narrow strip instead of running past its edge. */
+.notion-sidebar.collapsed .sidebar-footer-version,
+.notion-sidebar.collapsed .sidebar-footer-update { display: none; }
+.notion-sidebar.collapsed .sidebar-footer-meta { justify-content: center; padding: 6px 0 0; }
+.notion-sidebar.collapsed .sidebar-settings-row-btn,
+.notion-sidebar.collapsed .sidebar-account {
+  width: 36px;
+  height: 36px;
+  margin: 0 auto !important;
+  padding: 0 !important;
+  gap: 0;
+  justify-content: center;
+}
+.notion-sidebar.collapsed .sidebar-footer { align-items: center; }
