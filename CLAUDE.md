@@ -1,7 +1,7 @@
 # BankoSpace
 
 A personal productivity desktop app — tasks, calendar, notes, habits and
-medications, payments, Japanese study, fitness — built with **Tauri v2 + React
+medications, payments, fitness — built with **Tauri v2 + React
 (Vite)**. Data lives in `localStorage` and syncs between the owner's machines
 (Windows and an Apple Silicon Mac) through **Supabase** (`user_data` table,
 one row per user and key).
@@ -95,6 +95,16 @@ machines silently holding different data.
 The desktop build does not register a service worker (it could only ever
 serve an older copy of the embedded frontend); `src/main.jsx` removes any left
 behind. The web build keeps its PWA service worker.
+
+## Banko Learn
+
+The Japanese study section (kana guide, practice, vocabulary, flash cards, the
+kana popup) moved to its own app, Banko Learn (`D:\Banko Files\BankoLearn`,
+repo berkbankoglu/BankoLearn). It signs in to the same account and syncs the
+`kana_*`, `flashCards` and `flashCardGroups` rows. Those keys are deliberately
+NOT in BankoSpace's `SYNC_KEYS`: BankoSpace must never read or write them
+(`tests/live_keys.test.js` checks this). Banko Learn's device status rows use
+the prefix `__learnstatus:` so they do not show up as BankoSpace devices.
 
 ## Dashboard
 

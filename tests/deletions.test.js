@@ -16,14 +16,14 @@ await sb.pullFromSupabase();
 await sb.pushDirtyToSupabase();
 ok('a previously synced key removed elsewhere is not uploaded again', !row('goals') && localStorage.getItem('goals') === null);
 
-localStorage.setItem('flashCards', '[{"id":2}]');
-localStorage.removeItem('flashCards');
+localStorage.setItem('reviews_v1', '[{"id":2}]');
+localStorage.removeItem('reviews_v1');
 await sleep(1000);
-ok('a removal cancels the previous debounced write', row('flashCards')?.value === 'null' && localStorage.getItem('flashCards') === null);
-ok('a deletion remains represented in the cloud', !!row('flashCards') && row('flashCards').value === 'null');
-store.flashCards = '[{"id":2}]'; // an old copy on a second device
+ok('a removal cancels the previous debounced write', row('reviews_v1')?.value === 'null' && localStorage.getItem('reviews_v1') === null);
+ok('a deletion remains represented in the cloud', !!row('reviews_v1') && row('reviews_v1').value === 'null');
+store.reviews_v1 = '[{"id":2}]'; // an old copy on a second device
 await sb.pullFromSupabase();
-ok('a deletion tombstone clears an old local copy', localStorage.getItem('flashCards') === null);
+ok('a deletion tombstone clears an old local copy', localStorage.getItem('reviews_v1') === null);
 
 // A slow old write must finish before a newer deletion, even for callers
 // that bypass the debounce layer and call pushKeyToSupabase directly.

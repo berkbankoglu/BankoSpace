@@ -26,7 +26,6 @@ export const SECTION_BLURBS = {
   notes:        'Notes with formatting, images, drawings and sub-notes.',
   checklists:   'A daily checklist that resets each morning, and a long-term one.',
   habits:       'Habits ticked off day by day, and your medications.',
-  japanesekana: 'Learn Japanese: kana, vocabulary and flash cards.',
   fitness:      'Meals and calories, workouts, weight and measurements.',
   review:       'A rated library of what you watch, read, play and listen to.',
 };

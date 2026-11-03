@@ -25,7 +25,6 @@ export const WIDGETS = [
   { id: 'notes',    title: 'Notes',         blurb: 'Pinned and recent notes, one click from opening.' },
   { id: 'habits',   title: 'Habits',        blurb: "Today's habits, ticked off here, with your streaks." },
   { id: 'checklist', title: 'Daily checklist', blurb: 'The checklist that resets every morning.' },
-  { id: 'study',    title: 'Study',         blurb: 'Flash cards and kana: what is waiting, and a way into practice.' },
   { id: 'fitness',  title: 'Fitness',       blurb: "Today's calories against your target, with the macros." },
 ];
 const KNOWN = new Set(WIDGETS.map(w => w.id));

@@ -247,18 +247,6 @@ fn spawn_eventlog_snapshot(incident_id: u64) {
 }
 
 #[tauri::command]
-fn toggle_kana_window(app: tauri::AppHandle) {
-    if let Some(w) = app.get_webview_window("kana-popup") {
-        if w.is_visible().unwrap_or(false) {
-            let _ = w.hide();
-        } else {
-            let _ = w.show();
-            let _ = w.set_focus();
-        }
-    }
-}
-
-#[tauri::command]
 async fn fetch_tts(text: String, slow: bool) -> Result<Vec<u8>, String> {
     let url = format!(
         "https://translate.googleapis.com/translate_tts?ie=UTF-8&tl=ja&client=tw-ob&slow={}&q={}",
@@ -1354,7 +1342,6 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
-toggle_kana_window,
             fetch_post,
             fetch_get,
             fetch_http,

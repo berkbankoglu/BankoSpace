@@ -20,10 +20,21 @@
   padding: 8px 10px 8px 14px;
   flex: 0 0 auto;
   border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
 }
 .wg-panel.collapsed .wg-header { border-bottom: none; }
+/* Closed, a widget is just its header strip, like Today closed beside it. */
+.wg-panel.collapsed { height: auto; flex: 0 0 auto; }
 
-.wg-collapse,
+/* Same arrow as Today's (.dp-chevron), so closed panels line up. */
+.wg-chevron {
+  font-size: 11px;
+  color: #888;
+  transition: transform 0.15s ease;
+}
+.wg-chevron.collapsed { transform: rotate(-90deg); }
+
 .wg-open {
   width: 18px;
   height: 18px;
@@ -36,7 +47,6 @@
   border-radius: 4px;
   cursor: pointer;
 }
-.wg-collapse:hover,
 .wg-open:hover { background: var(--bg-hover); color: var(--text-primary); }
 .wg-open { margin-left: auto; }
 
@@ -48,10 +58,17 @@
   color: var(--text-secondary);
 }
 .wg-badge {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
+  margin-left: 2px;
+  font-size: 11px;
+  color: var(--text-muted);
   font-variant-numeric: tabular-nums;
+}
+
+/* Between the folding grid row and the scrolling body. */
+.wg-collapsible-inner {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .wg-body {
@@ -187,26 +204,34 @@
 .wg-meter-fill.over { background: #d29922; }
 .wg-meter-caption { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 
-/* Notes: a note with sub-notes can list them under its row. */
+/* Notes: a click folds a note's pages open under its row. */
 .wg-note { display: flex; flex-direction: column; }
-.wg-note-toggle {
+/* Opens the note in its own window. */
+.wg-note-open {
   flex-shrink: 0;
-  width: 24px;
-  height: 24px;
-  margin: -4px -4px -4px 0;
+  width: 28px;
+  height: 28px;
+  margin: -6px -6px -6px 0;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
-  border: none;
-  border-radius: 6px;
+  border: 1px solid transparent;
+  border-radius: 7px;
   background: none;
   color: var(--text-muted);
   cursor: pointer;
-  transition: transform 0.18s ease, color 0.15s, background 0.15s;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
 }
-.wg-note-toggle:hover { color: var(--text-primary); background: rgba(255, 255, 255, 0.07); }
-.wg-note-toggle.open { transform: rotate(90deg); }
+.wg-note-open:hover { color: var(--text-primary); background: var(--bg-elevated); border-color: var(--border-hover); }
+.wg-note-open:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.wg-note-fold {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.wg-note-fold.open { grid-template-rows: 1fr; }
+.wg-note-fold > div { min-height: 0; overflow: hidden; }
 .wg-note-subs {
   display: flex;
   flex-direction: column;
@@ -214,9 +239,7 @@
   margin: 4px 0 2px 14px;
   padding-left: 10px;
   border-left: 1px solid var(--border);
-  animation: wg-note-subs-in 0.18s ease-out;
 }
-@keyframes wg-note-subs-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 .wg-note-sub {
   display: flex;
   align-items: baseline;
@@ -250,8 +273,4 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-@media (prefers-reduced-motion: reduce) {
-  .wg-note-subs { animation: none; }
-  .wg-note-toggle { transition: none; }
 }

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, Fragment } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, Fragment } from 'react';
 import {
   WIDGETS, MAX_COLUMNS, DASH_LAYOUT_EVENT,
   loadLayout, saveLayout, place, remove, prune, defaultSlot, placedIds,
@@ -27,6 +27,46 @@ function readStored(key, fallback) {
     const v = JSON.parse(localStorage.getItem(key));
     return v && typeof v === 'object' ? { ...fallback, ...v } : fallback;
   } catch { return fallback; }
+}
+
+// Opening and closing a panel, as one movement. The pane's height runs from
+// wherever it is right now to where it will settle, and the panel's body keeps
+// its full open height throughout, pinned to the bottom of the shrinking
+// space — so it slides up under the header as a whole (or down out of it)
+// instead of being squeezed and re-laid out on the way. Starting from the
+// pane's live height is what lets a second click mid-way turn it round
+// smoothly.
+const PANE_MS = 420;
+const PANE_EASE = 'cubic-bezier(0.4, 0, 0.2, 1)';
+
+function clearPaneAnim(el) {
+  const s = el.__paneAnim;
+  if (!s) return;
+  el.__paneAnim = null;
+  s.anim.cancel();
+  if (s.panel) s.panel.style.removeProperty('flex');
+  if (s.body) ['display', 'position', 'flex', 'min-height', 'overflow'].forEach(p => s.body.style.removeProperty(p));
+  if (s.item) ['position', 'left', 'right', 'bottom', 'height'].forEach(p => s.item.style.removeProperty(p));
+}
+
+function animatePane(el, from, contentH, closing) {
+  clearPaneAnim(el);
+  const panel = el.firstElementChild;
+  const body = el.querySelector('.dash-collapsible');
+  const item = body && body.firstElementChild;
+  const to = el.getBoundingClientRect().height;
+  // The body's open height: as it was before closing, or as it now is open.
+  const H = closing ? contentH : (item ? item.getBoundingClientRect().height : 0);
+  if (!panel || !body || !item || Math.abs(to - from) < 1) return;
+
+  panel.style.flex = '1 1 0px';
+  Object.assign(body.style, { display: 'block', position: 'relative', flex: '1 1 0px', minHeight: '0', overflow: 'hidden' });
+  Object.assign(item.style, { position: 'absolute', left: '0', right: '0', bottom: '0', height: `${H}px` });
+
+  const frame = (h) => ({ flexBasis: `${h}px`, flexGrow: 0, flexShrink: 0, height: `${h}px`, minHeight: '0px' });
+  const anim = el.animate([frame(from), frame(to)], { duration: PANE_MS, easing: PANE_EASE });
+  el.__paneAnim = { anim, panel, body, item, H };
+  anim.onfinish = () => { if (el.__paneAnim?.anim === anim) clearPaneAnim(el); };
 }
 
 export default function DashColumns({
@@ -69,7 +109,31 @@ export default function DashColumns({
   }, [editing, layout, commit, resetColWidths]);
 
   const storeObj = (key, value, setter) => { localStorage.setItem(key, JSON.stringify(value)); setter(value); };
-  const toggleCollapsed = (id) => storeObj('dashPanelCollapsed', { ...collapsed, [id]: !collapsed[id] }, setCollapsed);
+  // Measured just before a panel opens or closes, animated once React has laid
+  // out the new state (see animatePane above).
+  const paneJobs = useRef({});
+  const toggleCollapsed = (id) => {
+    const pane = document.querySelector(`.dash-col-pane[data-widget="${id}"]`);
+    if (pane) {
+      const item = pane.querySelector('.dash-collapsible > *');
+      paneJobs.current[id] = {
+        from: pane.getBoundingClientRect().height,
+        // Mid-animation the body is already held at its open height.
+        contentH: pane.__paneAnim ? pane.__paneAnim.H : (item ? item.getBoundingClientRect().height : 0),
+      };
+    }
+    storeObj('dashPanelCollapsed', { ...collapsed, [id]: !collapsed[id] }, setCollapsed);
+  };
+  useLayoutEffect(() => {
+    const jobs = paneJobs.current;
+    paneJobs.current = {};
+    Object.entries(jobs).forEach(([id, job]) => {
+      const pane = document.querySelector(`.dash-col-pane[data-widget="${id}"]`);
+      if (!pane) return;
+      clearPaneAnim(pane);
+      animatePane(pane, job.from, job.contentH, !!collapsed[id]);
+    });
+  }, [collapsed]);
   const isCollapsed = (id) => !!collapsed[id];
 
   const membersOf = (col) => (layout.columns[col] || []).filter(isAvailable);

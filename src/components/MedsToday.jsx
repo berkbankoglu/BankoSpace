@@ -145,24 +145,23 @@ export default function MedsToday({ collapsed, onToggle, onOpenMeds }) {
 
   return (
     <div className={`meds-panel${collapsed ? ' collapsed' : ''}`}>
-      <div className="meds-header">
-        <button className="meds-collapse" onClick={onToggle} title={collapsed ? 'Expand' : 'Collapse'}>
-          {collapsed ? '▸' : '▾'}
-        </button>
+      <div className="meds-header" onClick={onToggle} title={collapsed ? 'Expand' : 'Collapse'}>
+        <span className={`meds-chevron${collapsed ? ' collapsed' : ''}`}>▾</span>
         <span className="meds-title">MEDS</span>
         <button
           className="meds-day"
-          onClick={() => setViewDate(today)}
+          onClick={(e) => { e.stopPropagation(); setViewDate(today); }}
           disabled={viewDate === today}
           title={viewDate === today ? 'Showing today' : 'Back to today'}
         >{dayLabel}</button>
         {progress.total > 0 && (
           <span className="meds-count">{progress.taken}/{progress.total}</span>
         )}
-        <button className="meds-open" onClick={onOpenMeds} title="Manage medications">↗</button>
+        <button className="meds-open" onClick={(e) => { e.stopPropagation(); onOpenMeds(); }} title="Manage medications">↗</button>
       </div>
 
-      {!collapsed && (
+      <div className={`dash-collapsible${collapsed ? ' collapsed' : ''}`}>
+        <div className="meds-collapsible-inner">
         <div className="meds-body">
           {/* A week behind you, one square a day. Click one to see it. */}
           <div className="meds-history">
@@ -254,7 +253,8 @@ export default function MedsToday({ collapsed, onToggle, onOpenMeds }) {
             ))
           )}
         </div>
-      )}
+        </div>
+      </div>
     </div>
   );
 }

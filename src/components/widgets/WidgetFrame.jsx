@@ -7,15 +7,22 @@ import './Widgets.css';
 export default function WidgetFrame({ title, badge, collapsed, onToggle, onOpen, openTitle, children, className = '' }) {
   return (
     <div className={`wg-panel${collapsed ? ' collapsed' : ''} ${className}`}>
-      <div className="wg-header">
-        <button className="wg-collapse" onClick={onToggle} title={collapsed ? 'Expand' : 'Collapse'}>
-          {collapsed ? '▸' : '▾'}
-        </button>
+      {/* The whole strip opens and closes it, as Today's does. */}
+      <div className="wg-header" onClick={onToggle} title={collapsed ? 'Expand' : 'Collapse'}>
+        <span className={`wg-chevron${collapsed ? ' collapsed' : ''}`}>▾</span>
         <span className="wg-title">{title}</span>
         {badge != null && badge !== '' && <span className="wg-badge">{badge}</span>}
-        {onOpen && <button className="wg-open" onClick={onOpen} title={openTitle || 'Open'}>↗</button>}
+        {onOpen && (
+          <button className="wg-open" onClick={(e) => { e.stopPropagation(); onOpen(); }} title={openTitle || 'Open'}>↗</button>
+        )}
       </div>
-      {!collapsed && <div className="wg-body">{children}</div>}
+      {/* Always mounted, folded away when closed — the same open/close as
+          Today and Payments (.dash-collapsible), rather than a snap. */}
+      <div className={`dash-collapsible${collapsed ? ' collapsed' : ''}`}>
+        <div className="wg-collapsible-inner">
+          <div className="wg-body">{children}</div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -9,7 +9,6 @@ const { notesToShow, default: NotesWidget } = await import('../src/components/wi
 const { streakOf, default: HabitsWidget } = await import('../src/components/widgets/HabitsWidget.jsx');
 const { visibleItems, default: ChecklistWidget } = await import('../src/components/widgets/ChecklistWidget.jsx');
 const { fitnessToday, default: FitnessWidget } = await import('../src/components/widgets/FitnessWidget.jsx');
-const { studySummary, default: StudyWidget } = await import('../src/components/widgets/StudyWidget.jsx');
 
 console.log('\n--- Notes ---');
 const notes = [
@@ -61,20 +60,8 @@ ok('shows eaten and left', h.includes('1050 kcal eaten') && h.includes('950 left
 store.ft_goal_kcal = '1000';
 ok('and says when over', html(React.createElement(FitnessWidget, { onToggle: noop, onOpenFitness: noop })).includes('50 over'));
 
-console.log('\n--- Study ---');
-reset();
-store.flashCards = JSON.stringify([{ known: true }, { known: false }, { known: null }, {}]);
-store.kana_best_score = JSON.stringify({ score: 42 });
-store.kana_stats = JSON.stringify({ a: {}, i: {} });
-const st = studySummary();
-ok('cards not marked known are to review', st.toReview === 3 && st.known === 1);
-ok('kana best streak', st.bestStreak === 42 && st.practised === 2);
-h = html(React.createElement(StudyWidget, { onToggle: noop, onOpenStudy: noop }));
-ok('both ways into practice are offered', h.includes('Practise cards') && h.includes('Practise kana'));
-reset();
-ok('nothing studied: one way in', html(React.createElement(StudyWidget, { onToggle: noop, onOpenStudy: noop })).includes('Start with kana'));
-
 console.log('\n--- the library knows them ---');
 const { WIDGETS } = await import('../src/utils/dashLayout.js');
-ok('eleven widgets in all', WIDGETS.length === 11 && ['notes','habits','checklist','study','fitness'].every(id => WIDGETS.some(w => w.id === id)));
+ok('ten widgets in all', WIDGETS.length === 10 && ['notes','habits','checklist','fitness'].every(id => WIDGETS.some(w => w.id === id)));
+ok('Study left with Banko Learn', !WIDGETS.some(w => w.id === 'study'));
 done();

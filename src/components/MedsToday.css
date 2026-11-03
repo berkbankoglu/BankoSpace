@@ -20,9 +20,26 @@
   padding: 8px 10px 8px 14px;
   flex: 0 0 auto;
   border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+}
+.meds-panel.collapsed .meds-header { border-bottom: none; }
+.meds-panel.collapsed { height: auto; flex: 0 0 auto; }
+
+/* Same arrow as Today's (.dp-chevron). */
+.meds-chevron {
+  font-size: 11px;
+  color: #888;
+  transition: transform 0.15s ease;
+}
+.meds-chevron.collapsed { transform: rotate(-90deg); }
+
+.meds-collapsible-inner {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
-.meds-collapse,
 .meds-open {
   width: 18px;
   height: 18px;
@@ -35,7 +52,6 @@
   border-radius: 4px;
   cursor: pointer;
 }
-.meds-collapse:hover,
 .meds-open:hover { background: var(--bg-hover); color: var(--text-primary); }
 .meds-open { margin-left: auto; }
 
@@ -267,17 +283,25 @@
 }
 .meds-group-count { font-variant-numeric: tabular-nums; letter-spacing: 0; }
 
-/* Empty stomach / With food, beside the name. Either shows nothing. */
+/* Empty stomach / With food, beside the name. Either shows nothing. Quiet
+   on purpose: the row's own colour already says which medication it is, so
+   this reads as a note, not a second accent. It steps aside while the row's
+   Add note / Skip buttons are showing in the same place. */
 .meds-food {
   flex: 0 0 auto;
   padding: 2px 7px;
   font-size: 10.5px;
-  font-weight: 600;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
   border-radius: 6px;
   white-space: nowrap;
+  transition: opacity 0.12s ease;
 }
-.meds-food-empty { color: #e3b341; background: rgba(227, 179, 65, 0.12); }
-.meds-food-full  { color: #56d364; background: rgba(86, 211, 100, 0.12); }
+.meds-item:hover .meds-food,
+.meds-item:has(.meds-actions:focus-within) .meds-food { opacity: 0; }
+@media (hover: none) { .meds-item:hover .meds-food { opacity: 1; } }
 
 /* Reordering: the row being moved stays as a faint placeholder, and a line
    shows where it will land. */

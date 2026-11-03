@@ -5,7 +5,6 @@ const P = {
   dashboard: <><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></>,
   checklists: <><path d="M4 6.5l1.8 1.8L9 5" /><path d="M4 13.5l1.8 1.8L9 12" /><path d="M12.5 7h7.5M12.5 14h7.5M4.5 19.5h15.5" /></>,
   habits: <><path d="M20 12a8 8 0 1 1-2.34-5.66" /><path d="M20 4.5v4h-4" /></>,
-  japanesekana: <><path d="M4 5.5h9M8.5 3.5v2M6 5.5c0 5 2.5 8 6 9.5M11 5.5c-.5 4.5-3 8-6.5 10" /><path d="M13 20.5l3.5-9 3.5 9M14.3 17.5h4.4" /></>,
   fitness: <><path d="M6.5 7v10M17.5 7v10M3.5 9.5v5M20.5 9.5v5M6.5 12h11" /></>,
   planner: <><rect x="3.5" y="5" width="17" height="15.5" rx="2" /><path d="M3.5 10h17M8 3v4M16 3v4" /></>,
   review: <><path d="M12 3.8l2.5 5.1 5.6.8-4.05 3.95.95 5.6L12 16.6l-5 2.65.95-5.6L3.9 9.7l5.6-.8z" /></>,

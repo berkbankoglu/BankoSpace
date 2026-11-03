@@ -23,13 +23,10 @@ export default defineConfig({
       // because those APIs are only granted to the main window).
       workbox: {
         navigateFallbackDenylist: [
-          /^\/kana\.html$/,
           /^\/note\.html$/,
           /^\/confirmed\.html$/,
         ],
       },
-      // kana.html is a Tauri-only popup window entry — never opened directly
-      // on the web, so it shouldn't be part of the installable app shell.
       includeManifestIcons: false,
       manifest: {
         name: 'BankoSpace',
@@ -54,7 +51,6 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),
-kana: resolve(__dirname, 'kana.html'),
         note: resolve(__dirname, 'note.html'),
       }
     }

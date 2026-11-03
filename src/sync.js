@@ -217,8 +217,7 @@ export function installSyncLayer() {
   window.addEventListener('beforeunload', flushAll);
   window.addEventListener('note-media-sync-status', emitStatus);
 
-  // Another window of this app (a note opened in its own window, the kana
-  // popup) shares this storage but has no sync layer of its own. Its writes
+  // Another window of this app (a note opened in its own window) shares this storage but has no sync layer of its own. Its writes
   // reach this window only as a storage event: treat them as this device's
   // edits, and let the section showing that key re-read it. Synthetic events
   // this window raises itself carry no storageArea and are left alone.
@@ -324,8 +323,6 @@ const LIVE_EVENTS = {
   meds_log_v1: 'meds-changed',
   meds_skip_v1: 'meds-changed',
   meds_order_v1: 'meds-changed',
-  flashCards: 'flashcards-updated',
-  flashCardGroups: 'flashcards-updated',
   freeformTabs: 'storage-updated',
   payments_v2: 'storage',
   betaFeatures_v1: 'beta-features-changed',

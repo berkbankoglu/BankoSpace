@@ -12,12 +12,6 @@ const LABS_VERSION = [4, 6, 0];
 // makes the app read as something other than what it is.
 export const BETA_FEATURES = [
   {
-    id: 'japanesekana',
-    label: 'Language Learn',
-    sidebarId: 'japanesekana',
-    description: 'Japanese kana guide, practice drills, a vocabulary list and flash cards.',
-  },
-  {
     id: 'review',
     label: 'Review',
     sidebarId: 'review',

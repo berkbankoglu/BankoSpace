@@ -4,10 +4,11 @@ import NoteQuickEdit from './NoteQuickEdit';
 import { isTauri } from '../../platform';
 import { openNoteWindow } from '../../utils/noteWindow';
 
-// Pinned notes first, then the ones touched most recently. A row opens that
-// note to write in — its own window in the desktop app, a card over the page
-// on the web; ↗ opens Notes as it was. A note with sub-notes has a toggle that
-// lists them under it, each opening on its own page.
+// Pinned notes first, then the ones touched most recently. A click on a row
+// folds its pages open beneath it — the main page and every sub-note, each
+// opening on its own page. The button at the row's right opens the note
+// itself: its own window in the desktop app, a card over the page on the web.
+// ↗ in the header opens Notes as it was.
 const read = () => { try { return JSON.parse(localStorage.getItem('notes')) || []; } catch { return []; } };
 const plain = (html) => String(html || '')
   .replace(/<br\s*\/?>|<\/(p|div|li|h\d)>/gi, ' ')
@@ -83,7 +84,7 @@ export default function NotesWidget({ collapsed, onToggle, onOpenNotes }) {
         <WidgetEmpty action="Write a note" onAction={() => onOpenNotes()}>No notes yet.</WidgetEmpty>
       ) : shown.map(n => {
         const subs = n.subNotes || [];
-        const isOpen = subs.length > 0 && !!open[n.id];
+        const isOpen = !!open[n.id];
         return (
           <div key={n.id} className="wg-note">
             <div
@@ -91,9 +92,13 @@ export default function NotesWidget({ collapsed, onToggle, onOpenNotes }) {
               tabIndex={0}
               className="wg-row"
               style={{ '--wg-accent': n.color || 'var(--border)' }}
-              onClick={(e) => openNote(n, null, e.currentTarget)}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openNote(n, null, e.currentTarget); } }}
-              title={n.title || 'Untitled'}
+              onClick={() => toggle(n.id)}
+              onKeyDown={(e) => {
+                if (e.target !== e.currentTarget) return;
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(n.id); }
+              }}
+              title={isOpen ? 'Hide pages' : 'Show pages'}
+              aria-expanded={isOpen}
             >
               <div className="wg-row-main">
                 <span className="wg-row-name">{n.title || 'Untitled'}</span>
@@ -102,32 +107,42 @@ export default function NotesWidget({ collapsed, onToggle, onOpenNotes }) {
                 </span>
               </div>
               <span className="wg-row-meta">{n.pinned ? 'Pinned' : when(n.updatedAt)}</span>
-              {subs.length > 0 && (
-                <button
-                  className={`wg-note-toggle${isOpen ? ' open' : ''}`}
-                  onClick={(e) => { e.stopPropagation(); toggle(n.id); }}
-                  title={isOpen ? 'Hide pages' : `Show ${pages(subs.length)}`}
-                  aria-expanded={isOpen}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9.5 6.5l5.5 5.5-5.5 5.5" /></svg>
-                </button>
-              )}
+              <button
+                className="wg-note-open"
+                onClick={(e) => { e.stopPropagation(); openNote(n, null, e.currentTarget.closest('.wg-row')); }}
+                title="Open in a window"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4" y="7" width="13" height="13" rx="2" /><path d="M10 4h10v10M20 4l-8 8" /></svg>
+              </button>
             </div>
-            {isOpen && (
-              <div className="wg-note-subs">
-                {subs.map(sn => (
+            {/* Folds open with the same grid-row movement as the panels. */}
+            <div className={`wg-note-fold${isOpen ? ' open' : ''}`}>
+              <div>
+                <div className="wg-note-subs">
                   <button
-                    key={sn.id}
                     className="wg-note-sub"
-                    onClick={(e) => openNote(n, sn.id, e.currentTarget)}
-                    title={sn.title || 'Sub Note'}
+                    tabIndex={isOpen ? 0 : -1}
+                    onClick={(e) => openNote(n, null, e.currentTarget)}
+                    title="Open the main page"
                   >
-                    <span className="wg-note-sub-name">{sn.title || 'Sub Note'}</span>
-                    <span className="wg-note-sub-text">{plain(sn.content).slice(0, 80)}</span>
+                    <span className="wg-note-sub-name">Main page</span>
+                    <span className="wg-note-sub-text">{plain(n.content).slice(0, 80) || 'Empty'}</span>
                   </button>
-                ))}
+                  {subs.map(sn => (
+                    <button
+                      key={sn.id}
+                      className="wg-note-sub"
+                      tabIndex={isOpen ? 0 : -1}
+                      onClick={(e) => openNote(n, sn.id, e.currentTarget)}
+                      title={sn.title || 'Sub Note'}
+                    >
+                      <span className="wg-note-sub-name">{sn.title || 'Sub Note'}</span>
+                      <span className="wg-note-sub-text">{plain(sn.content).slice(0, 80)}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
-            )}
+            </div>
           </div>
         );
       })}

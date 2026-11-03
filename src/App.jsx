@@ -8,10 +8,8 @@ import { supabase, pushDirtyToSupabase } from './supabase';
 import { startupSync, settleAfterMount, startPolling, syncNow, flushAll, cancelPending } from './sync';
 import Login from './components/Login';
 import CategoryColumn from './components/CategoryColumn';
-import FlashCards from './components/FlashCards';
 import DailyChecklist from './components/DailyChecklist';
 import FitnessTracker from './components/FitnessTracker';
-import JapaneseKana from './components/JapaneseKana';
 import SubscriptionTracker, { SubscriptionWidget, SubscriptionPopup } from './components/SubscriptionTracker';
 import Calendar from './components/Calendar';
 import MedsToday from './components/MedsToday';
@@ -20,7 +18,6 @@ import DashColumns from './components/DashColumns';
 import SyncStatus from './components/SyncStatus';
 import NotesWidget from './components/widgets/NotesWidget';
 import HabitsWidget from './components/widgets/HabitsWidget';
-import StudyWidget from './components/widgets/StudyWidget';
 import FitnessWidget from './components/widgets/FitnessWidget';
 import ChecklistWidget from './components/widgets/ChecklistWidget';
 import SectionPicker from './components/SectionPicker';
@@ -29,7 +26,7 @@ import { WIDGETS } from './utils/dashLayout';
 import { BETA_FEATURES, BETA_EVENT, getBetaFlags, setBetaFlag } from './utils/betaFeatures';
 import { PROFILE_EVENT, AVATAR_COLORS, getProfile, setProfile, displayName, initials, avatarColor, validateUsername, accountSubtitle } from './utils/profile';
 import { ACCOUNTS_EVENT, MAX_ACCOUNTS, listAccounts, rememberAccount, forgetAccount, clearAccountData } from './utils/accounts';
-import { getApiKey, setApiKey, forgetApiKey, claimLegacyApiKey } from './utils/apiKey';
+import { forgetApiKey, claimLegacyApiKey } from './utils/apiKey';
 import ReviewTracker from './components/ReviewTracker';
 import { syncHabitsFromPlanner } from './utils/habitPlannerSync';
 import { useUndoScope, useUndoHotkeys } from './utils/undoHistory';
@@ -276,7 +273,7 @@ function TaskContributionGraph({ todos, contributionLog }) {
 }
 import { playClickSound, playCompleteSound, playUncompleteSound, playDeleteSound, playNavSound, playAddSound, setVolume, getVolume } from './utils/sounds';
 
-const APP_VERSION = '4.10.1';
+const APP_VERSION = '4.11.0';
 // The sync layer reports which build each device runs; it lives outside React.
 window.__APP_VERSION = APP_VERSION;
 const MIN_COL_PX = 220;
@@ -533,16 +530,12 @@ function App({ session, onLogout }) {
   // Fitness'ın sol sidebar altındaki alt sekmesi: 'overview' | 'workout'
   const [fitnessView, setFitnessView] = useState(() => localStorage.getItem('ft_view') || 'overview');
   useEffect(() => { localStorage.setItem('ft_view', fitnessView); }, [fitnessView]);
-  // Language Learn'ın sol sidebar altındaki alt sekmesi: 'guide' | 'practice' | 'vocabulary' | 'flashcards'
-  const [kanaView, setKanaView] = useState(() => localStorage.getItem('kana_ui_view') || 'guide');
-  useEffect(() => { localStorage.setItem('kana_ui_view', kanaView); }, [kanaView]);
 
   const [sidebarItems, setSidebarItems] = useState(() => {
     const defaults = [
       { id: 'dashboard',    label: 'Dashboard',      view: 'dashboard',    hidden: false, icon: '⊞' },
       { id: 'checklists',   label: 'Checklists',      view: 'checklists',   hidden: false, icon: '✓' },
       { id: 'habits',       label: 'Habits',           view: 'habits',       hidden: false, icon: '⟳' },
-      { id: 'japanesekana', label: 'Language Learn',  view: 'japanesekana', hidden: false, icon: 'あ' },
       { id: 'fitness',      label: 'Fitness',          view: 'fitness',      hidden: false, icon: '◈' },
       { id: 'planner',      label: 'Calendar',         view: 'planner',      hidden: false, icon: '≡' },
       { id: 'review',       label: 'Review',           view: 'review',       hidden: false, icon: '★' },
@@ -798,10 +791,6 @@ function App({ session, onLogout }) {
   });
 
   // Collapse states for sections
-  const [flashCardsCollapsed, setFlashCardsCollapsed] = useState(() => {
-    const saved = localStorage.getItem('flashCardsCollapsed');
-    return saved === 'true';
-  });
   const [remindersCollapsed, setRemindersCollapsed] = useState(() => {
     const saved = localStorage.getItem('remindersCollapsed');
     return saved === 'true';
@@ -897,7 +886,7 @@ const [dailyChecklistCollapsed, setDailyChecklistCollapsed] = useState(() => {
 
   useEffect(() => startPolling(rehydrate), [rehydrate]);
 
-  // Sections with pages under them (Fitness, Language Learn) fold like a tree.
+  // Sections with pages under them (Fitness) fold like a tree.
   // Kept per device: it is how this window is arranged, not data.
   const [openGroups, setOpenGroups] = useState(() => {
     try { return JSON.parse(localStorage.getItem('sidebarOpen_v1')) || {}; } catch { return {}; }
@@ -910,11 +899,6 @@ const [dailyChecklistCollapsed, setDailyChecklistCollapsed] = useState(() => {
 
   const openSidebarItem = useCallback((item) => {
     playNavSound();
-    if (item.id === 'japanesekana') {
-      setKanaView('guide');
-      setActiveView('japanesekana');
-      return;
-    }
     if (item.id === 'fitness') setFitnessView('overview');
     setActiveView(item.view);
   }, []);
@@ -1123,10 +1107,6 @@ const [dailyChecklistCollapsed, setDailyChecklistCollapsed] = useState(() => {
   }, [theme, colorTheme]);
 
   // Save collapse states to localStorage
-
-  useEffect(() => {
-    localStorage.setItem('flashCardsCollapsed', flashCardsCollapsed);
-  }, [flashCardsCollapsed]);
 
   useEffect(() => {
     localStorage.setItem('remindersCollapsed', remindersCollapsed);
@@ -1734,7 +1714,6 @@ useEffect(() => {
       'The following will be deleted:\n' +
       '• All your todo lists\n' +
       '• References and notes\n' +
-      '• Flash cards\n' +
       '• Goals and reminders\n' +
       '• Achievements and heatmap\n\n' +
       'Type "YES" to continue:');
@@ -1917,9 +1896,6 @@ useEffect(() => {
                     <button className={`settings-modal-nav-item ${settingsTab === 'account' ? 'active' : ''}`} onClick={() => setSettingsTab('account')}>
                       <span className="settings-nav-icon">👤</span> Profile
                     </button>
-                    <button className={`settings-modal-nav-item ${settingsTab === 'ai' ? 'active' : ''}`} onClick={() => setSettingsTab('ai')}>
-                      <span className="settings-nav-icon">🤖</span> AI
-                    </button>
                     <button className={`settings-modal-nav-item ${settingsTab === 'sync' ? 'active' : ''}`} onClick={() => setSettingsTab('sync')}>
                       <span className="settings-nav-icon">☁</span> Cloud Sync
                     </button>
@@ -2061,23 +2037,6 @@ useEffect(() => {
                       ) : (
                         <div className="settings-empty-state">Not signed in</div>
                       )}
-                    </div>
-                  )}
-
-                  {settingsTab === 'ai' && (
-                    <div className="settings-modal-section">
-                      <h2 className="settings-modal-title">AI</h2>
-                      <div className="settings-field">
-                        <label className="settings-field-label">Anthropic API Key</label>
-                        <div className="settings-field-desc">Enter your API key to use Claude AI features. It belongs to this account only: other accounts on this device never see or use it, and it is never synced or exported.</div>
-                        <input
-                          type="password"
-                          className="settings-field-input"
-                          defaultValue={getApiKey()}
-                          placeholder="sk-ant-..."
-                          onBlur={e => setApiKey(e.target.value)}
-                        />
-                      </div>
                     </div>
                   )}
 
@@ -2399,17 +2358,14 @@ useEffect(() => {
                   fitness: [
                     ['overview', 'Nutrition'], ['charts', 'Charts'], ['workout', 'Workout'],
                   ],
-                  japanesekana: [
-                    ['guide', 'Guide'], ['practice', 'Practice'], ['vocabulary', 'Vocabulary'], ['flashcards', 'Flash Cards'],
-                  ],
                 };
                 return shown.map((item, index) => {
                   const subs = SUBPAGES[item.id];
                   const open = subs && (openGroups[item.id] ?? activeView === item.view);
-                  const subView = item.id === 'fitness' ? fitnessView : kanaView;
+                  const subView = fitnessView;
                   const openSub = (v) => {
                     playNavSound();
-                    if (item.id === 'fitness') setFitnessView(v); else setKanaView(v);
+                    setFitnessView(v);
                     setActiveView(item.view);
                   };
                   return (
@@ -2606,12 +2562,6 @@ useEffect(() => {
           )}
 
 
-          {/* Language Learn full page */}
-          {activeView === 'japanesekana' && (
-            <ViewErrorBoundary>
-            <JapaneseKana view={kanaView} />
-            </ViewErrorBoundary>
-          )}
 
 
 
@@ -2696,15 +2646,6 @@ useEffect(() => {
                         collapsed={collapsed}
                         onToggle={onToggle}
                         onOpenChecklists={() => setActiveView('checklists')}
-                      />
-                    );
-                  }
-                  if (id === 'study') {
-                    return (
-                      <StudyWidget
-                        collapsed={collapsed}
-                        onToggle={onToggle}
-                        onOpenStudy={(tab) => { setKanaView(tab); setActiveView('japanesekana'); }}
                       />
                     );
                   }

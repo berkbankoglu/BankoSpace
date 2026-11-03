@@ -33,17 +33,20 @@ ok('meds -> meds-changed', fired.includes('meds-changed:meds_v1'));
 ok('calendar -> planner-data-changed with its key', fired.includes('planner-data-changed:planner_blocks'));
 ok('no reload for any of them', reloads.n === 0);
 
-console.log('\n--- kana practice data changed elsewhere, mid-practice here ---');
+console.log('\n--- study data belongs to Banko Learn now ---');
+// Banko Learn writes these rows on the same account. BankoSpace neither takes
+// them in nor sends them, whatever this device still holds.
 cloudSet('kana_selected_rows', ['a', 'ka']);
 cloudSet('kana_stats', { a: 2 });
 await sleep(500);
-ok('it is stored for the next time practice opens', JSON.parse(localStorage.getItem('kana_selected_rows')).includes('ka'));
-await sleep(4000);
-ok('the window is NOT reloaded out from under the practice', reloads.n === 0);
-const before = cloud().calls.filter(c => c[0] === 'upsert' && c[1].key === 'kana_stats').length;
+ok('a study row changed elsewhere is not taken in', localStorage.getItem('kana_selected_rows') === null && JSON.parse(localStorage.getItem('kana_stats')).a === 1);
+const before = cloud().calls.filter(c => (c[0] === 'upsert' || c[0] === 'delete') && String(c[1].key).startsWith('kana_')).length;
 localStorage.setItem('kana_stats', JSON.stringify({ a: 1, answered: true }));
+localStorage.removeItem('kana_selected_rows');
 await sleep(900);
-ok('the next answer here is saved and sent', cloud().calls.filter(c => c[0] === 'upsert' && c[1].key === 'kana_stats').length === before + 1);
+ok('nor is a study key written here ever sent', cloud().calls.filter(c => (c[0] === 'upsert' || c[0] === 'delete') && String(c[1].key).startsWith('kana_')).length === before);
+ok("and the cloud keeps Banko Learn's copy", cloud().rows.find(r => r.key === 'kana_stats').value.a === 2);
+ok('the window is never reloaded', reloads.n === 0);
 stop();
 
 console.log('\n--- notes merge ---');

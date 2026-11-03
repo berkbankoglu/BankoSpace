@@ -57,7 +57,12 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: { persistSession: true, autoRefreshToken: true },
 });
 
-// All localStorage keys to sync
+// All localStorage keys to sync.
+//
+// The Japanese study keys (kana_*, flashCards, flashCardGroups) are not here:
+// that section is its own app now, Banko Learn, which syncs them on the same
+// account. A row missing from this list is never read or written from here, so
+// its data stays in the cloud for Banko Learn.
 export const SYNC_KEYS = [
   'todos',
   'categoryNames',
@@ -67,8 +72,6 @@ export const SYNC_KEYS = [
   'habitTracker_habits',
   'habitTracker_log',
   'habitTracker_autolog',
-  'flashCards',
-  'flashCardGroups',
   'notes',
   'freeformTabs',
   'quickNotes',
@@ -80,20 +83,9 @@ export const SYNC_KEYS = [
   'loginHeatmap',
   'bs_contribution_log',
   'payments_v2',
-  'kana_learned_words',
-  'kana_selected_rows',
-  'kana_custom_words',
-  'kana_custom_folders',
-  'kana_selected_vocab',
-  'kana_stats',
-  'kana_prefs',
-  'kana_best_score',
-  'kana_meaning_overrides',
   'reviews_v1',
   'research_watchlist',
   'research_checked',
-  'kana_cell_colors',
-  'kana_char_notes',
   'ft_profile',
   'ft_goal',
   'ft_weight_log',
